@@ -222,7 +222,7 @@ int main(void) {
 	return EXIT_SUCCESS;
 }
 
-编译:test.c，然后运行。注意：加上aet所在的头文件和库路径。
+编译:test.c，然后运行。注意：加上aet所在的头文件和库路径。下面的gcc一定是指到你新安装的gcc,而不是系统自带的。 
 gcc -L/home/aet/temp/libaet/libaet1.0.0/bin -laet1.0.0 -I/home/aet/temp/libaet/libaet1.0.0 -o test.c
 
 

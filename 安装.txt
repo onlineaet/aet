@@ -191,11 +191,11 @@ int c_disable_extension_diagnostics (void);
  make install
 9.如果成功，则说明可以使用gcc来编译使用aet语言的基础程序库了。
 
-编译aet基础库 libaet1.0.9.so
-1.进入/home/aet/temp/libaet,并在当前目录解压 aet1.0.zip。
+二、编译aet基础库 libaet1.0.0.so
+1.进入/home/aet/temp/libaet,并在当前目录解压 aet-master.zip。
 删除用不到的gcc10.4.0目录。
 2.进入/home/aet/temp/libaet/libaet1.0.0目录，编辑app.mk文件的如下内容。
-PC_COMPILE_ALL       = /home/sns/gcc-10.4.0/bin/
+PC_COMPILE_ALL       = /home/aet/gcc-10.4.0/bin/
 这一行指定的gcc所在路径改为你刚刚安装的aet gcc路径。如:/home/aet/install/gcc-10.4.0/
 3.运行以下命令:make TARGET=lib.
 4.生成的动态库存在/home/aet/temp/libaet/libaet1.0.0/bin目录。文件名是:libaet1.0.0.so

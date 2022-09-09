@@ -1,0 +1,228 @@
+安装:
+分两部分：
+1.编译aet编译器。2.用aet编译器编译aet基础库
+安装环境 ubuntu 20.04
+
+一、编译aet
+1.从https://mirrors.ustc.edu.cn/gnu/gcc/gcc-10.4.0/ 下载gcc10.4.0
+2.解压到指定目录，例如：/home/aet/temp/gcc10.4.0
+3.在/home/aet/temp/gcc10.4.0下编译gcc,下面几行是编译gcc的命令。
+ $ cd /home/aet/temp/gcc10.4.0
+ $ mkdir build
+ $ cd build
+  ../configure --prefix=/home/aet/install/gcc-10.4.0/ --enable-checking=release --enable-languages=c,c++ --disable-multilib 
+  --with-gmp=/usr/local/gmp-6.2.0 --with-mpfr=/usr/local/mpfr-4.1.0 --with-mpc=/usr/local/mpc-1.2.1
+ make
+ make install
+ 如果成功编译并安装gcc，可以继续下面的步骤。 
+4.进入https://gitee.com/originrobot/aet.git网站，在"克隆/下载"处下载aet-master.zip
+5.复制aet-master.zip到/home/aet/temp/gcc10.4.0
+6.进入/home/aet/temp/gcc10.4.0，并在当前目录解压 aet-master.zip。
+删除用不到的libaet目录。
+aet1.0.0.zip中的文件会覆盖gcc10.4.0下面的文件,具体内容如下:
+
+(1)libcpp/directives.c
+在2623行插入
+ }else if(buffer->dir.name && strcmp(buffer->dir.name,"aet")==0){ //zclei 为了恢复token在文件的位置。看restorelocation.c
+        //fprintf(stderr,"_cpp_pop_buffer  回调aet --- buffer:%p notes:%p 上一个:%p\n",buffer,buffer->notes,pfile->buffer);
+        buffer->dir.construct("",&buffer->dir);
+        if(to_free)
+            free ((void *)to_free);
+
+(2)libcpp/files.c
+ 在725行把 buf = XNEWVEC (uchar, size + 16);改成buf = XNEWVEC (uchar, size + 64);
+
+(3)gcc/configure
+在32397行  for lang in $subdirs c-family common analyzer 加入"aet"。变成  for lang in $subdirs c-family common analyzer aet 
+
+(4)Makefile.in
+在1021行
+ALL_CXXFLAGS = $(T_CFLAGS) $(CFLAGS-$@) $(CXXFLAGS) $(INTERNAL_CFLAGS) 
+的后面加入 "-fpermissive\" 变成ALL_CXXFLAGS = $(T_CFLAGS) $(CFLAGS-$@) $(CXXFLAGS) $(INTERNAL_CFLAGS) -fpermissive
+
+在1210行加入需要编译的aet文件:
+AET_OBJS=aet/natomic.o  aet/nmem.o 	aet/nslice.o  aet/nlist.o \
+    aet/nlog.o   aet/nqsort.o aet/nptrarray.o aet/nerror.o \
+    aet/nprintf.o aet/nstrfuncs.o  aet/nunicode.o aet/nconvert.o \
+    aet/nuniprop.o aet/nstring.o aet/nunidecomp.o aet/nhash.o \
+    aet/nfileutils.o aet/ncharset.o aet/localcharset.o aet/nfile.o \
+    aet/c-aet.o aet/classinfo.o aet/classmgr.o aet/aetutils.o aet/aetprinttree.o aet/aetmangle.o\
+    aet/classparser.o aet/classimpl.o aet/aet-typeck.o aet/aet-c-common.o aet/aet-c-fold.o\
+    aet/aet-convert.o aet/classref.o aet/classinit.o aet/varcall.o aet/classfinalize.o\
+    aet/aet-check.o aet/aet-warn.o aet/classctor.o aet/supercall.o aet/funchelp.o aet/funccall.o \
+    aet/classinterface.o aet/classcast.o aet/classpackage.o aet/genericutil.o aet/genericcall.o\
+    aet/classdot.o aet/classpermission.o aet/varmgr.o aet/parserhelp.o aet/parserstatic.o\
+    aet/genericimpl.o aet/generic-typeck.o aet/classutil.o aet/classfunc.o aet/funcmgr.o\
+    aet/newobject.o aet/newstack.o aet/newstrategy.o aet/newheap.o aet/newfield.o aet/blockfunc.o\
+    aet/genericblock.o aet/blockmgr.o aet/genericinfo.o aet/aet-dump.o aet/genericexpand.o\
+    aet/genericfile.o aet/genericcommon.o aet/genericclass.o aet/genericquery.o\
+    aet/genericmodel.o aet/genericparser.o aet/classaccess.o aet/makefileparm.o aet/xmlfile.o\
+    aet/middlefile.o aet/classfinal.o aet/classbuild.o aet/linkfile.o aet/funccheck.o\
+    aet/ifacefile.o  aet/classlib.o  aet/libfile.o aet/genericfunc.o aet/genericdefine.o\
+    aet/genericmethod.o aet/genericcheck.o aet/objectreturn.o aet/superdefine.o aet/enumparser.o\
+    aet/restorelocation.o  aet/namelesscall.o aet/implicitlycall.o aet/cmprefopt.o aet/accesscontrols.o
+ 
+ 在1668行加入“$(AET_OBJS) \”。
+
+ 在2190行加入“aet/aetcompile.o”。
+ COLLECT2_OBJS = collect2.o collect2-aix.o vec.o ggc-none.o \
+  collect-utils.o file-find.o hash-table.o selftest.o aet/aetcompile.o
+  
+  (5)gcc/gcc.c
+  在7386行加入代码:
+  //zclei
+static void setAetVar (int argc, char **argv)
+{
+      int i;
+      static char *SEPARATION="#$%";
+      char buffer[512*1024];
+      int offset=0;
+      char *space=SEPARATION;
+      for(i=0;i<argc;i++){
+          char *arg=argv[i];
+          memcpy(buffer+offset,arg,strlen(arg));
+          offset+=strlen(arg);
+          memcpy(buffer+offset,space,3);
+          offset+=3;
+         // fprintf(stderr,"找到的makefile传给编译器gcc的参数 %d %s\n",i,arg);
+      }
+       buffer[offset]='\0';
+      //fprintf(stderr,"找到的makefile传给编译器gcc的参数-----PID:%d %s\n",getpid(),buffer);
+       xputenv (concat ("GCC_AET_PARM=", buffer, NULL));
+}
+
+在7441加入代码:
+  setAetVar(argc,argv);
+
+    (6)gcc/collect2.h
+    在40行加入代码:
+    //zclei
+    extern char  **aet_compile(char ** ld_argv);
+    
+   (7)gcc/collect2.c
+   在756行加入代码:
+     /*zclei*/
+  ld_argv=aet_compile(ld_argv);
+
+   (8)gcc/c-family/c-common.h
+   在248行加入代码:
+     /*zclei 以下18个是为AET保留的关键字*/
+  RID_AET_CLASS,   RID_AET_ABSTRACT,  RID_AET_INTERFACE,
+  RID_AET_EXTENDS, RID_AET_IMPLEMENTS,      RID_AET_REALIZE_CLASS,
+  RID_AET_FINAL,RID_AET_NEW,RID_AET_SUPER,RID_AET_PACKAGE,
+  RID_AET_PUBLIC,RID_AET_PROTECTED,RID_AET_PRIVATE,RID_AET_GENERIC_INFO,
+  RID_AET_GENERIC_BLOCK,RID_AET_GOTO,RID_AET_OBJECT,RID_AET_ENUM,
+
+   (9)gcc/c-family/c-common.c
+   在580行加入代码:
+   
+     /*zclei aet*  RID_AET_CLASS, RID_AET_ABSTRACT,  RID_AET_INTERFACE, RID_AET_EXTENDS, RID_AET_IMPLEMENTS*/
+  { "class$",           RID_AET_CLASS,  0 },
+  { "abstract$",        RID_AET_ABSTRACT,   0 },
+  { "interface$",       RID_AET_INTERFACE,  0 },
+  { "extends$",         RID_AET_EXTENDS,    0 },
+  { "implements$",      RID_AET_IMPLEMENTS, 0 },
+  { "impl$",            RID_AET_REALIZE_CLASS,  0 },
+  { "final$",           RID_AET_FINAL,  0 },
+  { "new$",             RID_AET_NEW,    0 },
+  { "super$",           RID_AET_SUPER,  0 },
+  { "package$",         RID_AET_PACKAGE,    0 },
+  { "public$",          RID_AET_PUBLIC, 0 },
+  { "protected$",       RID_AET_PROTECTED,  0 },
+  { "private$",         RID_AET_PRIVATE,    0 },
+  { "enum$",            RID_AET_ENUM,0 },
+  { "generic_info$",    RID_AET_GENERIC_INFO,   0 },
+  { "genericblock$",    RID_AET_GENERIC_BLOCK,  0 },
+  { "aet_goto_compile$", RID_AET_GOTO,  0 },
+  { "__OBJECT__",        RID_AET_OBJECT,0 },
+  
+  (10)gcc/c/c-tree.h
+  在601行,改extern void push_parm_decl (const struct c_parm *, tree *)为
+  extern tree push_parm_decl (const struct c_parm *, tree *);//zclei 返回值从void改成tree
+  在602行加入代码:
+extern void c_c_decl_bind_file_scope(tree decl);//zclei 在函数内创建函数声明，bind到file_scope
+extern tree c_c_decl_get_decl_in_symbol_binding(tree functionId);//zclei 是不是一个内建的implicitly函数
+extern void aet_record_maybe_used_decl(tree);//zclei zclei
+
+  (11)gcc/c/c-parser.h
+  在160行加入代码:
+  //zclei 为classparser暴露一些接口
+tree c_c_parser_std_attribute_specifier_sequence (c_parser *);
+tree c_c_parser_gnu_attributes (c_parser *);
+void c_c_parser_set_source_position_from_token (c_token *token);
+bool c_c_parser_nth_token_starts_std_attributes (c_parser *,unsigned int);
+void c_c_parser_static_assert_declaration_no_semi (c_parser *);
+void c_c_parser_skip_to_end_of_block_or_statement (c_parser *);
+bool c_c_parser_pragma (c_parser *, int pc/*enum pragma_context*/, bool *);
+void c_c_parser_asm_definition (c_parser *);
+tree c_c_parser_compound_statement (c_parser *, location_t *);
+void c_c_parser_static_assert_declaration (c_parser *);
+void c_restore_extension_diagnostics (int flags);
+struct c_expr c_c_parser_initializer (c_parser *);
+void c_c_parser_declaration_or_fndef (c_parser *, bool, bool, bool,
+					   bool, bool, tree *, vec<c_token>,
+					   bool have_attrs = false,
+					   tree attrs = NULL,
+					   struct oacc_routine_data * = NULL,
+					   bool * = NULL);
+void c_c_parser_set_enter_aet(c_parser *parser,bool enter);
+
+void c_warn_for_abs (location_t loc, tree fndecl, tree arg);
+struct c_expr c_c_parser_expr_no_commas (c_parser *, struct c_expr *,tree = NULL_TREE);
+int c_disable_extension_diagnostics (void);
+//zclei =======
+
+  (12)gcc/c/c-parser.c
+  改动较大，不再列出差异。有兴趣可以用文件比较工具meld来与原始gcc10.4.0的c-parser.c比较。
+
+  (13)gcc/c/c-decl.c
+   改动较大，不再列出差异。
+
+  (14)gcc/c/c-typeck.c
+   改动较大，不再列出差异。
+   
+  以上14个文件就是编译aet所需要改动的gcc原始文件。如需恢复到gcc，只需重新拷回以上14个文件即可。
+
+7.用两条命令 make clean   make distclean 清除上一次编译的gcc.
+8.再一次执行以下3条命令来编译gcc:
+ ../configure --prefix=/home/aet/install/gcc-10.4.0/ --enable-checking=release --enable-languages=c,c++ --disable-multilib 
+  --with-gmp=/usr/local/gmp-6.2.0 --with-mpfr=/usr/local/mpfr-4.1.0 --with-mpc=/usr/local/mpc-1.2.1
+ make
+ make install
+9.如果成功，则说明可以使用gcc来编译使用aet语言的基础程序库了。
+
+编译aet基础库 libaet1.0.9.so
+1.进入/home/aet/temp/libaet,并在当前目录解压 aet1.0.zip。
+删除用不到的gcc10.4.0目录。
+2.进入/home/aet/temp/libaet/libaet1.0.0目录，编辑app.mk文件的如下内容。
+PC_COMPILE_ALL       = /home/sns/gcc-10.4.0/bin/
+这一行指定的gcc所在路径改为你刚刚安装的aet gcc路径。如:/home/aet/install/gcc-10.4.0/
+3.运行以下命令:make TARGET=lib.
+4.生成的动态库存在/home/aet/temp/libaet/libaet1.0.0/bin目录。文件名是:libaet1.0.0.so
+
+测试:
+写一个test.c
+代码如下:
+#include <stdio.h>
+#include <stdlib.h>
+#include <aet/lang/AObject.h>
+
+class$ TestAet{
+
+};
+
+impl$ TestAet{
+  TestA(){
+      printf("hello aet!\n");
+  }
+};
+
+int main(void) {
+	TestA ax=new$ TestA();
+	return EXIT_SUCCESS;
+}
+
+编译:test.c，然后运行。注意：加上aet所在的头文件和库路径。
+gcc -L/home/aet/temp/libaet/libaet1.0.0/bin -laet1.0.0 -I/home/aet/temp/libaet/libaet1.0.0 -o test.c
+
+

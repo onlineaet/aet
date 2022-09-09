@@ -19,7 +19,7 @@
 5.复制aet-master.zip到/home/aet/temp/gcc10.4.0
 6.进入/home/aet/temp/gcc10.4.0，并在当前目录解压 aet-master.zip。
 删除用不到的libaet目录。
-aet1.0.0.zip中的文件会覆盖gcc10.4.0下面的文件,具体内容如下:
+aet-master.zip中的文件会覆盖gcc10.4.0下面的文件,具体内容如下:
 
 (1)libcpp/directives.c
 在2623行插入

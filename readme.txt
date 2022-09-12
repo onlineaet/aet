@@ -1,3 +1,15 @@
+"AET" has been developed for two years. It is a programming language that looks like an object, 
+is compatible with C language, has simple syntax, is flexible and extensible, 
+like C + +, ADA, objc and so on in GCC platform.
+
+"AET" contains almost all the features of object-oriented programming languages, 
+supports generic programming (substitution and virtualization) and syntax stage optimization. 
+When using C language, it is very difficult to use object-oriented theory and method for complex programming. With "AET", 
+we can enjoy the simplicity and efficiency brought by C language, and at the same time, we can also use
+The complex software is constructed by using the programming method of surface object.
+
+
+
 “轻言蔓语”历时2年开发，是一门面象对象、兼容c语言、语法简单、灵活可扩展的编程语言，就像gcc平台中的c++、ada、objc等。
 
 “轻言蔓语”包含几乎所有面象对象程序语言的特性，支持泛型编程（替换和虚化）以及语法阶段优化。在使用C语言时，很

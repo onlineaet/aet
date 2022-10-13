@@ -651,8 +651,6 @@ static void addMiddleCodes(NewStrategy *self,char *varName,ClassName *className,
 	  * 替换父类的同名同参数函数的问题。
 	  */
 	 char *override=NULL;//zclei 该方法被classinit.c 中的modifyParentMethod替换。class_init_override_parent_ref(classInit,className,varName);
-	 char *testOverride=class_init_override_parent_ref(classInit,className,varName);
-	 //printf("test old override---- %s\n",testOverride);
 	 char *freeChild=class_init_modify_root_object_free_child(classInit,className,varName);
 	 if(override!=NULL){
 	   n_string_append(codes,override);

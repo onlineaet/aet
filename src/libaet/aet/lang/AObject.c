@@ -8,6 +8,7 @@ impl$ AObject{
   AObject(){
      refCount=1;
   }
+
   ~AObject(){
      a_debug("析构函数执行。");
   }
@@ -22,7 +23,7 @@ impl$ AObject{
 	  a_debug("释放内存,如果objectSize>0是堆内存， 否则是栈或全局:objectSize:%d %s",objectSize,myClass->getName());
 	  _free_super_data(self);
 	  if(objectSize>0){
-	    a_slice_free1 (objectSize,(apointer)self);
+	     a_slice_free1(objectSize,(apointer)self);
 	  }
   }
 
@@ -30,9 +31,6 @@ impl$ AObject{
 
   }
 
-  void free_child(){
-
-  }
 
   auint getRefCount(){
       aint old_ref;
@@ -82,7 +80,7 @@ impl$ AObject{
          /* 可能同时被重新引用 */
          if (A_LIKELY (old_ref == 1)){
         	 a_debug("在这里真正的释放了。%p %s",self,myClass->getName());
-        	 free_child();//是在new对象时赋值的
+        	 free_child();//是在new对象时由编译器赋值的 。AObject不能具体实现free_child方法。由编译器生成。
         	 freeObject();
    	     }
       }

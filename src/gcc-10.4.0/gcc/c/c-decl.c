@@ -11741,7 +11741,7 @@ c_check_in_current_scope (tree decl)
 }
 
 //zclei
-void c_c_decl_bind_file_scope(tree  decl)
+void c_c_decl_bind_file_scope (tree  decl)
 {
    tree name = DECL_NAME (decl);
    struct c_scope *scope = file_scope;
@@ -11752,7 +11752,7 @@ void c_c_decl_bind_file_scope(tree  decl)
 }
 
 //zclei 是不是一个内建的implicitly函数
-tree c_c_decl_get_decl_in_symbol_binding(tree functionId)
+tree c_c_decl_get_decl_in_symbol_binding (tree functionId)
 {
        struct c_binding *b;
       tree decl = NULL_TREE;

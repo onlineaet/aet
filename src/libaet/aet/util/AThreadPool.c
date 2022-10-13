@@ -252,7 +252,7 @@ static void bindCpu(AThreadPool *self)
        AThread *thread=AThread.current();
        pthread_t   systemThread=thread->getSystemThread();
 
-       printf("system has %d processor(s) bind:%d %p\n", num,i,thread);
+       //printf("system has %d processor(s) bind:%d %p\n", num,i,thread);
           CPU_ZERO(&mask);
           CPU_SET(i,&mask);
           if(pthread_setaffinity_np(systemThread, sizeof(mask),&mask)< 0){
@@ -262,11 +262,11 @@ static void bindCpu(AThreadPool *self)
           if(pthread_getaffinity_np(systemThread, sizeof(get),&get)< 0){
               fprintf(stderr,"get thread affinity failed\n");
           }
-          for(j= 0; j< num; j++){
-              if(CPU_ISSET(j,&get)){
-                  printf("thread %d is running in processor %d numThread:%d %p\n",(int)pthread_self(), j,self->numThreads,thread);
-              }
-          }
+//          for(j= 0; j< num; j++){
+//              if(CPU_ISSET(j,&get)){
+//                  printf("thread %d is running in processor %d numThread:%d %p\n",(int)pthread_self(), j,self->numThreads,thread);
+//              }
+//          }
 }
 
 
@@ -348,15 +348,7 @@ static apointer  proxy_cb (apointer userData)
             //a_debug("free_pool 44 %d thread:%p\n",free_pool,selfThread);
 
             pool->queue->lock();
-           // a_debug("free_pool 55 %d thread:%p\n",free_pool,selfThread);
-
-            //a_debug("thread %p entering pool %p from global pool.",AThread.current(), pool);
-
-            /* pool->num_threads++ is not done here, but in
-             * g_thread_pool_start_thread to make the new started
-             * thread known to the pool before itself can do it.
-             */
-          }
+         }
       }
    // a_debug("proxy_cb 退出了----\n");
       return NULL;
@@ -575,17 +567,16 @@ impl$ AThreadPool{
           return FALSE;
       aboolean result = TRUE;
       queue->lock();
-      //printf("push---00 name:%s %p %d %p\n",name,AThread.current(),queue->lengthUnlocked(),self->sortFunc);
       if (queue->lengthUnlocked() >= 0){
           AError *curError = NULL;
-          printf("push---11 name:%s %p %d\n",name,AThread.current(),queue->lengthUnlocked());
+         // printf("push---11 name:%s %p %d\n",name,AThread.current(),queue->lengthUnlocked());
 
           if (!startThread(&curError)){
               a_error_transfer(error, curError);
+              a_warning("不能加入到线程池的队列中 data:%p name:%s currentThread:%p queue->lengthUnlocked():%d\n",data,name,AThread.current(),queue->lengthUnlocked());
               result = FALSE;
           }
           //printf("push---22 name:%s %p %d\n",name,AThread.current(),queue->lengthUnlocked());
-
       }
       if (self->sortFunc)
          queue->pushSortedUnlocked (data,self->sortFunc,sortUserData);
@@ -606,7 +597,7 @@ impl$ AThreadPool{
     }
 
     void free(aboolean immediate,aboolean wait_){
-      // printf("g_thread_pool_free is 00 :%d %d\n",running,immediate);
+      // printf("a_thread_pool_free is 00 :%d %d\n",running,immediate);
       a_return_if_fail (running);
       a_return_if_fail (immediate || maxThreads != 0 || queue->length() == 0);
       queue->lock();
@@ -615,7 +606,7 @@ impl$ AThreadPool{
       waiting = wait_;
       if (wait_){
           while (queue->lengthUnlocked()!= (int)-numThreads && !(immediate && numThreads == 0)){
-              //printf("g_thread_pool_free 22 name:%s wait wait %p %d %d\n",name,AThread.current(),running,queue->lengthUnlocked());
+              //printf("a_thread_pool_free 22 name:%s wait wait %p %d %d\n",name,AThread.current(),running,queue->lengthUnlocked());
               cond.wait(queue->getMutex());
           }
       }
@@ -627,22 +618,22 @@ impl$ AThreadPool{
           if (numThreads == 0){
               /* 没有线程了，可以清除 */
               queue->unlock();
-              //printf("g_thread_pool_free 33 没有线程了，可以清除 name:%s %p %d %d\n",name,AThread.current(),running,queue->lengthUnlocked());
+              //printf("a_thread_pool_free 33 没有线程了，可以清除 name:%s %p %d %d\n",name,AThread.current(),running,queue->lengthUnlocked());
 
               internalClear();
               return;
            }
-         // printf("g_thread_pool_free 44 name:%s %p %d %d\n",name,AThread.current(),running,queue->lengthUnlocked());
+         // printf("a_thread_pool_free 44 name:%s %p %d %d\n",name,AThread.current(),running,queue->lengthUnlocked());
 
           wakeupAndStopAll();
-          printf("g_thread_pool_free 55 name:%s %p %d %d\n",name,AThread.current(),running,queue->lengthUnlocked());
+          printf("a_thread_pool_free 55 name:%s %p %d %d\n",name,AThread.current(),running,queue->lengthUnlocked());
 
       }
-      //printf("g_thread_pool_free 66 name:%s %p %d %d\n",name,AThread.current(),running,queue->lengthUnlocked());
+      //printf("a_thread_pool_free 66 name:%s %p %d %d\n",name,AThread.current(),running,queue->lengthUnlocked());
 
       waiting = FALSE;
       queue->unlock();
-      //printf("g_thread_pool_free name:%s 77\n",name);
+      //printf("a_thread_pool_free name:%s 77\n",name);
     }
 
     void setSortFunction(ACompareDataFunc  func,apointer userData) {

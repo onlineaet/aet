@@ -744,7 +744,6 @@ apointer a_slice_alloc (asize mem_size)
    * must come first.
    */
   tmem = thread_memory_from_self ();
-
   chunk_size = P2ALIGN (mem_size);
   acat = allocator_categorize (chunk_size);
   if (A_LIKELY (acat == 1))     /* allocate through magazine layer */

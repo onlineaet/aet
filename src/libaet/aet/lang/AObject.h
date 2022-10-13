@@ -21,11 +21,11 @@ typedef struct _SuperCallData{
 
 public$ class$ AObject{
    public$ static void * newObject(asize size);
-   private$  asize    objectSize;
+   private$  asize     objectSize;
    private$  volatile auint refCount;
    public$ void       unref();
    public$ AObject*   ref();
-   public$ void       free_child();
+   public$ void       free_child();//在new对象时由编译器赋值的 。AObject不能具体实现free_child方法。由编译器生成。
    public$ void       freeObject();//与newObjec对应。
    public$ auint      getRefCount();
    public$ final$ AClass *getClass();

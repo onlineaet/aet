@@ -172,7 +172,12 @@ static int fillLink(tree call,NString *linkStr,nboolean tailed)
         isFunc=TRUE;
      }else if(TREE_CODE(call)==COMPONENT_REF){
          tree field=TREE_OPERAND (call, 1);
-         name=IDENTIFIER_POINTER(DECL_NAME(field));
+         if(!DECL_NAME(field)){
+             printf("在classutil.c fillLink() TREE_CODE(call)==COMPONENT_REF field没有名字。\n");
+             name=NULL;
+         }else{
+             name=IDENTIFIER_POINTER(DECL_NAME(field));
+         }
          type=TREE_TYPE(field);
          parm=type;
          //printf("函数返回值:xxxxx %s\n",name);
@@ -221,7 +226,6 @@ int class_util_has_nameless_call(tree value)
     NString *linkStr=n_string_new("");
     for(i=array->len-1;i>=0;i--){
          tree call=n_ptr_array_index(array,i);
-        // printf("class_util_has_nameless_call---- %d\n",i);
          int r= fillLink(call,linkStr,i==0);
          if(r>result)
              result=r;

@@ -2353,7 +2353,7 @@ lookup_field (tree type, tree component)
 	    	  n_info("lookup_field 11 DECL_NAME (field) == NULL_TREE && RECORD_OR_UNION_TYPE_P (TREE_TYPE (field)) p %p\n",type,component);
 	          tree anon = lookup_field (TREE_TYPE (field), component);
 	          if (anon){
-		    	  printf("lookup_field 22 %p %p %p\n",type,component,anon);
+		    	  printf("lookup_field 22xxddd %p %p %p\n",type,component,anon);
 		          return tree_cons (NULL_TREE, field, anon);
 	          }
 

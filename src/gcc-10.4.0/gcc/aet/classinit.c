@@ -338,7 +338,7 @@ static void twoStepRelace(ClassInit *self,ClassName *childName,ClassName *parent
    //2.用子类实现的接口的field方法替换父类的方法
    //3.用子类的field方法替换父类的接口的方法
    //4.用子类实现的接口的field方法替换父类的接口方法
-   n_debug("class_init replace 00 index:%d  用子类%ss,替换父类%s的方法\n",childName->sysName,parent->sysName);
+   n_debug("class_init replace 00 index:%d  用子类%s,替换父类%s的方法\n",childName->sysName,parent->sysName);
 	fillReplaceParentFuncInfo(self,array,childName,childName,parent,parent);
    int i;
    for(i=0;i<info->ifaceCount;i++){
@@ -498,8 +498,6 @@ void       class_init_create_init_decl(ClassInit *self,ClassName *className)
  */
 char      *class_init_modify_root_object_free_child(ClassInit *self,ClassName *className,char *varName)
 {
-//	if(5>3)
-//		return NULL;
 	ClassName *rootClassName=class_mgr_get_class_name_by_user(class_mgr_get(),AET_ROOT_OBJECT);
 	if(rootClassName==NULL)
 		return NULL;

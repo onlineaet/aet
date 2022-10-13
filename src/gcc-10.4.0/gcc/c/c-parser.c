@@ -7846,8 +7846,8 @@ c_parser_expr_no_commas (c_parser *parser, struct c_expr *after,
 		  aet_cpp_ttype_str[c_parser_peek_token (parser)->type],after);
   aet_print_token(c_parser_peek_token (parser));
   lhs = c_parser_conditional_expression (parser, after, omp_atomic_lhs);
-  n_debug("c_parser_expr_no_commas 11 作赋值表达式处理，赋值表达式的左值当作条件表达式进行分析 赋值运算符:%s CODE:%s",
-		  aet_cpp_ttype_str[c_parser_peek_token (parser)->type],get_tree_code_name(code));
+//  n_debug("c_parser_expr_no_commas 11 作赋值表达式处理，赋值表达式的左值当作条件表达式进行分析 赋值运算符:%s CODE:%s",
+		//  aet_cpp_ttype_str[c_parser_peek_token (parser)->type],get_tree_code_name(code));
   op_location = c_parser_peek_token (parser)->location;
   //zclei
   if(c_parser_peek_token (parser)->type==CPP_EQ &&
@@ -7894,8 +7894,8 @@ c_parser_expr_no_commas (c_parser *parser, struct c_expr *after,
       code = BIT_IOR_EXPR;
       break;
     default:
-    	n_debug("c_parser_expr_no_commas 22 右边作赋值表达式处理，赋值运算符:%s code:%s ",
-    			  aet_cpp_ttype_str[c_parser_peek_token (parser)->type],get_tree_code_name(code));
+    	//n_debug("c_parser_expr_no_commas 22 右边作赋值表达式处理，赋值运算符:%s code:%s ",
+    			//  aet_cpp_ttype_str[c_parser_peek_token (parser)->type],get_tree_code_name(code));
         //zclei
         class_parser_is_static_continue_compile_and_goto(class_parser_get());
         lhs=class_impl_nameles_call(classImpl,lhs);

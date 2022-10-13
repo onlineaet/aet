@@ -21,7 +21,7 @@ The complex software is constructed by using the programming method of surface o
 “轻言蔓语”可以编写运行在各种芯片平台上的系统软件和应用软件。
 
 
-我给这门语言取一个好听的中文名：“轻言蔓语”。 表达它不仅灵活而且扩展性强。翻译成英文是：active expandable translator， 
+“轻言蔓语”， 表达它不仅灵活而且扩展性强。翻译成英文是：active expandable translator， 
 缩写aet,也称A语言。所以大家在代码里会看到很多“aet”单词。
 
 市场上已有了很多开发语言，为什么自已还要再发明一门新语言呢？

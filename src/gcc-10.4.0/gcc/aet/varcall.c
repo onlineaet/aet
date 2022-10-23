@@ -19,7 +19,6 @@ If not see <http://www.gnu.org/licenses/>.
 AET was originally developed  by the zclei@sina.com at guiyang china .
 */
 
-
 #include "config.h"
 #include <cstdio>
 #define INCLUDE_UNIQUE_PTR
@@ -316,36 +315,72 @@ tree var_call_dot_visit(VarCall *self,tree exprValue,tree component,location_t c
 
 
 /**
+ * 只在类中找变量。
+ */
+FuncAndVarMsg var_call_find_var_at_class(VarCall *self,tree id,ClassName *className)
+{
+         c_parser *parser=self->parser;
+         if(parser->isAet){
+            if(className==NULL)
+                return ID_NOT_FIND;
+            tree classId=aet_utils_create_ident(className->sysName);
+            tree classDecl=lookup_name(classId);
+            if(!classDecl || classDecl==NULL_TREE || classDecl==error_mark_node){
+                return ID_NOT_FIND;
+            }
+            int re=findVal(self,className,id);
+            return re;
+         }
+         return ID_NOT_FIND;
+}
+
+
+static FuncAndVarMsg findAtAet(VarCall *self,tree id,ClassName *className)
+{
+     c_parser *parser=self->parser;
+     char *idStr=IDENTIFIER_POINTER(id);
+     if(parser->isAet){
+        if(className==NULL)
+            return ID_NOT_FIND;
+        tree classId=aet_utils_create_ident(className->sysName);
+        tree classDecl=lookup_name(classId);
+        if(!classDecl || classDecl==NULL_TREE || classDecl==error_mark_node){
+            return ID_NOT_FIND;
+        }
+        int re=findVal(self,className,id);
+        return re;
+     }
+     return ID_NOT_FIND;
+}
+
+/**
  * lookup_name找到由系统处理
  * 在aet中,在本类和父类中找，如果找到返回ISAET_FIND_VAL
  * 找不到,再找静态变量如果找到返回ISAET_FIND_STATIC_VAL,否则返回ID_NOT_FIND,也由系统处理。
  */
-FuncAndVarMsg var_call_get_process_var_method(VarCall *self,tree id,ClassName *className)
+FuncAndVarMsg var_call_get_process_var_method(VarCall *self,location_t loc,tree id,ClassName *className)
 {
+      c_parser *parser=self->parser;
       char *idStr=IDENTIFIER_POINTER(id);
       tree decl = lookup_name (id);
-      if(decl && decl != error_mark_node){
-      	 n_debug("var_call 00 找到了声明的变量由系统build_external_ref处理 decl code:%s id:%s",get_tree_code_name(TREE_CODE(decl)),idStr);
-       	  return ID_EXISTS;
+      if(aet_utils_valid_tree(decl)){
+          tree global = identifier_global_value (id);
+          if(global==decl){
+              FuncAndVarMsg ret=findAtAet(self,id,className);
+              if(ret==ISAET_FIND_VAL || ret==ISAET_FIND_STATIC_VAL){
+                   //如果decl的范围是文件，优先取类变量
+                   location_t dloc=DECL_SOURCE_LOCATION(decl);
+                   expanded_location xlocx = expand_location(dloc);
+                   expanded_location xloc = expand_location(loc);
+                   n_warning("%s:%d:%d 全局变量%s(%s:%d:%d)\n\t\t\t\t\t与类%s或它的父类中的变量名相同！,类变量优先。\n",
+                           xloc.file,xloc.line, xloc.column,idStr,xlocx.file,xlocx.line, xlocx.column,className->userName);
+                   return ret;
+              }
+          }
+          return ID_EXISTS;
       }
-  	  c_parser *parser=self->parser;
-  	  if(parser->isAet){
-  		 if(className==NULL)
-  			 return ID_NOT_FIND;
-  		 tree classId=aet_utils_create_ident(className->sysName);
-  		 tree classDecl=lookup_name(classId);
-  		 if(!classDecl || classDecl==NULL_TREE || classDecl==error_mark_node){
-  			n_debug("var_call 11 在aet中，但类没找到，可能是个错误，由系统处理。 classname:%s id:%s",className,idStr);
-  		     return ID_NOT_FIND;
-  	     }
-  		// printf("var_call_get_process_var_method--- %s %s\n",className->sysName,idStr);
-		 int re=findVal(self,className,id);
-		 n_debug("var_call 22 在aet中， 在本类或父类中找变量。结果是 %d classname:%s id:%s",re,className->sysName,idStr);
-		 return re;
-      }
-      return ID_NOT_FIND;
+      return findAtAet(self,id,className);
 }
-
 
 /**
  * var 重整为  self->var,

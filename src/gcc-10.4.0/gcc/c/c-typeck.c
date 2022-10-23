@@ -3256,7 +3256,6 @@ convert_argument (location_t ploc, tree function, tree fundecl,
 
   if (type == error_mark_node || !COMPLETE_TYPE_P (type))
     {
-      printf("convert_argument ----xxdd ==== %d %d\n",type == error_mark_node);
       error_at (ploc, "type of formal parameter %d is incomplete",
 		parmnum + 1);
       return val;
@@ -3265,7 +3264,6 @@ convert_argument (location_t ploc, tree function, tree fundecl,
   /* Optionally warn about conversions that differ from the default
      conversions.  */
     if (warn_traditional_conversion || warn_traditional)
-	//  if(5>3)
     {
 
       unsigned int formal_prec = TYPE_PRECISION (type);
@@ -3315,7 +3313,6 @@ convert_argument (location_t ploc, tree function, tree fundecl,
 	  /* Warn if any argument is passed as `float',
 	     since without a prototype it would be `double'.  */
 	  if (formal_prec == TYPE_PRECISION (float_type_node) && type != dfloat32_type_node){
-		  printf("xxxxx--------formal_prec == TYPE_PRECISION (float_type_node) && type != dfloat32_type_node \n");
 	    warning_at (ploc, 0,"passing argument %d of %qE as %<float%> rather than %<double%> due to prototype",argnum, rname);
 	  }
 
@@ -3410,25 +3407,10 @@ convert_argument (location_t ploc, tree function, tree fundecl,
 					 val, origtype, ic_argpass,
 					 npc, fundecl, function,
 					 parmnum + 1, warnopt);
-//  printf("there xxxx 00\n");
-//  printNode(val);
-//  printf("there xxxx 11\n");
-//  printNode(parmval);
-//  printf("there xxxx 22\n");
-//  printNode(fundecl);
-//  printf("there xxxx 33\n");
-//  printNode(type);
-
-
   if (targetm.calls.promote_prototypes (fundecl ? TREE_TYPE (fundecl) : 0)
       && INTEGRAL_TYPE_P (type)
       && (TYPE_PRECISION (type) < TYPE_PRECISION (integer_type_node))){
-//	  printf("there xxxx 44\n");
-//	  printNode(parmval);
     parmval = default_conversion (parmval);
-//	  printf("there xxxx 55\n");
-//	  printNode(parmval);
-
   }
 
   return parmval;
@@ -6851,8 +6833,6 @@ convert_for_assignment (location_t location, location_t expr_loc, tree type,
 	  && TYPE_MAIN_VARIANT (checktype) != TYPE_MAIN_VARIANT (type))
        {
 	  gcc_rich_location loc (location);
-	  printf("convert_for_assignment ----111 \n");
-
 	  warning_at (&loc, OPT_Wenum_conversion,
 		      "implicit conversion from %qT to %qT",
 		      checktype, type);

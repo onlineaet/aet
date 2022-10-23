@@ -24,36 +24,13 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 #define INCLUDE_UNIQUE_PTR
 #include "system.h"
 #include "coretypes.h"
-#include "target.h"
-#include "function.h"
-#include "tree.h"
-#include "timevar.h"
-#include "stringpool.h"
-#include "cgraph.h"
-#include "attribs.h"
-#include "stor-layout.h"
-#include "varasm.h"
-#include "trans-mem.h"
 #include "c-family/c-pragma.h"
-#include "gcc-rich-location.h"
-#include "c-family/c-common.h"
-
 #include "c/c-tree.h"
-#include "c-family/name-hint.h"
-#include "c-family/known-headers.h"
-#include "c-family/c-spellcheck.h"
-#include "c-aet.h"
-#include "../libcpp/internal.h"
 #include "c/c-parser.h"
-#include "c/gimple-parser.h"
-#include "../libcpp/include/cpplib.h"
 #include "tree-iterator.h"
-
-
-#include "opt-suggestions.h"
-#include "gcc.h"
 #include "opts.h"
 
+#include "c-aet.h"
 #include "aetutils.h"
 #include "classmgr.h"
 #include "classimpl.h"
@@ -609,7 +586,7 @@ struct c_expr class_impl_process_expression(ClassImpl *self,struct c_expr expr,l
     ClassName *className=self->className;
 	if(fun){
 	   FuncAndVarMsg msg=func_call_get_process_express_method(self->funcCall,id,className);
-	   n_debug("class_impl_process_expression 00 找函数 %s className:%s re:%d\n",IDENTIFIER_POINTER(id),className==NULL?"null":className->sysName,msg);
+	   n_debug("class_impl_process_expression 00 找函数 %s className:%s re:%d",IDENTIFIER_POINTER(id),className==NULL?"null":className->sysName,msg);
 	   if(msg==ID_IS_CONSTRUCTOR){
 		   error_at(loc,"构造函数%qs只能通过new或super调用。",IDENTIFIER_POINTER(id));
 	   }else if(msg==ISAET_FIND_FUNC){
@@ -654,7 +631,7 @@ struct c_expr class_impl_process_expression(ClassImpl *self,struct c_expr expr,l
            }
 	   }
 	}else{
-		FuncAndVarMsg msg=var_call_get_process_var_method(self->varCall,id,className);
+		FuncAndVarMsg msg=var_call_get_process_var_method(self->varCall,loc,id,className);
 		n_debug("class_impl_process_expression 77 找变量 %s className:%s FuncAndVarMsg:%d\n",
 				IDENTIFIER_POINTER(id),className==NULL?"null":className->sysName,msg);
 		if(msg==ISAET_FIND_VAL){
@@ -1402,4 +1379,5 @@ void class_impl_test_target(tree target)
         }
     }
 }
+
 

@@ -131,8 +131,7 @@ struct c_expr   class_impl_nameles_call(ClassImpl *self,struct c_expr expr);
 void            class_impl_replace_self_call_at_statement_after_labels(ClassImpl *self);
 nboolean        class_impl_is_impl(ClassImpl *self,char *sysName);//判断是否实现了sysName名称所指定的类
 
-
-void class_impl_test_target(tree target);
+void             class_impl_test_target(tree target);
 
 
 

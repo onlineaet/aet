@@ -45,10 +45,11 @@ typedef struct _VarRefRelation{
 
 
 VarCall      *var_call_new();
-FuncAndVarMsg var_call_get_process_var_method(VarCall *self,tree id,ClassName *className);
+FuncAndVarMsg var_call_get_process_var_method(VarCall *self,location_t loc,tree id,ClassName *className);
 void          var_call_add_deref(VarCall *self,tree id,ClassName *className);
 tree          var_call_pass_one_convert(VarCall *self,location_t component_loc,tree exprValue,tree component,VarRefRelation *item,tree *staticVar);
 tree          var_call_dot_visit(VarCall *self,tree exprValue,tree component,location_t component_loc,VarRefRelation *item,tree *staticVar);
+FuncAndVarMsg var_call_find_var_at_class(VarCall *self,tree id,ClassName *className);//只在类中找变量。
 
 
 

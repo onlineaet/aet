@@ -941,7 +941,6 @@ impl$ AKeyFile{
           int num_groups = groups->length();
           a_return_val_if_fail (num_groups > 0, NULL);
           char **groupArray = a_new (char *, num_groups+1);
-          printf("num_groups -- %d\n",num_groups);
           ListIterator *iter=groups->initIter();
           apointer value=NULL;
           int i=0;

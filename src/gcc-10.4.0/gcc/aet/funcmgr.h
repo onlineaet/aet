@@ -31,7 +31,6 @@ typedef struct _FuncMgr FuncMgr;
 /* --- structures --- */
 struct _FuncMgr
 {
-	c_parser *parser;
 	AetMangle *mangle;
 	NHashTable *hashTable;
 	NHashTable *staticHashTable;

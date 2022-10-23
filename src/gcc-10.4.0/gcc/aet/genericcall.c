@@ -173,8 +173,8 @@ tree  generic_call_check_parm(GenericCall *self,location_t loc,tree function,tre
 	    	 return val;
 	    }else if(equal && varStr!=NULL && strcmp(str,varStr)){
 	      	 n_free(str);
-	   	    	 n_free(varStr);
-	   	    	 return val;
+	   	     n_free(varStr);
+	   	     return val;
 	    }else{
 	 	    // printf("generic_call_check_parm --- %s funName:%s 泛型函数的声明:%s\n",str,funName,generic_model_tostring(funcGen));
 	    	 nboolean ok=generic_model_exits_ident(funcGen,str);
@@ -186,7 +186,7 @@ tree  generic_call_check_parm(GenericCall *self,location_t loc,tree function,tre
 //	    	    	- The method put(T) in the type Hello2<T> is not applicable for the arguments
 //	    	    	 (String)
 	           // error_at(loc,"在类%qs中的方法%qs不能使用参数%qE。",globalClassName?globalClassName->userName:"null",funName,valtype);
-	            n_warning(loc,"在类%s中的方法%s不能使用参数。",globalClassName?globalClassName->userName:"null",funName);
+	            n_warning("在类%s中的方法%s不能使用参数。",globalClassName?globalClassName->userName:"null",funName);
 
 	            return parmval;
 	         }
@@ -669,5 +669,6 @@ GenericCall *generic_call_get()
 	}
 	return singleton;
 }
+
 
 

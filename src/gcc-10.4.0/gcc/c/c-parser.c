@@ -10703,7 +10703,7 @@ static struct c_expr c_parser_postfix_expression_after_primary (c_parser *parser
 	         n_debug("c_parser_postfix_expression_after_primary 22 函数参数处理完成 expr.value:%s %p 参数个数:%d",
 	   	        		 get_tree_code_name(TREE_CODE(expr.value)),expr.value,vec_safe_length (exprlist));
 	         if(class_impl_is_aet_class_component_ref_call(classImpl,expr)){
-	        	 //printf("需要加入参数self到参数列表中 参数个数:%d\n",vec_safe_length (exprlist));
+	        	// printf("需要加入参数self到参数列表中 参数个数:%d\n",vec_safe_length (exprlist));
 	        	 if(!class_util_add_self(expr,&exprlist,&origtypes,&arg_loc)){
 		        	 printf("需要加入参数self到参数列表中 参数个数:%d,但失败了。\n",vec_safe_length (exprlist));
 	        	 }

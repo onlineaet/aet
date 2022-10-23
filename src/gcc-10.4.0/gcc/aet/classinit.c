@@ -630,12 +630,7 @@ void class_init_create_init_define(ClassInit *self,ClassName *className,NPtrArra
 	 }
 	 fillFreeChildMethodForAObject(className,buf);
 	 fillGetClassMethodForAObject(className,getAClassFuncName,buf);
-
-	 //createModifyAbstractParentMethod(className,buf);
 	 char *newCodes=modifyParentMethodNew(self,className);
-	 //printf("newCodes0-----%s\n",newCodes0);
-	 //printf("newCodes-----%s\n",newCodes);
-
 	 if(newCodes!=NULL){
 	    n_string_append(buf,newCodes);
 	    n_free(newCodes);
@@ -647,7 +642,6 @@ void class_init_create_init_define(ClassInit *self,ClassName *className,NPtrArra
 		   n_string_append(buf,code->modify);
 	    }
 	 }
-
 	 if(superCodes!=NULL){
 	    n_string_append(buf,superCodes);
 	 }

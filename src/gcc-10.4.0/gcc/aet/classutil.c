@@ -25,32 +25,12 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 #include "system.h"
 #include "coretypes.h"
 #include "target.h"
-
 #include "function.h"
 #include "tree.h"
-#include "timevar.h"
-#include "stringpool.h"
-#include "cgraph.h"
-#include "attribs.h"
 #include "toplev.h"
-
-#include "stor-layout.h"
-#include "varasm.h"
-#include "trans-mem.h"
 #include "c-family/c-pragma.h"
-#include "gcc-rich-location.h"
-#include "c-family/c-common.h"
-#include "gimple-expr.h"
-
 #include "c/c-tree.h"
-
-#include "c-family/name-hint.h"
-#include "c-family/known-headers.h"
-#include "c-family/c-spellcheck.h"
-#include "../libcpp/internal.h"
 #include "c/c-parser.h"
-#include "c/gimple-parser.h"
-#include "../libcpp/include/cpplib.h"
 #include "opts.h"
 
 #include "aetinfo.h"
@@ -59,14 +39,6 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 #include "aetprinttree.h"
 #include "classmgr.h"
 #include "c-aet.h"
-
-#include "system.h"
-#include "coretypes.h"
-#include "tree.h"
-#include "tree-pretty-print.h"
-#include "tree-dump.h"
-#include "langhooks.h"
-#include "tree-iterator.h"
 #include "genericutil.h"
 
 
@@ -925,5 +897,7 @@ nboolean  class_util_is_function_field(tree fieldDecl)
        return TRUE;
    return FALSE;
 }
+
+
 
 

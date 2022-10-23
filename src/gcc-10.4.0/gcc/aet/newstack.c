@@ -154,7 +154,7 @@ static void setInitLocalStaticVar(NewStack *self,tree var,ClassName *className)
     createInitCodes(self,var,className,codes);
     n_string_append(codes,"}\n");
 	aet_utils_add_token(parse_in,codes->str,codes->len);
-	printf("setInitLocalStaticVar 原代码:\n%s\n",codes->str);
+	n_debug("setInitLocalStaticVar 原代码:\n%s\n",codes->str);
 	n_string_free(codes,TRUE);
 }
 

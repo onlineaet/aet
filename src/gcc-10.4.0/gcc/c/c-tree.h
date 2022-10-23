@@ -601,7 +601,7 @@ extern void c_pop_function_context (void);
 extern tree push_parm_decl (const struct c_parm *, tree *);//zclei 返回值从void改成tree
 extern void c_c_decl_bind_file_scope(tree decl);//zclei 在函数内创建函数声明，bind到file_scope
 extern tree c_c_decl_get_decl_in_symbol_binding(tree functionId);//zclei 是不是一个内建的implicitly函数
-extern void aet_record_maybe_used_decl(tree);//zclei zclei
+extern void aet_record_maybe_used_decl(tree);//zclei
 
 extern struct c_declarator *set_array_declarator_inner (struct c_declarator *,
 							struct c_declarator *);

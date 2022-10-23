@@ -20,7 +20,7 @@ impl$ AObject{
 
   void freeObject(){
       AClass *myClass = getClass();
-	  a_debug("释放内存,如果objectSize>0是堆内存， 否则是栈或全局:objectSize:%d %s",objectSize,myClass->getName());
+	   a_debug("释放内存,如果objectSize>0是堆内存， 否则是栈或全局:objectSize:%d %s",objectSize,myClass->getName());
 	  _free_super_data(self);
 	  if(objectSize>0){
 	     a_slice_free1(objectSize,(apointer)self);

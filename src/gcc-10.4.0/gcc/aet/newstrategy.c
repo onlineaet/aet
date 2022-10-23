@@ -645,7 +645,7 @@ static void addMiddleCodes(NewStrategy *self,char *varName,ClassName *className,
 	 }
 	 char *initFuncName=aet_utils_create_init_method(className->sysName);
 	 n_string_append_printf(codes,"%s(%s);\n",initFuncName,varName);
-	 /**
+	/**
 	  * class_init_override_parent_ref不再调用，该方法被classinit.c 中的modifyParentMethod替换，并且在
 	  * class_init_create_init_define中调用,比较重大的改变。解决BUG，子类定义的函数（没有声明的情况下）不能
 	  * 替换父类的同名同参数函数的问题。

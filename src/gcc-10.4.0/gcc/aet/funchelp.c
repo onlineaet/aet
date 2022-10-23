@@ -48,7 +48,6 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 #include "c-family/name-hint.h"
 #include "c-family/known-headers.h"
 #include "c-family/c-spellcheck.h"
-#include "c-aet.h"
 #include "../libcpp/internal.h"
 #include "c/c-parser.h"
 #include "c/gimple-parser.h"

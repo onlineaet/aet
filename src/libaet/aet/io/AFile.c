@@ -588,7 +588,7 @@ impl$ AFile{
         while ((readdir_r(dir, ptr, &result) == 0)  && (result != NULL)) {
             if (!strcmp(ptr->d_name, ".") || !strcmp(ptr->d_name, "..") || !ptr->d_name)
                 continue;
-            rv->add(new$ AFile(self,ptr->d_name));
+            rv->add(new$ AFile(self,ptr->d_name)->ref());//new AFile()出while范围会被释放。所以加上一次引用。
         }
         closedir(dir);
         free(ptr);
@@ -596,10 +596,9 @@ impl$ AFile{
         AFile **files= a_new (AFile*, size + 1);
         files[size]=NULL;
         int i;
-        for(i=0;i<size;i++){
+        for(i=0;i<size;i++)
             files[i]=rv->get(i);
             //printf("str_array[i] i:%d %s\n",i,files[i]->getAbsolutePath());
-        }
         rv->unref();
         return files;
 	}
@@ -613,7 +612,7 @@ impl$ AFile{
 		AList *files =new$ AList();
 		int i;
 		for(i=0;i<size;i++){
-			files->add(new$ AFile(self,filesPath[i]));
+			files->add(new$ AFile(self,filesPath[i])->ref());
 		}
 		a_strfreev(filesPath);
 		return files;

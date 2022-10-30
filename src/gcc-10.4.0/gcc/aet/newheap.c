@@ -213,6 +213,7 @@ static void setInitLocalVar(NewHeap *self,tree var,ClassName *className,nboolean
         error_at(input_location,"setInitLocalVar 不应该出现的错误，构造函数的位置是零，报告此错误。");
         return ;
     }
+
     aet_utils_add_token_with_location(parse_in,codes->str,codes->len,ctorLoc);
 	n_debug("new_heap setInitLocalVar 源代码:varName:%s file:%s\n%s\n",varName,in_fnames[0],codes->str);
 	n_string_free(codes,TRUE);
@@ -279,14 +280,65 @@ static nboolean newHeapObject(NewHeap *self,tree var,nboolean modify)
 }
 
 /**
+ * 为参数是无名new对象，创建一个函数内的变量。
+ */
+static tree createNamelessVar(char *sysName,char *varName)
+{
+    tree id=aet_utils_create_ident(sysName);
+    tree decl=lookup_name(id);
+    if(!aet_utils_valid_tree(decl)){
+        n_error("错误，创建实参无名对象%s，找不到类声明。",sysName);
+        return NULL_TREE;
+    }
+    aet_print_tree(decl);
+    tree pointerType=build_pointer_type(TREE_TYPE(decl));
+    tree varNameId=aet_utils_create_ident(varName);
+    location_t  loc = input_location;
+    decl = build_decl (loc, VAR_DECL, varNameId, pointerType);
+    TREE_READONLY (decl) = 0;
+    DECL_ARTIFICIAL (decl) = 0;
+    DECL_INITIAL (decl) = NULL_TREE;
+    TREE_USED (decl) = 1;
+    DECL_CONTEXT(decl)=current_function_decl;
+    DECL_EXTERNAL(decl)=0;
+    TREE_STATIC(decl)=0;
+    TREE_PUBLIC(decl)=0;
+    return decl;
+}
+
+/**
  * 不要加分号
  * 函数中作为参数加分号要出错
  * getName(new$ Abc())
+ * 无名创建对象 当作用函数参数时 setData(new$ Abc());，需要另外处理.
+ * 在当前函数范围创建临时变量。该变量初始化在参数体中。代码如下
+ * void xxxx(){
+ *  setData(new$ Abc());转化成
+ * }
+ *
+ * void xxxx(){
+ *   Abc *tempAbc __attribute__((cleanup(a_object_cleanup_local_object_from_static_or_stack)));
+ *   setData(({tempAbc=debug_AObject.newObject(sizeof(debug_AObject));....});转化成
+ * }
+ *
  */
-void new_heap_create_object_no_decl(NewHeap *self,ClassName *className,GenericModel *genericDefine,char *ctorStr)
+void new_heap_create_object_no_decl(NewHeap *self,ClassName *className,GenericModel *genericDefine,char *ctorStr,nboolean isParserParmsState)
 {
 	 char *tempVarName=class_util_create_new_object_temp_var_name(className->sysName,CREATE_OBJECT_METHOD_NO_DECL_HEAP);
 	 ClassInit *classInit=((NewStrategy *)self)->classInit;
+	 if(aet_utils_valid_tree(current_function_decl) && isParserParmsState){
+	     printf("在函数内调用new$ Object() isParserParmsState:%d\n",isParserParmsState);
+	     c_parser *parser=((NewStrategy *)self)->parser;
+	     tree decl=createNamelessVar(className->sysName,tempVarName);
+	     tree  attr = NULL_TREE;
+	     tree cleanfunc=lookup_name(get_identifier(AET_CLEANUP_NAMELESS_OBJECT_METHOD));
+	     attr=tree_cons (get_identifier ("cleanup"), cleanfunc, attr);
+	     DECL_ATTRIBUTES(decl)=attr;
+	     location_t  loc = DECL_SOURCE_LOCATION(decl);
+         tree type=TREE_TYPE(decl);
+         c_bind(loc,decl,FALSE);
+	     finish_decl (decl, loc, NULL_TREE,type, NULL_TREE);
+	 }
 	 NString *codes=n_string_new("");
 	 new_strategy_new_object((NewStrategy *)self,tempVarName,genericDefine,className,ctorStr,codes,FALSE);
 	 char *remain= getRemainToken(self);
@@ -297,8 +349,12 @@ void new_heap_create_object_no_decl(NewHeap *self,ClassName *className,GenericMo
 	 }
 	 new_strategy_add_new((NewStrategy*)self,className,tempVarName);
 	 new_strategy_set_var_type((NewStrategy*)self,NEW_OBJECT_LOCAL);
-	// char *insert=" __attribute__((cleanup(a_object_cleanup_local_object_from_static_or_stack))) ";
-	 //codes=n_string_insert(codes,2,insert);
+     if(aet_utils_valid_tree(current_function_decl) && isParserParmsState){
+         //替换debug_AObject *_notv5_13debug_AObject1;为空:
+         char find[512];
+         sprintf(find,"%s *%s;",className->sysName,tempVarName);
+         n_string_replace(codes,find,"",1);
+     }
 	 aet_utils_add_token(parse_in,codes->str,codes->len);
 	 n_debug("new_heap new_heap_create_object_no_decl 源代码:\n%s\n",codes->str);
 	 n_string_free(codes,TRUE);

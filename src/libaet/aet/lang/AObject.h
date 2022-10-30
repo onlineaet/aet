@@ -48,9 +48,19 @@ typedef struct _AArrayCleanup
     int size;
 }AArrayCleanup;
 
+/**
+ * 配合编译器，清除实参new$ Object()。
+ */
+static inline void a_object_cleanup_nameless_object(void **values)
+{
+    AObject *obj=*values;
+    obj->unref();
+    obj=NULL;
+}
+
 static inline void a_object_cleanup_local_object_from_static_or_stack(AObject *obj)
 {
-    //printf("a_object_cleanup_local_object_from_static_or_stack %p\n",obj);
+    //printf("a_object_cleanup_local_object_from_static_or_stack ---%p\n",obj);
     obj->unref();
     obj=NULL;
 }
@@ -93,6 +103,7 @@ static inline  void _free_super_data(AObject *self)
     if(self){
         int i=0;
         if(self->superCallData){
+           // printf("_free_super_data ---- %p\n",self);
             while(self->superCallData[i]!=NULL){
                 SuperCallData *item=self->superCallData[i];
                 a_free(item->sysName);

@@ -79,7 +79,7 @@ static nboolean isUnpointerClass(tree var)
 	return TRUE;
 }
 
-static void setClearup(NewStack *self,tree decl)
+static void setCleanup(NewStack *self,tree decl)
 {
 	  tree attr = lookup_attribute ("cleanup", DECL_ATTRIBUTES (decl));
 	  if (attr){
@@ -222,7 +222,7 @@ static nboolean initObject(NewStack *self,tree var)
 			setVarProperties(self,NEW_OBJECT_LOCAL_STATIC);
 			return TRUE;
 		}else{
-			setClearup(self,var);
+			setCleanup(self,var);
 			setInitLocalVar(self,var,className);
 			n_debug("new_stack_check 33 局部变量 var is name:%s className:%s isExternal:%d isPublic:%d isStatic:%d\n",
 						declName,className->sysName,external,isPublic,isStatic);

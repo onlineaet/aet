@@ -66,4 +66,5 @@ char                 *class_util_get_class_name_from_field_decl(tree fieldDecl);
 int                   class_util_get_nameless_call_link(tree value,NPtrArray *array,char **link);
 nboolean              class_util_is_function_field(tree field);
 
+
 #endif /* ! GCC_C_AET_H */

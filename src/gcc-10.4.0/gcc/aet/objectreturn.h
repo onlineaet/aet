@@ -27,8 +27,8 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 
 
 /**
- * 发AObject obj=new$ AObject();时加入了cleanup，当退出作用域时
- * cleanup将被调用，如果obj作为返回值，这时cleanup是不能调用了，该类
+ * 当AObject obj=new$ AObject();时加入了cleanup，当退出作用域时
+ * cleanup将被调用，如果obj作为返回值，这时cleanup不能调用，该类
  * 就是用于解决是否要移走cleanup然后把cleanup转移到被赋值的对象中。
  */
 

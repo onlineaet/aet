@@ -498,7 +498,7 @@ static nboolean isFromStack(NewObject *self)
         return FALSE;
     if(!self->returnNewObject)
         return FALSE;
-    new_object_return_newobject(self,FALSE);
+    new_object_set_return_newobject(self,FALSE);
     tree  decl = DECL_RESULT (current_function_decl);
     tree type=TREE_TYPE(decl);
     if(TREE_CODE(type)!=RECORD_TYPE)
@@ -529,7 +529,7 @@ nboolean  new_object_parser_new$(NewObject *self)
    nboolean fromStack=isFromStack(self);
    n_debug("获取构造函数的原代码是:%s fromstack:%d\n",codes->str,fromStack);
    if(!fromStack)
-     new_heap_create_object_no_decl(self->newHeap,className,genericsDefine,codes->str);
+     new_heap_create_object_no_decl(self->newHeap,className,genericsDefine,codes->str,self->isParserParmsState);
    else
      new_stack_create_object_no_name(self->newStack,className,genericsDefine,codes->str);
    n_string_free(codes,TRUE);
@@ -540,10 +540,19 @@ nboolean  new_object_parser_new$(NewObject *self)
 /**
  * 语句 return new$ Abc 可以判断是返回指针还是对象变量
  */
-void new_object_return_newobject(NewObject *self,nboolean returnNewObject)
+void new_object_set_return_newobject(NewObject *self,nboolean returnNewObject)
 {
     self->returnNewObject=returnNewObject;
 }
+
+/**
+ *  当前是不是存在解析参数状态。
+ */
+void new_object_set_parser_parms_state(NewObject *self,nboolean isParserParmsState)
+{
+    self->isParserParmsState=isParserParmsState;
+}
+
 
 /**
  * 在类中new一个静态的对象，象这样：

@@ -41,7 +41,7 @@ struct _NewHeap
 NewHeap    *new_heap_new();
 nboolean    new_heap_create_object(NewHeap *self,tree var);
 nboolean    new_heap_modify_object(NewHeap *self,tree var);
-void        new_heap_create_object_no_decl(NewHeap *self,ClassName *className,GenericModel *genericDefine,char *ctorStr);
+void        new_heap_create_object_no_decl(NewHeap *self,ClassName *className,GenericModel *genericDefine,char *ctorStr,nboolean isParserParmsState);
 void        new_heap_finish(NewHeap *self,CreateClassMethod method,tree func);
 char       *new_heap_create_object_for_static(NewHeap *self,tree var);
 

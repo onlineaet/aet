@@ -759,8 +759,8 @@ static void bind (tree name, tree decl, struct c_scope *scope, bool invisible, b
 
   b->prev = scope->bindings;
   scope->bindings = b;
-//  n_debug("bind 11 name:%s decl code:%d codeName:%s binding_freelist:%p depth:%d scope:%p b:%p ",name?IDENTIFIER_POINTER(name):"unknown",
-//				TREE_CODE(decl),get_tree_code_name(TREE_CODE(decl)),binding_freelist,b->depth,scope,b);
+  n_debug("bind 11 name:%s decl code:%d codeName:%s binding_freelist:%p depth:%d scope:%p b:%p ",name?IDENTIFIER_POINTER(name):"unknown",
+				TREE_CODE(decl),get_tree_code_name(TREE_CODE(decl)),binding_freelist,b->depth,scope,b);
   if (decl_jump_unsafe (decl))
     scope->has_jump_unsafe_decl = 1;
 
@@ -11754,7 +11754,7 @@ void c_c_decl_bind_file_scope (tree  decl)
 //zclei 是不是一个内建的implicitly函数
 tree c_c_decl_get_decl_in_symbol_binding (tree functionId)
 {
-       struct c_binding *b;
+      struct c_binding *b;
       tree decl = NULL_TREE;
       tree asmspec_tree;
       for (b = I_SYMBOL_BINDING (functionId); b; b = b->shadowed){
@@ -11765,5 +11765,6 @@ tree c_c_decl_get_decl_in_symbol_binding (tree functionId)
       }
      return decl;
 }
+
 
 #include "gt-c-c-decl.h"

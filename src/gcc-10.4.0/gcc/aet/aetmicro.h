@@ -194,6 +194,7 @@ enum warn_error_info{
 #define AET_ROOT_OBJECT                    "AObject"
 #define AET_ROOT_CLASS                     "AClass"
 #define AET_CLEANUP_OBJECT_METHOD          "a_object_cleanup_local_object_from_static_or_stack"
+#define AET_CLEANUP_NAMELESS_OBJECT_METHOD "a_object_cleanup_nameless_object" //清除实参是new$ Object()
 
 #define AET_MAX_INTERFACE 5 //一个类同时只能实现5个接口
 #define AET_INIT_GLOBAL_METHOD_STRING      "init_1234ergR5678"

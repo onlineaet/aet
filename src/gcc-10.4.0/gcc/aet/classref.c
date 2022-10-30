@@ -114,7 +114,6 @@ static tree createNormalOrSuperRef(ClassRef *self,location_t loc,location_t comp
 		 BINFO_FLAG_6(ref)=1;//这是通过类引用的方式调用函数的标记
 	 else
 		 BINFO_FLAG_5(ref)=1;//这是通过类引用的方式调用函数的标记并且是父调用
-	 n_debug("class_ref_build_deref 33 %p %p\n",ref,DECL_LANG_SPECIFIC (ref));
 	 return ref;
 }
 

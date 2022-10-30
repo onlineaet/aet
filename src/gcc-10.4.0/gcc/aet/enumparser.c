@@ -158,7 +158,7 @@ static EnumData *getEnumDataByName(EnumParser *self,char *sysName,char *name,nbo
     NPtrArray* data=n_ptr_array_new();
     for(i=0;i<array->len;i++){
     	EnumData *item=(EnumData *)n_ptr_array_index(array,i);
-    	//printf("getEnumDataByName --- %s %s %s orig:%d\n",name,item->origName,item->typedefName,orig);
+    	n_debug("getEnumDataByName --- %s %s %s orig:%d\n",name,item->origName,item->typedefName,orig);
     	if(orig){
       	   if(strcmp(item->origName,name)==0){
       		  return item;
@@ -515,14 +515,18 @@ tree  enum_parser_parser_dot(EnumParser *self,struct c_typespec *specs)
 	   return NULL_TREE;
     char *origName=IDENTIFIER_POINTER(t->value);
     EnumData *item=findEnumType(self,sysName,origName,TRUE);
-	printf("enum_parser_parser_dot 33 %s %p\n",origName,item);
+	//printf("enum_parser_parser_dot 33 origName:%s sysName:%s %p\n",origName,sysName,item);
     if(item==NULL)
         item=findEnumType(self,sysName,origName,FALSE);
+    //printf("enum_parser_parser_dot 44 origName:%s sysName:%s %p\n",origName,sysName,item);
+
     if(item!=NULL){
     	//说明找到一个枚举类型
     	c_parser_consume_token (parser); //consume cpp_dot
      	c_parser_consume_token (parser); //consume cpp_name(enum 名字)
     	return item->typeDecl;
+    }else{
+        n_warning("找不到类%s的枚举类型%s！检查类型是否有错。",sysName,origName);
     }
 	return NULL_TREE;
 }

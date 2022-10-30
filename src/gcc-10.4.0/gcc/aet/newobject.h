@@ -37,8 +37,8 @@ struct _NewObject
     NewStack *newStack;
     NewHeap *newHeap;
     NewField *newField;
-    nboolean returnNewObject;//标记return关键词是 new$ AObject
-
+    nboolean returnNewObject;//标记是不是正在解析return new$ Object() 这样的语句。如果是，new$ Object()返回的是堆内存对象而不是栈内存对象。
+    nboolean isParserParmsState;//是不是解析参数据状态。只能用在c-parser.c中。
 };
 
 NewObject  *new_object_get();
@@ -47,8 +47,9 @@ nboolean    new_object_ctor(NewObject *self,tree decl);
 void        new_object_finish(NewObject *self,CreateClassMethod method,tree func);
 nboolean    new_object_modify(NewObject *self,tree decl);
 nboolean    new_object_parser_new$(NewObject *self);
-void        new_object_return_newobject(NewObject *self,nboolean returnNewObject);//语句 return new$ Abc 可以判断是返回指针还是对象变量
+void        new_object_set_return_newobject(NewObject *self,nboolean returnNewObject);//语句 return new$ Abc 可以判断是返回指针还是对象变量
 char *      new_object_parser_for_static(NewObject *self,tree decl,GenericModel *genericsModel);
+void        new_object_set_parser_parms_state(NewObject *self,nboolean isParserParmsState);//当前是不是存在解析参数状态。
 
 void        new_object_set_parser(NewObject *self,c_parser *parser);
 

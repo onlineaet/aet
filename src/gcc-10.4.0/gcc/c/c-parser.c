@@ -6472,7 +6472,7 @@ static void c_parser_statement_after_labels (c_parser *parser, bool *if_p, vec<t
 	            }else{
 	               location_t xloc = c_parser_peek_token (parser)->location;
 	               if(c_parser_next_token_is_keyword(parser,RID_AET_NEW)){//zclei return new$ Abc 说明返回的是一个指针对象类对象变量
-	            	   new_object_return_newobject(new_object_get(),TRUE);
+	                   new_object_set_return_newobject(new_object_get(),TRUE);
 	               }
 	               struct c_expr expr = c_parser_expression_conv (parser);
 	               mark_exp_read (expr.value);
@@ -10693,12 +10693,13 @@ static struct c_expr c_parser_postfix_expression_after_primary (c_parser *parser
 	         }
 	         n_debug("c_parser_postfix_expression_after_primary 11 进入函数参数处理 %p %s ",expr.value,
 	        		 get_tree_code_name(TREE_CODE(expr.value)));
+	         new_object_set_parser_parms_state(new_object_get(),TRUE);
 	         literal_zero_mask = 0;
 	         if (c_parser_next_token_is (parser, CPP_CLOSE_PAREN))
 	            exprlist = NULL;
 	         else
 	            exprlist = c_parser_expr_list (parser, true, false, &origtypes,sizeof_arg_loc, sizeof_arg, &arg_loc, &literal_zero_mask);
-
+             new_object_set_parser_parms_state(new_object_get(),FALSE);
 	         c_parser_skip_until_found (parser, CPP_CLOSE_PAREN,"expected %<)%>");
 	         n_debug("c_parser_postfix_expression_after_primary 22 函数参数处理完成 expr.value:%s %p 参数个数:%d",
 	   	        		 get_tree_code_name(TREE_CODE(expr.value)),expr.value,vec_safe_length (exprlist));

@@ -32,6 +32,7 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 #include "c/c-tree.h"
 #include "c/c-parser.h"
 #include "opts.h"
+#include "tree-iterator.h"
 
 #include "aetinfo.h"
 #include "aetutils.h"
@@ -897,6 +898,7 @@ nboolean  class_util_is_function_field(tree fieldDecl)
        return TRUE;
    return FALSE;
 }
+
 
 
 

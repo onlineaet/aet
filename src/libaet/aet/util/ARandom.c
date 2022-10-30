@@ -109,6 +109,12 @@ impl$ ARandom{
       createSeed(seed, 4);
     }
 
+    ARandom(const auint32 seed){
+        createSeed(seed);
+    }
+
+
+
     ARandom(const auint32 *seed,auint length){
         createSeed(seed,length);
     }

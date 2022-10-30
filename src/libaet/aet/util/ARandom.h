@@ -21,6 +21,7 @@ public$ class$ ARandom{
 	private$ auint32 mt[A_RAND_COUNT]; /* 存储状态  */
 	private$ auint mti;
 	public$ ARandom(const auint32 *seed,auint length);
+    public$ ARandom(const auint32 seed);
 	public$ void setSeed (auint32  seed);
 	public$ void setSeed(const auint32 *seed,auint length);
 	public$ aint32 nextInt(aint32  begin,aint32  end);

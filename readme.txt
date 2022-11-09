@@ -1,6 +1,6 @@
-"AET" has been developed for two years. It is a programming language that looks like an object, 
-is compatible with C language, has simple syntax, is flexible and extensible, 
-like c++, ada, objc and so on in GCC platform.
+"AET" has been developed for two years. It is a Object-oriented Programming Language that is 
+compatible with C language, has simple syntax, is flexible and extensible, like c++, ada,
+objc and so on in GCC platform.
 
 "AET" contains almost all the features of object-oriented programming languages, 
 supports generic programming (substitution and virtualization) and syntax stage optimization. 
@@ -49,7 +49,8 @@ aet是基于gcc开发的，为了区别于c++的关键字，除了"__OBJECT__"�
    "public$"     public$修饰的类、属性、方法和构造方法可以被任何类访问。  
    "protected$"  protected$修饰的类、属性、方法和构造方法可以被同一个包中的类或子类访问。   
    "private$"    只能由本类访问。   
-   "enum$"       定义枚举      
+   "enum$"       定义枚举。
+   "varof$"      测试它左边的变量是否是它右边的AET类或接口的实例。  
    "generic_info$"  获取泛型信息,
    "genericblock$"   泛型块函数，只有在泛型块函数内的泛型声明才会被真实类型替换。其它都被虚化成void
    "__OBJECT__"      用以指示本行语句所在的源文件中的类名。

@@ -65,7 +65,7 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 #include "c-aet.h"
 #include "aetprinttree.h"
 
-#include "varmgr.h"
+#include "classparser.h"
 #include "parserstatic.h"
 #include "classutil.h"
 #include "aet-c-parser-header.h"
@@ -227,6 +227,33 @@ nboolean parser_help_compare(tree funcType1,tree funcType2)
 			 return FALSE;
 	}
 	return TRUE;
+}
+
+/**
+ * 为类声明和接口声明加一个变量作用魔数
+ * 并作为第一个参数。
+ * private$ int _aet_magic$_123;
+ */
+void     parser_help_add_magic()
+{
+      ClassParser *classParser=class_parser_get();
+      c_parser *parser=classParser->parser;
+      c_token *token = c_parser_peek_token (parser);//
+      int tokenCount=parser->tokens_avail;
+      if(tokenCount+4>AET_MAX_TOKEN){
+            error("token太多了");
+            return FALSE;
+      }
+      int i;
+      for(i=tokenCount;i>0;i--){
+          aet_utils_copy_token(&parser->tokens[i-1],&parser->tokens[i-1+4]);
+      }
+      aet_utils_create_private$_token(&parser->tokens[0],input_location);
+      aet_utils_create_int_token(&parser->tokens[1],input_location);
+      aet_utils_create_token(&parser->tokens[2],CPP_NAME,AET_MAGIC_NAME,strlen(AET_MAGIC_NAME));
+      aet_utils_create_token(&parser->tokens[3],CPP_SEMICOLON,";",1);
+      parser->tokens_avail=tokenCount+4;
+      aet_print_token_in_parser("parser_help_add_magic ---- ",classParser->currentClassName->sysName);
 }
 
 

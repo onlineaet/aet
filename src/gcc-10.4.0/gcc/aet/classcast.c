@@ -893,13 +893,20 @@ void class_cast_parm_convert_from_deref(ClassCast *self,tree func,vec<tree, va_g
 					break;
 				}
 				tree actualParm = (*exprlist)[count];
+				printf("class_cast_parm_convert_from_deref 实参是:%d\n",count);
+				aet_print_tree(actualParm);
 				if(count==0){
 					nboolean isRefUnref=isIFaceRefOrUnref(op0,fieldDecl);
 					tree cc=convertToIface(type,actualParm,isRefUnref);
+	                printf("class_cast_parm_convert_from_deref 11 实参是:%d cc:%p\n",count,cc);
+
 					if(cc!=NULL_TREE)
 					  (*exprlist)[count]=cc;
 				}else{
+
 				   tree cc=convertActualParm(type,actualParm,count);
+                   printf("class_cast_parm_convert_from_deref 22 实参是:%d cc:%p\n",count,cc);
+
 				   if(cc!=NULL_TREE)
 					  (*exprlist)[count]=cc;
 				}

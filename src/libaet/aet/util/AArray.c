@@ -48,7 +48,7 @@ impl$ AArray{
 	     want_alloc = nearestPow (want_alloc);
 	     want_alloc = MAX (want_alloc, MIN_ARRAY_SIZE);
          self->data = a_realloc (self->data, want_alloc);//realloc 保留原来的数据返加扩大的内存
-         printf("maybeExpand %d %p\n",want_alloc,self->data);
+       //  printf("maybeExpand %d %p\n",want_alloc,self->data);
 	     memset (self->data + self->alloc, 0, want_alloc - self->alloc);
 	     self->alloc = want_alloc;
 	  }

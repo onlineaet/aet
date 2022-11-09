@@ -33,21 +33,25 @@ public$ class$ AObject{
    private$ unsigned long *_superFuncAddr123[10];//存放每个继承类的原始函数地址。这些地址来自superCallData
 };
 
-class$ AClass{
+/**
+ * 编译器完成AClass实例化和属性的赋值。
+ * 具体在_createAClass_debug_RandomGenerator_123方法中。
+ * 所以用户是不能创建AClass对象的。
+ */
+public$ class$ AClass{
     private$ char *name;
     private$ char *packageName;
+    private$ AClass *parent;
+    private$ AClass *interfaces[10];
+    private$ int interfaceCount;
     private$ AClass();
-    public$ char *getName();
+    public$ char    *getName();
+    public$ char    *getPackage();
+    public$ AClass  *getParent();
+    public$ AClass **getInterfaces(int *count);
 };
 
-
-typedef struct _AArrayCleanup
-{
-    void *arrays;
-    int count;
-    int size;
-}AArrayCleanup;
-
+///////////////---------------以下都是编译器调用的，用户程序不能调用---------------
 /**
  * 配合编译器，清除实参new$ Object()。
  */
@@ -67,6 +71,7 @@ static inline void a_object_cleanup_local_object_from_static_or_stack(AObject *o
 
 typedef struct _IfaceCommonData123 IfaceCommonData123;
 struct _IfaceCommonData123{
+    int   _aet_magic$_123;
     void *_atClass123;
 };
 
@@ -86,6 +91,58 @@ static inline  IfaceCommonData123 * _iface_reserve_ref_func_define_123(IfaceComm
 static inline  void _iface_reserve_unref_func_define_123(IfaceCommonData123 *iface)
 {
     ((AObject*)iface->_atClass123)->unref();
+}
+
+
+static inline int is_aet_class(AClass *class,char *name)
+{
+        char sysName[512];
+        char *package=class->getPackage();
+        if(package!=NULL)
+           sprintf(sysName,"%s_%s",package,class->getName());
+        else
+           sprintf(sysName,"%s",package,class->getName());
+        return strcmp(sysName,name)==0;
+}
+
+static inline int object_varof(AClass *class,char *name)
+{
+    if(class==NULL)
+        return 0;
+    if(is_aet_class(class,name))
+        return 1;
+    AClass *parentClass=class->getParent();
+    if(parentClass!=NULL){
+       if(is_aet_class(parentClass,name))
+          return 1;
+    }
+       int ifaceCount=0;
+       AClass **interfaceClasses=class->getInterfaces(&ifaceCount);
+       int i;
+       for(i=0;i<ifaceCount;i++){
+           if(is_aet_class(interfaceClasses[i],name))
+                return 1;
+       }
+       return object_varof(parentClass,name);
+}
+
+static inline int  varof_object_or_interface (void *object,char *name)
+{
+    char *magic=(char*)object;
+    int magicNum = (magic[3]<<24) + (magic[2]<<16) + (magic[1]<<8) + (magic[0]);
+    if(magicNum!=1725348960 && magicNum!=1725348961)
+        return 0;
+    AObject *dest=NULL;
+    if(magicNum==1725348960){
+        dest=(AObject*)object;
+    }else if(magicNum==1725348961){
+        char *atClass=magic+sizeof(int);//跳过_aet_magic$_123
+        unsigned long value=0;
+        memcpy(value,atClass,sizeof(unsigned long));
+        dest=(AObject*)(value);//
+        printf("dest is :%p %ld\n",dest,value);
+    }
+    return object_varof(dest,name);
 }
 
 /**

@@ -27,6 +27,7 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 #include "c/c-lang.h"
 #include "c/c-parser.h"
 #include "../libcpp/include/cpplib.h"
+#include "options.h"
 
 #include "aetutils.h"
 #include "aetinfo.h"
@@ -37,12 +38,11 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 #include "aetprinttree.h"
 #include "funcmgr.h"
 #include "classmgr.h"
+#include "classutil.h"
 
 ClassInfo *class_info_new()
 {
-	//ClassInfo *self=n_new(ClassInfo,sizeof(ClassInfo));
 	ClassInfo *self = n_slice_alloc0 (sizeof(ClassInfo));
-
 	self->type=CLASS_TYPE_NORMAL;
 	self->className.sysName=NULL;
 	self->className.userName=NULL;
@@ -50,7 +50,6 @@ ClassInfo *class_info_new()
 	self->parentName.sysName=NULL;
 	self->parentName.userName=NULL;
 	self->parentName.package=NULL;
-
 	int i;
 	for(i=0;i<AET_MAX_INTERFACE;i++){
 	  self->ifaces[i].sysName=NULL;
@@ -88,25 +87,17 @@ nboolean   class_info_is_final(ClassInfo *self)
 	return self->isFinal;
 }
 
-
-
 nboolean   class_info_is_field(ClassInfo *self,tree component)
 {
      tree record=self->record;
-     tree field=aet_lookup_field(record,component);
-     //if(field && field!=error_mark_node)
-        //printf("class_info_get_field %s %s %s class:%s\n",get_tree_code_name(TREE_CODE(record)),
-        	//	get_tree_code_name(TREE_CODE(field)),IDENTIFIER_POINTER(component),self->className.sysName);
-     return (field && field!=error_mark_node && TREE_CODE(field)==TREE_LIST);
+     return class_util_have_field(record,component);
 }
 
 nboolean   class_info_is_field_by_name(ClassInfo *self,char *fieldName)
 {
      tree record=self->record;
      tree  component=aet_utils_create_ident(fieldName);
-     tree field=aet_lookup_field(record,component);
-    // printf("class_info_is_field_by_name %s %p\n",get_tree_code_name(TREE_CODE(record)),field);
-     return (field && field!=error_mark_node);
+     return class_util_have_field(record,component);
 }
 
 tree  class_info_get_field_by_component(ClassInfo *self,tree ident)
@@ -353,9 +344,57 @@ nboolean  class_info_is_decl_file(ClassInfo *self,char *file)
     return !strcmp(self->file,file);
 }
 
+/**
+ * 为AClass创建代码
+ */
+char *class_info_create_class_code(ClassInfo *self)
+{
+    ClassName *className=&self->className;
+    NString *codes=n_string_new("");
+    //给AClass.h中的属性赋值
+    n_string_append_printf(codes,"obj->name=strdup(\"%s\");\n",className->userName);
+    if(className->package)
+       n_string_append_printf(codes,"obj->packageName=strdup(\"%s\");\n",className->package);
+    if(self->parentName.sysName)
+       n_string_append_printf(codes,"obj->parent=%s.class;\n",self->parentName.userName);
+    if(!class_info_is_interface(self)){
+        int i;
+        for(i=0;i<self->ifaceCount;i++){
+            n_string_append_printf(codes,"obj->interfaces[%d]=%s.class;\n",i,self->ifaces[i].userName);
+        }
+        if(self->ifaceCount>0){
+            n_string_append_printf(codes,"obj->interfaceCount=%d;\n",i,self->ifaceCount);
+        }
+    }
+    char *ret=n_strdup(codes->str);
+    n_string_free(codes,TRUE);
+    return ret;
+}
 
 
+nboolean      class_info_is_root(ClassInfo *self)
+{
+    return self->type==CLASS_TYPE_NORMAL && !strcmp(self->className.userName,AET_ROOT_OBJECT);
+}
 
+/**
+ * 声明所在的文件
+ */
+void  class_info_set_file(ClassInfo *self,char *file)
+{
+    if(self->file!=NULL){
+        n_error("类%s声明所在的文件%s已设置。",self->className.userName,self->file);
+        return;
+    }
+    self->file=n_strdup(file);
+}
+
+char  *class_info_get_file(ClassInfo *self)
+{
+    if(self==NULL)
+        return NULL;
+    return self->file;
+}
 
 
 

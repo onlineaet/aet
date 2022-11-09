@@ -79,6 +79,25 @@ static void createVar(char *className,char *result)
 	sprintf(result,"_%s%u",temp,hash);
 }
 
+/**
+ * 创建生成aclass的函数名，如:
+ * static  AClass *_createAClass_debug_ARandom_123(debug_ARandom *self)
+   {
+       static AClass *_aclassdebug_ARandom3488912659=NULL;
+       if(_aclassdebug_ARandom3488912659!=NULL){
+           return _aclassdebug_ARandom3488912659;
+       }
+       debug_AClass *obj=({ debug_AClass *temp;
+           temp=debug_AClass.newObject(sizeof(debug_AClass));
+           temp->objectSize=sizeof(debug_AClass);
+           debug_AClass_init_1234ergR5678_debug_AClass(temp);
+           temp->AClass();temp;});
+       obj->name=strdup("ARandom");//这里是具体内容
+       obj->packageName=strdup("com.dnn");
+      _aclassdebug_ARandom3488912659=obj;
+       return _aclassdebug_ARandom3488912659;
+    }
+ */
 void class_build_create_func_name(ClassName *className,char *buf)
 {
 	 sprintf(buf,"_createAClass_%s_123",className->sysName);
@@ -90,7 +109,7 @@ void class_build_create_func_name_by_sys_name(char *sysName,char *buf)
 }
 
 /**
- * 第个类除了接口，当impl完成后，生成创建本身类信息的代码
+ * 除了接口，当impl完成后，生成创建本身类信息的代码
  * 在类的初始化时，如果参数是self就会调这里。
  * AClass *obj=new$ AClass()变成:
  * AObject *obj=({ test_AClass *_notv2_11test_AClass1;
@@ -115,6 +134,8 @@ void class_build_create_codes(ClassBuild *self,ClassName *className,NString *cod
 	    n_error("%s与%s的包名，应该是一样的。%s %s",AET_ROOT_OBJECT,AET_ROOT_CLASS,oName->package,cName->package);
 	    return;
    }
+   ClassInfo *classInfo=class_mgr_get_class_info_by_class_name(class_mgr_get(),className);
+   char *varInitCodes=class_info_create_class_code(classInfo);
    char *initMethod=aet_utils_create_init_method(cName->sysName);
    n_string_append_printf(codes,"static  AClass *%s(%s *self)\n",funcName,className->sysName);
    n_string_append(codes,       "{\n");
@@ -125,10 +146,11 @@ void class_build_create_codes(ClassBuild *self,ClassName *className,NString *cod
    n_string_append_printf(codes,"           %s *obj=({ %s *temp;\n",cName->sysName,cName->sysName);
    n_string_append_printf(codes,"           temp=%s.newObject(sizeof(%s));\n",cName->sysName,cName->sysName);
    n_string_append_printf(codes,"           temp->objectSize=sizeof(%s);\n",cName->sysName);
-   n_string_append_printf(codes,"           %s(temp);\n",initMethod);
+   n_string_append_printf(codes,"           %s(temp);\n",initMethod);//调用初始化方法
    n_string_append(codes,"                  temp->AClass();\n");
    n_string_append(codes,"                  temp;});\n");
-   n_string_append_printf(codes,"    obj->name=strdup(\"%s\");\n",className->userName);
+   n_string_append(codes,varInitCodes);
+   n_string_append_printf(codes,"    obj->%s=%d;\n",AET_MAGIC_NAME,AET_MAGIC_NAME_VALUE);//设魔数
    n_string_append_printf(codes,"    %s=obj;\n",varName);
    n_string_append_printf(codes,"     return %s;\n",varName);
    n_string_append(codes,"       }\n");

@@ -113,7 +113,7 @@ static char *getRootObjectPathOrObjectFile(char *src,char *dest,nboolean needRoo
 	char *p1=n_file_get_absolute_path(n_file_get_parent_file(sroot));
 	char *p2=n_file_get_absolute_path(n_file_get_parent_file(dfile));
 	if(!strcmp(p1,p2)){
-	  printf("源文件与.o中同一个目录下:%s %s\n",p1,sname);
+	  n_debug("源文件与.o中同一个目录下:p1:%s sname:%s\n",p1,sname);
 	  if(needRootPath){
 		 return n_strdup(p1);
 	  }else{
@@ -206,7 +206,10 @@ char *makefile_parm_get_object_root_path(MakefileParm *self)
 
 #define SEPARATION "#$%"
 
-
+/**
+ * 写入编译参数到与正在编译的同名的.tmp文件中。
+ * 为第二次编译做准备。
+ */
 void makefile_parm_write_compile_argv(MakefileParm *self)
 {
 	 char *aetEnv=getenv ("GCC_AET_PARM");
@@ -269,6 +272,15 @@ static void initRootObjectPath(MakefileParm *self)
 	}
 }
 
+/**
+ * 初始化两个参数参数
+ * 1.编译器可执行文件
+ * 2..o文件存放的根目录。
+ * 例如:
+ * /home/sns/gcc-10.4.0/bin/gcc
+ * /home/sns/workspace/ai/pc-build
+ * 并把这两个参数存入文件aet_object_path.tmp
+ */
 static void makefile_parm_init_argv (MakefileParm *self)
 {
 	if(self->collect2LinkFile==NULL){
@@ -285,15 +297,10 @@ static void makefile_parm_init_argv (MakefileParm *self)
 		n_error("通过环境变量COLLECT_GCC找不到 gcc\n");
 		return;
 	}
+	n_debug("makefile_parm_init_argv --- %s %s isSecondCompile:%d",aetGcc,objectPath,self->isSecondCompile);
 	n_string_append_printf(codes,"%s\n",aetGcc);
 	n_string_append_printf(codes,"%s",objectPath);
-	//NFile *file=n_file_new(in_fnames[0]);
-	//nint64 time=n_file_get_create_time(file);
-	//n_file_unref(file);
-	//nint64 nowt=link_file_lock_get_create_time(self->collect2LinkFile);
-	//if(nowt<time){
     link_file_lock_write(self->collect2LinkFile,codes->str,codes->len);
-	//}
 	n_string_free(codes,TRUE);
 }
 

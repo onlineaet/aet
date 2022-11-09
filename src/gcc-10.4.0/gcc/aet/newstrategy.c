@@ -688,6 +688,7 @@ static void new_strategy_create_common_heap_codes(NewStrategy *self,char *varNam
 	 n_string_append_printf(codes,"({ %s *%s;\n",className->sysName,varName);
 	 n_string_append_printf(codes,"%s=%s.newObject(sizeof(%s));\n",varName,className->sysName,className->sysName);
 	 n_string_append_printf(codes,"%s->objectSize=sizeof(%s);\n",varName,className->sysName);
+     n_string_append_printf(codes,"%s->%s=%d;\n",varName,AET_MAGIC_NAME,AET_MAGIC_NAME_VALUE);
 	 addMiddleCodes(self,varName,className,genericDefine,undefineImplCodes, ctorStr,TRUE,codes);
 	 n_string_append_printf(codes,"%s;})%s\n",varName,addSSemicolon?";":"");
 }

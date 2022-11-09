@@ -263,7 +263,7 @@ int aet_utils_in_micro()
               state=FROM_MACRO;
           state=FROM_OTHER;
       }
-      n_debug("aet_utils_in_micro tokenKind:%d context->prev:%p end:%d in_directive:%d pfile->context->c.macro:%p\n",
+      n_debug("restorelocaton.c aet_utils_in_micro tokenKind:%d context->prev:%p end:%d in_directive:%d pfile->context->c.macro:%p",
               context->tokens_kind,context->prev,end,in_directive,pfile->context->c.macro);
       return state;
 }

@@ -592,6 +592,7 @@ const struct c_common_resword c_common_reswords[] =
   { "protected$",       RID_AET_PROTECTED,  0 },
   { "private$",         RID_AET_PRIVATE,    0 },
   { "enum$",            RID_AET_ENUM,0 },
+  { "varof$",           RID_AET_VAROF,0 },
   { "generic_info$",    RID_AET_GENERIC_INFO,   0 },
   { "genericblock$",    RID_AET_GENERIC_BLOCK,  0 },
   { "aet_goto_compile$", RID_AET_GOTO,  0 },

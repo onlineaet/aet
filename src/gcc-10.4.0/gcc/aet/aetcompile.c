@@ -27,6 +27,7 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 #include "file-find.h"
 #include "simple-object.h"
 #include "lto-section-names.h"
+#include <dirent.h>
 
 #include "collect2.h"
 #include "collect2-aix.h"
@@ -39,6 +40,15 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 
 #include "aetmicro.h"
 
+static int compileHeaderFile(char *objectRootPath);
+static int readFileList(char *basePath,char **objs);
+
+struct command
+{
+  const char *prog;     /* program name.  */
+  const char **argv;        /* vector of args.  */
+};
+
 
 static int getArgc(char **ld_argv)
 {
@@ -48,6 +58,7 @@ static int getArgc(char **ld_argv)
     }
     return count;
 }
+
 static int  gsplit (const char *string,const char *delimiter,char **buffers,int length)
 {
 	if(!string)
@@ -83,6 +94,8 @@ static int  gsplit (const char *string,const char *delimiter,char **buffers,int 
 
 /**
  * 获得GCC可执行文件和的路径
+ * aet_object_path.tmp不存在。说明不需要有第二次编译。
+ * 因为如果编译的是aet相关的。会生成aet_object_path.tmp文件。
  */
 static int getGccAndObjectPath(char *gcc,char *objectPath)
 {
@@ -148,10 +161,10 @@ static char * compileFuncCheckFile(char *gcc,char *objectRootPath)
     if(!fsrc && fdest){
     	//不编译，不加.o到ld中
     	action=0;
-    }else if(fsrc && !dest){
+    }else if(fsrc && !fdest){
     	//需要编译 加.o到ld中
     	action=2;
-    }else if(fsrc && dest){
+    }else if(fsrc && fdest){
     	//都存在,比较时间
 		unsigned long long st= getLastModified(src);
 		unsigned long long dt= getLastModified(dest);
@@ -195,23 +208,38 @@ static char * compileFuncCheckFile(char *gcc,char *objectRootPath)
 
 /**
  * 加新的.o到最终目标
+ * 两类文件的.o要加入到链结器中。
+ * 1.temp_func_track_45.c 生成的.o文件
+ * 2.接口的实现文件。
  */
-static char **createNewArgv(char **ld_argv,char *additional)
+static char **createNewArgv(char **ld_argv,char *additional,int ifaceObjectCount,char **ifaceObjects)
 {
 	 int count= getArgc(ld_argv);
+	 int total=count;
 	 int i;
-	 char **real_argv = XCNEWVEC (char *, count+2);
+	 if(additional!=NULL)
+	     total+=1;
+	 total+=ifaceObjectCount;
+	 total+=1;//放NULL
+	 char **real_argv = XCNEWVEC (char *, total);
 	 const char ** argv = CONST_CAST2 (const char **, char **,real_argv);
 	 for(i=0;i<count;i++){
 		argv[i]=ld_argv[i];
 	 }
-	 argv[count]=additional;
-	 argv[count+1]=(char*)0;
+	 if(additional)
+	   argv[count++]=additional;
+	 for(i=0;i<ifaceObjectCount;i++){
+	     argv[count++]=ifaceObjects[i];
+	 }
+	 argv[count++]=(char*)0;
 	 return argv;
 }
 
 #define FILTER_ARGV_0 "-plugin-opt=-fresolution="
 
+/**
+ * 如果从保存库路径的文件aet_collect2_argv.tmp
+ */
 static void writeLibArgv(char **ld_argv,char *objectRootPath)
 {
    char fileName[255];
@@ -249,6 +277,7 @@ static void writeLibArgv(char **ld_argv,char *objectRootPath)
         	  }
           }
       }
+      printf("是否要写入库路径到文件aet_collect2_argv.tmp find:%d i:%d count:%d\n",find,i,count);
       if(find==0){
     	  return;
       }
@@ -266,15 +295,10 @@ static void writeLibArgv(char **ld_argv,char *objectRootPath)
 
 
 
-///////////////////////-----------------------------------------------
+///////////////////////--------编译泛型文件---------------------------------------
 
-struct command
-{
-  const char *prog;		/* program name.  */
-  const char **argv;		/* vector of args.  */
-};
 
-static void createCmdForSencodCompile(char *fileName,struct command *cmds,int index)
+static void createCmdForGenericCompile(char *fileName,struct command *cmds,int index)
 {
     int len=strlen(fileName);
     char temp[255];
@@ -306,7 +330,7 @@ static void createCmdForSencodCompile(char *fileName,struct command *cmds,int in
     for(i=0;i<argc;i++){
         argv[i] = items[i];
     }
-    argv[argc] = "-Dnclcompileyes";
+    argv[argc] = xstrdup("-Dnclcompileyes");
     argv[argc+1] = (char *) 0;
     cmds[index].prog=items[0];
     cmds[index].argv=argv;
@@ -317,7 +341,6 @@ static int fillFileCount(char *objectRootPath,char **items,int count)
     char buffer[10*1024];
     char fileName[256];
     sprintf(fileName,"%s/%s",objectRootPath,AET_NEED_SECOND_FILE_NAME);
-    printf("compileGenericFile----11 %s\n",fileName);
     FILE *fp=fopen(fileName,"r");
     if(!fp){
 	   return 0;
@@ -327,8 +350,9 @@ static int fillFileCount(char *objectRootPath,char **items,int count)
     if(rev<=0)
 	   return 0;
     buffer[rev]='\0';
+    printf("第二次需要编译的文件有:fileName:%s content:%s\n",fileName,buffer);
     int length= gsplit (buffer,"\n",items,count);
-	remove((const char *)fileName);
+	remove((const char *)fileName);//删除文件aet_need_second_compile.tmp
     return length;
 
 }
@@ -336,8 +360,11 @@ static int fillFileCount(char *objectRootPath,char **items,int count)
 static char *aetgcc="gcc";
 
 
+/**
+ * 第二次编译泛型和接口有关的文件
+ */
 
-static int compileGenericOrIfaceFile (char *gcc,char *objectRootPath)
+static int compileGenericFile (char *gcc,char *objectRootPath)
 {
   int i;
   int n_commands;		/* # of command.  */
@@ -350,7 +377,7 @@ static int compileGenericOrIfaceFile (char *gcc,char *objectRootPath)
   commands = (struct command *) alloca (count * sizeof (struct command));
   n_commands=0;
   for(i=0;i<count;i++){
- 	   printf("删除需要第二次编译的.o文件。%s\n",oFiles[i]);
+ 	   printf("删除需要第二次编译的泛型的.o文件。%s\n",oFiles[i]);
  	   char *fileName=oFiles[i];
  	   int fileLen=strlen(fileName);
  	   if(fileLen==0)
@@ -359,7 +386,7 @@ static int compileGenericOrIfaceFile (char *gcc,char *objectRootPath)
  		   error ("无效的文件名:%s", fileName);
  	   }
  	   remove((const char *)fileName);
- 	   createCmdForSencodCompile(fileName,commands,n_commands++);
+ 	   createCmdForGenericCompile(fileName,commands,n_commands++);
   }
 
   struct pex_obj *pexes[n_commands];
@@ -387,17 +414,184 @@ static int compileGenericOrIfaceFile (char *gcc,char *objectRootPath)
 	     }
 	     pex_free (pexes[i]);
 	     if(status==0){
-	   	    printf("编译第二次成功%s\n",oFiles[i]);
+	   	    printf("编译泛型文件第二次成功%s\n",oFiles[i]);
 	     }else{
-		   	printf("编译第二次失败%s status:%d\n",oFiles[i],status);
+		   	printf("编译泛型文件第二次失败%s status:%d\n",oFiles[i],status);
 		   	ok=i;
 	     }
     }
     if(ok>=0){
-        fatal_error (input_location, "编译第二次失败:%qs",oFiles[ok]);
+        fatal_error (input_location, "编译泛型文件第二次失败:%qs",oFiles[ok]);
     }
     return 0;
 }
+
+
+
+//////////////////////////编译头文件-------------------------------
+
+static void getOFileName(char *cFile,char *oFile)
+{
+    char *re=strstr(cFile,".c");
+    int remainLen=strlen(cFile)-strlen(re);
+    char remain[remainLen+1];
+    memcpy(remain,cFile,remainLen);
+    remain[remainLen]='\0';
+    sprintf(oFile,"%s.o",remain);
+}
+
+static void createCmdForIfaceCompile(char *cFile,char *oFile,char *compileParm,struct command *cmds,int index)
+{
+    static char * SEPARATION ="#$%"; //与gcc.c中的一样
+    char *items[1024];
+    int argc=  gsplit (compileParm,SEPARATION,items,1024);
+    if(items[argc-1]==NULL || !strcmp(items[argc-1],"")){
+        printf("从compileParm取出的最后一个参数是空的或长度是0 %s 参数个数:%d\n",items[argc-1],argc);
+        argc--;
+    }
+    char **real_argv = XCNEWVEC (char *, argc+2);
+    const char ** argv = CONST_CAST2 (const char **, char **,real_argv);
+    int i;
+    for(i=0;i<argc;i++){
+        argv[i] = items[i];
+    }
+    argv[argc-3] =xstrdup(oFile);//这里可能有问题 跳过-c参数， 如果没有-c,赋值是错的。
+    argv[argc-1] =xstrdup(cFile);
+    argv[argc] = xstrdup("-Dnclcompileyes");
+    argv[argc+1] = (char *) 0;
+    cmds[index].prog=items[0];
+    cmds[index].argv=argv;
+//    for(i=argc-5;i<argc+2;i++){
+//        printf("createCmdForIfaceCompile---eee-- %d %s\n",i,argv[i]);
+//    }
+
+}
+
+/**
+ * 读取两个文件的内容
+ * iface_impl_index.tmp 由ifacecompile.c写入的要编译的头文件换行符分隔。
+ * iface_impl_parm.tmp 编译参数，每个c文件有一个编译参数。是往文件覆盖写的。
+ */
+static int readIfaceFile(char *fileName,char *buffer,int size)
+{
+         FILE *fp=fopen(fileName,"r");
+         if(!fp){
+            return 0;
+         }
+         int rev = fread(buffer, sizeof(char), size, fp);
+         fclose(fp);
+         if(rev<=0)
+            return  0;
+         buffer[rev]='\0';
+         return rev;
+}
+
+static int readFileList(char *basePath,char **objs)
+{
+    DIR *dir;
+    struct dirent *ptr;
+    if ((dir=opendir(basePath)) == NULL)
+    {
+        perror("Open dir error...");
+        exit(1);
+    }
+    int count=0;
+    while ((ptr=readdir(dir)) != NULL)
+    {
+        if(strcmp(ptr->d_name,".")==0 || strcmp(ptr->d_name,"..")==0)    ///current dir OR parrent dir
+            continue;
+        else if(ptr->d_type == 8) {   ///file
+            if(strstr(ptr->d_name,IFACE_OBJECT_FILE_SUFFIX)){
+                printf("aetcompile.c readFileList name:%s/%s\n",basePath,ptr->d_name);
+                char *ret=xmalloc(strlen(basePath)+strlen(ptr->d_name)+2);
+                sprintf(ret,"%s/%s",basePath,ptr->d_name);
+                objs[count++]=ret;
+            }
+        }else if(ptr->d_type == 10)    ///link file
+            printf("d_name:%s/%s\n",basePath,ptr->d_name);
+        else if(ptr->d_type == 4) //dir
+        {
+         continue;
+        }
+    }
+    closedir(dir);
+    return count;
+}
+
+static int compileHeaderFile(char *objectRootPath)
+{
+       char indexFileName[512];
+       sprintf(indexFileName,"%s/%s",objectRootPath,IFACE_IMPL_INDEX_FILE);
+       char buffer[1024*10];
+       readIfaceFile(indexFileName,buffer,1024*10);
+       char paramFileName[512];
+       sprintf(paramFileName,"%s/%s",objectRootPath,IFACE_IMPL_PARM_FILE);
+       char compileParm[4096];
+       readIfaceFile(paramFileName,compileParm,4096);
+       char *headImplCFiles[2048];
+       int count=  gsplit (buffer,"\n",headImplCFiles,2048);
+       struct command *commands;  /* each command buffer with above info.  */
+       commands = (struct command *) alloca (count * sizeof (struct command));
+       int   n_commands=0;
+       int i;
+       for(i=0;i<count;i++){
+           if(strlen(headImplCFiles[i])==0)
+               continue;
+           char *cFile=headImplCFiles[i];
+           char oFile[512];
+           getOFileName(cFile,oFile);
+           createCmdForIfaceCompile(cFile,oFile,compileParm,commands,n_commands++);
+       }
+
+       struct pex_obj *pexes[n_commands];
+       for(i=0;i<n_commands;i++){
+           pexes[i]=pex_init (0,aetgcc,NULL);
+           if (pexes[i] == NULL){
+             remove(indexFileName);
+             remove(paramFileName);
+             fatal_error (input_location, "%<pex_init%> failed: %m");
+           }
+       }
+
+       for (i = 0; i < n_commands; i++){
+           const char *errmsg;
+           int err;
+           const char *string = commands[i].argv[0];
+           errmsg = pex_run (pexes[i], PEX_LAST | PEX_SEARCH,string, CONST_CAST (char **, commands[i].argv),NULL, NULL, &err);
+           if (errmsg != NULL){
+               remove(indexFileName);
+               remove(paramFileName);
+               errno = err;
+               fatal_error (input_location,err ? "cannot execute %qs: %s: %m": "cannot execute %qs: %s",string, errmsg);
+           }
+        }
+        int ok=-1;
+        for (i = 0; i < n_commands; i++){
+              int status=0;
+              if (!pex_get_status (pexes[i], 1, &status)){
+                  remove(indexFileName);
+                  remove(paramFileName);
+                  fatal_error (input_location, "failed to get exit status: %m");
+              }
+              pex_free (pexes[i]);
+              if(status==0){
+                 printf("编译接口文件成功%s\n",headImplCFiles[i]);
+              }else{
+                 printf("编译接口文件失败%s status:%d\n",headImplCFiles[i],status);
+                 ok=i;
+              }
+              remove(headImplCFiles[i]);//移走.c文件
+         }
+         remove(indexFileName);
+         remove(paramFileName);
+         if(ok>=0){
+             fatal_error (input_location, "编译接口文件失败:%qs",headImplCFiles[ok]);
+         }
+         return 0;
+}
+
+///////////////////////结束编译头文件---------------------------------
+
 
 /**
  * 被collect2.c的do_link调用
@@ -408,23 +602,22 @@ static int compileGenericOrIfaceFile (char *gcc,char *objectRootPath)
  */
 char **aet_compile(char **ld_argv)
 {
-	 char gcc[256];
-	 char objectRootPath[256];
-	 int re=getGccAndObjectPath(gcc,objectRootPath);
-	 if(re==0){
-	      //printf("aet_compile 把编译参数中有关库路径写入到文件 gcc:%s objectRootPath:%s :file:%s\n",gcc,objectRootPath,SAVE_LIB_PARM_FILE);
-		  writeLibArgv(ld_argv,objectRootPath);//把库信息写入文件
+     char gcc[256];
+     char objectRootPath[256];
+     int re=getGccAndObjectPath(gcc,objectRootPath);
+     if(re==0){
+          //printf("aet_compile 把编译参数中有关库路径写入到文件 gcc:%s objectRootPath:%s :file:%s\n",gcc,objectRootPath,SAVE_LIB_PARM_FILE);
+          writeLibArgv(ld_argv,objectRootPath);//把库信息写入文件
           //printf("aet_compilexxx 把编译参数中有关库路径写入到文件 gcc:%s objectRootPath:%s :file:%s\n",gcc,objectRootPath,SAVE_LIB_PARM_FILE);
-		  char *addObject=compileFuncCheckFile(gcc,objectRootPath);
+          char *addObject=compileFuncCheckFile(gcc,objectRootPath);
          // printf("aet_compilexxxyyyyy 把编译参数中有关库路径写入到文件 gcc:%s objectRootPath:%s :file:%s\n",gcc,objectRootPath,SAVE_LIB_PARM_FILE);
-		  compileGenericOrIfaceFile(gcc,objectRootPath);
-		  printf("aet_compile  aet的跟踪文件 %s  %s %s\n",COMPILE_TRACK_FILE_NAME,gcc,addObject);
-		  if(addObject!=NULL){
-			  char **aetargv=createNewArgv(ld_argv,addObject);
-			  return aetargv;
-		  }
-	 }
+          compileGenericFile(gcc,objectRootPath);
+          compileHeaderFile(objectRootPath);
+          char *ifaceObjecs[1000];
+          int ifaceObjectCount=readFileList(objectRootPath,ifaceObjecs);
+          printf("aet_compile  aet的跟踪文件 %s  %s %s\n",COMPILE_TRACK_FILE_NAME,gcc,addObject);
+          char **aetargv=createNewArgv(ld_argv,addObject,ifaceObjectCount,ifaceObjecs);
+          return aetargv;
+     }
      return ld_argv;
 }
-
-

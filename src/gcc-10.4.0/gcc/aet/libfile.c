@@ -760,10 +760,10 @@ static char *getStr(char *src,char *match)
  * 3. --rpath-link
  * 只能在编译#define ADDITIONAL_MIDDLE_AET_FILE        "temp_func_track_45.c"
  * 时调用,取到的全局变量是用zip压缩的char型数据，保存在resultArray中
+ * 参数 libFile=SAVE_LIB_PARM_FILE 有所有引用库的名字
  */
 void lib_file_import_lib(LibFile *self,char *libFile)
 {
-	//libFile=SAVE_LIB_PARM_FILE
 	FILE *fp = fopen(libFile, "r");
 	char buffer[4096];
 	int rev=0;
@@ -813,6 +813,9 @@ void lib_file_import_lib(LibFile *self,char *libFile)
 	n_ptr_array_unref(fileNameArray);
 }
 
+/**
+ * 把打开的各种库中有关AET的内容定入到AET_REF_LIB_FILE_NAME中
+ */
 void lib_file_write(LibFile *self,char *fileName)
 {
 	NString *codes=n_string_new("");

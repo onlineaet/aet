@@ -171,7 +171,6 @@ static tree castInterfaceRef(tree parmOrVar,ClassName *parentName,ClassName *ifa
 		tree ifaceVarInParentClass=class_mgr_get_field_by_name(class_mgr_get(),parentName, ifaceVar);
 		if(!aet_utils_valid_tree(ifaceVarInParentClass))
 			return NULL_TREE;
-
 		tree parentType=createCastType(parentName);
 		tree castParent = build1 (NOP_EXPR, parentType, parmOrVar);
 		protected_set_expr_location (castParent, loc);

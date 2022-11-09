@@ -397,14 +397,9 @@ static void c_lex_one_token (c_parser *parser, c_token *token, bool raw = false)
 
 	      decl = lookup_name (token->value);
           enum rid rid_code1 = C_RID_CODE (token->value);
-         // if(!strcmp(IDENTIFIER_POINTER(token->value),"Abc"))
-            // n_info("c_lex_one_token 44 通过lookup_name 查看是不是一个类型 rid_code:%s  decl:%p value:%s %p",
-        		 // aet_rid_str[rid_code1],decl,IDENTIFIER_POINTER(token->value),token->value);
 	      if (decl){
 	         if (TREE_CODE (decl) == TYPE_DECL){
-	        	 //n_info("c_lex_one_token 55 通过lookup_name 这是一个类型名 rid_code:%s  decl:%p value:%s",
-	           		  //aet_rid_str[rid_code1],decl,IDENTIFIER_POINTER(token->value));
-		        token->id_kind = C_ID_TYPENAME; //描述类型的标识符
+	            token->id_kind = C_ID_TYPENAME; //描述类型的标识符
 		        break;
 	         }
 	      }else if (c_dialect_objc ()){
@@ -3163,7 +3158,6 @@ void c_parser_declspecs (c_parser *parser, struct c_declspecs *specs,
 	  t.expr_const_operands = true;
 	  n_debug("声明说明符语法 102 加入void int float等类型声明符： count:%d keyword:%d specs:%p",
 	    			  count,c_parser_peek_token (parser)->keyword,specs);
-	  n_debug("void is --- %s %p %p\n",get_tree_code_name(TREE_CODE(t.spec)),t.spec,void_node);
 	  declspecs_add_type (loc, specs, t);
 	  c_parser_consume_token (parser);
 	  break;
@@ -6418,7 +6412,7 @@ static void c_parser_statement_after_labels (c_parser *parser, bool *if_p, vec<t
           add_stmt (c_parser_compound_statement (parser));
           break;
        case CPP_KEYWORD:
-     	  n_debug("语句标签后 22 CPP_KEYWORD rid:%s", aet_rid_str[c_parser_peek_token (parser)->keyword]);
+     	  n_debug("语句标签后 22 CPP_KEYWORD rid:%s", aet_utils_get_keyword_string(c_parser_peek_token (parser)));
           switch (c_parser_peek_token (parser)->keyword){
 	         case RID_IF:
 	            c_parser_if_statement (parser, if_p, chain);
@@ -7129,10 +7123,10 @@ c_parser_for_statement (c_parser *parser, bool ivdep, unsigned short unroll,
       else if (c_parser_next_tokens_start_declaration (parser)
 	       || c_parser_nth_token_starts_std_attributes (parser, 1))
 	{
-	  c_parser_declaration_or_fndef (parser, true, true, true, true, true, 
+	  c_parser_declaration_or_fndef (parser, true, true, true, true, true,
 					 &object_expression, vNULL);
 	  parser->objc_could_be_foreach_context = false;
-	  
+
 	  if (c_parser_next_token_is_keyword (parser, RID_IN))
 	    {
 	      c_parser_consume_token (parser);
@@ -7163,7 +7157,7 @@ c_parser_for_statement (c_parser *parser, bool ivdep, unsigned short unroll,
 	      c_parser_declaration_or_fndef (parser, true, true, true, true,
 					     true, &object_expression, vNULL);
 	      parser->objc_could_be_foreach_context = false;
-	      
+
 	      restore_extension_diagnostics (ext);
 	      if (c_parser_next_token_is_keyword (parser, RID_IN))
 		{
@@ -7897,8 +7891,12 @@ c_parser_expr_no_commas (c_parser *parser, struct c_expr *after,
     	//n_debug("c_parser_expr_no_commas 22 右边作赋值表达式处理，赋值运算符:%s code:%s ",
     			//  aet_cpp_ttype_str[c_parser_peek_token (parser)->type],get_tree_code_name(code));
         //zclei
-        class_parser_is_static_continue_compile_and_goto(class_parser_get());
-        lhs=class_impl_nameles_call(classImpl,lhs);
+        if(c_parser_next_token_is_keyword(parser,RID_AET_VAROF)){
+          lhs=class_impl_varof_parser(classImpl,lhs);
+        }else{
+           class_parser_is_static_continue_compile_and_goto(class_parser_get());
+           lhs=class_impl_nameles_call(classImpl,lhs);
+        }
         return lhs;
     }
   c_parser_consume_token (parser);
@@ -7906,7 +7904,6 @@ c_parser_expr_no_commas (c_parser *parser, struct c_expr *after,
   n_debug("c_parser_expr_no_commas 33 右边作赋值表达式处理，赋值运算符:%s code:%s lhs.value:%p rhs.value:%p",
 		  aet_cpp_ttype_str[c_parser_peek_token (parser)->type],get_tree_code_name(code),lhs.value,rhs.value);
   aet_print_token(c_parser_peek_token (parser));
-
   //zclei
   if(c_parser_next_token_is_keyword(parser,RID_AET_GENERIC_BLOCK)){
 	  printf("c_parser_expr_no_commas  发现genericblock\n");
@@ -8270,7 +8267,6 @@ c_parser_binary_expression (c_parser *parser, struct c_expr *after,
 		case CPP_GREATER:
 		  oprec = PREC_REL;
 		  ocode = GT_EXPR;
-		  n_debug("CPP_GREATER-------\n");
 		  break;
 		case CPP_LESS_EQ:
 		  oprec = PREC_REL;
@@ -8337,7 +8333,7 @@ c_parser_binary_expression (c_parser *parser, struct c_expr *after,
 	  }
       sp++;
       stack[sp].loc = binary_loc;
-      n_debug("c_parser_binary_expression ---00----- %s sp:%d\n",get_tree_code_name(ocode),sp);
+      n_debug("c_parser_binary_expression ---11----- %s sp:%d\n",get_tree_code_name(ocode),sp);
       stack[sp].expr = c_parser_cast_expression (parser, NULL);
       stack[sp].prec = oprec;
       stack[sp].op = ocode;
@@ -8346,7 +8342,7 @@ c_parser_binary_expression (c_parser *parser, struct c_expr *after,
  out:
   while (sp > 0)
     POP;
-  n_debug("c_parser_binary_expression 11 二元表达式 expr.value:%p %s ",
+  n_debug("c_parser_binary_expression 22 二元表达式 expr.value:%p %s ",
 		  stack[0].expr.value,get_tree_code_name(TREE_CODE(stack[0].expr.value)));
 
   return stack[0].expr;
@@ -10704,11 +10700,9 @@ static struct c_expr c_parser_postfix_expression_after_primary (c_parser *parser
 	         n_debug("c_parser_postfix_expression_after_primary 22 函数参数处理完成 expr.value:%s %p 参数个数:%d",
 	   	        		 get_tree_code_name(TREE_CODE(expr.value)),expr.value,vec_safe_length (exprlist));
 	         if(class_impl_is_aet_class_component_ref_call(classImpl,expr)){
-	        	// printf("需要加入参数self到参数列表中 参数个数:%d\n",vec_safe_length (exprlist));
 	        	 if(!class_util_add_self(expr,&exprlist,&origtypes,&arg_loc)){
 		        	 printf("需要加入参数self到参数列表中 参数个数:%d,但失败了。\n",vec_safe_length (exprlist));
 	        	 }
-	        	 //printf("加self之前的exprlist 00 %p %d\n",exprlist,exprlist->length());
 	        	  vec_safe_reserve (exprlist, 2);//为泛型参数tempFgpi1234预留一个空间，否则vec_safe_insert会改变exprlist 用的是realloc方法
 	        	  if(origtypes)
                      vec_safe_reserve (origtypes, 2);
@@ -10973,18 +10967,13 @@ static vec<tree, va_gc> *c_parser_expr_list (c_parser *parser, bool convert_p, b
 
     ret = make_tree_vector ();
     if (p_orig_types == NULL){
-        n_debug("c_parser_expr_list 00 _orig_types == NULL");
-
        orig_types = NULL;
     }else{
-        n_debug("c_parser_expr_list 11 orig_types = make_tree_vector ()");
-
        orig_types = make_tree_vector ();
     }
 
     if (literal_zero_mask)
        c_parser_check_literal_zero (parser, literal_zero_mask, 0);
-    n_debug("c_parser_expr_list 22 开始赋值 convert_p:%d fold_p:%d",convert_p,fold_p);
     expr = c_parser_expr_no_commas (parser, NULL);
     if (convert_p){
        expr = convert_lvalue_to_rvalue (expr.get_location (), expr, true, true);
@@ -10993,8 +10982,6 @@ static vec<tree, va_gc> *c_parser_expr_list (c_parser *parser, bool convert_p, b
        expr.value = c_fully_fold (expr.value, false, NULL);
     }
     ret->quick_push (expr.value);
-    n_debug("c_parser_expr_list 33 开始赋值 ",get_tree_code_name(TREE_CODE(expr.value)));
-
     if (orig_types)
        orig_types->quick_push (expr.original_type);
     if (locations)
@@ -11015,7 +11002,6 @@ static vec<tree, va_gc> *c_parser_expr_list (c_parser *parser, bool convert_p, b
        vec_safe_push (ret, expr.value);
        n_debug("c_parser_expr_list 44 开始赋值  expr.value:%p %p",
     		   expr.value,TREE_TYPE(expr.value),get_tree_code_name(TREE_CODE(expr.value)));
-
        if (orig_types)
 	      vec_safe_push (orig_types, expr.original_type);
        if (locations)
@@ -11235,7 +11221,7 @@ c_parser_objc_class_instance_variables (c_parser *parser)
 	  /* There is a syntax error.  We want to skip the offending
 	     tokens up to the next ';' (included) or '}'
 	     (excluded).  */
-	  
+
 	  /* First, skip manually a ')' or ']'.  This is because they
 	     reduce the nesting level, so c_parser_skip_until_found()
 	     wouldn't be able to skip past them.  */
@@ -11541,7 +11527,7 @@ c_parser_objc_methodproto (c_parser *parser)
   /* Forget protocol qualifiers now.  */
   parser->objc_pq_context = false;
 
-  /* Do not allow the presence of attributes to hide an erroneous 
+  /* Do not allow the presence of attributes to hide an erroneous
      method implementation in the interface section.  */
   if (!c_parser_next_token_is (parser, CPP_SEMICOLON))
     {
@@ -11692,7 +11678,7 @@ c_parser_objc_method_decl (c_parser *parser, bool is_class_method,
 	    {
 	      ellipsis = true;
 	      c_parser_consume_token (parser);
-	      attr_err |= c_parser_objc_maybe_method_attributes 
+	      attr_err |= c_parser_objc_maybe_method_attributes
 						(parser, attributes) ;
 	      break;
 	    }
@@ -11881,7 +11867,7 @@ c_parser_objc_try_catch_finally_statement (c_parser *parser)
 	     going.  */
 	  if (c_parser_next_token_is (parser, CPP_CLOSE_PAREN))
 	    c_parser_consume_token (parser);
-	  
+
 	  /* If these is no immediate closing parenthesis, the user
 	     probably doesn't know that parenthesis are required at
 	     all (ie, they typed "@catch NSException *e").  So, just
@@ -16628,8 +16614,8 @@ c_parser_omp_all_clauses (c_parser *parser, omp_clause_mask mask,
 	  clauses = c_parser_omp_clause_aligned (parser, clauses);
 	  c_name = "aligned";
 	  break;
-	case PRAGMA_OMP_CLAUSE_LINEAR: 
-	  clauses = c_parser_omp_clause_linear (parser, clauses); 
+	case PRAGMA_OMP_CLAUSE_LINEAR:
+	  clauses = c_parser_omp_clause_linear (parser, clauses);
 	  c_name = "linear";
 	  break;
 	case PRAGMA_OMP_CLAUSE_DEPEND:
@@ -18378,7 +18364,7 @@ c_parser_omp_for_loop (location_t loc, c_parser *parser, enum tree_code code,
 	      this_pre_body = pop_stmt_list (this_pre_body);
 	      if (pre_body)
 		{
-		  tree t = pre_body;   
+		  tree t = pre_body;
 		  pre_body = push_stmt_list ();
 		  add_stmt (t);
 		  add_stmt (this_pre_body);

@@ -175,14 +175,14 @@ tree  class_ref_build_deref(ClassRef *self,location_t loc,location_t component_l
 	     if(className==NULL)
 		     className=class_mgr_get_class_name_by_sys(class_mgr_get(),idStr);
 		 ClassInfo *info=class_mgr_get_class_info_by_class_name(class_mgr_get(),className);
-		 n_debug("class_ref_build_deref 00 className:%s component:%s 当前所在函数：%s\n",
+		 n_debug("class_ref_build_deref 00 className:%s component:%s 当前所在函数：%s",
 				 className==NULL?"null":className->sysName,idStr,IDENTIFIER_POINTER(DECL_NAME(current_function_decl)));
 		 if(info!=NULL){
 			 //这时构造函数
 			 char *lows[4];
 			 int relationShip=class_access_get_last_class_and_var((ClassAccess*)self,loc,component,exprValue,lows);
 			 if(relationShip<0){
-				 n_error("class_ref_build_deref 11 是构造函数 className:%s component:%s 根类:%s 根变量:%s 当前所在函数：%s\n",
+				 n_error("class_ref_build_deref 11 是构造函数 className:%s component:%s 根类:%s 根变量:%s 当前所在函数：%s",
 										 className->sysName,IDENTIFIER_POINTER(component),lows[0],lows[1],IDENTIFIER_POINTER(DECL_NAME(current_function_decl)));
 				 return error_mark_node;
 			 }

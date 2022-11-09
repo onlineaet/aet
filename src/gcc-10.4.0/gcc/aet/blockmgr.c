@@ -119,11 +119,9 @@ static vec<tree, va_gc> *c_parser_expr_list (c_parser *parser, bool convert_p, b
     ret = make_tree_vector ();
     if (p_orig_types == NULL){
         n_debug("c_parser_expr_list 00 _orig_types == NULL");
-
        orig_types = NULL;
     }else{
         n_debug("c_parser_expr_list 11 orig_types = make_tree_vector ()");
-
        orig_types = make_tree_vector ();
     }
 
@@ -850,7 +848,7 @@ NPtrArray *block_mgr_read_define_new_object(BlockMgr *self,char *belongSysName)
  */
 static void  saveDefineNewObject(BlockMgr *self)
 {
-	n_info("在编译完成后，保存new$泛型对象(泛型确定的) 泛型对象个数:%d %s\n",self->collectNewObject->len,in_fnames[0]);
+	n_info("在编译完成后，保存new$泛型对象(泛型确定的) 泛型对象个数:%d %s",self->collectNewObject->len,in_fnames[0]);
     if(self->collectNewObject->len==0){
         generic_file_save_define_new$(generic_file_get(),NULL);
     	return;
@@ -871,7 +869,7 @@ static void  saveDefineNewObject(BlockMgr *self)
  */
 static void  saveOutFuncGenericCall(BlockMgr *self)
 {
-	n_info("在编译完成后，保存泛型函数调用 泛型函数调用个数:%d\n",self->defineFuncCallArray->len);
+	n_info("在编译完成后，保存泛型函数调用 泛型函数调用个数:%d",self->defineFuncCallArray->len);
     if(self->defineFuncCallArray->len==0){
     	generic_file_save_out_func_call(generic_file_get(),NULL);
     	return;
@@ -892,7 +890,7 @@ static void  saveOutFuncGenericCall(BlockMgr *self)
  */
 void  block_mgr_save_define_newobject_and_func_call(BlockMgr *self)
 {
-	n_debug("block_mgr_save_define_newobject_and_func_call--- %s\n",in_fnames[0]);
+	n_debug("block_mgr_save_define_newobject_and_func_call--- %s",in_fnames[0]);
 	saveDefineNewObject(self);
 	saveOutFuncGenericCall(self);
 }

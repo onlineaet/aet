@@ -25,7 +25,8 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 #include "nlib.h"
 #include "c-aet.h"
 
-cpp_hashnode * aet_utils_create_identifier(const uchar *str,size_t len);
+tree           aet_utils_create_identifier(const uchar *str,size_t len);
+tree           aet_utils_create_ident(uchar *str);
 c_token       *aet_utils_create_typedef_token(c_token *token,location_t start_loc);
 c_token       *aet_utils_create_struct_token(c_token *token,location_t start_loc);
 c_token       *aet_utils_create_return_token(c_token *token,location_t start_loc);
@@ -36,10 +37,10 @@ c_token       *aet_utils_create_static_token(c_token *token,location_t start_loc
 c_token       *aet_utils_create_char_token(c_token *token,location_t start_loc);
 c_token       *aet_utils_create_int_token(c_token *token,location_t start_loc);
 void           aet_utils_create_number_token(c_token *src,int value);
+void           aet_utils_create_private$_token(c_token *token,location_t start_loc);
 
 void           aet_utils_copy_token(c_token *src,c_token *dest);
 void           aet_utils_create_token(c_token *token,enum cpp_ttype type,uchar *str,int len);
-tree           aet_utils_create_ident(uchar *str);
 tree           aet_utils_create_temp_func_name(char *className,char *orgiName);
 int            aet_utils_get_orgi_func_and_class_name(char *newName,char *className,char *funcName);
 c_token       *aet_utils_create_super_token(c_token *token,location_t start_loc);
@@ -103,9 +104,11 @@ typedef enum{
 }TokenFrom;
 
 //token来自micro吗?
-int  aet_utils_in_micro();
+int      aet_utils_in_micro();
 //是不是在编译附加代码状态
 nboolean aet_utils_compile_additional_code_status();
+
+char   *aet_utils_get_keyword_string(c_token *token);//获取keyword类型的keyword的字符串
 
 
 #endif /* ! GCC_C_AET_H */

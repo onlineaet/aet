@@ -54,8 +54,8 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 #include "varmgr.h"
 #include "classutil.h"
 #include "classmgr.h"
-#include "classimpl.h"
 #include "classbuild.h"
+#include "classimpl.h"
 
 #define CONTROL_VAR_AFTERFIX  "__access_controls_123"
 
@@ -92,6 +92,7 @@ static nint compareSafeCode_cb(nconstpointer  cand1,nconstpointer  cand2)
 static void accessControlsInit(AccessControls *self)
 {
     self->accessArray = n_ptr_array_new ();
+    self->implClassArray=n_ptr_array_new();//在一个文件中实现了几个类
 }
 
 static void printSafeCode(ClassName *className,NPtrArray *array)
@@ -112,12 +113,12 @@ static void printSafeCode(ClassName *className,NPtrArray *array)
             premission="公共";
         else if(item->permission==CLASS_PERMISSION_PROTECTED)
             premission="保护";
-        else if(item->permission==CLASS_PERMISSION_PROTECTED)
+        else if(item->permission==CLASS_PERMISSION_PRIVATE)
             premission="私有";
         n_string_append_printf(str,"%d\t%s\t%s\t%s\n",item->serialNumber,type,premission,item->name);
     }
     printf("类：%s 所有方法和变量如下\n",className->sysName);
-    printf("序号\t名字\t类型\t权限\n");
+    printf("序号\t类型\t权限\t名字\n");
     printf("%s\n",str->str);
 }
 
@@ -341,6 +342,21 @@ typedef struct _AccessEnv
     char *file;
 }AccessEnv;
 
+/**
+ * 是否实现了sysName指定的类
+ */
+static nboolean exitsImpl(AccessControls *self,char *sysName)
+{
+   int i;
+   for(i=0;i<self->implClassArray->len;i++){
+       char *item=(char*)n_ptr_array_index(self->implClassArray,i);
+       if(strcmp(item,sysName)==0)
+           return TRUE;
+   }
+   return FALSE;
+}
+
+
 static void addCall(AccessControls *self,ClassFunc *calleeFunc,nboolean isAet,char *callSysName,location_t loc)
 {
     AccessEnv *env=n_slice_new(AccessEnv);
@@ -410,21 +426,18 @@ static void addEnum(AccessControls *self,char  *calleeSystem,EnumData *enumData,
 }
 
 /**
- * 在由编译器创建的代码，如果有访问了类的方法和变量都要忽略
+ * 在由编译器创建的代码，如果访问了AClass类的方法和变量都要忽略
  * 比如 static  AClass *_createAClass_debug_AObject_123(debug_AObject *self)
  */
-static nboolean filter()
+static nboolean filter(AccessControls *self)
 {
-    ClassImpl  *impl=class_impl_get();
     if (aet_utils_valid_tree(current_function_decl)){
         char *name=IDENTIFIER_POINTER(DECL_NAME(current_function_decl));
-        NPtrArray *implClassArray=impl->implClassArray;
         int i;
-        for(i=0;i<implClassArray->len;i++){
+        for(i=0;i<self->implClassArray->len;i++){
             char funcName[255];
-            char *sysName=(char *)n_ptr_array_index(implClassArray,i);
+            char *sysName=(char *)n_ptr_array_index(self->implClassArray,i);
             class_build_create_func_name_by_sys_name(sysName,funcName);
-            //printf("skip skip---- %s %s\n",name,funcName);
             if(!strcmp(funcName,name)){
               return TRUE;
             }
@@ -434,13 +447,11 @@ static nboolean filter()
     return FALSE;
 }
 
-static char *getPackageFromClassImpl()
+static char *getPackageFromClassImpl(AccessControls *self)
 {
-        ClassImpl  *impl=class_impl_get();
-        NPtrArray *implClassArray=impl->implClassArray;
         int i;
-        for(i=0;i<implClassArray->len;i++){
-            char *sysName=(char *)n_ptr_array_index(implClassArray,i);
+        for(i=0;i<self->implClassArray->len;i++){
+            char *sysName=(char *)n_ptr_array_index(self->implClassArray,i);
             ClassName *call=class_mgr_get_class_name_by_sys(class_mgr_get(),sysName);
             if(call->package!=NULL)
                 return call->package;
@@ -459,10 +470,9 @@ static nboolean isSamePackage(char *callee,char *call)
 
 static void checkMethod(AccessControls *self,AccessEnv *env)
 {
-       ClassImpl  *impl=class_impl_get();
        char *calleeFuncSysName=IDENTIFIER_POINTER(TYPE_NAME(env->calleeFunc->classTree));
        calleeFuncSysName=calleeFuncSysName+1;//去除下划线 _debug_ARandom
-       if(class_impl_is_impl(impl,calleeFuncSysName)){
+       if(exitsImpl(self,calleeFuncSysName)){
            //printf("在:%s中调用类:%s的方法:%s，并且调用类和被调用类的实现都在同一个文件中。",
                   // env->callSysName==NULL?"在文件":env->callSysName,calleeFuncSysName,env->calleeFunc->orgiName);
            return;
@@ -506,7 +516,7 @@ static void checkMethod(AccessControls *self,AccessEnv *env)
            char *callPackage=call->package;
            //如果调用类没有包名，但类实现现其它类实现在一起，并且其中某个类实现声明有包名，则调用类使用这个包名
            if(callPackage==NULL)
-               callPackage= getPackageFromClassImpl();
+               callPackage= getPackageFromClassImpl(self);
            if(isSamePackage(callee->package,callPackage)) //同一个包内
                return;
            ClassRelationship ship=   class_mgr_relationship(class_mgr_get(), env->callSysName,calleeFuncSysName);
@@ -523,9 +533,8 @@ static void checkMethod(AccessControls *self,AccessEnv *env)
 
 static void checkVar(AccessControls *self,AccessEnv *env)
 {
-       ClassImpl  *impl=class_impl_get();
        char *calleeSysName=env->calleeSysName;
-       if(class_impl_is_impl(impl,calleeSysName)){
+       if(exitsImpl(self,calleeSysName)){
            //printf("在:%s中调用类:%s的变量:%s，并且调用类和被调用类的实现都在同一个文件中。",
                  //  env->callSysName==NULL?"在文件":env->callSysName,calleeSysName,env->varEntity->orgiName);
            return;
@@ -590,7 +599,7 @@ static void checkVar(AccessControls *self,AccessEnv *env)
            char *callPackage=call->package;
            //如果调用类没有包名，但类实现现其它类实现在一起，并且其中某个类实现声明有包名，则调用类使用这个包名
            if(callPackage==NULL)
-               callPackage= getPackageFromClassImpl();
+               callPackage= getPackageFromClassImpl(self);
            if(isSamePackage(callee->package,callPackage)) //同一个包内
                return;
            ClassRelationship ship=   class_mgr_relationship(class_mgr_get(), env->callSysName,calleeSysName);
@@ -600,7 +609,7 @@ static void checkVar(AccessControls *self,AccessEnv *env)
                     env->callSysName,calleeSysName,env->varEntity->orgiName);
        }else{
            //当前文件有实现了与被调用类相同的包的类。
-           char *callPackage= getPackageFromClassImpl();
+           char *callPackage= getPackageFromClassImpl(self);
            if(callPackage!=NULL){
                if(isSamePackage(info->className.package,callPackage)) //同一个包内
                   return;
@@ -616,9 +625,8 @@ static void checkVar(AccessControls *self,AccessEnv *env)
 
 static void checkEnum(AccessControls *self,AccessEnv *env)
 {
-       ClassImpl  *impl=class_impl_get();
        char *calleeSysName=env->calleeSysName;
-       if(class_impl_is_impl(impl,calleeSysName)){
+       if(exitsImpl(self,calleeSysName)){
           // printf("在:%s中调用类:%s的枚举:%s，并且调用类和被调用类的实现都在同一个文件中。",
                  //  env->callSysName==NULL?"在文件":env->callSysName,calleeSysName,env->enumData->origName);
            return;
@@ -664,7 +672,7 @@ static void checkEnum(AccessControls *self,AccessEnv *env)
            char *callPackage=call->package;
            //如果调用类没有包名，但类实现现其它类实现在一起，并且其中某个类实现声明有包名，则调用类使用这个包名
            if(callPackage==NULL)
-               callPackage= getPackageFromClassImpl();
+               callPackage= getPackageFromClassImpl(self);
            if(isSamePackage(callee->package,callPackage)) //同一个包内
                return;
            ClassRelationship ship=   class_mgr_relationship(class_mgr_get(), env->callSysName,calleeSysName);
@@ -674,7 +682,7 @@ static void checkEnum(AccessControls *self,AccessEnv *env)
                     env->callSysName,calleeSysName,env->enumData->origName);
        }else{
            //当前文件有实现了与被调用类相同的包的类。
-           char *callPackage= getPackageFromClassImpl();
+           char *callPackage= getPackageFromClassImpl(self);
            if(callPackage!=NULL){
                if(isSamePackage(info->className.package,callPackage)) //同一个包内
                   return;
@@ -709,22 +717,28 @@ nboolean access_controls_access_method(AccessControls *self,location_t loc,Class
     }
     if(!aet_utils_valid_tree(func->fieldDecl)){
         //类中的私有方法。不可能访问到。
+        n_debug("访问类方法---11- %s permission:%d parser->isAet:%d\n",func->mangleFunName,func->permission,parser->isAet);
         return TRUE;
     }
     calleeSysName=calleeSysName+1;//去除下划线 _debug_ARandom
     if(parser->isAet){
-        ClassImpl  *impl=class_impl_get();
-        char *sysName=impl->className->sysName;
+        ClassName *implClassName=class_impl_get_class_name(class_impl_get());
+        char *sysName=implClassName->sysName;
         if(!strcmp(sysName,calleeSysName)){
             //1.在类实现中，调用的是本类的方法，不需要判断权限
+            n_debug("访问类方法---22- %s permission:%d parser->isAet:%d\n",func->mangleFunName,func->permission,parser->isAet);
             return TRUE;
         }else{
             //2.在类实现中，调用的是其它类的方法，保存调用信息，当整个文件编译完后再判断权限
+            n_debug("访问类方法---33- %s permission:%d parser->isAet:%d\n",func->mangleFunName,func->permission,parser->isAet);
+
             addCall(self,func,TRUE,sysName,loc);
         }
     }else{
-        if(filter()) //过滤编译器内部创建的初始化代码
+        if(filter(self)) //过滤编译器内部创建的初始化代码
            return TRUE;
+        n_debug("访问类方法---44- %s permission:%d parser->isAet:%d\n",func->mangleFunName,func->permission,parser->isAet);
+
         addCall(self,func,FALSE,NULL,loc);
     }
     return TRUE;
@@ -754,8 +768,8 @@ nboolean access_controls_access_var(AccessControls *self,location_t loc,char *va
     //printf("访问类变量---- var:%s calleeSysName:%s permission:%d parser->isAet:%d 所在函数:%s\n",
            // varName,calleeSysName,entity->permission,parser->isAet,atFuncName);
     if(parser->isAet){
-        ClassImpl  *impl=class_impl_get();
-        char *sysName=impl->className->sysName;
+        ClassName *implClassName=class_impl_get_class_name(class_impl_get());
+        char *sysName=implClassName->sysName;
         if(!strcmp(sysName,calleeSysName)){
             //1.在类实现中，调用的是本类的方法，不需要判断权限
             return TRUE;
@@ -764,7 +778,7 @@ nboolean access_controls_access_var(AccessControls *self,location_t loc,char *va
             addVar(self,calleeSysName,entity,TRUE,sysName,loc);
         }
     }else{
-        if(filter()) //过滤编译器内部创建的初始化代码
+        if(filter(self)) //过滤编译器内部创建的初始化代码
            return TRUE;
         addVar(self,calleeSysName,entity,FALSE,NULL,loc);
     }
@@ -796,8 +810,8 @@ nboolean access_controls_access_enum(AccessControls *self,location_t loc,EnumDat
     //printf("访问枚举---- sysName:%s permission:%d parser->isAet:%d 所在函数:%s\n",
            // enumData->sysName,enumData->permission,parser->isAet,atFuncName);
     if(parser->isAet){
-           ClassImpl  *impl=class_impl_get();
-           char *sysName=impl->className->sysName;
+           ClassName *implClassName=class_impl_get_class_name(class_impl_get());
+           char *sysName=implClassName->sysName;
            if(!strcmp(sysName,calleeSysName)){
                //1.在类实现中，调用的是本类的枚举，不需要判断权限
                return TRUE;
@@ -806,7 +820,7 @@ nboolean access_controls_access_enum(AccessControls *self,location_t loc,EnumDat
                addEnum(self,calleeSysName,enumData,enumVar,TRUE,sysName,loc);
            }
     }else{
-           if(filter()) //过滤编译器内部创建的初始化代码
+           if(filter(self)) //过滤编译器内部创建的初始化代码
               return TRUE;
            addEnum(self,calleeSysName,enumData,enumVar,FALSE,NULL,loc);
     }
@@ -826,6 +840,19 @@ void access_controls_check(AccessControls *self)
        else
            checkEnum(self,item);
    }
+}
+
+
+
+/**
+ * 加入在当前编译文件中实现的类的名称到AccessControls中.
+ * 第二次编译接口时，也有接口的初始化方法和AClass的实现，也需要加入到AccessControls中
+ */
+void  access_controls_add_impl(AccessControls *self,char *sysName)
+{
+    if(exitsImpl(self,sysName))
+        return;
+    n_ptr_array_add(self->implClassArray,n_strdup(sysName));
 }
 
 

@@ -94,7 +94,7 @@ static void classParserInit(ClassParser *self)
 	self->classFinal=class_final_new();
 	self->classPackage=class_package_new();
 	self->classPermission=class_permission_new();
-	self->classBuild=class_build_new();
+	self->classBuild=class_build_new();//AClass中的变量赋值代码生成器
 	self->funcCheck=func_check_new();
 	self->state=CLASS_STATE_STOP;
 	self->currentClassName=NULL;
@@ -243,7 +243,6 @@ static void checkAndSetGeneric(ClassParser *self,tree decl,GenericModel *gen,Gen
 	     }
 	     generic_impl_check_func_at_field(generic_impl_get(),decl,declarator);
 	  }else{
-		   aet_print_tree(decl);
 		   nboolean  ok= generic_impl_check_var(generic_impl_get(),decl,gen);
 		   n_debug("checkAndSetGeneric 22 检查带泛型的类变量 ok:%d\n",ok);
 	  }
@@ -295,7 +294,7 @@ static tree  c_parser_class_declaration (ClassParser *self,ClassInfo *classInfo,
          parser_static_collect_token(parser_static_get(),dr.permission,dr.isFinal);
          return NULL_TREE;
     }
-	//printf("class_permission_set_decorate 11 %s fileName:%s state:%d\n",self->currentClassName->sysName,self->fileName,self->state);
+	n_debug("class_permission_set_decorate 11 %s fileName:%s state:%d permission:%d",self->currentClassName->sysName,self->fileName,self->state,dr.permission);
     class_permission_set_decorate(self->classPermission,&dr);
 	if(c_parser_next_token_is (parser, CPP_NAME)){
 	    aet_print_token(c_parser_peek_token (parser));
@@ -337,7 +336,7 @@ static tree  c_parser_class_declaration (ClassParser *self,ClassInfo *classInfo,
        return NULL_TREE;
     }
     finish_declspecs (specs);
-    n_debug("新----struct内的声明 11 到这里specs已有声明说明符了比如 int 完成finish_declspecs %p\n",specs);
+    n_debug("新----struct内的声明 11 到这里specs已有声明说明符了比如 int 完成finish_declspecs %p",specs);
     if(TREE_CODE(specs->type)==ENUMERAL_TYPE){
          if(specs->typespec_kind==ctsk_tagdef){
              n_debug("为类中的枚举加入类型声明 %s\n",className->sysName);
@@ -477,7 +476,8 @@ static tree  c_parser_class_declaration (ClassParser *self,ClassInfo *classInfo,
 	     if(change)
 	    	 func_mgr_set_class_func_decl(func_mgr_get(),decls,className);
 	     else{//说明是变量
-	    	 if(isIface && strcmp(IDENTIFIER_POINTER(DECL_NAME(decls)),IFACE_COMMON_STRUCT_VAR_NAME)){
+	         char *varName=IDENTIFIER_POINTER(DECL_NAME(decls));
+	    	 if(isIface && strcmp(varName,IFACE_COMMON_STRUCT_VAR_NAME) && strcmp(varName,AET_MAGIC_NAME)){
                 error_at(input_location,"接口中不能声明或定义变量。%qD",decls);
                 return NULL_TREE;
 	    	 }
@@ -768,6 +768,7 @@ static void gotoStaticAndInit(ClassParser *self,char *sysName)
 	  aet_print_token_in_parser("gotoStaticAndInit ---- %s",sysName);
 }
 
+
 /**
  *解析类或接口声明，即 class Abc{
  */
@@ -824,9 +825,9 @@ struct c_typespec class_parser_parser_class_specifier (ClassParser *self)
       c_parser_consume_token (parser);
       FieldDecorate dr= class_permission_get_decorate_by_class(self->classPermission,sysClassName,classType);
       n_debug("class_permission_stop 00 sysClassName:%s classType:%d isFinal:%d %d\n",sysClassName,classType,dr.isFinal,dr.permission);
-	  class_mgr_set_type(class_mgr_get(),sysClassName,classType,dr.permission,dr.isFinal);
+	  class_mgr_set_type(class_mgr_get(),ident_loc,sysClassName,classType,dr.permission,dr.isFinal);
 	  class_permission_stop(self->classPermission);
-	  n_debug("新 ---分析struct 11 设类的类型和访问权限 sysClassName:%s classType:%d permission:%d ", sysClassName,classType,dr.permission);
+	  n_debug("新 ---分析struct 11 设类的类型和访问权限 sysClassName:%s classType:%d permission:%d", sysClassName,classType,dr.permission);
       //分析Extends Implements
        classInfo=class_mgr_get_class_info(class_mgr_get(),sysClassName);
        if(classInfo==NULL){
@@ -865,7 +866,11 @@ struct c_typespec class_parser_parser_class_specifier (ClassParser *self)
      tree contents;
      timevar_push (TV_PARSE_STRUCT);
      contents = NULL_TREE;
-     c_parser_consume_token (parser);
+     c_parser_consume_token (parser);//consume {
+     aet_print_token(c_parser_peek_token (parser));
+     //加一个魔数变量作为类或接口的第一个变量
+     if(class_info_is_root(classInfo))
+       parser_help_add_magic();
 	 //如果是接口加入一个变量和两个方法
      if(classType==CLASS_TYPE_INTERFACE){
          n_debug("是接口声明:%s\n",classInfo->className.sysName);
@@ -986,8 +991,7 @@ struct c_typespec class_parser_parser_class_specifier (ClassParser *self)
 
       postfix_attrs = c_c_parser_gnu_attributes (parser);
       ret.spec = finish_struct(struct_loc, type, nreverse (contents),chainon (std_attrs,chainon (attrs, postfix_attrs)),struct_info);
-      n_debug("新 ---分析struct 77 完成finish_struct 并加源代码 class_init_create_init_decl %s %s %p %p",
-    		  get_tree_code_name(TREE_CODE(ret.spec)),IDENTIFIER_POINTER(TYPE_NAME (ret.spec)),DECL_LANG_SPECIFIC(ret.spec),ret.spec);
+      n_debug("新 ---分析struct 77 完成finish_struct %s %p",IDENTIFIER_POINTER(TYPE_NAME (ret.spec)),ret.spec);
       class_mgr_set_record(class_mgr_get(),&classInfo->className,ret.spec);
       testAddNewField(ret.spec);
       ret.kind = ctsk_tagdef;
@@ -1187,16 +1191,19 @@ nboolean  class_parser_goto(ClassParser *self,nboolean start_attr_ok,int *action
 	  c_parser_consume_token (parser);//consume   RID_AET_GOTO
 	  c_parser_consume_token (parser);//consume   GOTO_CHECK_FUNC_DEFINE
 	  middle_file_import_lib(middle_file_get());//为第二次编译和类方法检查生成库连结
-	  //printf("goto GOTO_CHECK_FUNC_DEFINE\n");
 	  func_check_check_all_define(self->funcCheck);
-	  middle_file_ready_define_iface_static_var_and_init_method(middle_file_get());
+	  iface_file_compile_ready(iface_file_get());
 	  middle_file_create_global_var(middle_file_get());
 	  return FALSE;
   }else if(pos==GOTO_IFACE_COMPILE){
 	  c_parser_consume_token (parser);//consume   RID_AET_GOTO
 	  c_parser_consume_token (parser);//consume   GOTO_IFACE_COMPILE
-	  //printf("下一个还是AET_GOTO\n");
-	  iface_file_impl_iface(iface_file_get());
+	  c_token *sysNameToken = c_parser_peek_token (parser);
+	  tree string=sysNameToken->value;
+	  const char *tokenString  = TREE_STRING_POINTER (string);
+	  char *sysNames=tokenString;
+	  c_parser_consume_token (parser);//consume   "test_Iface1,test_Iface2"
+	  iface_file_compile(iface_file_get(),sysNames);
 	  return FALSE;
   }else{
 	  return block_mgr_parser_goto(block_mgr_get(),start_attr_ok,pos);
@@ -1357,6 +1364,7 @@ void  class_parser_set_parser(ClassParser *self,c_parser *parser)
 	 generic_expand_set_parser(generic_expand_get(),parser);
 	 new_object_set_parser(new_object_get(),parser);
 }
+
 
 ClassParser *class_parser_get()
 {

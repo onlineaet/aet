@@ -7866,7 +7866,6 @@ tree grokfield (location_t loc, struct c_declarator *declarator, struct c_declsp
 	   tree width, tree *decl_attrs)
 {
    tree value;
-	n_debug("糅合成一个FIELD_DECL 00 declarator->kind:%d c ",declarator->kind);
    if (declarator->kind == cdk_id && declarator->u.id.id == NULL_TREE  && width == NULL_TREE){
 		n_debug("糅合成一个FIELD_DECL 11 declarator->kind:%d ",declarator->kind);
 
@@ -7913,16 +7912,10 @@ tree grokfield (location_t loc, struct c_declarator *declarator, struct c_declsp
       else
 	      pedwarn_c99 (loc, OPT_Wpedantic,"ISO C90 doesn%'t support unnamed structs/unions");
   }
-	n_debug("糅合成一个FIELD_DECL 33 declarator->kind:%d ",declarator->kind);
-
   value = grokdeclarator (declarator, declspecs, FIELD, false,
 			  width ? &width : NULL, decl_attrs, NULL, NULL,
 			  DEPRECATED_NORMAL);
-	n_debug("糅合成一个FIELD_DECL 44 新的decl树:%p declarator->kind:%d ",value,declarator->kind);
-
   finish_decl (value, loc, NULL_TREE, NULL_TREE, NULL_TREE);
-	n_debug("糅合成一个FIELD_DECL 55 新的decl树:%p declarator->kind:%d ",value,declarator->kind);
-
   DECL_INITIAL (value) = width;
   if (width)
     SET_DECL_C_BIT_FIELD (value);
@@ -7933,13 +7926,11 @@ tree grokfield (location_t loc, struct c_declarator *declarator, struct c_declsp
 	 which find it.  */
       struct c_binding *b = I_SYMBOL_BINDING (DECL_NAME (value));
       if (b != NULL){
-    		n_debug("糅合成一个FIELD_DECL 66 declarator->kind:%d ",declarator->kind);
-
-	  /* If the in_struct field is not yet set, push it on a list
+         n_debug("糅合成一个FIELD_DECL 66 declarator->kind:%d ",declarator->kind);
+	     /* If the in_struct field is not yet set, push it on a list
 	     to be cleared when this struct is finished.  */
 	     if (!b->in_struct){
-	    		n_debug("糅合成一个FIELD_DECL 77 declarator->kind:%d ",declarator->kind);
-
+	         n_debug("糅合成一个FIELD_DECL 77 declarator->kind:%d ",declarator->kind);
 	         struct_parse_info->fields.safe_push (b);
 	         b->in_struct = 1;
 	     }
@@ -8172,6 +8163,9 @@ field_decl_cmp (const void *x_p, const void *y_p)
 {
   const tree *const x = (const tree *) x_p;
   const tree *const y = (const tree *) y_p;
+//  printf("field_decl_cmp --- %s %s\n",IDENTIFIER_POINTER(DECL_NAME(*x),IDENTIFIER_POINTER(DECL_NAME(*y)));
+//  printNode(*x);
+//  printNode(*y);
 
   if (DECL_NAME (*x) == DECL_NAME (*y))
     /* A nontype is "greater" than a type.  */
@@ -8228,7 +8222,6 @@ tree finish_struct (location_t loc, tree t, tree fieldlist, tree attributes,
 
   expanded_location xloc;
   xloc = expand_location(loc);
-  n_debug("finish_struct 00 :%d :%d pedantic:%d %p %p", xloc.line,xloc.column,pedantic,DECL_LANG_SPECIFIC(t),t);
   decl_attributes (&t, attributes, (int) ATTR_FLAG_TYPE_IN_PLACE);
   if (pedantic){
       for (x = fieldlist; x; x = DECL_CHAIN (x)){
@@ -8263,9 +8256,6 @@ tree finish_struct (location_t loc, tree t, tree fieldlist, tree attributes,
      until now.)  */
   bool saw_named_field = false;
   for (x = fieldlist; x; x = DECL_CHAIN (x)){
-	  n_debug("finish_struct 22 :%d :%d  pedantic:%d ", xloc.line,xloc.column,pedantic);
-	  //printNode(x);
-
       if (TREE_TYPE (x) == error_mark_node)
 	     continue;
       DECL_CONTEXT (x) = t;
@@ -8330,8 +8320,6 @@ tree finish_struct (location_t loc, tree t, tree fieldlist, tree attributes,
 
   maybe_apply_pragma_scalar_storage_order (t);
 
-  n_debug("finish_struct 33 :%d :%d pedantic:%d treecode:%d RECORD_TYPE:%d %p %p",
-		  xloc.line,xloc.column,pedantic,TREE_CODE (t),RECORD_TYPE,DECL_LANG_SPECIFIC(t),t);
   layout_type (t);
   if (TYPE_SIZE_UNIT (t)
       && TREE_CODE (TYPE_SIZE_UNIT (t)) == INTEGER_CST
@@ -8343,8 +8331,6 @@ tree finish_struct (location_t loc, tree t, tree fieldlist, tree attributes,
      with scalar component if the enclosing type has reverse storage order.  */
   for (tree field = fieldlist; field; field = DECL_CHAIN (field))
     {
-	  n_debug("finish_struct 44 :%d :%d  pedantic:%d %p %p", xloc.line,xloc.column,pedantic,DECL_LANG_SPECIFIC(t),t);
-
       if (TREE_CODE (field) == FIELD_DECL
 	  && DECL_INITIAL (field)
 	  && TREE_TYPE (field) != error_mark_node)
@@ -8392,7 +8378,6 @@ tree finish_struct (location_t loc, tree t, tree fieldlist, tree attributes,
     int len = 0;
 
     for (x = fieldlist; x; x = DECL_CHAIN (x)){
-  	  n_debug("finish_struct 55 :%d :%d  pedantic:%d DECL_LANG_SPECIFIC:%p t:%p", xloc.line,xloc.column,pedantic,DECL_LANG_SPECIFIC(t),t);
 	   if (len > 15 || DECL_NAME (x) == NULL)
 	     break;
 	   len += 1;
@@ -8415,8 +8400,6 @@ tree finish_struct (location_t loc, tree t, tree fieldlist, tree attributes,
 	   space->s = space2;
 	   field_array = &space2->elts[0];
 	   for (x = fieldlist; x; x = DECL_CHAIN (x)){
-		  	  n_debug("finish_struct 77 :%d :%d  pedantic:%d DECL_LANG_SPECIFIC:%p x:%p", xloc.line,xloc.column,pedantic,DECL_LANG_SPECIFIC(t),t);
-
 	      field_array[len++] = x;
 	      /* If there is anonymous struct or union, break out of the loop.  */
 	      if (DECL_NAME (x) == NULL)
@@ -8424,8 +8407,7 @@ tree finish_struct (location_t loc, tree t, tree fieldlist, tree attributes,
 	    }
 	    /* Found no anonymous struct/union.  Add the TYPE_LANG_SPECIFIC.  */
 	    if (x == NULL){
-	    	  n_debug("finish_struct 88 :%d :%d  pedantic:%d ", xloc.line,xloc.column,pedantic);
-
+	       n_debug("finish_struct 88 设置排序标记，在lookup_field中需要查找方法的依据 len:%d", len);
 	       TYPE_LANG_SPECIFIC (t) = space;
 	       TYPE_LANG_SPECIFIC (t)->s->len = len;
 	       field_array = TYPE_LANG_SPECIFIC (t)->s->elts;
@@ -8443,8 +8425,6 @@ tree finish_struct (location_t loc, tree t, tree fieldlist, tree attributes,
 
   tree incomplete_vars = C_TYPE_INCOMPLETE_VARS (TYPE_MAIN_VARIANT (t));
   for (x = TYPE_MAIN_VARIANT (t); x; x = TYPE_NEXT_VARIANT (x)){
-  	  n_debug("finish_struct 99 :%d :%d  pedantic:%d DECL_LANG_SPECIFIC:%p ", xloc.line,xloc.column,pedantic,DECL_LANG_SPECIFIC(t));
-      //printNode(x);
       TYPE_FIELDS (x) = TYPE_FIELDS (t);
       TYPE_LANG_SPECIFIC (x) = TYPE_LANG_SPECIFIC (t);
       TYPE_TRANSPARENT_AGGR (x) = TYPE_TRANSPARENT_AGGR (t);
@@ -8453,15 +8433,13 @@ tree finish_struct (location_t loc, tree t, tree fieldlist, tree attributes,
       C_TYPE_VARIABLE_SIZE (x) = C_TYPE_VARIABLE_SIZE (t);
       C_TYPE_INCOMPLETE_VARS (x) = NULL_TREE;
   	  n_debug("finish_struct ----99 :%d :%d  pedantic:%d DECL_LANG_SPECIFIC:%p %p t:%p", xloc.line,xloc.column,pedantic,DECL_LANG_SPECIFIC(t),TYPE_LANG_SPECIFIC (t),t);
-
     }
 
   /* Update type location to the one of the definition, instead of e.g.
      a forward declaration.  */
   if (TYPE_STUB_DECL (t)){
   	  n_debug("finish_struct 100 :%d :%d  pedantic:%d ", xloc.line,xloc.column,pedantic);
-
-    DECL_SOURCE_LOCATION (TYPE_STUB_DECL (t)) = loc;
+      DECL_SOURCE_LOCATION (TYPE_STUB_DECL (t)) = loc;
   }
 
   /* Finish debugging output for this type.  */
@@ -9648,7 +9626,6 @@ void
 finish_function (location_t end_loc)
 {
    tree fndecl = current_function_decl;
-   n_debug("完成函数  00 %s",get_tree_code_name(TREE_CODE(fndecl)));
   if (c_dialect_objc ())
     objc_finish_function ();
 
@@ -9663,14 +9640,12 @@ finish_function (location_t end_loc)
   }
 
   if (DECL_INITIAL (fndecl) && DECL_INITIAL (fndecl) != error_mark_node){
-	  n_debug("完成函数  22 %s ",get_tree_code_name(TREE_CODE(fndecl)));
     BLOCK_SUPERCONTEXT (DECL_INITIAL (fndecl)) = fndecl;
   }
 
   /* Must mark the RESULT_DECL as being in this function.  */
 
   if (DECL_RESULT (fndecl) && DECL_RESULT (fndecl) != error_mark_node){
-	  n_debug("完成函数  33 %s ",get_tree_code_name(TREE_CODE(fndecl)));
       DECL_CONTEXT (DECL_RESULT (fndecl)) = fndecl;
   }
 
@@ -9688,10 +9663,7 @@ finish_function (location_t end_loc)
 
   /* Tie off the statement tree for this function.  */
   DECL_SAVED_TREE (fndecl) = pop_stmt_list (DECL_SAVED_TREE (fndecl));
-  n_debug("完成函数  55 code:%s name:%s",get_tree_code_name(TREE_CODE(fndecl)),DECL_NAME(fndecl)?IDENTIFIER_POINTER(DECL_NAME(fndecl)):"null");
   finish_fname_decls ();
-  n_debug("完成函数  66 code:%s name:%s",get_tree_code_name(TREE_CODE(fndecl)),DECL_NAME(fndecl)?IDENTIFIER_POINTER(DECL_NAME(fndecl)):"null");
-
   /* Complain if there's no return statement only if option specified on
      command line.  */
   if (warn_return_type > 0
@@ -9726,8 +9698,6 @@ finish_function (location_t end_loc)
 	        && !TREE_NO_WARNING (decl))
 	       warning_at (DECL_SOURCE_LOCATION (decl),OPT_Wunused_but_set_parameter,"parameter %qD set but not used", decl);
   }
-  n_debug("完成函数  99 %s ",get_tree_code_name(TREE_CODE(fndecl)));
-
       /* Complain about locally defined typedefs that are not used in this
          function.  */
   maybe_warn_unused_local_typedefs ();
@@ -9742,8 +9712,6 @@ finish_function (location_t end_loc)
 
      /* Finalize the ELF visibility for the function.  */
   c_determine_visibility (fndecl);
-  n_debug("完成函数  100 %s ",get_tree_code_name(TREE_CODE(fndecl)));
-
      /* For GNU C extern inline functions disregard inline limits.  */
   if (DECL_EXTERNAL (fndecl) && DECL_DECLARED_INLINE_P (fndecl) && (flag_gnu89_inline || lookup_attribute ("gnu_inline", DECL_ATTRIBUTES (fndecl))))
         DECL_DISREGARD_INLINE_LIMITS (fndecl) = 1;
@@ -9773,7 +9741,6 @@ finish_function (location_t end_loc)
 	     }
   }
 
-  n_debug("完成函数  102 %s ",get_tree_code_name(TREE_CODE(fndecl)));
   if (!decl_function_context (fndecl))
         undef_nested_function = false;
   if (cfun->language != NULL){
@@ -11463,7 +11430,6 @@ struct c_declspecs *finish_declspecs (struct c_declspecs *specs)
   if (specs->type != NULL)
     {
       specs->postfix_attrs = c_warn_type_attributes (specs->postfix_attrs);
-      n_debug("decl_attributes---\n");
       decl_attributes (&specs->type, specs->postfix_attrs, 0);
       specs->postfix_attrs = NULL_TREE;
     }

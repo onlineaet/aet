@@ -1667,7 +1667,6 @@ static void write_method_parms00 (AetMangle *self,tree parm_types,int skip)
   if(count==0 || (skip>0 && count==2)){
       write_type (self,void_type_node);
 	  varargs_p = 0;
-      //printf("write_method_parms00 11 无参数：%p\n",first_parm_type);
   }
 
   if (varargs_p)

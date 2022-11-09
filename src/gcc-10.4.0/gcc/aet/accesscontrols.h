@@ -40,9 +40,8 @@ struct _AccessControls
 {
 	c_parser *parser;
     NPtrArray *accessArray;//存储访问信息的数组
-
+    NPtrArray *implClassArray;//当前编译文件中实现的类
 };
-
 
 AccessControls *access_controls_get();
 void            access_controls_save_access_code(AccessControls *self,ClassName *className);
@@ -52,9 +51,11 @@ nboolean        access_controls_access_enum(AccessControls *self,location_t loc,
 
 void            access_controls_check(AccessControls *self);
 void            access_controls_set_parser(AccessControls *self,c_parser *parser);
-
-
-
+/**
+ * 加入在当前编译文件中实现的类的名称到AccessControls中.
+ * 第二次编译接口时，也有接口的初始化方法和AClass的实现，也需要加入到AccessControls中
+ */
+void            access_controls_add_impl(AccessControls *self,char *sysName);
 
 #endif
 

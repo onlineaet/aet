@@ -113,24 +113,50 @@ nboolean  aet_utils_is_unref_name(char *className,char *funcName)
 	return strcmp(temp,funcName)==0;
 }
 
+static unsigned int calc_hash (const unsigned char *str, size_t len)
+{
+  size_t n = len;
+  unsigned int r = 0;
+  while (n--)
+    r = HT_HASHSTEP (r, *str++);
+  return HT_HASHFINISH (r, len);
+}
+
 /*
  * lex.c中每个字符算一个hash 必须与lex.c保持一致。
+ * aet_utils_create_identifier中创建hash的方法与symtab.c中的不一样。
+ * "_aet_magic$_123"字符串用calc_hash创建与lex.c方法创建的hash不一样。所以生成的tree不一样。
+ * 在lookup_field中就找不到对应的field。也一能用
+ * get_identifier_with_length(str,strlen(str));
+ * get_identifier (str);
+ * 他们所用的hashtable与parser_in中的也不一样。
+ * 把symtab.c中的calc_hash移到aet_utils_create_identifier解决问题。在lex.c中创建hash的地方有三处。
+  unsigned int hash = HT_HASHSTEP (0, *base);
+  cur = base + 1;
+  while (ISIDNUM (*cur))
+    {
+      hash = HT_HASHSTEP (hash, *cur);
+      cur++;
+    }
+  len = cur - base;
+  hash = HT_HASHFINISH (hash, len);
+
+    unsigned int hash = HT_HASHSTEP (0, *cur);
+  ++cur;
+  while (ISIDNUM (*cur))
+    {
+      hash = HT_HASHSTEP (hash, *cur);
+      ++cur;
+    }
+  hash = HT_HASHFINISH (hash, cur - base);
  */
-cpp_hashnode * aet_utils_create_identifier(const uchar *str,size_t len)
+tree aet_utils_create_identifier(const uchar *str,size_t len)
 {
    cpp_hashnode *result;
-   const uchar *cur;
-   unsigned int hash = HT_HASHSTEP (0, *str);
-   cur=str+1;
-   while (ISIDNUM (*cur)){
-        hash = HT_HASHSTEP (hash, *cur);
-        cur++;
-   }
-   hash = HT_HASHFINISH (hash, len);
+   unsigned int hash= calc_hash(str,len);
    result = CPP_HASHNODE (ht_lookup_with_hash (parse_in->hash_table,
 						  (const unsigned char *)str, len, hash, HT_ALLOC));
-   //n_debug("创建标识符 ---%s %d cpphashnode:%p hash:%u", (char *)str,len,result,hash);
-   return result;
+   return HT_IDENT_TO_GCC_IDENT (HT_NODE (result));
 }
 
 c_token      *aet_utils_create_typedef_token(c_token *token,location_t start_loc)
@@ -139,8 +165,7 @@ c_token      *aet_utils_create_typedef_token(c_token *token,location_t start_loc
 	  token->id_kind=C_ID_NONE;
       token->keyword = RID_TYPEDEF;
       token->pragma_kind = PRAGMA_NONE;
-      cpp_hashnode * hashnode=aet_utils_create_identifier("typedef",7);
-      token->value = HT_IDENT_TO_GCC_IDENT (HT_NODE (hashnode));
+      token->value=aet_utils_create_identifier("typedef",7);
       C_SET_RID_CODE(token->value,RID_TYPEDEF);
       TREE_LANG_FLAG_0 (token->value) = 1;
  	  token->location = start_loc;
@@ -153,8 +178,7 @@ c_token      *aet_utils_create_struct_token(c_token *token,location_t start_loc)
 	  token->id_kind=C_ID_NONE;
       token->keyword = RID_STRUCT;
       token->pragma_kind = PRAGMA_NONE;
-      cpp_hashnode * hashnode=aet_utils_create_identifier("struct",6);
-      token->value = HT_IDENT_TO_GCC_IDENT (HT_NODE (hashnode));
+      token->value=aet_utils_create_identifier("struct",6);
       C_SET_RID_CODE(token->value,RID_STRUCT);
       TREE_LANG_FLAG_0 (token->value) = 1;
  	  token->location = start_loc;
@@ -167,8 +191,7 @@ c_token      *aet_utils_create_return_token(c_token *token,location_t start_loc)
 	  token->id_kind=C_ID_NONE;
       token->keyword = RID_RETURN;
       token->pragma_kind = PRAGMA_NONE;
-      cpp_hashnode * hashnode=aet_utils_create_identifier("return",6);
-      token->value = HT_IDENT_TO_GCC_IDENT (HT_NODE (hashnode));
+      token->value =aet_utils_create_identifier("return",6);
       C_SET_RID_CODE(token->value,RID_RETURN);
       TREE_LANG_FLAG_0 (token->value) = 1;
  	  token->location = start_loc;
@@ -182,8 +205,7 @@ c_token      *aet_utils_create_if_token(c_token *token,location_t start_loc)
       token->id_kind=C_ID_NONE;
       token->keyword = RID_IF;
       token->pragma_kind = PRAGMA_NONE;
-      cpp_hashnode * hashnode=aet_utils_create_identifier("if",2);
-      token->value = HT_IDENT_TO_GCC_IDENT (HT_NODE (hashnode));
+      token->value = aet_utils_create_identifier("if",2);
       C_SET_RID_CODE(token->value,RID_IF);
       TREE_LANG_FLAG_0 (token->value) = 1;
       token->location = start_loc;
@@ -196,8 +218,7 @@ c_token      *aet_utils_create_sizeof_token(c_token *token,location_t start_loc)
 	  token->id_kind=C_ID_NONE;
       token->keyword = RID_SIZEOF;
       token->pragma_kind = PRAGMA_NONE;
-      cpp_hashnode * hashnode=aet_utils_create_identifier("sizeof",6);
-      token->value = HT_IDENT_TO_GCC_IDENT (HT_NODE (hashnode));
+      token->value = aet_utils_create_identifier("sizeof",6);
       C_SET_RID_CODE(token->value,RID_SIZEOF);
       TREE_LANG_FLAG_0 (token->value) = 1;
  	  token->location = start_loc;
@@ -210,8 +231,7 @@ c_token      *aet_utils_create_static_token(c_token *token,location_t start_loc)
 	  token->id_kind=C_ID_NONE;
       token->keyword = RID_STATIC;
       token->pragma_kind = PRAGMA_NONE;
-      cpp_hashnode * hashnode=aet_utils_create_identifier("static",6);
-      token->value = HT_IDENT_TO_GCC_IDENT (HT_NODE (hashnode));
+      token->value = aet_utils_create_identifier("static",6);
       C_SET_RID_CODE(token->value,RID_STATIC);
       TREE_LANG_FLAG_0 (token->value) = 1;
  	  token->location = start_loc;
@@ -224,8 +244,7 @@ c_token      *aet_utils_create_char_token(c_token *token,location_t start_loc)
 	  token->id_kind=C_ID_NONE;
       token->keyword = RID_CHAR;
       token->pragma_kind = PRAGMA_NONE;
-      cpp_hashnode * hashnode=aet_utils_create_identifier("char",4);
-      token->value = HT_IDENT_TO_GCC_IDENT (HT_NODE (hashnode));
+      token->value=aet_utils_create_identifier("char",4);
       C_SET_RID_CODE(token->value,RID_CHAR);
       TREE_LANG_FLAG_0 (token->value) = 1;
  	  token->location = start_loc;
@@ -238,14 +257,28 @@ c_token      *aet_utils_create_int_token(c_token *token,location_t start_loc)
 	  token->id_kind=C_ID_NONE;
       token->keyword = RID_INT;
       token->pragma_kind = PRAGMA_NONE;
-      cpp_hashnode * hashnode=aet_utils_create_identifier("int",3);
-      token->value = HT_IDENT_TO_GCC_IDENT (HT_NODE (hashnode));
+      token->value=aet_utils_create_identifier("int",3);
       C_SET_RID_CODE(token->value,RID_INT);
       TREE_LANG_FLAG_0 (token->value) = 1;
  	  token->location = start_loc;
       return token;
 }
 
+/**
+ * 创建private$
+ */
+void  aet_utils_create_private$_token(c_token *token,location_t start_loc)
+{
+     token->type = CPP_KEYWORD;
+     token->id_kind=C_ID_NONE;
+     token->keyword = RID_AET_PRIVATE;
+     token->pragma_kind = PRAGMA_NONE;
+     token->value=aet_utils_create_identifier("private$",8);
+     C_SET_RID_CODE(token->value,RID_AET_PRIVATE);
+     TREE_LANG_FLAG_0 (token->value) = 1;
+     token->location = start_loc;
+     return token;
+}
 
 c_token       *aet_utils_create_super_token(c_token *token,location_t start_loc)
 {
@@ -253,8 +286,7 @@ c_token       *aet_utils_create_super_token(c_token *token,location_t start_loc)
 	  token->id_kind=C_ID_NONE;
       token->keyword = RID_AET_SUPER;
       token->pragma_kind = PRAGMA_NONE;
-      cpp_hashnode * hashnode=aet_utils_create_identifier("super$",6);
-      token->value = HT_IDENT_TO_GCC_IDENT (HT_NODE (hashnode));
+      token->value=aet_utils_create_identifier("super$",6);
       C_SET_RID_CODE(token->value,RID_AET_SUPER);
       TREE_LANG_FLAG_0 (token->value) = 1;
 	  token->location = start_loc;
@@ -267,8 +299,7 @@ c_token       *aet_utils_create_aet_goto_token(c_token *token,location_t start_l
 	  token->id_kind=C_ID_NONE;
       token->keyword = RID_AET_GOTO;
       token->pragma_kind = PRAGMA_NONE;
-      cpp_hashnode * hashnode=aet_utils_create_identifier(RID_AET_GOTO_STR,strlen(RID_AET_GOTO_STR));
-      token->value = HT_IDENT_TO_GCC_IDENT (HT_NODE (hashnode));
+      token->value=aet_utils_create_identifier(RID_AET_GOTO_STR,strlen(RID_AET_GOTO_STR));
       C_SET_RID_CODE(token->value,RID_AET_GOTO);
       TREE_LANG_FLAG_0 (token->value) = 1;
 	  token->location = start_loc;
@@ -281,8 +312,7 @@ c_token       *aet_utils_create_void_token(c_token *token,location_t start_loc)
 	  token->id_kind=C_ID_NONE;
 	  token->keyword = RID_VOID;
 	  token->pragma_kind = PRAGMA_NONE;
-	  cpp_hashnode * hashnode=aet_utils_create_identifier("void",4);
-	  token->value = HT_IDENT_TO_GCC_IDENT (HT_NODE (hashnode));
+	  token->value=aet_utils_create_identifier("void",4);
 	  C_SET_RID_CODE(token->value,RID_VOID);
 	  TREE_LANG_FLAG_0 (token->value) = 1;
 	  token->location = start_loc;
@@ -303,8 +333,7 @@ void aet_utils_create_token(c_token *token,enum cpp_ttype type,uchar *str,int le
 {
    token->type = type;
    if(type==CPP_NAME){
-	  cpp_hashnode * hashnode=aet_utils_create_identifier(str,len);
-	  token->value = HT_IDENT_TO_GCC_IDENT (HT_NODE (hashnode));
+      token->value =aet_utils_create_identifier(str,len);
 	  token->id_kind = C_ID_ID;
    }else{
 	  token->id_kind=C_ID_NONE;
@@ -324,12 +353,9 @@ void  aet_utils_create_number_token(c_token *token,int value)
 	   token->value=build_int_cst (integer_type_node, w);
 }
 
-
-
 tree aet_utils_create_ident(uchar *str)
 {
-   cpp_hashnode * hashnode=aet_utils_create_identifier(str,strlen(str));
-   return HT_IDENT_TO_GCC_IDENT (HT_NODE (hashnode));
+   return aet_utils_create_identifier(str,strlen(str));
 }
 
 
@@ -631,5 +657,13 @@ char *aet_utils_create_enum_element_name(char *sysName,char *origElement)
 	int hash=aet_utils_create_hash(origElement,strlen(origElement));
 	sprintf(temp,"_e1%d%s%d%s%u",strlen(sysName),sysName,strlen(origElement),origElement,hash);
 	return n_strdup(temp);
+}
+
+/**
+ * 获取keyword类型的keyword的字符串
+ */
+char   *aet_utils_get_keyword_string(c_token *token)
+{
+    return getKeyword(token);
 }
 

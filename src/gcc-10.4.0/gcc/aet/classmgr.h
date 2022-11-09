@@ -38,7 +38,7 @@ struct _ClassMgr
 ClassMgr * class_mgr_get();
 nboolean   class_mgr_is_class(ClassMgr *self,char *className);
 nboolean   class_mgr_add(ClassMgr *self,char *sysClassName,char *userClassName,char *package);
-nboolean   class_mgr_set_type(ClassMgr *self,char *sysClassName,ClassType classType,ClassPermissionType permission,nboolean isFinal);
+nboolean   class_mgr_set_type(ClassMgr *self,location_t loc,char *sysClassName,ClassType classType,ClassPermissionType permission,nboolean isFinal);
 ClassName *class_mgr_get_class_name_by_user(ClassMgr *self,char *userClassName);
 ClassName *class_mgr_get_class_name_by_sys(ClassMgr *self,char *sysClassName);
 ClassInfo *class_mgr_get_class_info(ClassMgr *self,char *sysClassName);
@@ -54,6 +54,7 @@ ClassName *class_mgr_find_interface(ClassMgr *self,ClassName *className,ClassNam
 nboolean   class_mgr_about_generic(ClassMgr *self,ClassName *className);
 int        class_mgr_get_distance(ClassMgr *self,char *sysName);
 char      *class_mgr_find_field(ClassMgr *self,char *fromSysName,char *fieldName);
+NPtrArray *class_mgr_get_all_iface_info(ClassMgr *self);
 
 
 #endif

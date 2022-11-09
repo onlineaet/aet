@@ -69,7 +69,6 @@ static void genericExpandInit(GenericExpand *self)
 {
 	self->genericParser=generic_parser_new();
 	self->genericNeedFileEnd=FALSE;
-	self->ifaceNeedFileEnd=FALSE;
 	self->genericDefine=generic_define_new();
 
 }
@@ -557,45 +556,30 @@ static cpp_buffer * createBuffer (cpp_reader *pfile, const uchar *str, size_t le
    return new_buffer;
 }
 
-static char* getCurrentFile(c_parser *parser)
+
+/**
+ * 获得编译文件的cpp_buffer
+ */
+static cpp_buffer* getCompileFileBuffer(cpp_buffer *buffer)
 {
-       cpp_buffer *buffer= parse_in->buffer;
        if(buffer==NULL){
-           printf("getCurrentFile 00 buffer:%p %s\n",buffer,in_fnames[0]);
-    	   return NULL;
+           printf("getCompileFileBuffer 00 buffer:%p %s\n",buffer,in_fnames[0]);
+           return NULL;
        }
        struct _cpp_file *file=buffer->file;
        if(file==NULL){
-           printf("getCurrentFile 11 file:%p %s\n",file,in_fnames[0]);
-    	   return NULL;
+           cpp_buffer *prev=buffer->prev;
+           return getCompileFileBuffer(prev);
        }
        const char *fileName=_cpp_get_file_name (file);
-       if(strcmp(fileName,in_fnames[0])){
-           printf("getCurrentFile 22 %s %s\n",file,in_fnames[0]);
-    	   return NULL;
+       if(!strcmp(fileName,in_fnames[0])){
+           return buffer;
        }
-       return fileName;
+       cpp_buffer *prev=buffer->prev;
+       return getCompileFileBuffer(prev);
 }
 
-static nboolean addToCppBuffer00(c_parser *parser,char *tag)
-{
-	char *fileName=getCurrentFile(parser);
-	if(fileName!=NULL){
-		 NString *fstr=n_string_new(fileName);
-		 nboolean ok=(n_string_ends_with(fstr,".c") || n_string_ends_with(fstr,".cpp"));
-		 n_string_free(fstr,TRUE);
-		 printf("addToCppBuffer ---- 00 %s ok:%d tag:%s len:%d\n",fileName,ok,tag,strlen(tag));
-		 if(ok){
-			cpp_buffer *newBuffer=createBuffer(parse_in,tag,strlen(tag),TRUE);
-			printf("addToCppBuffer ---- 11 ---当前.c的buffer %p prev:%p newBuffer:%p\n",parse_in->buffer,parse_in->buffer->prev,newBuffer);
-			parse_in->buffer->prev=newBuffer;
-			return TRUE;
-		 }
-	}else{
-		 n_error("当前编译的内容来自缓存，不是来自文件%s。",in_fnames[0]);
-	}
-	return FALSE;
-}
+
 
 /**
  * 在files.c把read_file_guts函数中的16改成64,留出空间，追加字符串
@@ -604,21 +588,21 @@ static nboolean addToCppBuffer00(c_parser *parser,char *tag)
  */
 static nboolean addToCppBuffer(c_parser *parser,char *tag)
 {
-	char *fileName=getCurrentFile(parser);
-	if(fileName!=NULL){
-		 NString *fstr=n_string_new(fileName);
-		 nboolean ok=(n_string_ends_with(fstr,".c") || n_string_ends_with(fstr,".cpp"));
-		 n_string_free(fstr,TRUE);
-		 n_debug("addToCppBuffer ---- 00 %s ok:%d tag:%s len:%d\n",fileName,ok,tag,strlen(tag));
-		 if(ok){
-			 strncat(parse_in->buffer->buf,tag,strlen(tag));
-			 parse_in->buffer->rlimit=parse_in->buffer->rlimit+strlen(tag);
-			 return TRUE;
-		 }
-	}else{
-		 n_error("当前编译的内容来自缓存，不是来自文件%s。",in_fnames[0]);
-	}
-	return FALSE;
+    cpp_buffer* buffer=getCompileFileBuffer(parse_in->buffer);
+    if(buffer!=NULL){
+        NString *fstr=n_string_new(in_fnames[0]);
+        nboolean ok=(n_string_ends_with(fstr,".c") || n_string_ends_with(fstr,".cpp"));
+        n_string_free(fstr,TRUE);
+        n_debug("addToCppBuffer --xxx-- 00 %s ok:%d tag:%s len:%d\n",in_fnames[0],ok,tag,strlen(tag));
+        if(ok){
+            strncat(buffer->buf,tag,strlen(tag));
+            buffer->rlimit=buffer->rlimit+strlen(tag);
+            return TRUE;
+        }
+    }else{
+       n_error("当前编译的内容来自缓存，不是来自文件%s。",in_fnames[0]);
+    }
+    return FALSE;
 }
 
 
@@ -628,32 +612,9 @@ void generic_expand_add_eof_tag(GenericExpand *self)
 	if(self->genericNeedFileEnd)
 		return;
 	 char tag[256];
-	 if(self->ifaceNeedFileEnd){
-		sprintf(tag,"%s %d \n %s %d \n",
-				RID_AET_GOTO_STR,GOTO_GENERIC_BLOCK_FUNC_DEFINE_COMPILE,
-				RID_AET_GOTO_STR,GOTO_IFACE_COMPILE);
-	 }else{
-		sprintf(tag,"%s %d \n",
-							RID_AET_GOTO_STR,GOTO_GENERIC_BLOCK_FUNC_DEFINE_COMPILE);
-	 }
-		printf("generic_expand_add_eof_tag %s pid:%d %s\n",tag,getpid(),in_fnames[0]);
+     sprintf(tag,"%s %d \n",RID_AET_GOTO_STR,GOTO_GENERIC_BLOCK_FUNC_DEFINE_COMPILE);
+     n_debug("generic_expand_add_eof_tag %s pid:%d %s\n",tag,getpid(),in_fnames[0]);
 	 self->genericNeedFileEnd=addToCppBuffer(self->parser,tag);
-}
-
-void generic_expand_add_eof_tag_for_iface(GenericExpand *self)
-{
-	c_parser *parser=self->parser;
-	if(self->ifaceNeedFileEnd)
-		return;
-	char tag[256];
-	if(self->genericNeedFileEnd){
-		sprintf(tag,"%s %d \n %s %d \n",
-				RID_AET_GOTO_STR,GOTO_GENERIC_BLOCK_FUNC_DEFINE_COMPILE,RID_AET_GOTO_STR,GOTO_IFACE_COMPILE);
-	}else{
-		sprintf(tag,"%s %d \n",RID_AET_GOTO_STR,GOTO_IFACE_COMPILE);
-	}
-	printf("generic_expand_add_eof_tag_for_iface--- %s pid:%d %s\n",tag,getpid(),in_fnames[0]);
-	self->ifaceNeedFileEnd=addToCppBuffer(self->parser,tag);
 }
 
 void generic_expand_set_parser(GenericExpand *self,c_parser *parser)
@@ -672,9 +633,4 @@ GenericExpand *generic_expand_get()
 	}
 	return singleton;
 }
-
-
-
-
-
 

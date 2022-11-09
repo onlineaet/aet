@@ -1227,7 +1227,8 @@ AET_OBJS=aet/natomic.o  aet/nmem.o 	aet/nslice.o  aet/nlist.o \
     aet/middlefile.o aet/classfinal.o aet/classbuild.o aet/linkfile.o aet/funccheck.o\
     aet/ifacefile.o  aet/classlib.o  aet/libfile.o aet/genericfunc.o aet/genericdefine.o\
     aet/genericmethod.o aet/genericcheck.o aet/objectreturn.o aet/superdefine.o aet/enumparser.o\
-    aet/restorelocation.o  aet/namelesscall.o aet/implicitlycall.o aet/cmprefopt.o  aet/accesscontrols.o
+    aet/restorelocation.o  aet/namelesscall.o aet/implicitlycall.o aet/cmprefopt.o  aet/accesscontrols.o\
+    aet/aetexpr.o
 
 # Analyzer object files
 ANALYZER_OBJS = \

@@ -1,5 +1,5 @@
 /*
-   Copyright (C) 2022 guiyang wangyong co.,ltd.
+ * Copyright (C) 2022 , guiyang,wangyong co.,ltd.
 
 This file is part of AET.
 
@@ -19,19 +19,30 @@ If not see <http://www.gnu.org/licenses/>.
 AET was originally developed  by the zclei@sina.com at guiyang china .
 */
 
-
-#ifndef __GCC_PARSER_HELP_H__
-#define __GCC_PARSER_HELP_H__
+#ifndef __GCC_AET_EXPR_H__
+#define __GCC_AET_EXPR_H__
 
 #include "nlib.h"
-#include "c-aet.h"
 #include "classinfo.h"
+#include "classfunc.h"
+#include "enumparser.h"
 
 
+typedef struct _AetExpr AetExpr;
+/* --- structures --- */
+struct _AetExpr
+{
+	c_parser *parser;
+};
 
-nboolean parser_help_compare(tree funcType1,tree funcType2);
-void     parser_help_add_magic();//为类声明和接口声明加一个变量作用魔数
+
+AetExpr      *aet_expr_new();
+struct c_expr aet_expr_varof_parser(AetExpr *self,struct c_expr lhs);
+void          aet_expr_set_parser(AetExpr *self,c_parser *parser);
+
+
 
 
 #endif
+
 

@@ -65,6 +65,7 @@ int                   class_util_has_nameless_call(tree value);
 char                 *class_util_get_class_name_from_field_decl(tree fieldDecl);
 int                   class_util_get_nameless_call_link(tree value,NPtrArray *array,char **link);
 nboolean              class_util_is_function_field(tree field);
+nboolean              class_util_have_field(tree type, tree component);//在结构体或UNION中查找component
 
 
 #endif /* ! GCC_C_AET_H */

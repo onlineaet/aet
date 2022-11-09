@@ -73,12 +73,12 @@ nboolean class_mgr_add(ClassMgr *self,char *sysClassName,char *userClassName,cha
 	  info->className.package=NULL;
     const char *file = LOCATION_FILE (input_location);
     if(file!=NULL)
-        info->file=n_strdup(file);
+        class_info_set_file(info,file);
     n_hash_table_insert (self->mgrHash, n_strdup(sysClassName),info);
 	return TRUE;
 }
 
-nboolean class_mgr_set_type(ClassMgr *self,char *sysClassName,ClassType classType,ClassPermissionType permission,nboolean isFinal)
+nboolean class_mgr_set_type(ClassMgr *self,location_t loc,char *sysClassName,ClassType classType,ClassPermissionType permission,nboolean isFinal)
 {
    	if(!n_hash_table_contains(self->mgrHash,sysClassName)){
    	    error ("没找到class %qs",sysClassName);
@@ -90,14 +90,21 @@ nboolean class_mgr_set_type(ClassMgr *self,char *sysClassName,ClassType classTyp
 	info->isFinal=isFinal;
   	if(isFinal){
       if(class_info_is_abstract_class(info)){
-     	 error("类%qs是抽象类，不能用final$修饰。",sysClassName);
+     	 error_at(loc,"类%qs是抽象类，不能用final$修饰。",sysClassName);
      	 return FALSE;
       }
       if(class_info_is_interface(info)){
-		 error("类%qs是接口，不能用final$修饰。",sysClassName);
+		 error_at(loc,"类%qs是接口，不能用final$修饰。",sysClassName);
 		 return FALSE;
       }
    	}
+  	NString *checkStr=n_string_new(sysClassName);
+  	nboolean reverName=(n_string_ends_with(checkStr,AET_ROOT_OBJECT) || n_string_ends_with(checkStr,AET_ROOT_CLASS));
+  	n_string_free(checkStr,TRUE);
+  	if(info->type==CLASS_TYPE_INTERFACE && reverName){
+  	    error_at(loc,"接口%qs的名字不能含有%qs或%qs。",sysClassName,AET_ROOT_OBJECT,AET_ROOT_CLASS);
+  	    return FALSE;
+  	}
 	return TRUE;
 }
 
@@ -378,6 +385,21 @@ char  *class_mgr_find_field(ClassMgr *self,char *fromSysName,char *fieldName)
 {
     char *belongClass=findField(self,fromSysName,fieldName);
     return belongClass;
+}
+
+NPtrArray *class_mgr_get_all_iface_info(ClassMgr *self)
+{
+        NPtrArray *array=n_ptr_array_new();
+        NHashTableIter iter;
+        npointer key, value;
+        n_hash_table_iter_init(&iter, self->mgrHash);
+        while (n_hash_table_iter_next(&iter, &key, &value)) {
+            ClassInfo *info = (ClassInfo *)value;
+            if(class_info_is_interface(info)){
+                n_ptr_array_add(array,info);
+            }
+        }
+        return array;
 }
 
 

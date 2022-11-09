@@ -1,12 +1,15 @@
 安装:
 分两部分：
 1.编译aet编译器。2.用aet编译器编译aet基础库
-安装环境 ubuntu 20.04
+编译环境要求: ubuntu 20.04
 
 一、编译aet
 1.从https://mirrors.ustc.edu.cn/gnu/gcc/gcc-10.4.0/ 下载gcc10.4.0
-2.解压到指定目录，例如：/home/aet/temp/gcc10.4.0
-3.在/home/aet/temp/gcc10.4.0下编译gcc,下面几行是编译gcc的命令。
+2.进入https://gitee.com/onlineaet/aet。在"克隆/下载"处下载aet-master.zip
+3.解压gcc10.4.0到指定目录，例如：/home/aet/temp/gcc10.4.0
+4.解压aet-master.zip。在解压目录下生aet-master/src/gcc-10.4.0,把aet-master/src/gcc-10.4.0下
+的两个目录gcc和libcpp覆盖到/home/aet/temp/gcc10.4.0中。
+5.在/home/aet/temp/gcc10.4.0下编译gcc,下面几行是编译gcc的命令。
  $ cd /home/aet/temp/gcc10.4.0
  $ mkdir build
  $ cd build
@@ -14,13 +17,9 @@
   --with-gmp=/usr/local/gmp-6.2.0 --with-mpfr=/usr/local/mpfr-4.1.0 --with-mpc=/usr/local/mpc-1.2.1
  make
  make install
- 如果成功编译并安装gcc，可以继续下面的步骤。 
-4.进入https://gitee.com/originrobot/aet.git网站，在"克隆/下载"处下载aet-master.zip
-5.复制aet-master.zip到/home/aet/temp/gcc10.4.0
-6.进入/home/aet/temp/gcc10.4.0，并在当前目录解压 aet-master.zip。
-删除用不到的libaet目录。
-aet-master.zip中的文件会覆盖gcc10.4.0下面的文件,具体内容如下:
+ 如果成功编译并安装gcc，可以继续下面的步骤。 如果不成功，可以先编译原gcc10.4.0再编译aet
 
+二、覆盖原gcc的文件如下：
 (1)libcpp/directives.c
 在2623行插入
  }else if(buffer->dir.name && strcmp(buffer->dir.name,"aet")==0){ //zclei 为了恢复token在文件的位置。看restorelocation.c
@@ -41,7 +40,7 @@ ALL_CXXFLAGS = $(T_CFLAGS) $(CFLAGS-$@) $(CXXFLAGS) $(INTERNAL_CFLAGS)
 的后面加入 "-fpermissive\" 变成ALL_CXXFLAGS = $(T_CFLAGS) $(CFLAGS-$@) $(CXXFLAGS) $(INTERNAL_CFLAGS) -fpermissive
 
 在1210行加入需要编译的aet文件:
-AET_OBJS=aet/natomic.o  aet/nmem.o 	aet/nslice.o  aet/nlist.o \
+AET_OBJS=aet/natomic.o  aet/nmem.o  aet/nslice.o  aet/nlist.o \
     aet/nlog.o   aet/nqsort.o aet/nptrarray.o aet/nerror.o \
     aet/nprintf.o aet/nstrfuncs.o  aet/nunicode.o aet/nconvert.o \
     aet/nuniprop.o aet/nstring.o aet/nunidecomp.o aet/nhash.o \
@@ -60,11 +59,12 @@ AET_OBJS=aet/natomic.o  aet/nmem.o 	aet/nslice.o  aet/nlist.o \
     aet/middlefile.o aet/classfinal.o aet/classbuild.o aet/linkfile.o aet/funccheck.o\
     aet/ifacefile.o  aet/classlib.o  aet/libfile.o aet/genericfunc.o aet/genericdefine.o\
     aet/genericmethod.o aet/genericcheck.o aet/objectreturn.o aet/superdefine.o aet/enumparser.o\
-    aet/restorelocation.o  aet/namelesscall.o aet/implicitlycall.o aet/cmprefopt.o aet/accesscontrols.o
+    aet/restorelocation.o  aet/namelesscall.o aet/implicitlycall.o aet/cmprefopt.o  aet/accesscontrols.o\
+    aet/aetexpr.o
  
- 在1668行加入“$(AET_OBJS) \”。
+ 在1669行加入“$(AET_OBJS) \”。
 
- 在2190行加入“aet/aetcompile.o”。
+ 在2192行加入“aet/aetcompile.o”。
  COLLECT2_OBJS = collect2.o collect2-aix.o vec.o ggc-none.o \
   collect-utils.o file-find.o hash-table.o selftest.o aet/aetcompile.o
   
@@ -191,7 +191,7 @@ int c_disable_extension_diagnostics (void);
  make install
 9.如果成功，则说明可以使用gcc来编译使用aet语言的基础程序库了。
 
-二、编译aet基础库 libaet1.0.0.so
+三、编译aet基础库 libaet1.0.0.so
 1.进入/home/aet/temp/libaet,并在当前目录解压 aet-master.zip。
 删除用不到的gcc10.4.0目录。
 2.进入/home/aet/temp/libaet/libaet1.0.0目录，编辑app.mk文件的如下内容。
@@ -200,7 +200,7 @@ PC_COMPILE_ALL       = /home/aet/gcc-10.4.0/bin/
 3.运行以下命令:make TARGET=lib.
 4.生成的动态库存在/home/aet/temp/libaet/libaet1.0.0/bin目录。文件名是:libaet1.0.0.so
 
-测试:
+四、测试:
 写一个test.c
 代码如下:
 #include <stdio.h>

@@ -27,12 +27,14 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 #include "target.h"
 #include "function.h"
 #include "tree.h"
+#include "tree-core.h"
 #include "toplev.h"
 #include "c-family/c-pragma.h"
 #include "c/c-tree.h"
 #include "c/c-parser.h"
 #include "opts.h"
 #include "tree-iterator.h"
+#include "c/c-lang.h"
 
 #include "aetinfo.h"
 #include "aetutils.h"
@@ -365,6 +367,7 @@ CreateClassMethod class_util_get_create_method(tree selfexpr)
     	aet_print_tree_skip_debug(selfexpr);
     	n_error("class_util_get_create_method 不知什么类型\n");
     }
+    return CREATE_CLASS_METHOD_UNKNOWN;
 }
 
 nboolean class_util_is_class(struct c_declspecs *declspecs)
@@ -899,7 +902,81 @@ nboolean  class_util_is_function_field(tree fieldDecl)
    return FALSE;
 }
 
+/**
+ * 域变量中有符号$,如_aet_magic$_123。
+ * 在二分查找中找不到???
+ */
+static tree lookupField(tree type, tree component)
+{
+   tree field;
+   if (TYPE_LANG_SPECIFIC (type) && TYPE_LANG_SPECIFIC (type)->s  && !seen_error ()){
+      int bot, top, half;
+      tree *field_array = &TYPE_LANG_SPECIFIC (type)->s->elts[0];
+      field = TYPE_FIELDS (type);
+      bot = 0;
+      top = TYPE_LANG_SPECIFIC (type)->s->len;
+      while (top - bot > 1){
+         half = (top - bot + 1) >> 1;
+         field = field_array[bot+half];
+         if (DECL_NAME (field) == NULL_TREE){
+            /* Step through all anon unions in linear fashion.  */
+            while (DECL_NAME (field_array[bot]) == NULL_TREE){
+              field = field_array[bot++];
+              if (RECORD_OR_UNION_TYPE_P (TREE_TYPE (field))) {
+                  tree anon = lookupField (TREE_TYPE (field), component);
+                  if (anon)
+                     return field;
+                 if (flag_plan9_extensions  && TYPE_NAME (TREE_TYPE (field)) != NULL_TREE  &&
+                        (TREE_CODE (TYPE_NAME (TREE_TYPE (field)))== TYPE_DECL)  && (DECL_NAME (TYPE_NAME (TREE_TYPE (field))) == component))
+                    break;
+               }
+            }
 
+             /* Entire record is only anon unions.  */
+            if (bot > top)
+               return NULL_TREE;
+             /* Restart the binary search, with new lower bound.  */
+            continue;
+         }
+         if (DECL_NAME (field) == component)
+             break;
+         if (DECL_NAME(field) < component)
+            bot += half;
+         else
+           top = bot + half;
+     }
+     if (DECL_NAME (field_array[bot]) == component)
+         field = field_array[bot];
+     else if (DECL_NAME (field) != component)
+         return NULL_TREE;
+   } else{
+      for (field = TYPE_FIELDS (type); field; field = DECL_CHAIN (field)){
+         if (DECL_NAME (field) == NULL_TREE && RECORD_OR_UNION_TYPE_P (TREE_TYPE (field))){
+             tree anon = lookupField (TREE_TYPE (field), component);
+             if (anon)
+               return field;
+             if (flag_plan9_extensions  && TYPE_NAME (TREE_TYPE (field)) != NULL_TREE
+                && TREE_CODE (TYPE_NAME (TREE_TYPE (field))) == TYPE_DECL  && (DECL_NAME (TYPE_NAME (TREE_TYPE (field))) == component))
+              break;
+         }
+         if (DECL_NAME (field) == component)
+              break;
+     }
+     if (field == NULL_TREE)
+        return NULL_TREE;
+   }
+   return field;
+}
+
+/**
+ * 在结构体或UNION中查找component
+ */
+nboolean  class_util_have_field(tree type, tree component)
+{
+    tree field= lookupField(type,component);
+    return aet_utils_valid_tree(field);
+
+}
 
 
 

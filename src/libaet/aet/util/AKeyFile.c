@@ -160,7 +160,7 @@ impl$ AKeyFile{
           }
       }
       if(currentGroup->keyValuePairList->length()==0 && !currentGroup->name){
-           printf("当前组没有内容从groups移走它--- name:%s\n",currentGroup->name);
+           a_debug("当前组没有内容从groups移走它--- name:%s\n",currentGroup->name);
            groups->remove(currentGroup);
            freeKeyFileGroup_cb(currentGroup);
            currentGroup=NULL;

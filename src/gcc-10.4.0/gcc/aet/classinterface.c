@@ -324,17 +324,11 @@ static char *getRefOrUnrefMangleName(ClassInfo *info,char *refOrUnref)
 
 /**
  * 给接口方法ref和unref赋值
- * #define IFACE_REF_FIELD_NAME            "_iface_reserve_ref_field_123"
-  *#define IFACE_UNREF_FIELD_NAME          "_iface_reserve_unref_field_123"
-  *#define
-  *#define IFACE_REF_FUNC_DEFINE_NAME            "_iface_reserve_ref_func_define_123"
-#define IFACE_UNREF_FUNC_DEFINE_NAME          "_iface_reserve_unref_func_define_123"
  * object->ifaceVar._iface_reserve_ref_field_123=_iface_reserve_ref_func_define_123;
  * object->ifaceVar._iface_reserve_unref_field_123=_iface_reserve_unref_func_define_123;
  */
 static void assignmentIfaceRefFunction(ClassInfo *info,NPtrArray *array)
 {
-
 	 int i;
 	 for(i=0;i<info->ifaceCount;i++){
 		   ClassName iface=info->ifaces[i];
@@ -380,6 +374,25 @@ static void assignmentIfaceRefFunction(ClassInfo *info,NPtrArray *array)
 }
 
 /**
+ * 给接口变量AET_MAGIC_NAME设置魔数AET_MAGIC_NAME_VALUE
+ * 接口的magic是AET_MAGIC_NAME_VALUE+1
+ */
+static void assignmentMagic(ClassInfo *info,NPtrArray *array)
+{
+        int i;
+        for(i=0;i<info->ifaceCount;i++){
+              ClassName iface=info->ifaces[i];
+              ClassInfo *faceInfo=class_mgr_get_class_info_by_class_name(class_mgr_get(),&iface);
+              char ifaceVar[255];
+              aet_utils_create_in_class_iface_var(faceInfo->className.userName,ifaceVar);//一定与classparser中创建的接口变量名相同
+              IFaceSourceCode *code=n_slice_new(IFaceSourceCode);
+              code->define=NULL;
+              code->modify=n_strdup_printf("self->%s.%s.%s=%d;\n",ifaceVar,IFACE_COMMON_STRUCT_VAR_NAME,AET_MAGIC_NAME,AET_IFACE_MAGIC_NAME_VALUE);
+              n_ptr_array_add(array,code);
+        }
+}
+
+/**
  * 在classimpl最后把接口的方法找到可以给它赋值的类方法。
  */
 NPtrArray *class_interface_add_define(ClassInterface *self,ClassName *className)
@@ -408,6 +421,7 @@ NPtrArray *class_interface_add_define(ClassInterface *self,ClassName *className)
 	   ImplIfaceFunc *item=(ImplIfaceFunc *)n_ptr_array_index(array,i);
 	   createInterfaceMethodAssignmentCode(item,ifaceResult);
    }
+   assignmentMagic(info,ifaceResult);//给接口设魔数
    assignmentAtClass(info,ifaceResult);//给接口的变量_iface_common_var的域成员_atClass1234赋值=(void*)self;
    assignmentIfaceRefFunction(info,ifaceResult);//给接口的变量_iface_common_var的域成员ref赋值=_iface_ref_function_123
    n_ptr_array_set_free_func(array,freeImplIfaceFunc_cb);
@@ -416,26 +430,74 @@ NPtrArray *class_interface_add_define(ClassInterface *self,ClassName *className)
 }
 
 /**
- * 加
- * #define IFACE_REF_FUNCTION_NAME            "_iface_reserve_ref_function_123"
- #define IFACE_UNREF_FUNCTION_NAME          "_iface_reserve_unref_function_123"
- * 1.IfaceCommonData1234 _iface_common_var;
- * 2.IfaceCommonData1234 *_iface_reserve_ref_function_123();
- * 3.void _iface_reserve_unref_function_123();
+ * 加二个变量二个方法
+ * 1.private$ int _aet_magic$_123;
+ * 2.private$ IfaceCommonData1234 _iface_common_var;
+ * 3.private$ IfaceCommonData1234 *_iface_reserve_ref_function_123();
+ * 4.private$ void _iface_reserve_unref_function_123();
  */
+void class_interface_add_var_ref_unref_methodxxrrrr0000(ClassInterface *self)
+{
+  c_parser *parser=self->parser;
+  location_t  loc = c_parser_peek_token(parser)->location;
+  int tokenCount=parser->tokens_avail;
+  if(tokenCount+17>AET_MAX_TOKEN){
+		error("token太多了");
+		return FALSE;
+  }
+  int i;
+  for(i=tokenCount;i>0;i--){
+     aet_utils_copy_token(&parser->tokens[i-1],&parser->tokens[i-1+17]);
+  }
+  /**
+   * AET_MAGIC_NAME                       "_aet_magic$_123"
+   * 在AObject.h中定义了函数
+   * IFACE_REF_FUNCTION_NAME            "_iface_reserve_ref_function_123"
+   * IFACE_UNREF_FUNCTION_NAME          "_iface_reserve_unref_function_123"
+   */
+
+   aet_utils_create_int_token(&parser->tokens[0],input_location);
+   aet_utils_create_token(&parser->tokens[1],CPP_NAME,AET_MAGIC_NAME,strlen(AET_MAGIC_NAME));
+   aet_utils_create_token(&parser->tokens[2],CPP_SEMICOLON,";",1);
+
+   aet_utils_create_token(&parser->tokens[3],CPP_NAME,IFACE_COMMON_STRUCT_NAME,strlen(IFACE_COMMON_STRUCT_NAME));
+   parser->tokens[3].id_kind=C_ID_TYPENAME;//关键
+   aet_utils_create_token(&parser->tokens[4],CPP_NAME,IFACE_COMMON_STRUCT_VAR_NAME,strlen(IFACE_COMMON_STRUCT_VAR_NAME));
+   aet_utils_create_token(&parser->tokens[5],CPP_SEMICOLON,";",1);
+
+   aet_utils_create_token(&parser->tokens[6],CPP_NAME,IFACE_COMMON_STRUCT_NAME,strlen(IFACE_COMMON_STRUCT_NAME));
+   parser->tokens[6].id_kind=C_ID_TYPENAME;//关键
+   aet_utils_create_token(&parser->tokens[7],CPP_MULT,"*",1);
+   aet_utils_create_token(&parser->tokens[8],CPP_NAME,IFACE_REF_FIELD_NAME,strlen(IFACE_REF_FIELD_NAME));
+   aet_utils_create_token(&parser->tokens[9],CPP_OPEN_PAREN,"(",1);
+   aet_utils_create_token(&parser->tokens[10],CPP_CLOSE_PAREN,")",1);
+   aet_utils_create_token(&parser->tokens[11],CPP_SEMICOLON,";",1);
+
+   aet_utils_create_void_token(&parser->tokens[12],input_location);
+   aet_utils_create_token(&parser->tokens[13],CPP_NAME,IFACE_UNREF_FIELD_NAME,strlen(IFACE_UNREF_FIELD_NAME));
+   aet_utils_create_token(&parser->tokens[14],CPP_OPEN_PAREN,"(",1);
+   aet_utils_create_token(&parser->tokens[15],CPP_CLOSE_PAREN,")",1);
+   aet_utils_create_token(&parser->tokens[16],CPP_SEMICOLON,";",1);
+   parser->tokens_avail=tokenCount+17;
+   aet_print_token_in_parser("class_interface_add_var_ref_unref_method ----");
+   return TRUE;
+}
+
 void class_interface_add_var_ref_unref_method(ClassInterface *self)
 {
   c_parser *parser=self->parser;
   location_t  loc = c_parser_peek_token(parser)->location;
   int tokenCount=parser->tokens_avail;
   if(tokenCount+14>AET_MAX_TOKEN){
-		error("token太多了");
-		return FALSE;
+        error("token太多了");
+        return FALSE;
   }
   int i;
   for(i=tokenCount;i>0;i--){
-		 aet_utils_copy_token(&parser->tokens[i-1],&parser->tokens[i-1+14]);
+         aet_utils_copy_token(&parser->tokens[i-1],&parser->tokens[i-1+14]);
   }
+
+
   aet_utils_create_token(&parser->tokens[0],CPP_NAME,IFACE_COMMON_STRUCT_NAME,strlen(IFACE_COMMON_STRUCT_NAME));
   parser->tokens[0].id_kind=C_ID_TYPENAME;//关键
   aet_utils_create_token(&parser->tokens[1],CPP_NAME,IFACE_COMMON_STRUCT_VAR_NAME,strlen(IFACE_COMMON_STRUCT_VAR_NAME));

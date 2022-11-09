@@ -41,6 +41,7 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 #include "superdefine.h"
 #include "implicitlycall.h"
 #include "cmprefopt.h"
+#include "aetexpr.h"
 
 
 typedef struct _ClassImpl ClassImpl;
@@ -61,6 +62,7 @@ struct _ClassImpl
     ClassInit *classInit;
     ClassCast  *classCast;
     SuperDefine  *superDefine;
+    AetExpr      *aetExpr;
     ImplicitlyCall *implicitlyCall;
     CmpRefOpt      *cmpRefOpt;
     int nest;
@@ -73,8 +75,6 @@ struct _ClassImpl
     	tree  varDecles[30];
     	int count;
     }objectMacro;
-
-    NPtrArray *implClassArray;//在一个文件中实现了几个类
 };
 
 
@@ -126,10 +126,11 @@ tree            class_impl_modify_func_pointer(ClassImpl *self,tree lhs,tree rhs
  * 是不是Abc.xxxx表达式
  */
 nboolean        class_impl_is_class_dot_expression(ClassImpl *self);
+ClassName      *class_impl_get_class_name(ClassImpl *self);
 
 struct c_expr   class_impl_nameles_call(ClassImpl *self,struct c_expr expr);
 void            class_impl_replace_self_call_at_statement_after_labels(ClassImpl *self);
-nboolean        class_impl_is_impl(ClassImpl *self,char *sysName);//判断是否实现了sysName名称所指定的类
+struct c_expr   class_impl_varof_parser(ClassImpl *self,struct c_expr lhs);//解析关键字varof$
 
 void             class_impl_test_target(tree target);
 

@@ -39,7 +39,6 @@ struct _GenericExpand
 	c_parser *parser;
 	GenericParser *genericParser;
 	nboolean genericNeedFileEnd;
-	nboolean ifaceNeedFileEnd;
 	GenericDefine *genericDefine;
 };
 
@@ -60,7 +59,6 @@ void            generic_expand_create_fggb_var_and_setblock_func(GenericExpand *
 
 void            generic_expand_parser_typeof(GenericExpand *self);
 
-void            generic_expand_add_eof_tag_for_iface(GenericExpand *self);
 void            generic_expand_add_eof_tag(GenericExpand *self);
 
 void            generic_expand_set_parser(GenericExpand *self,c_parser *parser);

@@ -306,7 +306,7 @@ static void createFuncImplStrForAbstract(ClassName *className,NString *fieldDecl
 				ClassFunc *func=(ClassFunc *)n_ptr_array_index(ifaceArray,j);
 				if(aet_utils_valid_tree(func->fieldDecl) && !func->isStatic){
 					//记录本类没有实现的接口方法。
-					printf("dddd--cccc-- %s %s\n",func->orgiName,func->rawMangleName);
+					n_debug("记录本类没有实现的接口方法 %s %s\n",func->orgiName,func->rawMangleName);
 					if(!ifaceFuncAtClass(funcArray,func->rawMangleName) && !isReserveRefOrUnrefMethod(func->orgiName)){
 					    n_string_append(fieldDeclStr,func->rawMangleName);
 					    n_string_append(fieldDeclStr,",");
@@ -421,7 +421,6 @@ void   func_check_check_define(FuncCheck *self,ClassName *className)
 	if(self->xmlFile==NULL){
 		initXmlFile(self);
 	}
-
 	ClassInfo *info=class_mgr_get_class_info_by_class_name(class_mgr_get(),className);
 	nboolean re=checkSelfFuncDefine(className);
 	if(!re)
@@ -591,7 +590,7 @@ static CollectInfo *createCollect(char *upperPortion,char *lowerPart)
 	  collect->info=info;
 	  collect->impl=impl;
 	  if(info->type==CLASS_TYPE_NORMAL){
-		  n_debug("因为是普通类所以要检查从AObject到本身的方法是否已实现。%s\n",info->sysName);
+		  n_debug("因为是普通类所以要检查从AObject到本身的方法是否已实现。%s",info->sysName);
 	  }else if(info->type==CLASS_TYPE_ABSTRACT_CLASS){
 	      n_debug("因为是抽象类所以不需要检查。%s\n",info->sysName);
 	  }else{
@@ -776,15 +775,17 @@ void func_check_check_all_define(FuncCheck *self)
 		n_ptr_array_unref(self->currentFuncArray);
 		self->currentFuncArray=NULL;
 	}
-	n_debug("func_check_check_all_define 00 从文件aet_class_func_check_xml.tmp中读出FuncCheckData\n");
+	n_debug("func_check_check_all_define 00 从文件aet_class_func_check_xml.tmp中读出FuncCheckData。");
 	self->currentFuncArray=checkStepOne(self);
-	if(self->currentFuncArray==NULL || self->currentFuncArray->len==0)
+	if(self->currentFuncArray==NULL || self->currentFuncArray->len==0){
+	    n_debug("func_check_check_all_define 11 从文件aet_class_func_check_xml.tmp中读出FuncCheckData是空的或长度是零。");
 		return;
-	n_debug("func_check_check_all_define 11 检查的类数量:%d\n",self->currentFuncArray->len);
+	}
 	NPtrArray *filter=checkStepTwo(self,self->currentFuncArray);
-	if(filter->len==0)
+	if(filter->len==0){
+	    n_debug("func_check_check_all_define 22 过滤后没有需要检查的方法了。");
 		return;
-	n_debug("func_check_check_all_define 22 过滤后还剩:%d\n",filter->len);
+	}
 	checkStepThree(self,filter);
 }
 

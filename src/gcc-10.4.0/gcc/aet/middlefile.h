@@ -33,7 +33,6 @@ typedef struct _MiddleFile MiddleFile;
 struct _MiddleFile
 {
    LinkFile *linkFile;
-   nboolean  addImplIface;
 };
 
 
@@ -41,8 +40,6 @@ MiddleFile  *middle_file_get();
 void         middle_file_modify(MiddleFile *self);
 void         middle_file_create_global_var(MiddleFile *self);
 void         middle_file_import_lib(MiddleFile *self);
-void         middle_file_ready_define_iface_static_var_and_init_method(MiddleFile *self);
-
 char        *middle_file_decode(char *value,int size);
 
 

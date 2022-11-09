@@ -88,7 +88,6 @@ typedef struct _IFaceSaveData{
 	char *sysName;
 	char *oFile;
 	char *cFile;
-	NPtrArray *beQuotedArray;
 }IFaceSaveData;
 
 typedef enum{
@@ -105,18 +104,13 @@ void             xml_file_remove_generic(XmlFile *self,int id,char *key);
 void             xml_file_add_generic(XmlFile *self,GenericSaveData *data);
 NPtrArray       *xml_file_get_generic_data(XmlFile *self);
 
-nboolean         xml_file_remove_iface(XmlFile *self,char *cfile);
-void             xml_file_add_iface(XmlFile *self,NPtrArray *ifaceSysName,char *cfile,char *ofile);
-NPtrArray       *xml_file_get_iface_data(XmlFile *self);
-void             xml_file_get_iface_file(char *src,char **cFile,char **oFile);
-void             xml_file_write_back_iface_data(XmlFile *self,NPtrArray *ifaceSaveData);
+char            *xml_file_create_iface_xml_string(NPtrArray *ifaceSaveDataArray);
 
 void             xml_file_get_lib(XmlFile *self,NPtrArray **dataArrays);
 
 
 GenericSaveData *xml_file_create_generic_data();
 void             xml_file_free_generic_data(GenericSaveData *data);
-
 
 
 

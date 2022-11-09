@@ -194,7 +194,7 @@ enum warn_error_info{
 #define AET_ROOT_OBJECT                    "AObject"
 #define AET_ROOT_CLASS                     "AClass"
 #define AET_CLEANUP_OBJECT_METHOD          "a_object_cleanup_local_object_from_static_or_stack"
-#define AET_CLEANUP_NAMELESS_OBJECT_METHOD "a_object_cleanup_nameless_object" //清除实参是new$ Object()
+#define AET_CLEANUP_NAMELESS_OBJECT_METHOD "a_object_cleanup_nameless_object" //释放实参是new$ Object()的变量
 
 #define AET_MAX_INTERFACE 5 //一个类同时只能实现5个接口
 #define AET_INIT_GLOBAL_METHOD_STRING      "init_1234ergR5678"
@@ -257,15 +257,24 @@ typedef enum{
 
 //////////////////编译期生成的临时文件---------------------------------
 #define GENERIC_BLOCK_INTO_FILE_NAME       "aet_generic_block_xml.tmp" //在编译期中存放new$泛型的有关信息。重要
-#define IFACE_STATIC_VAR_FILE_NAME         "aet_iface_static_var_xml.tmp"      //存放接口的变量名
+#define IFACE_IMPL_INDEX_FILE              "iface_impl_index.tmp" //需要编译的头文件
+#define IFACE_IMPL_PARM_FILE               "iface_impl_parm.tmp" //编译参数
 #define CLASS_FUNC_CHECK_FILE              "aet_class_func_check_xml.tmp"//存放类的方法，是一个xml文件
+
+#define IFACE_OBJECT_FILE_SUFFIX            "_impl_iface.o" //接口目标文件的后缀
+#define IFACE_SOURCE_FILE_SUFFIX            "_impl_iface.c" //接口实现源文件的后缀
+
 
 #define SAVE_LIB_PARM_FILE                  "aet_collect2_argv.tmp"
 #define ADDITIONAL_MIDDLE_AET_FILE          "temp_func_track_45.c"
-#define COMPILE_TRACK_FILE_NAME             "aet_object_path.tmp"
+#define COMPILE_TRACK_FILE_NAME             "aet_object_path.tmp"  //aet_compile.c中可以判断正在编译的是aet相关代码，这样可以检查是否需要再编译检查，泛型和接口
 #define AET_REF_LIB_FILE_NAME               "aet_ref_lib_file.tmp"
 #define AET_NEED_SECOND_FILE_NAME           "aet_need_second_compile.tmp" //存放需要第二次编译的文件名
 
+#define AET_MAGIC_NAME                       "_aet_magic$_123"  //存放魔数的变量名
+#define AET_MAGIC_NAME_VALUE                 1725348960 //存放魔数的变量名 int max=2147483647 接口加1
+#define AET_IFACE_MAGIC_NAME_VALUE           (AET_MAGIC_NAME_VALUE+1)//存放魔数的变量名 int max=2147483647 接口加1
+#define AET_VAR_OF_FUNC_NAME                 "varof_object_or_interface"  //varof具体实现。
 
 typedef enum _FuncAndVarMsg
 {

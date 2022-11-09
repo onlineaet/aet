@@ -7985,12 +7985,11 @@ static bool aet_reject_gcc_builtin (const_tree expr, location_t loc /* = UNKNOWN
   return false;
 }
 
-static tree
-lookup_field (tree type, tree component)
+static tree lookup_field (tree type, tree component)
 {
-  tree field;
+   tree field;
 
-  /* If TYPE_LANG_SPECIFIC is set, then it is a sorted array of pointers
+   /* If TYPE_LANG_SPECIFIC is set, then it is a sorted array of pointers
      to the field elements.  Use a binary search on this array to quickly
      find the element.  Otherwise, do a linear search.  TYPE_LANG_SPECIFIC
      will always be set for structures which have many elements.
@@ -7998,70 +7997,53 @@ lookup_field (tree type, tree component)
      Duplicate field checking replaces duplicates with NULL_TREE so
      TYPE_LANG_SPECIFIC arrays are potentially no longer sorted.  In that
      case just iterate using DECL_CHAIN.  */
-
-  if (TYPE_LANG_SPECIFIC (type) && TYPE_LANG_SPECIFIC (type)->s
-      && !seen_error ())
-    {
+  if (TYPE_LANG_SPECIFIC (type) && TYPE_LANG_SPECIFIC (type)->s  && !seen_error ()){
       int bot, top, half;
       tree *field_array = &TYPE_LANG_SPECIFIC (type)->s->elts[0];
-
       field = TYPE_FIELDS (type);
       bot = 0;
       top = TYPE_LANG_SPECIFIC (type)->s->len;
-      while (top - bot > 1)
-	{
-	  half = (top - bot + 1) >> 1;
-	  field = field_array[bot+half];
+      while (top - bot > 1){
+	     half = (top - bot + 1) >> 1;
+	     field = field_array[bot+half];
+   	     if (DECL_NAME (field) == NULL_TREE){
+	        /* Step through all anon unions in linear fashion.  */
+	        while (DECL_NAME (field_array[bot]) == NULL_TREE){
+		      field = field_array[bot++];
+		      if (RECORD_OR_UNION_TYPE_P (TREE_TYPE (field))) {
+		          tree anon = lookup_field (TREE_TYPE (field), component);
+		          if (anon)
+			         return tree_cons (NULL_TREE, field, anon);
 
-	  if (DECL_NAME (field) == NULL_TREE)
-	    {
-	      /* Step through all anon unions in linear fashion.  */
-	      while (DECL_NAME (field_array[bot]) == NULL_TREE)
-		{
-		  field = field_array[bot++];
-		  if (RECORD_OR_UNION_TYPE_P (TREE_TYPE (field)))
-		    {
-		      tree anon = lookup_field (TREE_TYPE (field), component);
-
-		      if (anon)
-			return tree_cons (NULL_TREE, field, anon);
-
-		      /* The Plan 9 compiler permits referring
-			 directly to an anonymous struct/union field
-			 using a typedef name.  */
-		      if (flag_plan9_extensions
-			  && TYPE_NAME (TREE_TYPE (field)) != NULL_TREE
-			  && (TREE_CODE (TYPE_NAME (TREE_TYPE (field)))
-			      == TYPE_DECL)
-			  && (DECL_NAME (TYPE_NAME (TREE_TYPE (field)))
-			      == component))
-			break;
+		         /* The Plan 9 compiler permits referring
+			      directly to an anonymous struct/union field
+			     using a typedef name.  */
+		         if (flag_plan9_extensions  && TYPE_NAME (TREE_TYPE (field)) != NULL_TREE  &&
+		                (TREE_CODE (TYPE_NAME (TREE_TYPE (field)))== TYPE_DECL)  && (DECL_NAME (TYPE_NAME (TREE_TYPE (field))) == component))
+			        break;
+		       }
 		    }
-		}
 
-	      /* Entire record is only anon unions.  */
-	      if (bot > top)
-		return NULL_TREE;
-
-	      /* Restart the binary search, with new lower bound.  */
-	      continue;
-	    }
-
-	  if (DECL_NAME (field) == component)
-	    break;
-	  if (DECL_NAME (field) < component)
-	    bot += half;
-	  else
-	    top = bot + half;
-	}
+	         /* Entire record is only anon unions.  */
+	        if (bot > top)
+		       return NULL_TREE;
+	         /* Restart the binary search, with new lower bound.  */
+	        continue;
+	     }
+          printNode(field);
+	     if (DECL_NAME (field) == component)
+	         break;
+	     if (DECL_NAME(field) < component)
+	        bot += half;
+	     else
+	       top = bot + half;
+	 }
 
       if (DECL_NAME (field_array[bot]) == component)
-	field = field_array[bot];
+	     field = field_array[bot];
       else if (DECL_NAME (field) != component)
-	return NULL_TREE;
-    }
-  else
-    {
+	    return NULL_TREE;
+   } else{
       for (field = TYPE_FIELDS (type); field; field = DECL_CHAIN (field)){
 	     if (DECL_NAME (field) == NULL_TREE && RECORD_OR_UNION_TYPE_P (TREE_TYPE (field))){
 	         tree anon = lookup_field (TREE_TYPE (field), component);
@@ -8075,13 +8057,10 @@ lookup_field (tree type, tree component)
 	         if (flag_plan9_extensions  && TYPE_NAME (TREE_TYPE (field)) != NULL_TREE
 		        && TREE_CODE (TYPE_NAME (TREE_TYPE (field))) == TYPE_DECL  && (DECL_NAME (TYPE_NAME (TREE_TYPE (field))) == component))
 		      break;
-	    }
-
-	    if (DECL_NAME (field) == component){
-	       n_info("在这里 field 22  DECL_NAME (field) == component %p",DECL_NAME (field),IDENTIFIER_POINTER(DECL_NAME (field)));
-	       break;
-	    }
-	}
+	     }
+	     if (DECL_NAME (field) == component)
+	          break;
+	 }
 
       if (field == NULL_TREE)
 	    return NULL_TREE;

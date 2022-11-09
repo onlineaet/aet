@@ -186,8 +186,6 @@ out:
        n_file_unref(canonicalFile);
 }
 
-
-
 void  class_package_parser(ClassPackage *self)
 {
       c_parser *parser=self->parser;
@@ -254,7 +252,7 @@ void  class_package_parser(ClassPackage *self)
        if(n_hash_table_contains(self->packHashTable,filex)){
            error_at(loc,"一个头文件只能有一次package$ %qs",filex);
        }
-       n_debug("class_package_parser 11 fileName:%s path:%s package:%s prefix:%s fullfile:%s\n",
+       n_debug("class_package_parser 11 fileName:%s path:%s package:%s prefix:%s fullfile:%s",
                info->fileName,info->path,info->packageName,info->classPrefix,filex);
        n_hash_table_insert (self->packHashTable, n_strdup(filex),info);
        n_string_free(classPrefixStr,TRUE);

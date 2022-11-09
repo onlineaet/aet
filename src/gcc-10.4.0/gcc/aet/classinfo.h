@@ -121,5 +121,9 @@ GenericModel *class_info_create_default_generic_define(ClassInfo *self);
 GenericModel *class_info_get_generic_model(ClassInfo *self);
 
 nboolean      class_info_is_decl_file(ClassInfo *self,char *file);//判断classinfo是否声明在文件file中。
+char         *class_info_create_class_code(ClassInfo *self);//生成AClass变量的赋值代码
+nboolean      class_info_is_root(ClassInfo *self);//是不是AObject;
+void          class_info_set_file(ClassInfo *self,char *file);//声明所在的文件
+char         *class_info_get_file(ClassInfo *self);//声明所在的文件
 
 #endif

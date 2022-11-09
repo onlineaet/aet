@@ -2299,8 +2299,6 @@ lookup_field (tree type, tree component)
      case just iterate using DECL_CHAIN.  */
 
   if (TYPE_LANG_SPECIFIC (type) && TYPE_LANG_SPECIFIC (type)->s && !seen_error ()){
-	  n_info("lookup_field 00 TYPE_LANG_SPECIFIC (type) && TYPE_LANG_SPECIFIC (type)->s && !seen_error () %p %p",type,component);
-
       int bot, top, half;
       tree *field_array = &TYPE_LANG_SPECIFIC (type)->s->elts[0];
       field = TYPE_FIELDS (type);
@@ -2334,7 +2332,6 @@ lookup_field (tree type, tree component)
 	      /* Restart the binary search, with new lower bound.  */
 	      continue;
 	    }
-
 	    if (DECL_NAME (field) == component)
 	        break;
 	    if (DECL_NAME (field) < component)
@@ -2350,13 +2347,10 @@ lookup_field (tree type, tree component)
  }else{
       for (field = TYPE_FIELDS (type); field; field = DECL_CHAIN (field)){
 	     if (DECL_NAME (field) == NULL_TREE && RECORD_OR_UNION_TYPE_P (TREE_TYPE (field))){
-	    	  n_info("lookup_field 11 DECL_NAME (field) == NULL_TREE && RECORD_OR_UNION_TYPE_P (TREE_TYPE (field)) p %p\n",type,component);
 	          tree anon = lookup_field (TREE_TYPE (field), component);
-	          if (anon){
-		    	  printf("lookup_field 22xxddd %p %p %p\n",type,component,anon);
+	           n_info("lookup_field 11 DECL_NAME (field) == NULL_TREE && RECORD_OR_UNION_TYPE_P (TREE_TYPE (field)) %p %p anon:%p\n",type,component,anon);
+	          if (anon)
 		          return tree_cons (NULL_TREE, field, anon);
-	          }
-
 	      /* The Plan 9 compiler permits referring directly to an
 		 anonymous struct/union field using a typedef
 		 name.  */
@@ -2367,12 +2361,9 @@ lookup_field (tree type, tree component)
 		      == component))
 		    break;
 	    }
-   	  //printf("lookup_field ---33 %s %s\n",IDENTIFIER_POINTER(component),IDENTIFIER_POINTER(DECL_NAME (field)));
-
-	    if (DECL_NAME (field) == component){
-	    	n_debug("lookup_field 找到了 field 33 DECL_NAME (field) == component %p %p %p %s",type,component,field,IDENTIFIER_POINTER(component));
+	    if (DECL_NAME (field) == component)
 	        break;
-	    }
+
 	  }
       if (field == NULL_TREE)
 	    return NULL_TREE;

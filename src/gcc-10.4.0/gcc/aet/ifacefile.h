@@ -23,29 +23,23 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 #define __GCC_IFACE_FILE_H__
 
 #include "nlib.h"
-#include "c-aet.h"
-#include "classinfo.h"
-#include "xmlfile.h"
+#include "linkfile.h"
 
 
 typedef struct _IfaceFile IfaceFile;
 /* --- structures --- */
 struct _IfaceFile
 {
-	   XmlFile *xmlFile;
-	   NPtrArray *recordCallIface;
+    LinkFile *linkFile;
+    LinkFile *parmFile;
 };
 
 
 IfaceFile  *iface_file_get();
-void        iface_file_record(IfaceFile *self,ClassName *className);
-void        iface_file_record_by_sys_name(IfaceFile *self,char *sysName);
 void        iface_file_save(IfaceFile *self);
-NPtrArray  *iface_file_read(IfaceFile *self);
-void        iface_file_write(IfaceFile *self,NPtrArray *ifaceSaveDataArray);
-void        iface_file_impl_iface(IfaceFile *self);
-
-
+void        iface_file_compile(IfaceFile *self,char *ifaces);
+void        iface_file_compile_ready(IfaceFile *self);
+char       *iface_file_get_xml_string(IfaceFile *self);
 
 
 #endif

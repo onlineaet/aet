@@ -116,9 +116,8 @@ static void classImplInit(ClassImpl *self)
 	self->superDefine=super_define_new();
 	self->implicitlyCall=implicitly_call_new();
 	self->cmpRefOpt=cmp_ref_opt_new();
+    self->aetExpr=aet_expr_new();
     self->objectMacro.count=0;
-    self->implClassArray=n_ptr_array_new();//在一个文件中实现了几个类
-
 }
 
 static nboolean checkDefaultConstructorDefine(ClassImpl *self)
@@ -321,7 +320,7 @@ void class_impl_parser(ClassImpl *self)
    }else{
       error_at(impl_loc, "关键字impl$后应是类名!");
    }
-   n_ptr_array_add(self->implClassArray,n_strdup(IDENTIFIER_POINTER (ident)));
+   access_controls_add_impl(access_controls_get(),n_strdup(IDENTIFIER_POINTER (ident)));
    if (c_parser_next_token_is (parser, CPP_OPEN_BRACE)){
 	  n_debug("开始编译 impl{中的代码 class:%s %s\n",IDENTIFIER_POINTER (ident),in_fnames[0]);
 	  c_parser_consume_token (parser);
@@ -467,11 +466,11 @@ nboolean  class_impl_add_self_to_param(ClassImpl *self,nboolean isFuncGeneric)
 nboolean  class_impl_add_static_to_declspecs(ClassImpl *self,location_t loc,struct c_declspecs *specs)
 {
 	  if(specs->storage_class ==csc_static){
-		  n_debug("已经存在static存储声明说明符了 %s\n",self->className->sysName);
+		  n_debug("已经存在static存储声明说明符了 %s",self->className->sysName);
 		  return TRUE;
 	  }
 	  if(specs->storage_class!=csc_none){
-		  n_debug("已经有其它存储声明说明符了 %d %s %s\n",specs->storage_class,aet_c_storage_class_str[specs->storage_class],self->className->sysName);
+		  n_debug("已经有其它存储声明说明符了 %d %s %s",specs->storage_class,aet_c_storage_class_str[specs->storage_class],self->className->sysName);
           return FALSE;
 	  }
 	  specs->storage_class=csc_static;
@@ -601,7 +600,7 @@ struct c_expr class_impl_process_expression(ClassImpl *self,struct c_expr expr,l
 		   expr.value =result;
 		   set_c_expr_source_range (&expr, tok_range);
 	   }else if(msg==ISAET_FIND_STATIC_FUNC){
-		   n_debug("class_impl_process_expression 22 找到类静态函数 -----------className:%s funcName:%s\n",
+		   n_debug("class_impl_process_expression 22 找到类静态函数 -----------className:%s funcName:%s",
 				   className==NULL?"null":className->sysName,IDENTIFIER_POINTER(id));
 		  *action=2;
 		   if(className==NULL){
@@ -632,7 +631,7 @@ struct c_expr class_impl_process_expression(ClassImpl *self,struct c_expr expr,l
 	   }
 	}else{
 		FuncAndVarMsg msg=var_call_get_process_var_method(self->varCall,loc,id,className);
-		n_debug("class_impl_process_expression 77 找变量 %s className:%s FuncAndVarMsg:%d\n",
+		n_debug("class_impl_process_expression 77 找变量 %s className:%s FuncAndVarMsg:%d",
 				IDENTIFIER_POINTER(id),className==NULL?"null":className->sysName,msg);
 		if(msg==ISAET_FIND_VAL){
 			*action=1;
@@ -640,16 +639,12 @@ struct c_expr class_impl_process_expression(ClassImpl *self,struct c_expr expr,l
 		}else if(msg==ISAET_FIND_STATIC_VAL){
 		    VarEntity *var=var_mgr_get_static_entity_by_recursion(var_mgr_get(),className,id);
 	        if(var!=NULL){
-				n_debug("class_impl_process_expression 88 找变量 %s className:%s FuncAndVarMsg:%d\n",
+				n_debug("class_impl_process_expression 88 找变量 %s className:%s FuncAndVarMsg:%d",
 						IDENTIFIER_POINTER(id),className==NULL?"null":className->sysName,msg);
 			   *action=2;
 			   source_range tok_range = c_parser_peek_token (parser)->get_range ();
 			   expr.value =var_entity_get_tree(var);
 			   set_c_expr_source_range (&expr, tok_range);
-		       char *sysName=var_entity_get_sys_name(var);
-               if(sysName!=NULL)
-                   iface_file_record_by_sys_name(iface_file_get(),sysName);//记录是不是接口的静态变量调用。
-
 			}
 		}else if(msg==ID_NOT_FIND){
 			   nboolean exists=func_mgr_static_func_exits_by_recursion( func_mgr_get(),className,id);
@@ -1017,9 +1012,8 @@ void class_impl_build_class_dot (ClassImpl *self, location_t loc,struct c_expr *
 			   nboolean exits=func_mgr_static_func_exits_by_recursion(func_mgr_get(),&info->className,component);
 			   if(!exits){
 				  if(!strcmp(IDENTIFIER_POINTER(component),"class")){
-					  printf("这是一个获取AClass的方法 %s\n",sysClassName);
+					  printf("这是一个获取AClass的方法 类:%s\n",sysClassName);
 					  expr->value =class_build_get_func(self->classBuild,&info->className);
-					  iface_file_record(iface_file_get(),&info->className);//记录是不是接口的.class调用。
 					  set_c_expr_source_range (expr, loc, end_loc);
 					  return;
 				  }else{
@@ -1044,8 +1038,6 @@ void class_impl_build_class_dot (ClassImpl *self, location_t loc,struct c_expr *
 				//找到了变量，获取该该变量是属于那个类的
 	             var=var_entity_get_tree(varEntity);
 	             access_controls_access_var(access_controls_get(),loc,varEntity->orgiName,varEntity->sysName);
-				 char *sysName=var_entity_get_sys_name(varEntity);
-                 iface_file_record_by_sys_name(iface_file_get(),sysName);//记录是不是接口的静态变量调用。
 			}
 			expr->value =var;
 			set_c_expr_source_range (expr, loc, end_loc);
@@ -1320,22 +1312,22 @@ void  class_impl_set_parser(ClassImpl *self, c_parser *parser)
 	  access_controls_set_parser(access_controls_get(),parser);
 	  implicitly_call_set_parser(self->implicitlyCall,parser);
       cmp_ref_opt_set_parser(self->cmpRefOpt,parser);
+      aet_expr_set_parser(self->aetExpr,parser);
 	  printf("编译文件:in_fnames[0]:%s\n",in_fnames[0]);
 }
 
 /**
- * 是否实现了sysName指定的类
+ * 解析关键字varof$
  */
-nboolean class_impl_is_impl(ClassImpl *self,char *sysName)
-{
-   int i;
-   for(i=0;i<self->implClassArray->len;i++){
-       char *item=(char*)n_ptr_array_index(self->implClassArray,i);
-       if(strcmp(item,sysName)==0)
-           return TRUE;
-   }
-   return FALSE;
+struct c_expr   class_impl_varof_parser(ClassImpl *self,struct c_expr lhs){
+    return aet_expr_varof_parser(self->aetExpr,lhs);
 }
+
+ClassName      *class_impl_get_class_name(ClassImpl *self)
+{
+    return self->className;
+}
+
 
 ClassImpl *class_impl_get()
 {

@@ -144,7 +144,6 @@ nboolean var_mgr_set_permission(VarMgr *self,ClassName *className,tree decl,Clas
 		for(i=0;i<array->len;i++){
 		   VarEntity *item=n_ptr_array_index(array,i);
 		   if(item->decl==decl){
-			   //printf("var_mgr_set_permission %s permiss:%d\n",className->sysName,permission);
 			   item->permission=permission;
 			   break;
 		   }

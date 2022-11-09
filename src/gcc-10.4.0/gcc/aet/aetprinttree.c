@@ -43,6 +43,7 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 #include "aetinfo.h"
 #include "aet-c-parser-header.h"
 #include "aetprinttree.h"
+#include "aetutils.h"
 
 static c_parser *aetPrintParser=NULL;
 
@@ -317,7 +318,7 @@ static void printToken(c_token *ct,char *file,char *func,char *line)
   static int pp=1;
   tree_debug(file,func,line ,"c_token:[%d] name:%s cpp_ttype:%-12s c_id_kind:%-10s rid:%d ridStr:%-12s %d,%d %8s %u",
 		  pp++, isData?numberStr:str1,aet_cpp_ttype_str[ct->type], aet_c_id_kind_str[ct->id_kind],
-				  ct->type==CPP_KEYWORD?ct->keyword:-1,ct->type==CPP_KEYWORD?aet_rid_str[ct->keyword]:"no",
+				  ct->type==CPP_KEYWORD?ct->keyword:-1,ct->type==CPP_KEYWORD?aet_utils_get_keyword_string(ct):"no",
 		  xloc.line, xloc.column,xloc.file,ct->location);/* 打印符号值的基本信息 */
 }
 
@@ -409,7 +410,7 @@ void           aet_print_token_skip_debug(c_token *ct)
 	       int pp=0;
 	      printf("c_token:[%d] name:%s cpp_ttype:%-12s c_id_kind:%-10s rid:%d ridStr:%-12s %d,%d %8s\n",
 	    		  pp++, isData?numberStr:str1,aet_cpp_ttype_str[ct->type], aet_c_id_kind_str[ct->id_kind],
-	    				  ct->type==CPP_KEYWORD?ct->keyword:-1,ct->type==CPP_KEYWORD?aet_rid_str[ct->keyword]:"no",
+	    				  ct->type==CPP_KEYWORD?ct->keyword:-1,ct->type==CPP_KEYWORD?aet_utils_get_keyword_string(ct):"no",
 	    		  xloc.line, xloc.column,xloc.file);/* 打印符号值的基本信息 */
 }
 

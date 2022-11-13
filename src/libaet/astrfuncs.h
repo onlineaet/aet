@@ -83,6 +83,7 @@ void    a_strfreev(achar **str_array);
 auint   a_strv_length(achar **str_array);
 char   *a_strstr_len (const char *haystack,assize haystack_len, const char *needle);
 int     a_ascii_strcasecmp (const char *s1,const char *s2);
+int     a_ascii_digit_value(char    c);
 
 
 #endif /* __A_STRFUNCS_H__ */

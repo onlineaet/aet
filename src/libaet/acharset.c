@@ -11,15 +11,9 @@
 #include "innerlock.h"
 
 
-
-
-
-
 #define relocate(pathname) (pathname)
 
 #define ALIB_CHARSETALIAS_DIR "/home/ai/" //LIBDIR
-
-
 
 #ifndef DIRECTORY_SEPARATOR
 # define DIRECTORY_SEPARATOR '/'
@@ -161,12 +155,12 @@ static void insert(HashTable *hash,char *key,char **value)
 	int i;
 	for(i=0;i<hash->keyCount;i++){
 		if(strcmp(hash->keys[i],key)==0){
-			hash->values[i]=value;
+			hash->values[i]=(char*)value;
 			return;
 		}
 	}
 	int pos=hash->keyCount;
-	hash->values[pos]=value;
+	hash->values[pos]=(char*)value;
 	hash->keyCount++;
 }
 
@@ -190,7 +184,7 @@ static HashTable *get_alias_hash (void)
           aliases += strlen (aliases) + 1;
           canonical = aliases;
           aliases += strlen (aliases) + 1;
-          alias_array = lookup (alias_hash, canonical);
+          alias_array = (const char **)lookup (alias_hash, (char *)canonical);
           if (alias_array){
               while (alias_array[count])
                 count++;
@@ -199,7 +193,7 @@ static HashTable *get_alias_hash (void)
           alias_array = a_renew (const char *, alias_array, count + 2);
           alias_array[count] = alias;
           alias_array[count + 1] = NULL;
-          insert (alias_hash, (char *)canonical, alias_array);
+          insert (alias_hash, (char *)canonical, (char **)alias_array);
         }
     }
 
@@ -214,7 +208,7 @@ static HashTable *get_alias_hash (void)
 const char ** _a_charset_get_aliases (const char *canonical_name)
 {
   HashTable *alias_hash = get_alias_hash();
-  return (const char **)lookup (alias_hash, canonical_name);
+  return (const char **)lookup (alias_hash, (char *)canonical_name);
 }
 
 static aboolean a_utf8_get_charset_internal (const char  *raw_data,const char **a)

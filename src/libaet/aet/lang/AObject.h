@@ -94,6 +94,7 @@ static inline  void _iface_reserve_unref_func_define_123(IfaceCommonData123 *ifa
 }
 
 
+
 static inline int is_aet_class(AClass *class,char *name)
 {
         char sysName[512];
@@ -101,7 +102,7 @@ static inline int is_aet_class(AClass *class,char *name)
         if(package!=NULL)
            sprintf(sysName,"%s_%s",package,class->getName());
         else
-           sprintf(sysName,"%s",package,class->getName());
+           sprintf(sysName,"%s",class->getName());
         return strcmp(sysName,name)==0;
 }
 
@@ -129,21 +130,22 @@ static inline int object_varof(AClass *class,char *name)
 static inline int  varof_object_or_interface (void *object,char *name)
 {
     char *magic=(char*)object;
-    int magicNum = (magic[3]<<24) + (magic[2]<<16) + (magic[1]<<8) + (magic[0]);
+    int magicNum =0;
+    memcpy(&magicNum,magic,sizeof(int));
     if(magicNum!=1725348960 && magicNum!=1725348961)
         return 0;
     AObject *dest=NULL;
     if(magicNum==1725348960){
         dest=(AObject*)object;
     }else if(magicNum==1725348961){
-        char *atClass=magic+sizeof(int);//跳过_aet_magic$_123
-        unsigned long value=0;
-        memcpy(value,atClass,sizeof(unsigned long));
-        dest=(AObject*)(value);//
-        printf("dest is :%p %ld\n",dest,value);
+        IfaceCommonData123 *iface=(IfaceCommonData123*)magic;
+        dest=(AObject*)iface->_atClass123;
     }
-    return object_varof(dest,name);
+    if(dest==NULL)
+        return 0;
+    return object_varof(dest->getClass(),name);
 }
+
 
 /**
  * 初始化superData，在AObject的init_1234ergR5678方法中调用。

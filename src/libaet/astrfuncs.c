@@ -415,7 +415,7 @@ char** a_strsplit (const char *string,const char *delimiter,int max_tokens)
 {
   char *s;
   const char *remainder;
-  int size=12;
+  auint size=12;
   char **array=a_new(char *,size);
 
   a_return_val_if_fail (string != NULL, NULL);
@@ -444,4 +444,11 @@ char** a_strsplit (const char *string,const char *delimiter,int max_tokens)
       array[count++]= a_strdup (remainder);
   array[count++]=NULL;
   return (char **) array;
+}
+
+int a_ascii_digit_value (char c)
+{
+  if (a_ascii_isdigit (c))
+    return c - '0';
+  return -1;
 }

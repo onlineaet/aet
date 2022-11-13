@@ -1,15 +1,15 @@
 #include <stdlib.h>
+#include <stdio.h>
 #include <langinfo.h>
 #include <string.h>
 #include <locale.h>
-
-
 #include "aunicode.h"
 #include "amem.h"
 #include "alog.h"
 #include "aunichartables.h"
 #include "aunidecomp.h"
 #include "aconvert.h"
+#include "astrfuncs.h"
 
 
 #define SBase 0xAC00
@@ -188,7 +188,7 @@ static const achar *fast_validate_len (const char *str,assize max_len)
 {
   const achar *p;
   if(max_len<0){
-	  printf("fast_validate_len error:max_len:%d",max_len);
+	  printf("fast_validate_len error:max_len:%ld",max_len);
 	  exit(-1);
   }
 
@@ -534,11 +534,11 @@ static LocaleType get_locale_type (void)
 #define A_UNICHAR_FULLWIDTH_F 0xff26
 #define A_UNICHAR_FULLWIDTH_a 0xff41
 #define A_UNICHAR_FULLWIDTH_f 0xff46
-//
+
 #define ATTR_TABLE(Page) (((Page) <= A_UNICODE_LAST_PAGE_PART1) \
                           ? attr_table_part1[Page] \
                           : attr_table_part2[(Page) - 0xe00])
-//
+
 #define ATTTABLE(Page, Char) \
   ((ATTR_TABLE(Page) == A_UNICODE_MAX_TABLE_INDEX) ? 0 : (attr_data[ATTR_TABLE(Page)][Char]))
 //
@@ -1140,13 +1140,13 @@ aunichar a_unichar_tolower (aunichar c)
 }
 
 #define CC_PART1(Page, Char) \
-  ((combining_class_table_part1[Page] >= A_UNICODE_MAX_TABLE_INDEX) \
-   ? (combining_class_table_part1[Page] - A_UNICODE_MAX_TABLE_INDEX) \
+  ((combining_class_table_part1[Page] >= A_UNICODE_MAX_TABLE_INDEX_COMP) \
+   ? (combining_class_table_part1[Page] - A_UNICODE_MAX_TABLE_INDEX_COMP) \
    : (cclass_data[combining_class_table_part1[Page]][Char]))
 
 #define CC_PART2(Page, Char) \
-  ((combining_class_table_part2[Page] >= A_UNICODE_MAX_TABLE_INDEX) \
-   ? (combining_class_table_part2[Page] - A_UNICODE_MAX_TABLE_INDEX) \
+  ((combining_class_table_part2[Page] >= A_UNICODE_MAX_TABLE_INDEX_COMP) \
+   ? (combining_class_table_part2[Page] - A_UNICODE_MAX_TABLE_INDEX_COMP) \
    : (cclass_data[combining_class_table_part2[Page]][Char]))
 
 #define COMBINING_CLASS(Char) \
@@ -1392,8 +1392,6 @@ achar *a_utf8_find_next_char (const achar *p,const achar *end)
     }
 }
 
-
-
 achar *a_utf8_strchr (const char *p,assize len,aunichar c)
 {
     char ch[10];
@@ -1420,99 +1418,24 @@ char *a_utf8_make_valid (const char *str,assize len)
       if (a_utf8_validate (remainder, remaining_bytes, &invalid))
 	      break;
       valid_bytes = invalid - remainder;
-      //if (string == NULL)
-	     //string = g_string_sized_new (remaining_bytes);
       memcpy(string+count,remainder,valid_bytes);
       count+=valid_bytes;
-      //g_string_append_len (string, remainder, valid_bytes);
-      /* append U+FFFD REPLACEMENT CHARACTER */
-      //g_string_append (string, "\357\277\275");
       memcpy(string+count,"\357\277\275",strlen("\357\277\275"));
       count+=strlen("\357\277\275");
-
       remaining_bytes -= valid_bytes + 1;
       remainder = invalid + 1;
   }
 
-  if (count == NULL)
+  if (count == 0)
     return a_strndup (str, len);
   memcpy(string+count,remainder,remaining_bytes);
   count+=remaining_bytes;
-
- // g_string_append_len (string, remainder, remaining_bytes);
- // g_string_append_c (string, '\0');
   string[count]='\0';
   if(a_utf8_validate (string, -1, NULL)){
 	  a_error("出错了 a_utf8_make_valid");
   }
   return a_strndup (string, count);
 }
-
-
-#define G_UNICHAR_FULLWIDTH_A 0xff21
-#define G_UNICHAR_FULLWIDTH_I 0xff29
-#define G_UNICHAR_FULLWIDTH_J 0xff2a
-#define G_UNICHAR_FULLWIDTH_F 0xff26
-#define G_UNICHAR_FULLWIDTH_a 0xff41
-#define G_UNICHAR_FULLWIDTH_f 0xff46
-
-#define ATTR_TABLE(Page) (((Page) <= G_UNICODE_LAST_PAGE_PART1) \
-                          ? attr_table_part1[Page] \
-                          : attr_table_part2[(Page) - 0xe00])
-
-#define ATTTABLE(Page, Char) \
-  ((ATTR_TABLE(Page) == G_UNICODE_MAX_TABLE_INDEX) ? 0 : (attr_data[ATTR_TABLE(Page)][Char]))
-
-#define TTYPE_PART1(Page, Char) \
-  ((type_table_part1[Page] >= A_UNICODE_MAX_TABLE_INDEX) \
-   ? (type_table_part1[Page] - A_UNICODE_MAX_TABLE_INDEX) \
-   : (type_data[type_table_part1[Page]][Char]))
-
-#define TTYPE_PART2(Page, Char) \
-  ((type_table_part2[Page] >= A_UNICODE_MAX_TABLE_INDEX) \
-   ? (type_table_part2[Page] - A_UNICODE_MAX_TABLE_INDEX) \
-   : (type_data[type_table_part2[Page]][Char]))
-
-#define TYPE(Char) \
-  (((Char) <= A_UNICODE_LAST_CHAR_PART1) \
-   ? TTYPE_PART1 ((Char) >> 8, (Char) & 0xff) \
-   : (((Char) >= 0xe0000 && (Char) <= A_UNICODE_LAST_CHAR) \
-      ? TTYPE_PART2 (((Char) - 0xe0000) >> 8, (Char) & 0xff) \
-      : A_UNICODE_UNASSIGNED))
-
-
-#define IS(Type, Class) (((auint)1 << (Type)) & (Class))
-#define OR(Type, Rest)  (((auint)1 << (Type)) | (Rest))
-
-
-
-#define ISALPHA(Type)   IS ((Type),             \
-                OR (A_UNICODE_LOWERCASE_LETTER, \
-                OR (A_UNICODE_UPPERCASE_LETTER, \
-                OR (A_UNICODE_TITLECASE_LETTER, \
-                OR (A_UNICODE_MODIFIER_LETTER,  \
-                OR (A_UNICODE_OTHER_LETTER,     0))))))
-
-#define ISALDIGIT(Type) IS ((Type),             \
-                OR (A_UNICODE_DECIMAL_NUMBER,   \
-                OR (A_UNICODE_LETTER_NUMBER,    \
-                OR (A_UNICODE_OTHER_NUMBER,     \
-                OR (A_UNICODE_LOWERCASE_LETTER, \
-                OR (A_UNICODE_UPPERCASE_LETTER, \
-                OR (A_UNICODE_TITLECASE_LETTER, \
-                OR (A_UNICODE_MODIFIER_LETTER,  \
-                OR (A_UNICODE_OTHER_LETTER,     0)))))))))
-
-#define ISMARK(Type)    IS ((Type),             \
-                OR (G_UNICODE_NON_SPACING_MARK, \
-                OR (G_UNICODE_SPACING_MARK, \
-                OR (G_UNICODE_ENCLOSING_MARK,   0))))
-
-#define ISZEROWIDTHTYPE(Type)   IS ((Type),         \
-                OR (G_UNICODE_NON_SPACING_MARK, \
-                OR (G_UNICODE_ENCLOSING_MARK,   \
-                OR (G_UNICODE_FORMAT,       0))))
-
 
 aboolean a_unichar_isalnum (aunichar c)
 {

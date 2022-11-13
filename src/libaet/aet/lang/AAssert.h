@@ -38,7 +38,7 @@ package$ aet.lang;
  *   case INT_TYPE:
  *     break ;
  *   default:
- *  /* 无效枚举值* /
+ *   无效枚举值
  *      a_assert_not_reached();
  *     break ;
  *  }

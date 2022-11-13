@@ -16,9 +16,9 @@ public$ class$ AString{
   private$ aint  length;
   volatile aint  refStrCount;
 
-  public$ AString(const char  *str);
+  public$ AString(const char *str);
   public$ AString(aint8 *data,auint len);
-  public$ AString (aint dfl_size);
+  public$ AString(aint dfl_size);
 
 
   public$ ~AString();

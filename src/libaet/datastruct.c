@@ -220,7 +220,7 @@ static achar *array_free (DArray     *array,ArrayFreeFlags  flags)
   return segment;
 }
 
-static aboolean atomic_ref_count_dec (aint *arc)
+static aboolean atomic_ref_count_dec (volatile aint *arc)
 {
     a_return_val_if_fail (arc != NULL, FALSE);
 	a_return_val_if_fail (a_atomic_int_get (arc) > 0, FALSE);

@@ -411,7 +411,7 @@ static ALogWriterOutput _a_log_writer_fallback (ALogLevelFlags log_level,const A
   FILE *stream;
   asize i;
   stream = log_level_to_file (log_level);
-  printf("_a_log_writer_fallback--- a_fields:%d\n",a_fields);
+  printf("_a_log_writer_fallback--- a_fields:%ld\n",a_fields);
   for (i = 0; i < a_fields; i++)
     {
       const ALogField *field = &fields[i];
@@ -482,8 +482,7 @@ void a_log_structured_standard (ALogLevelFlags log_level,const achar *object,con
 	  /* 我们使用固定大小的堆栈缓冲区，因为
 	   *在内存不足的情况下
 	  */
-      asize size ;
-      size = _a_vsnprintf (buffer, sizeof (buffer), message_format, args);
+      _a_vsnprintf (buffer, sizeof (buffer), message_format, args);
       fields[5].value = buffer;
   }else{
       fields[5].value = message_allocated = a_strdup_vprintf (message_format, args);
@@ -846,7 +845,6 @@ void a_logv (ALogLevelFlags log_level,const char   *format,va_list args)
       ALogLevelFlags test_level;
       test_level = 1L << i;
       if (log_level & test_level){
-         char *domain=NULL;
          ALogLevelFlags domain_fatal_mask;
          apointer data = NULL;
          aboolean masquerade_fatal = FALSE;

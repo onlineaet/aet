@@ -29,24 +29,17 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 #include "tree.h"
 #include "timevar.h"
 #include "stringpool.h"
-#include "cgraph.h"
 #include "toplev.h"
 #include "attribs.h"
-#include "stor-layout.h"
-#include "varasm.h"
-#include "trans-mem.h"
 #include "c-family/c-pragma.h"
 #include "gcc-rich-location.h"
 #include "opts.h"
-
 #include "c/c-tree.h"
-#include "c-family/name-hint.h"
-#include "c-family/known-headers.h"
-#include "c-family/c-spellcheck.h"
-#include "c-aet.h"
 #include "../libcpp/internal.h"
 #include "c/c-parser.h"
 #include "../libcpp/include/cpplib.h"
+
+#include "c-aet.h"
 #include "classparser.h"
 #include "aetutils.h"
 #include "classmgr.h"
@@ -1063,9 +1056,11 @@ static char *createClassName(ClassParser *self,char *orgiName,char **package)
 void class_parser_replace_class_to_typedef(ClassParser *self)
 {
 	  c_parser *parser=self->parser;
+	  parser_help_set_forbidden(TRUE);
 	  c_token *classSpec = c_parser_peek_token (parser);//"Class"
 	  classSpec->id_kind=C_ID_CLASSNAME;/*这是一个指示看	c-parser.c中的case RID_AET_CLASS:*/
 	  c_token *classNameToken=c_parser_peek_2nd_token(parser); //Abc
+	  parser_help_set_forbidden(FALSE);
 	  location_t orgLoc=classSpec->location;
 	  if(classNameToken->type==CPP_KEYWORD){
 		  error_at(orgLoc,"class$或interface$后不能是关键字。");
@@ -1271,12 +1266,18 @@ nboolean   class_parser_exception(ClassParser *self,tree value)
    return TRUE;
 }
 
+/**
+ * 解析AObject.Enum形式。
+ * ret中有类名。
+ */
 void  class_parser_parser_enum_dot(ClassParser *self,struct c_typespec *ret)
 {
+    parser_help_set_forbidden(TRUE);
 	tree value=enum_parser_parser_dot(enum_parser_get(),ret);
 	if(value!=NULL_TREE){
 		ret->spec=value;
 	}
+    parser_help_set_forbidden(FALSE);
 }
 
 /**
@@ -1284,8 +1285,8 @@ void  class_parser_parser_enum_dot(ClassParser *self,struct c_typespec *ret)
  */
 struct c_typespec class_parser_enum(ClassParser *self,location_t loc)
 {
-	//printf("class_parser_enum---- \n");
 	c_parser *parser=self->parser;
+	parser_help_set_forbidden(TRUE);
 	struct c_typespec ret;
 	ClassName *current=NULL;
 	if(class_parser_is_parsering(self)){
@@ -1299,6 +1300,7 @@ struct c_typespec class_parser_enum(ClassParser *self,location_t loc)
 	if(t->type!=CPP_OPEN_BRACE)
 		return ret;
 	ret=enum_parser_parser(enum_parser_get(),loc,current);
+    parser_help_set_forbidden(FALSE);
 	return ret;
 }
 
@@ -1338,6 +1340,11 @@ void class_parser_over_enum(ClassParser *self,struct c_declspecs *specs)
              enum_parser_create_decl(enum_parser_get(),input_location,NULL,specs,permission);
         }
     }
+}
+
+ClassName  *class_parser_get_class_name(ClassParser *self)
+{
+    return self->currentClassName;
 }
 
 

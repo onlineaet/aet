@@ -4975,7 +4975,7 @@ static tree convert_for_assignment (location_t location, location_t expr_loc, tr
 	      switch (errtype){
 	         case ic_argpass:
 	         {
-		        const char msg[] = G_("passing argument %d of %qE from pointer to non-enclosed address space");
+		        //const char msg[] = G_("passing argument %d of %qE from pointer to non-enclosed address space");
 		        if (warnopt)
 			         argsFuncsInfo.warns[argsFuncsInfo.warnCount++]=passing_argument_x_of_y_from_pointer_to_non_enclosed_address_space;
 		        else
@@ -4984,7 +4984,7 @@ static tree convert_for_assignment (location_t location, location_t expr_loc, tr
 	         }
 	         case ic_assign:
 	         {
-		        const char msg[] = G_("assignment from pointer to non-enclosed address space");
+		        //const char msg[] = G_("assignment from pointer to non-enclosed address space");
 		        if (warnopt)
 			         argsFuncsInfo.warns[argsFuncsInfo.warnCount++]=assignment_from_pointer_to_non_enclosed_address_space;
 		        else
@@ -4993,7 +4993,7 @@ static tree convert_for_assignment (location_t location, location_t expr_loc, tr
 	         }
 	         case ic_init:
 	         {
-		        const char msg[] = G_("initialization from pointer to on-enclosed address space");
+		        //const char msg[] = G_("initialization from pointer to on-enclosed address space");
 		        if (warnopt)
 			         argsFuncsInfo.warns[argsFuncsInfo.warnCount++]=initialization_from_pointer_to_on_enclosed_address_space;
 		        else
@@ -5002,7 +5002,7 @@ static tree convert_for_assignment (location_t location, location_t expr_loc, tr
 	         }
 	         case ic_return:
 	         {
-		        const char msg[] = G_("return from pointer to non-enclosed address space");
+		        //const char msg[] = G_("return from pointer to non-enclosed address space");
 		        if (warnopt)
 			         argsFuncsInfo.warns[argsFuncsInfo.warnCount++]=return_from_pointer_to_non_enclosed_address_space;
 		        else
@@ -5086,9 +5086,10 @@ static tree convert_for_assignment (location_t location, location_t expr_loc, tr
 			 qualifier on the element type. */
 	         if (!pedantic)
 	            ttl = strip_array_types (ttl);
-
 	      /* Assignments between atomic and non-atomic objects are OK.  */
 	         if (TYPE_QUALS_NO_ADDR_SPACE_NO_ATOMIC (ttr) & ~TYPE_QUALS_NO_ADDR_SPACE_NO_ATOMIC (ttl)){
+	             n_debug("convert_for_assignment wwfdsss0000\n");
+
 		        PEDWARN_FOR_QUALIFIERS (location, expr_loc,
 				          OPT_Wdiscarded_qualifiers,
 				          G_("passing argument %d of %qE discards "
@@ -5105,24 +5106,30 @@ static tree convert_for_assignment (location_t location, location_t expr_loc, tr
 	           /* If there is a mismatch, do warn.  */
 	         else if (warn_pointer_sign)
 		        switch (errtype){
-  	               printf("convert_for_assignment 110 ");
 		           case ic_argpass:
 		           {
 		              auto_diagnostic_group d;
 		              range_label_for_type_mismatch rhs_label (rhstype, type);
 		              gcc_rich_location richloc (expr_loc, &rhs_label);
-		              if (pedwarn (&richloc, OPT_Wpointer_sign,"pointer targets in passing argument %d of %qE differ in signedness", parmnum, rname))
-			             inform_for_arg (fundecl, expr_loc, parmnum, type,rhstype);
+		                pointer_targets_in_assignment_from_$rhstype$_to_$type$_differ_in_signedness,
+		                pointer_targets_in_initialization_of_$type$_from_$rhstype$_differ_in_signedness,
+		                pointer_targets_in_returning_$rhstype$__from_a_function_with_return_type_$type$_differ_in_signedness,
+		             // if (pedwarn (&richloc, OPT_Wpointer_sign,"pointer targets in passing argument %d of %qE differ in signedness", parmnum, rname))
+			            // inform_for_arg (fundecl, expr_loc, parmnum, type,rhstype);
+		               argsFuncsInfo.warns[argsFuncsInfo.warnCount++]=pointer_targets_in_assignment_from_$parmnum$_to_$rename$_differ_in_signedness;
 		           }
 		              break;
 		           case ic_assign:
-		              pedwarn (location, OPT_Wpointer_sign,"pointer targets in assignment from %qT to %qT differ in signedness", rhstype, type);
+		              //pedwarn (location, OPT_Wpointer_sign,"pointer targets in assignment from %qT to %qT differ in signedness", rhstype, type);
+                      argsFuncsInfo.warns[argsFuncsInfo.warnCount++]=pointer_targets_in_assignment_from_$rhstype$_to_$type$_differ_in_signedness;
 		              break;
 		           case ic_init:
-		              pedwarn_init (location, OPT_Wpointer_sign,"pointer targets in initialization of %qT from %qT differ in signedness", type,rhstype);
+		              //pedwarn_init (location, OPT_Wpointer_sign,"pointer targets in initialization of %qT from %qT differ in signedness", type,rhstype);
+                      argsFuncsInfo.warns[argsFuncsInfo.warnCount++]=pointer_targets_in_initialization_of_$type$_from_$rhstype$_differ_in_signedness;
 		              break;
 		           case ic_return:
-		              pedwarn (location, OPT_Wpointer_sign, "pointer targets in returning %qT from a function with return type %qT differ in signedness", rhstype, type);
+		              //pedwarn (location, OPT_Wpointer_sign, "pointer targets in returning %qT from a function with return type %qT differ in signedness", rhstype, type);
+                      argsFuncsInfo.warns[argsFuncsInfo.warnCount++]=pointer_targets_in_returning_$rhstype$__from_a_function_with_return_type_$type$_differ_in_signedness;
 		              break;
 		           default:
 		             gcc_unreachable ();
@@ -5147,8 +5154,6 @@ static tree convert_for_assignment (location_t location, location_t expr_loc, tr
 				        TYPE_QUALS (ttl) & ~TYPE_QUALS (ttr));
 	      }
 	}else if (!objc_ok){/* Avoid warning about the volatile ObjC EH puts on decls.  */
-          n_debug("convert_for_assignment 111 ");
-
 	   switch (errtype){
 	      case ic_argpass:
 	      {
@@ -5279,7 +5284,7 @@ static tree convert_for_assignment (location_t location, location_t expr_loc, tr
 	      auto_diagnostic_group d;
 	      range_label_for_type_mismatch rhs_label (rhstype, type);
 	      gcc_rich_location richloc (expr_loc, &rhs_label);
-	      const char msg[] = G_("incompatible type for argument %d of %qE");
+	      //const char msg[] = G_("incompatible type for argument %d of %qE");
 	      if (warnopt)
 	         argsFuncsInfo.warns[argsFuncsInfo.warnCount++]=incompatible_type_for_argument_x_of_y;
 	      else
@@ -5289,7 +5294,7 @@ static tree convert_for_assignment (location_t location, location_t expr_loc, tr
           break;
        case ic_assign:
        {
-	      const char msg[]= G_("incompatible types when assigning to type %qT from type %qT");
+	      //const char msg[]= G_("incompatible types when assigning to type %qT from type %qT");
 	      if (warnopt)
 		         argsFuncsInfo.warns[argsFuncsInfo.warnCount++]=incompatible_types_when_assigning_to_type_x_from_type_y;
 	      else
@@ -5298,7 +5303,7 @@ static tree convert_for_assignment (location_t location, location_t expr_loc, tr
        }
        case ic_init:
        {
-	      const char msg[]= G_("incompatible types when initializing type %qT using type %qT");
+	      //const char msg[]= G_("incompatible types when initializing type %qT using type %qT");
 	      if (warnopt)
 		         argsFuncsInfo.warns[argsFuncsInfo.warnCount++]=incompatible_types_when_initializing_type_x_using_type_y;
 	      else
@@ -5307,7 +5312,7 @@ static tree convert_for_assignment (location_t location, location_t expr_loc, tr
        }
        case ic_return:
        {
-	      const char msg[]= G_("incompatible types when returning type %qT but %qT was expected");
+	      //const char msg[]= G_("incompatible types when returning type %qT but %qT was expected");
 	      if (warnopt)
 		         argsFuncsInfo.warns[argsFuncsInfo.warnCount++]=incompatible_types_when_returning_type_x_but_y_was_expected;
 	      else

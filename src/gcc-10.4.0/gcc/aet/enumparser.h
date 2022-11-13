@@ -44,10 +44,10 @@ typedef struct _EnumElement{
 }EnumElement;
 
 typedef struct _EnumData{
-	char *sysName;
-	char *origName;
-	char *typedefName;
-	char *enumName;
+	char *sysName;       //属于那个类，如果sysName="" 全局的。
+	char *origName;     //源代码中的名字
+	char *typedefName; //typedef enum _xxx xxx typedefName=_xxx
+	char *enumName;   //  enumName=xxx 无下划线
 	ClassPermissionType permission;
 	tree typeDecl;
 	EnumElement *elements[300];

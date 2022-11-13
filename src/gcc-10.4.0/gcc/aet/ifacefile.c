@@ -352,7 +352,6 @@ void iface_file_compile_ready(IfaceFile *self)
     //删除所有的接口实现.c文件
     deleteIfaceImplFile();
     NPtrArray *ifaceDataArray=readFile(self);//
-    printf("iface_file_compile_ready 00 ifaceDataArray:%p\n",ifaceDataArray);
     removeImpleIfaceOfLib(ifaceDataArray);
     int i;
     NPtrArray *fileArray=n_ptr_array_new();//去除重复的头文件
@@ -366,7 +365,6 @@ void iface_file_compile_ready(IfaceFile *self)
           n_string_free(fileStr,TRUE);
           addFile(fileArray,item->file,item->sysName);
     }
-    printf("iface_file_compile_ready 11 fileArray:%d\n",fileArray->len);
     //创建源代码
     NString *fileCodes=n_string_new("");
     for(i=0;i<fileArray->len;i++){
@@ -390,7 +388,6 @@ void iface_file_compile_ready(IfaceFile *self)
            //头文件不存在,o文件也没有。
        }
     }
-    printf("iface_file_compile_ready 22 %s %d\n",fileCodes->str,fileCodes->len);
     link_file_lock_write(self->linkFile,fileCodes->str,fileCodes->len);
 }
 

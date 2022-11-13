@@ -137,7 +137,8 @@ void class_build_create_codes(ClassBuild *self,ClassName *className,NString *cod
    ClassInfo *classInfo=class_mgr_get_class_info_by_class_name(class_mgr_get(),className);
    char *varInitCodes=class_info_create_class_code(classInfo);
    char *initMethod=aet_utils_create_init_method(cName->sysName);
-   n_string_append_printf(codes,"static  AClass *%s(%s *self)\n",funcName,className->sysName);
+   //n_string_append_printf(codes,"static  AClass *%s(%s *self)\n",funcName,className->sysName);
+   n_string_append_printf(codes,"static  AClass *%s(AObject *self)\n",funcName);
    n_string_append(codes,       "{\n");
    n_string_append_printf(codes,"    static AClass *%s=NULL;\n",varName);
    n_string_append_printf(codes,"    if(%s!=NULL){\n",varName);
@@ -229,6 +230,8 @@ static nboolean relaceGetClassFieldRtn(tree fieldDecl,ClassInfo *aclassInfo)
     	return FALSE;
 	tree param_type_list = NULL;
     param_type_list = tree_cons (NULL_TREE, selftype, param_type_list);
+    param_type_list = tree_cons (NULL_TREE, void_type_node, param_type_list);//在函数声明的最后一个参数必须是void_type_node
+    param_type_list = nreverse (param_type_list);
     tree rtntype=createRtnType(&aclassInfo->className);
 	tree fntype = build_function_type (rtntype, param_type_list);
     TREE_TYPE(fieldType)=fntype;
@@ -243,7 +246,7 @@ static nboolean relaceGetClassFieldRtn(tree fieldDecl,ClassInfo *aclassInfo)
  */
 void class_build_replace_getclass_rtn(ClassBuild *self,ClassName *className)
 {
-   if(className==NULL || strcmp(className->userName,"AClass"))
+   if(className==NULL || strcmp(className->userName,AET_ROOT_CLASS))
 	   return;
    ClassInfo *aclassInfo=class_mgr_get_class_info_by_class_name(class_mgr_get(),className);
    char *package0=className->package;

@@ -299,6 +299,7 @@ void class_impl_parser(ClassImpl *self)
    location_t ident_loc = UNKNOWN_LOCATION;
    ClassName *tempClassName=NULL;
    self->readyEnd=0;
+   parser_help_set_forbidden(TRUE);//禁止下一个C_TOKEN被parser_help_set_class_or_enum_type改名了。
    impl_loc = c_parser_peek_token (parser)->location;
    c_parser_consume_token (parser);//consume impl$
    c_c_parser_set_source_position_from_token (c_parser_peek_token (parser));
@@ -320,6 +321,7 @@ void class_impl_parser(ClassImpl *self)
    }else{
       error_at(impl_loc, "关键字impl$后应是类名!");
    }
+   parser_help_set_forbidden(FALSE);//禁止下一个C_TOKEN被parser_help_set_class_or_enum_type改名了。
    access_controls_add_impl(access_controls_get(),n_strdup(IDENTIFIER_POINTER (ident)));
    if (c_parser_next_token_is (parser, CPP_OPEN_BRACE)){
 	  n_debug("开始编译 impl{中的代码 class:%s %s\n",IDENTIFIER_POINTER (ident),in_fnames[0]);
@@ -655,6 +657,15 @@ struct c_expr class_impl_process_expression(ClassImpl *self,struct c_expr expr,l
 			   if(exists){
 	              expr.value=parser_static_create_temp_tree(parser_static_get(),className,IDENTIFIER_POINTER(id));
 	    		  *action=2;
+			   }else{
+			       //是不是com.ARandom 模式
+			       if(c_parser_peek_token(parser)->type==CPP_DOT){
+			             nboolean ok= parser_help_parser_right_package_dot_class(IDENTIFIER_POINTER(id));
+			             if(ok){
+			                 aet_print_token(c_parser_peek_token (parser));
+			                 *action=4;
+			             }
+			       }
 			   }
 		}
 	}
@@ -855,45 +866,13 @@ nboolean class_impl_is_aet_class_component_ref_call(ClassImpl *self,struct c_exp
  * 由c-parser.c调用
  * 当参数是类名，找到当前类名，取系统名替换原来的类名。
  * 如who=AObject 替换成who=test_AObject
+ * 如果当前编译文件中有两个相同的类型会引起冲突。如何解决，根据上下文决定选那一个，上下文？？
+ * Dog 是一个结构体
+ * Dog 是一个类
  */
 nboolean class_impl_set_class_or_enum_type(ClassImpl *self,c_token *who)
 {
-	tree value=who->value;
-	char *id=IDENTIFIER_POINTER(value);
-	ClassName *className=class_mgr_get_class_name_by_user(class_mgr_get(),id);
-	nboolean result=FALSE;
-	if(className!=NULL){
-	   if(strcmp(className->sysName,className->userName)==0){
-	     n_warning("class_impl_set_class_or_enum_type 找到的class 包名是空的，不应该出现这种情况:%s %s",className->sysName,className->userName);
-	     result= FALSE;
-	   }else{
-		  tree newValue=aet_utils_create_ident(className->sysName);
-		  who->value=newValue;
-		  n_debug("class_impl_set_class_or_enum_type 找到的class 改成className->sysName:%s id:%s",className->sysName,id);
-		  result= TRUE;
-	   }
-	}else{
-		 //检查是不是类中声明的枚举。如果是，也需要c-parser.c设为ID_TYPENAME
-	     result= enum_parser_set_enum_type(enum_parser_get(),who);
-	}
-	if(result){
-       tree  decl = lookup_name (who->value);
-       if(decl){
-            if (TREE_CODE (decl) == TYPE_DECL){
-                n_info("class_impl_set_class_or_enum_type 22 通过lookup_name 这是一个类型名  decl:%p value:%s",decl,IDENTIFIER_POINTER(who->value));
-                who->id_kind = C_ID_TYPENAME; //描述类型的标识符
-                return TRUE;
-            }else if(TREE_CODE (decl) == FUNCTION_DECL){
-                char *name=IDENTIFIER_POINTER(DECL_NAME(decl));
-                if(!strcmp(name,className->sysName)){
-                    n_info("class_impl_set_class_or_enum_type 33 通过lookup_name 这是一个构造函数名  decl:%p value:%s",decl,IDENTIFIER_POINTER(who->value));
-                    who->id_kind = C_ID_TYPENAME; //描述类型的标识符
-                    return TRUE;
-                }
-            }
-       }
-	}
-	return FALSE;
+   return parser_help_set_class_or_enum_type(who);
 }
 
 /**
@@ -982,6 +961,7 @@ void class_impl_build_class_dot (ClassImpl *self, location_t loc,struct c_expr *
 	char *sysClassName=IDENTIFIER_POINTER(classTree);
 	tree component;
 	c_parser_consume_token (parser);//consume AObject
+	parser_help_set_forbidden(TRUE);
 	if (!c_parser_require (parser, CPP_DOT, "expected %<.%>")){//这里consume CPP_DOT
 	   expr->set_error ();
 	   return;
@@ -995,6 +975,7 @@ void class_impl_build_class_dot (ClassImpl *self, location_t loc,struct c_expr *
 	component = component_tok->value;
 	location_t end_loc = component_tok->get_finish ();
 	c_parser_consume_token (parser);//consume CPP_NAME
+    parser_help_set_forbidden(FALSE);
 	if (c_parser_next_token_is (parser, CPP_OPEN_PAREN)){
        n_debug("是函数调用----Class.func %s %s\n",sysClassName,IDENTIFIER_POINTER(component));
        expr->value =createTempStaticFunction(sysClassName,component,TRUE);
@@ -1018,12 +999,14 @@ void class_impl_build_class_dot (ClassImpl *self, location_t loc,struct c_expr *
 					  return;
 				  }else{
 					  //查找是不是枚举 Class和CPP_DOT已被consume了
-					 // nboolean isEnumDot=isClassDotEnumDot(self,sysClassName);
 					  char *enumOrigName=IDENTIFIER_POINTER(component);
+					  printf("查找是不是枚举 Class和CPP_DOT已被consume了 %s\n",enumOrigName);
 					  nboolean isClassDotEnum=enum_parser_is_class_dot_enum(enum_parser_get(),sysClassName,enumOrigName);
 					  printf("isEnumDot-----%d %s %s\n",isClassDotEnum,sysClassName,enumOrigName);
 					  if(isClassDotEnum){
+					      parser_help_set_forbidden(TRUE);
 						  enum_parser_build_class_dot_enum(enum_parser_get(),loc,sysClassName,enumOrigName,expr);
+	                      parser_help_set_forbidden(FALSE);
 					  }else{
 			             error_at(loc,"在类%qs中找不到变量:%qE",sysClassName,component);
 			             expr->set_error ();
@@ -1047,7 +1030,9 @@ void class_impl_build_class_dot (ClassImpl *self, location_t loc,struct c_expr *
 
 void class_impl_build_enum_dot (ClassImpl *self, location_t loc,struct c_expr *expr)
 {
+    parser_help_set_forbidden(TRUE);
 	enum_parser_build_dot(enum_parser_get(),loc,expr);
+    parser_help_set_forbidden(FALSE);
 }
 
 
@@ -1210,7 +1195,7 @@ struct c_expr class_impl_nameles_call(ClassImpl *self,struct c_expr expr)
  */
 tree class_impl_modify_func_pointer(ClassImpl *self,tree lhs,tree rhs)
 {
-      return parser_static_modify_func_pointer(parser_static_get(),lhs,rhs);
+   return parser_static_modify_func_pointer(parser_static_get(),lhs,rhs);
 }
 
 /**
@@ -1290,6 +1275,30 @@ tree  class_impl_build_deref(ClassImpl *self,location_t loc,location_t component
     return result;
 }
 
+/**
+ * 解析关键字varof$
+ */
+struct c_expr   class_impl_varof_parser(ClassImpl *self,struct c_expr lhs){
+    return aet_expr_varof_parser(self->aetExpr,lhs);
+}
+
+/**
+ * 解析com.ai.NLayer 重点是 com.ai.
+ * 有三处地方会调用。
+ * 1.函数参数声明 2.函数体内变量声明
+ */
+nboolean class_impl_parser_package_dot_class(ClassImpl *self)
+{
+      return parser_help_parser_left_package_dot_class();
+}
+
+
+ClassName      *class_impl_get_class_name(ClassImpl *self)
+{
+    return self->className;
+}
+
+
 
 void  class_impl_set_parser(ClassImpl *self, c_parser *parser)
 {
@@ -1315,19 +1324,6 @@ void  class_impl_set_parser(ClassImpl *self, c_parser *parser)
       aet_expr_set_parser(self->aetExpr,parser);
 	  printf("编译文件:in_fnames[0]:%s\n",in_fnames[0]);
 }
-
-/**
- * 解析关键字varof$
- */
-struct c_expr   class_impl_varof_parser(ClassImpl *self,struct c_expr lhs){
-    return aet_expr_varof_parser(self->aetExpr,lhs);
-}
-
-ClassName      *class_impl_get_class_name(ClassImpl *self)
-{
-    return self->className;
-}
-
 
 ClassImpl *class_impl_get()
 {

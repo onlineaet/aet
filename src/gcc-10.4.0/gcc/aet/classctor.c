@@ -256,6 +256,23 @@ static tree createTempFunction(tree field)
    return decl;
 }
 
+static int getFieldParmCount(tree field)
+{
+      tree  funcType = TREE_TYPE (field);
+      int count=0;
+      int varargs_p = 1;
+      for (tree al = TYPE_ARG_TYPES (funcType); al; al = TREE_CHAIN (al)){
+           tree type=TREE_VALUE(al);
+           if(type == void_type_node){
+               //n_debug("有void_type_node count:%d 函数名:%s",count,IDENTIFIER_POINTER(DECL_NAME(decl)));
+               varargs_p=0;
+               break;
+           }
+           count++;
+      }
+      return count;
+}
+
 static ClassFunc *candidateFunc(ClassCtor *self,vec<tree, va_gc> *exprlist,vec<tree, va_gc> *origtypes,
 		vec<location_t> arg_loc,location_t expr_loc,NPtrArray *funcs)
 {
@@ -270,7 +287,12 @@ static ClassFunc *candidateFunc(ClassCtor *self,vec<tree, va_gc> *exprlist,vec<t
 		   continue;
 	   }
 	   tree decl=createTempFunction(field);
-	   n_debug("找到了声明的构造函数 开始匹配参数 decl code:%s name:%s",get_tree_code_name(TREE_CODE(decl)),IDENTIFIER_POINTER(DECL_NAME(decl)));
+	   int fieldParmCount=getFieldParmCount(decl);
+	   n_debug("找到了声明的构造函数 开始匹配参数 decl code:%s name:%s 参数个数:%d 实参个数：%d",
+	           get_tree_code_name(TREE_CODE(decl)),IDENTIFIER_POINTER(DECL_NAME(decl)),fieldParmCount,exprlist->length());
+	   //因为有泛型，会增加参数，所以不能用下同的判断。
+	  // if(exprlist->length()!=fieldParmCount)
+	   //    continue;
 	   tree value=decl;
 	   mark_exp_read (value);
 	   value= aet_check_funcs_param (expr_loc, arg_loc, value,exprlist, origtypes);
@@ -548,7 +570,7 @@ nboolean  class_ctor_is(ClassCtor *self,struct c_declarator *declarator,ClassNam
 		if(temp!=NULL){
 		   enum c_declarator_kind kind=temp->kind;
 		   if(kind==cdk_function){
-			   n_debug("isConstruct 在class中找到一个函数声明 第%d个 %d %s\n",i,kind,aet_c_declarator_kind_str[kind]);
+			   n_debug("isConstruct 在class中找到一个函数声明 第%d个 %d \n",i,kind);
 			   funcdel=temp;
                break;
 		   }

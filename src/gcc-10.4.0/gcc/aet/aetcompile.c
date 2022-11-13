@@ -446,7 +446,7 @@ static void createCmdForIfaceCompile(char *cFile,char *oFile,char *compileParm,s
     char *items[1024];
     int argc=  gsplit (compileParm,SEPARATION,items,1024);
     if(items[argc-1]==NULL || !strcmp(items[argc-1],"")){
-        printf("从compileParm取出的最后一个参数是空的或长度是0 %s 参数个数:%d\n",items[argc-1],argc);
+        //printf("从compileParm取出的最后一个参数是空的或长度是0 %s 参数个数:%d\n",items[argc-1],argc);
         argc--;
     }
     char **real_argv = XCNEWVEC (char *, argc+2);

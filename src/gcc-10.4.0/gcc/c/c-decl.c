@@ -759,8 +759,7 @@ static void bind (tree name, tree decl, struct c_scope *scope, bool invisible, b
 
   b->prev = scope->bindings;
   scope->bindings = b;
-  n_debug("bind 11 name:%s decl code:%d codeName:%s binding_freelist:%p depth:%d scope:%p b:%p ",name?IDENTIFIER_POINTER(name):"unknown",
-				TREE_CODE(decl),get_tree_code_name(TREE_CODE(decl)),binding_freelist,b->depth,scope,b);
+
   if (decl_jump_unsafe (decl))
     scope->has_jump_unsafe_decl = 1;
 
@@ -5248,8 +5247,8 @@ tree start_decl (struct c_declarator *declarator, struct c_declspecs *declspecs,
   /* Add this decl to the current scope.
      TEM may equal DECL or it may be a previous decl of the same name.  */
 
-  n_debug("start_decl 11 context:%p extern:%d static:%d pub:%d ",
-  		   DECL_CONTEXT(decl),DECL_EXTERNAL(decl),TREE_STATIC(decl),TREE_PUBLIC(decl));
+//  n_debug("start_decl 11 context:%p extern:%d static:%d pub:%d ",
+//  		   DECL_CONTEXT(decl),DECL_EXTERNAL(decl),TREE_STATIC(decl),TREE_PUBLIC(decl));
   tem = pushdecl (decl);
 
   if (initialized && DECL_EXTERNAL (tem))
@@ -5257,9 +5256,8 @@ tree start_decl (struct c_declarator *declarator, struct c_declspecs *declspecs,
       DECL_EXTERNAL (tem) = 0;
       TREE_STATIC (tem) = 1;
     }
-  n_debug("start_decl 22xx decl:%p tem:%p context:%p extern:%d static:%d pub:%d ",
-  		   decl,tem,DECL_CONTEXT(tem),DECL_EXTERNAL(tem),TREE_STATIC(tem),TREE_PUBLIC(tem));
-   //printNode(tem);
+//  n_debug("start_decl 22xx decl:%p tem:%p context:%p extern:%d static:%d pub:%d ",
+//  		   decl,tem,DECL_CONTEXT(tem),DECL_EXTERNAL(tem),TREE_STATIC(tem),TREE_PUBLIC(tem));
   return tem;
 }
 
@@ -8049,19 +8047,14 @@ detect_field_duplicates (tree fieldlist)
 
   /* First, see if there are more than "a few" fields.
      This is trivially true if there are zero or one fields.  */
-  n_debug("fdetect_field_duplicates 00 %d  ", !fieldlist);
   if (!fieldlist || !DECL_CHAIN (fieldlist))
     return;
-  //n_debug("fdetect_field_duplicates xx00 %d  ", !fieldlist);
-
   x = fieldlist;
   do {
     timeout--;
     if (DECL_NAME (x) == NULL_TREE && RECORD_OR_UNION_TYPE_P (TREE_TYPE (x)))
       timeout = 0;
     x = DECL_CHAIN (x);
-   // n_debug("fdetect_field_duplicates 11 %d  ", !fieldlist);
-
   } while (timeout > 0 && x);
 
   /* If there were "few" fields and no anonymous structures or unions,
@@ -8077,8 +8070,6 @@ detect_field_duplicates (tree fieldlist)
 		&& RECORD_OR_UNION_TYPE_P (TREE_TYPE (x))
 		&& TYPE_NAME (TREE_TYPE (x)) != NULL_TREE
 		&& TREE_CODE (TYPE_NAME (TREE_TYPE (x))) == TYPE_DECL)){
-		  n_debug("fdetect_field_duplicates 22 %d  ", !fieldlist);
-
 	    for (y = fieldlist; y != x; y = TREE_CHAIN (y))
 	      if (is_duplicate_field (y, x)){
 		    error ("duplicate member %q+D", x);
@@ -8086,8 +8077,6 @@ detect_field_duplicates (tree fieldlist)
 		  }
 	  }
   }else{
-	  n_debug("fdetect_field_duplicates 33 %d  ", !fieldlist);
-
       hash_table<nofree_ptr_hash <tree_node> > htab (37);
       detect_field_duplicates_hash (fieldlist, &htab);
   }

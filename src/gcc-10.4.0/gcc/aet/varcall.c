@@ -271,7 +271,7 @@ tree var_call_dot_visit(VarCall *self,tree exprValue,tree component,location_t c
 {
 	enum tree_code code=TREE_CODE(exprValue);
 	if(code!=VAR_DECL && code!=PARM_DECL && code!=NOP_EXPR && code!=NON_LVALUE_EXPR && code!=ADDR_EXPR){
-		printf("var_call_dot_visit 不是变量类型 不是参数类型 不是NOP_EXPR 不是 NON_LVALUE_EXPR 不是 ADDR_EXPR 由系统处理 %s\n",
+	    n_debug("var_call_dot_visit 不是变量类型 不是参数类型 不是NOP_EXPR 不是 NON_LVALUE_EXPR 不是 ADDR_EXPR 由系统处理 %s\n",
 				get_tree_code_name(code));
 		return exprValue;
 	}

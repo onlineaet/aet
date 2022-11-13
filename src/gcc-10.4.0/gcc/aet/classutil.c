@@ -968,6 +968,62 @@ static tree lookupField(tree type, tree component)
    return field;
 }
 
+
+/**
+ * 清除警告信息。
+ * 只针对如下情况:
+ * ((debug_AObject *)self)->_Z7AObject10free_childEPN7AObjectE=_Z7ARandom23ARandom_unref_429114846EPN7ARandomE;
+ * _Z7AObject10free_childEPN7AObjectE的第一个参数是 AObject *self
+ * _Z7ARandom23ARandom_unref_429114846EPN7ARandomE的第一个参数是 ARandom *self
+ * 当build_modify_expr时:
+ *  警告：assignment to ‘void (*)(debug_AObject *)’ {或称 ‘void (*)(struct _debug_AObject *)’}
+ *  from incompatible pointer type ‘void (*)(debug_ARandom *)’ {或称 ‘void (*)(struct _debug_ARandom *)’} [-Wincompatible-pointer-types]
+ */
+int  class_util_erase_warning(tree lhtype,tree rhs)
+{
+    if(TREE_CODE(lhtype)!=POINTER_TYPE)
+       return 0;
+    tree lhtype_2=TREE_TYPE (lhtype);
+    if(TREE_CODE(lhtype_2)!=FUNCTION_TYPE)
+       return 0;
+    for (tree al = TYPE_ARG_TYPES (lhtype_2); al; al = TREE_CHAIN (al)){
+        tree type=TREE_VALUE(al);
+        if(TREE_CODE(type)!=POINTER_TYPE)
+            return 0;
+        char *objName=class_util_get_class_name(type);
+        printf("左边的第一个参数是:%s\n",objName);
+        if(objName==NULL || !strstr(objName,AET_ROOT_OBJECT))
+            return 0;
+        break;
+    }
+
+    if(TREE_CODE(rhs)!=ADDR_EXPR && TREE_CODE(rhs)!=COMPONENT_REF )
+         return 0;
+    if(TREE_CODE(rhs)==ADDR_EXPR){
+       tree fundecl = TREE_OPERAND(rhs,0);
+       if(TREE_CODE(fundecl)!=FUNCTION_DECL)
+         return 0;
+    }
+    tree rhtype=TREE_TYPE(rhs);
+    if(TREE_CODE(rhtype)!=POINTER_TYPE)
+         return 0;
+    tree rhtype_2=TREE_TYPE (rhtype);
+    if(TREE_CODE(rhtype_2)!=FUNCTION_TYPE)
+      return 0;
+    for (tree al = TYPE_ARG_TYPES (rhtype_2); al; al = TREE_CHAIN (al)){
+        tree type=TREE_VALUE(al);
+        if(TREE_CODE(type)!=POINTER_TYPE)
+            return 0;
+        char *objName=class_util_get_class_name(type);
+        printf("右边的第一个参数是:%s\n",objName);
+        if(objName==NULL || strstr(objName,AET_ROOT_OBJECT))
+            return 0;
+        break;
+    }
+    return 1;
+}
+
+
 /**
  * 在结构体或UNION中查找component
  */

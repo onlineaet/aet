@@ -290,7 +290,6 @@ nboolean   var_mgr_change_static_decl(VarMgr *self,ClassName *className,struct c
 		if(temp!=NULL){
 		   enum c_declarator_kind kind=temp->kind;
 		   if(kind==cdk_id){
-			  // printf("var_mgr_add_static 00 第%d个 %d %s\n",i,kind,aet_c_declarator_kind_str[kind]);
 			   vardel=temp;
 			   break;
 		   }

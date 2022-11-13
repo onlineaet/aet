@@ -67,5 +67,6 @@ int                   class_util_get_nameless_call_link(tree value,NPtrArray *ar
 nboolean              class_util_is_function_field(tree field);
 nboolean              class_util_have_field(tree type, tree component);//在结构体或UNION中查找component
 
+int                   class_util_erase_warning(tree type,tree lhs);//清除警告信息
 
 #endif /* ! GCC_C_AET_H */

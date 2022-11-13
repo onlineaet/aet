@@ -51,6 +51,9 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 #include "classmgr.h"
 #include "aetutils.h"
 #include "funcmgr.h"
+#include "classparser.h"
+#include "classimpl.h"
+#include "aet-c-parser-header.h"
 
 
 static void classMgrInit(ClassMgr *self)
@@ -130,33 +133,98 @@ nboolean   class_mgr_is_class(ClassMgr *self,char *sysClassName)
 	return info!=NULL;
 }
 
-
+/**
+ * 如果.h文件和编译文件在同一目录，以.h中的声明的类为准。
+ * 如果不在同一目录，找与编译文件的目录接近度最高的头文件中声明的为准。
+ * 接近度(proximity), 如何把目录转向量来计算接近度?。
+ */
 ClassName *class_mgr_get_class_name_by_user(ClassMgr *self,char *userClassName)
 {
 	NHashTableIter iter;
 	npointer key, value;
 	n_hash_table_iter_init(&iter, self->mgrHash);
 	int count=0;
+	ClassInfo *result=NULL;
 	while (n_hash_table_iter_next(&iter, &key, &value)) {
 		ClassInfo *info = (ClassInfo *)value;
 		if(strcmp(info->className.userName,userClassName)==0){
+		   result=info;
            count++;
 		}
 	}
 	if(count==0)
 		return NULL;
-
+	if(count==1)
+	    return &(result->className);
+	//处理超过两个的情况。
 	n_hash_table_iter_init(&iter, self->mgrHash);
+	NFile *inFnames=n_file_new(in_fnames[0]);
+	NFile  *inc=n_file_get_canonical_file(inFnames);
+	const char *parentDir=n_file_get_parent(inc);
+    while (n_hash_table_iter_next(&iter, &key, &value)) {
+        ClassInfo *info = (ClassInfo *)value;
+        if(strcmp(info->className.userName,userClassName)==0){
+            printf("in_fnames[0] %s file:%s\n",in_fnames[0],info->file);
+            NFile *f=n_file_new(info->file);
+            if(n_file_equals(inFnames,f)){
+                n_file_unref(f);
+                return &(info->className);
+            }
+            NFile  *fc=n_file_get_canonical_file(f);
+            const char *dir=n_file_get_parent(fc);
+            if(!strcmp(dir,parentDir)){
+                printf("in_fnames[0] 返回了-----%s file:%s\n",in_fnames[0],info->file);
+                n_file_unref(fc);
+                n_file_unref(f);
+                return &(info->className);
+            }
+            n_file_unref(f);
+            n_file_unref(fc);
+        }
+    }
+
+    n_file_unref(inc);
+    n_file_unref(inFnames);
+
+	//如果在parsering中并且classUserName==userClassName返回 该ClassInfo;
+	if(class_parser_is_parsering(class_parser_get())){
+	    ClassName *className=class_parser_get_class_name(class_parser_get());
+	    if(className!=NULL && !strcmp(className->userName,userClassName)){
+	        ClassInfo *info=class_mgr_get_class_info(self,className->sysName);
+	        if(info!=NULL){
+	            return &(info->className);
+	        }
+	    }
+	}
+	//如果在aet中与aet的类名为准
+    c_parser *parser=class_parser_get()->parser;
+    if(parser->isAet){
+        ClassName *className=class_impl_get_class_name(class_impl_get());
+        if(className!=NULL && !strcmp(className->userName,userClassName)){
+           ClassInfo *info=class_mgr_get_class_info(self,className->sysName);
+           if(info!=NULL){
+              return &(info->className);
+           }
+        }
+    }
+    //如果当前编译文件与头文件中同一个目录与该目录的为准
+
+    NString *str=n_string_new("");
+    n_string_append_printf(str,"找到多个相同的类名:%s ",userClassName);
+	n_hash_table_iter_init(&iter, self->mgrHash);
+	count=1;
 	while (n_hash_table_iter_next(&iter, &key, &value)) {
 		ClassInfo *info = (ClassInfo *)value;
 		if(strcmp(info->className.userName,userClassName)==0){
-			if(count>1){
-			  error("引用到两个相同的类名%qs。包名:%qs 去除其中一个多余的引用（提示：移走包含的头文件）。",userClassName,info->className.package);
-			}
-            return &(info->className);
+		    n_string_append_printf(str,"%d 包名:%s 系统名:%s ",count,info->className.package,info->className.sysName);
+		    count++;
+		    result=info;
 		}
 	}
-	return NULL;
+    n_string_append_printf(str," 最终选择的是:%s。 要精确的访问类，你可在类名前加上包名。如：com_ai_ConvOps。",result->className.sysName);
+    warning_at (input_location,0,"%qs",str->str);
+	n_string_free(str,TRUE);
+    return &(result->className);
 }
 
 ClassName *class_mgr_get_class_name_by_sys(ClassMgr *self,char *sysClassName)

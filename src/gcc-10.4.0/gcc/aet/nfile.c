@@ -1133,9 +1133,15 @@ nboolean   n_file_equals(NFile *self,NFile *dest)
 {
 	 if(self==NULL || dest==NULL)
 		 return FALSE;
-	 char *path=n_file_get_absolute_path(self);
-	 char *path1=n_file_get_absolute_path(dest);
-	 return strcmp(path,path1)==0;
+	 NFile *f=n_file_get_canonical_file(self);
+	 NFile *f1=n_file_get_canonical_file(dest);
+
+	 char *path=n_file_get_absolute_path(f);
+	 char *path1=n_file_get_absolute_path(f1);
+	 nboolean ret= strcmp(path,path1)==0;
+	 n_file_unref(f);
+	 n_file_unref(f1);
+	 return ret;
 }
 
 

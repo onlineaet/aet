@@ -122,12 +122,9 @@ static tree createOffsetof(char *className,char *face,location_t loc,nboolean mi
 	   if(!typeDecl || typeDecl==error_mark_node)
 		   return NULL_TREE;
 	   tree classRecord=TREE_TYPE(typeDecl);
-	   printf("class_cast createOffsetof 11 %s\n",get_tree_code_name(TREE_CODE(classRecord)));
 	   tree name=TYPE_NAME(classRecord);
-	   printf("class_cast RID_OFFSETOF --11 %s\n",get_tree_code_name(TREE_CODE(name)));
 	   if(TREE_CODE(name)==TYPE_DECL){
 		   tree id=DECL_NAME (name);
-		   printf("class_cast RID_OFFSETOF --1122 %s\n",IDENTIFIER_POINTER(id));
 	   }
 	   tree offsetof_ref;
 	   offsetof_ref = build1 (INDIRECT_REF, classRecord, null_pointer_node);
@@ -135,9 +132,7 @@ static tree createOffsetof(char *className,char *face,location_t loc,nboolean mi
 	   tree faceId=aet_utils_create_ident(face);
 	   offsetof_ref = build_component_ref(loc, offsetof_ref, faceId, loc);
 	   tree value = fold_offsetof (offsetof_ref);
-	   printf("class_cast createOffsetof 22 %s\n",get_tree_code_name(TREE_CODE(classRecord)));
 	   if(minus){
-		   printf("class_cast createOffsetof 33 %s\n",get_tree_code_name(TREE_CODE(classRecord)));
 	       value = wide_int_to_tree (TREE_TYPE (value), -wi::to_wide (value));
 	   }
 	   return value;
@@ -893,19 +888,16 @@ void class_cast_parm_convert_from_deref(ClassCast *self,tree func,vec<tree, va_g
 					break;
 				}
 				tree actualParm = (*exprlist)[count];
-				printf("class_cast_parm_convert_from_deref 实参是:%d\n",count);
-				aet_print_tree(actualParm);
+				n_debug("class_cast_parm_convert_from_deref 实参是:%d\n",count);
 				if(count==0){
 					nboolean isRefUnref=isIFaceRefOrUnref(op0,fieldDecl);
 					tree cc=convertToIface(type,actualParm,isRefUnref);
-	                printf("class_cast_parm_convert_from_deref 11 实参是:%d cc:%p\n",count,cc);
-
+					n_debug("class_cast_parm_convert_from_deref 11 实参是:%d cc:%p\n",count,cc);
 					if(cc!=NULL_TREE)
 					  (*exprlist)[count]=cc;
 				}else{
-
 				   tree cc=convertActualParm(type,actualParm,count);
-                   printf("class_cast_parm_convert_from_deref 22 实参是:%d cc:%p\n",count,cc);
+				   n_debug("class_cast_parm_convert_from_deref 22 实参是:%d cc:%p\n",count,cc);
 
 				   if(cc!=NULL_TREE)
 					  (*exprlist)[count]=cc;

@@ -505,10 +505,21 @@ static void structuredArray (NLogLevelFlags log_level,const NLogField *fields,ns
   }
 }
 
+static nboolean isDrop (NLogLevelFlags log_level)
+{
+  if(!(log_level & n_log_msg_prefix))
+      return TRUE;
+  if(log_level==N_LOG_LEVEL_ERROR)
+      return FALSE;
+  return FALSE;
+}
+
 
 void n_log_structured_standard (NLogLevelFlags log_level,const nchar *file,const nchar *line,
                            const nchar *func, const nchar *message_format,...)
 {
+   // if(isDrop(log_level))
+      //  return;
   NLogField fields[] =
     {
       { "PRIORITY", log_level_to_priority (log_level), -1 },

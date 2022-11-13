@@ -185,6 +185,10 @@ enum warn_error_info{
 		returning_pointer_to_$bltin$_of_type_$rhstype$_from_a_function_with_incompatible_type_$type$,
 		returning_$rhstype$_from_a_function_with_incompatible_return_type_$type$,
 		compare_aet_class_argument_orig_parm_error,//比较AET CLASS
+		pointer_targets_in_assignment_from_$parmnum$_to_$rename$_differ_in_signedness,
+		pointer_targets_in_assignment_from_$rhstype$_to_$type$_differ_in_signedness,
+		pointer_targets_in_initialization_of_$type$_from_$rhstype$_differ_in_signedness,
+		pointer_targets_in_returning_$rhstype$__from_a_function_with_return_type_$type$_differ_in_signedness,
 		go_unreachable,
 	    error_or_warn_unknown,
 };

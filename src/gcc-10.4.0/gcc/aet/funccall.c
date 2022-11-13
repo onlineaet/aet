@@ -259,8 +259,6 @@ static CandidateFun * checkParam(FuncCall *self,ClassFunc *func,tree decl,vec<tr
 		}
 		count++;
    }
-   int tt=type_num_arguments (funcType);
-
    //跳过FuncGenParmInfo info 形参 在泛型函数中abc(Abc *self,FuncGenParmInfoinfo,....);aet_check_funcs_param会判断是否要跳过参数
    if(count!=exprlist->length() && varargs_p==0){
 	   nboolean ok1=class_func_is_func_generic(func);
@@ -811,7 +809,7 @@ static tree callItself(FuncCall *self,tree func,SelectedDecl *selected,vec<tree,
 			error_at(DECL_SOURCE_LOCATION(item->fromImplDecl),"接口%qs不应有声明。",selected->iface);
 			return NULL_TREE;
 	    }
-		printf("func_call_select callItself 00 在这里创建本身接口方法的引用。接口所属类:%s 接口:%s\n",selected->className,selected->iface);
+		n_debug("func_call_select callItself 00 在这里创建本身接口方法的引用。接口所属类:%s 接口:%s\n",selected->className,selected->iface);
 		tree firstParm=NULL_TREE;
 		ClassName *className=class_mgr_get_class_name_by_sys(class_mgr_get(),selected->className);
 		ClassName *iface=class_mgr_get_class_name_by_sys(class_mgr_get(),selected->iface);

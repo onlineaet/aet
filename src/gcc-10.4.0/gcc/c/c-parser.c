@@ -793,9 +793,6 @@ bool
 c_parser_next_token_starts_declspecs (c_parser *parser)
 {
   c_token *token = c_parser_peek_token (parser);
-  n_debug("c_parser_next_token_starts_declspecs 00");
-  aet_print_token(token);
-
   /* In Objective-C, a classname normally starts a declspecs unless it
      is immediately followed by a dot.  In that case, it is the
      Objective-C 2.0 "dot-syntax" for class objects, ie, calls the
@@ -4531,10 +4528,14 @@ static struct c_parm *c_parser_parameter_declaration (c_parser *parser, tree att
   while (c_parser_next_token_is (parser, CPP_PRAGMA))
     c_parser_pragma (parser, pragma_param, NULL);
   c_token *cur=c_parser_peek_token (parser);
-  if(c_parser_next_token_is (parser, CPP_NAME)){
+  if(c_parser_next_token_is (parser, CPP_NAME)){//zclei
 	 if(generic_util_valid_id(cur->value)){
 		n_debug("c-parser.c 是一个泛型 把泛型替换成 aet_generic_E--- %s\n",IDENTIFIER_POINTER(cur->value));
 		generic_impl_replace_token(generic_impl_get(),cur);
+	 }else{
+	     if(c_parser_peek_2nd_token(parser)->type==CPP_DOT){
+	         class_impl_parser_package_dot_class(classImpl);
+	     }
 	 }
   }
   if (c_parser_next_token_is_keyword (parser, RID_AET_GOTO)){
@@ -4547,7 +4548,6 @@ static struct c_parm *c_parser_parameter_declaration (c_parser *parser, tree att
 		  // c_parser_nth_token_starts_std_attributes (parser, 1),cur->type,cur->id_kind);
   if (!c_parser_next_token_starts_declspecs (parser) && !c_parser_nth_token_starts_std_attributes (parser, 1)){
    	  //printf("创建c_parm 00  have_gnu_attrs:%d %s, %s, %d\n",have_gnu_attrs,__FILE__, __FUNCTION__, __LINE__);
-
       c_token *token = c_parser_peek_token (parser);
       if (parser->error)
 	    return NULL;
@@ -5867,7 +5867,6 @@ static location_t c_parser_compound_statement_nostart (c_parser *parser)
     bool last_label = false;
     bool save_valid_for_pragma = valid_location_for_stdc_pragma_p ();
     location_t label_loc = UNKNOWN_LOCATION;  /* Quiet warning.  */
-    n_debug("函数复合语句 00  isAet:%d nest:%d", parser->isAet,classImpl->nest);
     class_impl_nest_op(classImpl,TRUE);
     if (c_parser_next_token_is (parser, CPP_CLOSE_BRACE)){
  	   n_debug("函数复合语句 遇到CPP_CLOSE_BRACE 返回");
@@ -5890,8 +5889,6 @@ static location_t c_parser_compound_statement_nostart (c_parser *parser)
     if (c_parser_next_token_is_keyword (parser, RID_LABEL)){
 		  /* Read zero or more forward-declarations for labels that nested
 		 functions can jump to.  */
-	   n_debug("函数复合语句 11：进入RID_LABEL");
-
        mark_valid_location_for_stdc_pragma (false);
        while (c_parser_next_token_is_keyword (parser, RID_LABEL)){
 	      label_loc = c_parser_peek_token (parser)->location;
@@ -5952,28 +5949,34 @@ again:
 	      last_stmt = false;
 	      mark_valid_location_for_stdc_pragma (false);
 	      c_parser_label (parser);
+       }else if(c_parser_next_token_is (parser, CPP_NAME) && !c_parser_next_tokens_start_declaration (parser) &&
+               c_parser_peek_2nd_token (parser)->type == CPP_DOT){//zclei 解析com.ai.NLayer模式。
+            nboolean ret=class_impl_parser_package_dot_class(classImpl);
+            if(!ret){
+               goto statement;
+            }else{
+               goto class_dot_access;
+            }
 	   }else if (!last_label && (c_parser_next_tokens_start_declaration (parser)
 		   || (have_std_attrs && c_parser_next_token_is (parser, CPP_SEMICOLON)) || c_parser_next_token_is_keyword (parser, RID_AET_GOTO))){
-		   //zclei
+	    class_dot_access://zclei
 		   nboolean isClassAndDot=class_impl_next_tokens_is_class_and_dot (classImpl);
 		   if(isClassAndDot){
 			   if(class_impl_next_tokens_is_class_dot_enum(classImpl)){
 				   if(class_impl_next_tokens_is_class_dot_enum_dot(classImpl)){
-					   n_debug("函数复合语句 33xx：类点引用枚举 AObject.Enum.");
+					   n_debug("函数复合语句 44：类点引用枚举 AObject.Enum.");
 					   goto statement;
 				   }
 			   }else{
-			       n_debug("函数复合语句 33xx：类点引用 AObject.");
+			       n_debug("函数复合语句 55：类点引用 AObject.");
 			       goto statement;
 			   }
 		   }
 	      last_label = false;
 	      mark_valid_location_for_stdc_pragma (false);
 	      bool fallthru_attr_p = false;
-		  n_debug("函数复合语句 33： 对函数内部的声明进行分析 count:%d  ", testcount);
 	      c_parser_declaration_or_fndef (parser, true, !have_std_attrs, true, true, true, NULL, vNULL, have_std_attrs,
 	    		      std_attrs,NULL, &fallthru_attr_p);
-		  n_debug("函数复合语句 ----33： 对函数内部的声明进行分析 count:%d ", testcount);
 	      if (last_stmt && !fallthru_attr_p)
 	        pedwarn_c90 (loc, OPT_Wdeclaration_after_statement,"ISO C90 forbids mixed declarations and code");
 	      last_stmt = fallthru_attr_p;
@@ -5985,8 +5988,7 @@ again:
 				 been seen, it must start a statement, not a declaration,
 				 but standard attributes starting a declaration may appear
 				 after __extension__.  */
-			  n_debug("函数复合语句 44：  count:%d ", testcount);
-	          aet_print_token(c_parser_peek_token(parser));
+			  n_debug("函数复合语句 88：  count:%d ", testcount);
 	      while (c_parser_peek_2nd_token (parser)->type == CPP_KEYWORD && (c_parser_peek_2nd_token (parser)->keyword == RID_EXTENSION))
 	         c_parser_consume_token (parser);
 	      if (!have_std_attrs  && (c_token_starts_declaration (c_parser_peek_2nd_token (parser))
@@ -5996,8 +5998,6 @@ again:
 	         c_parser_consume_token (parser);
 	         last_label = false;
 	         mark_valid_location_for_stdc_pragma (false);
-			  n_debug("函数复合语句 55：  count:%d ", testcount);
-
 	         c_parser_declaration_or_fndef (parser, true, true, true, true,true, NULL, vNULL);
 			  /* Following the old parser, __extension__ does not
 			 disable this diagnostic.  */
@@ -6006,7 +6006,6 @@ again:
 		        pedwarn_c90 (loc, OPT_Wdeclaration_after_statement,"ISO C90 forbids mixed declarations and code");
 	         last_stmt = false;
 	      }else{
-			  n_debug("函数复合语句 66：goto statement  count:%d ", testcount);
 	         goto statement;
 	      }
 	   }else if (c_parser_next_token_is (parser, CPP_PRAGMA)){
@@ -6036,38 +6035,34 @@ again:
           }
        }else{
 	      statement:
-		    n_debug("函数复合语句 77：goto statement  count:%d ", testcount);
-
-	        c_warn_unused_attributes (std_attrs);
-	        last_label = false;
-	        last_stmt = true;
-	        mark_valid_location_for_stdc_pragma (false);
-	        c_parser_statement_after_labels (parser, NULL);
+		     //n_debug("函数复合语句 101：goto statement  count:%d ", testcount);
+	         c_warn_unused_attributes (std_attrs);
+	         last_label = false;
+	         last_stmt = true;
+	         mark_valid_location_for_stdc_pragma (false);
+	         c_parser_statement_after_labels (parser, NULL);
 	   }
       parser->error = false;
     }//end while
     if (last_label)
        error_at (label_loc, "label at end of compound statement");
     location_t endloc = c_parser_peek_token (parser)->location;
-    aet_print_token(c_parser_peek_token(parser));
-    n_debug("函数复合语句 88：goto statement  count:%d  nest:%d isctor:%d", testcount,classImpl->nest,classImpl->isConstructor);
+    //aet_print_token(c_parser_peek_token(parser));
+    //n_debug("函数复合语句 88：goto statement  count:%d  nest:%d isctor:%d", testcount,classImpl->nest,classImpl->isConstructor);
     class_impl_nest_op(classImpl,FALSE);
-    n_debug("函数复合语句 88xx：goto statement  count:%d  nest:%d isctor:%d", testcount,classImpl->nest,classImpl->isConstructor);
-    aet_print_token(c_parser_peek_token(parser));
+    //n_debug("函数复合语句 88xx：goto statement  count:%d  nest:%d isctor:%d", testcount,classImpl->nest,classImpl->isConstructor);
+    //aet_print_token(c_parser_peek_token(parser));
     //zclei again是我加上的
     if(parser->isAet && classImpl->nest==0 && classImpl->isConstructor){
     	//如果是构造函数加入返回语句
     	nboolean re=class_ctor_add_return_stmt(classImpl->classCtor);
-        n_debug("函数复合语句 99：goto statement  count:%d re:%d", testcount,re);
+        //n_debug("函数复合语句 102：goto statement  count:%d re:%d", testcount,re);
         if(re)
           goto again;
     }
 
     c_parser_consume_token (parser);
-    n_debug("函数复合语句 ccc88xx：goto statement  count:%d  nest:%d isctor:%d", testcount,classImpl->nest,classImpl->isConstructor);
-
-    aet_print_token(c_parser_peek_token(parser));
-
+    //n_debug("函数复合语句 ccc88xx：goto statement  count:%d  nest:%d isctor:%d", testcount,classImpl->nest,classImpl->isConstructor);
   /* Restore the value we started with.  */
     mark_valid_location_for_stdc_pragma (save_valid_for_pragma);
     return endloc;
@@ -9416,6 +9411,10 @@ static struct c_expr c_parser_postfix_expression (c_parser *parser)
                     set_c_expr_source_range (&expr, tok_range);
                     break;
 			    }
+                if(action==4){
+                   printf("这是一个com.ai.NLayer\n");
+                   goto classAccessLabel;
+                }
 				aet_print_token(c_parser_peek_token (parser));
 				expr.value = build_external_ref (loc, id,(c_parser_peek_token (parser)->type== CPP_OPEN_PAREN), &expr.original_type);
 				n_debug("c_parser_postfix_expression 77 后缀表达式 id:%s expr.value:%p ",
@@ -9451,6 +9450,7 @@ static struct c_expr c_parser_postfix_expression (c_parser *parser)
 	         }
 	         case C_ID_TYPENAME://zclei
 			 {
+			 classAccessLabel:
 				nboolean isClassAndDot=class_impl_next_tokens_is_class_and_dot (classImpl);
 				nboolean isEnumAndDot= class_impl_next_tokens_is_enum_and_dot (classImpl);
 				n_info("注意 这里是Class.name的调用 或者是Enum.name的调用 isClassAndDot:%d isEnumAndDot:%d",isClassAndDot,isEnumAndDot);

@@ -183,6 +183,7 @@ static char *aet_c_typespec_kind_str[]= {
   "ctsk_typeof"
 };
 
+
 /* The various kinds of declarators in C.  */
 static char *aet_c_declarator_kind_str[]= {
   /* An identifier.  */
@@ -196,7 +197,5 @@ static char *aet_c_declarator_kind_str[]= {
   /* Parenthesized declarator with nested attributes.  */
   "cdk_attrs"
 };
-
-
 
 #endif /* ! GCC_C_AET_H */

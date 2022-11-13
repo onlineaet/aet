@@ -525,9 +525,9 @@ static void fillFreeChildMethodForAObject(ClassName *className,NString *codes)
 	ClassName *rootClassName=class_mgr_get_class_name_by_user(class_mgr_get(),AET_ROOT_OBJECT);
 	if(rootClassName==NULL)
 		return ;
-	//printf("class_init_modify_root_object_free_child %s %s\n",rootClassName->sysName,rootClassName->userName);
+	//printf("fillFreeChildMethodForAObject %s %s\n",rootClassName->sysName,rootClassName->userName);
 	char *freeChildMangle=func_mgr_get_mangle_func_name(func_mgr_get(),rootClassName,"free_child");
-	//printf("class_init_modify_root_object_free_child 11 %s %s\n",rootClassName->sysName,freeChildMangle);
+	//printf("fillFreeChildMethodForAObject 11 %s %s\n",rootClassName->sysName,freeChildMangle);
 	if(freeChildMangle==NULL)
 		return ;
  	char unrefName[255];
@@ -543,9 +543,9 @@ static void fillGetClassMethodForAObject(ClassName *className,char *funcName,NSt
 	ClassName *rootClassName=class_mgr_get_class_name_by_user(class_mgr_get(),AET_ROOT_OBJECT);
 	if(rootClassName==NULL)
 		return ;
-	//printf("class_init_modify_root_object_free_child %s %s\n",rootClassName->sysName,rootClassName->userName);
+	//printf("fillGetClassMethodForAObject %s %s\n",rootClassName->sysName,rootClassName->userName);
 	char *getClassMangle=func_mgr_get_mangle_func_name(func_mgr_get(),rootClassName,"getClass");
-	//printf("class_init_modify_root_object_free_child 11 %s %s\n",rootClassName->sysName,freeChildMangle);
+	//printf("fillGetClassMethodForAObject 11 %s %s\n",rootClassName->sysName,freeChildMangle);
 	if(getClassMangle==NULL)
 		return;
  	n_string_append_printf(codes,"((%s *)self)->%s=%s;\n",rootClassName->sysName,getClassMangle,funcName);
@@ -614,7 +614,7 @@ void class_init_create_init_define(ClassInit *self,ClassName *className,NPtrArra
 	 n_string_append(buf,"if(self==NULL)\n");//说明要获取class类信息
 	 char getAClassFuncName[255];
 	 class_build_create_func_name(className,getAClassFuncName);
-	 n_string_append_printf(buf,"return (void *)%s(self);\n",getAClassFuncName);
+	 n_string_append_printf(buf,"return (void *)%s((AObject *)self);\n",getAClassFuncName);
 	 if(info->parentName.sysName){
 		 char *parentInitMethod=aet_utils_create_init_method(info->parentName.sysName);
 		 n_string_append_printf(buf,"%s((%s *)self);\n",parentInitMethod,info->parentName.sysName);

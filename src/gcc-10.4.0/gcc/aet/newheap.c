@@ -213,7 +213,6 @@ static void setInitLocalVar(NewHeap *self,tree var,ClassName *className,nboolean
         error_at(input_location,"setInitLocalVar 不应该出现的错误，构造函数的位置是零，报告此错误。");
         return ;
     }
-
     aet_utils_add_token_with_location(parse_in,codes->str,codes->len,ctorLoc);
 	n_debug("new_heap setInitLocalVar 源代码:varName:%s file:%s\n%s\n",varName,in_fnames[0],codes->str);
 	n_string_free(codes,TRUE);

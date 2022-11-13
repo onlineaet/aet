@@ -391,8 +391,11 @@ static void fillGenericArray(NString *codes,char *destVar,int destIndex,char *sr
 			 destVar,genericArrayName,destIndex,srcVar,deref?"->":".",genericArrayName,srcIndex);
 }
 
+/**
+ * genericCodesCount判断是否生成泛型代码。
+ */
 static void recursionInitParentInfo(NewStrategy *self,char *refVarName,ClassName *refClassName,
-		NString *codes,NPtrArray *genericArray,nboolean deref,int *tick)
+		NString *codes,NPtrArray *genericArray,nboolean deref,int *tick,int *genericCodesCount)
 {
      ClassInfo *info=class_mgr_get_class_info_by_class_name(class_mgr_get(),refClassName);
      if(info==NULL)
@@ -427,6 +430,7 @@ static void recursionInitParentInfo(NewStrategy *self,char *refVarName,ClassName
         		 else
        			    n_string_append_printf(codes,"%s *%s=(%s *)%s;\n",parentName->sysName,parentVar,parentName->sysName,refVarName);
         		 *tick=*tick+1;
+        		 *genericCodesCount+=1;
         		 int i;
         		 for(i=0;i<parentGenCount;i++){
                      GenericUnit *define=generic_model_get(info->parentGenericModel,i);
@@ -488,15 +492,16 @@ static void recursionInitParentInfo(NewStrategy *self,char *refVarName,ClassName
                     }
 			     }//end for
 			     *tick=*tick+1;
+                 *genericCodesCount+=1;
             }
-        	recursionInitParentInfo(self,parentVar,parentName,codes,genericArray,deref,tick);
+        	recursionInitParentInfo(self,parentVar,parentName,codes,genericArray,deref,tick,genericCodesCount);
      }else if(parentInfo && !class_info_is_generic_class(parentInfo)){
 		 if(!deref && *tick==0)
 		   n_string_append_printf(codes,"%s *%s=(%s *)(&%s);\n",parentName->sysName,parentVar,parentName->sysName,refVarName);
 		 else
 		   n_string_append_printf(codes,"%s *%s=(%s *)%s;\n",parentName->sysName,parentVar,parentName->sysName,refVarName);
 		 *tick=*tick+1;
-       	 recursionInitParentInfo(self,parentVar,parentName,codes,genericArray,deref,tick);
+       	 recursionInitParentInfo(self,parentVar,parentName,codes,genericArray,deref,tick,genericCodesCount);
      }
 }
 
@@ -516,7 +521,13 @@ char *new_strategy_recursion_init_parent_generic_info(NewStrategy *self,char *re
      NString *codes=n_string_new("");
      NPtrArray *genericArray=n_ptr_array_new_with_free_func(freeGenericData_cb);
      int tick=0;
-     recursionInitParentInfo(self,refVarName,refClassName,codes,genericArray,deref,&tick);
+     int genericCodesCount=0;
+     recursionInitParentInfo(self,refVarName,refClassName,codes,genericArray,deref,&tick,&genericCodesCount);
+     if(genericCodesCount==0){
+         n_string_free(codes,TRUE);
+         n_ptr_array_unref(genericArray);
+         return NULL;
+     }
      char *result=NULL;
      if(codes->len>0)
     	 result=n_strdup(codes->str);
@@ -639,7 +650,7 @@ static void addMiddleCodes(NewStrategy *self,char *varName,ClassName *className,
 	 }
 	 char *parentGenericInit=new_strategy_recursion_init_parent_generic_info((NewStrategy *)self,varName,className,TRUE);
 	 if(parentGenericInit!=NULL){
-		n_debug("createInitCodes 初始化父类的泛型\n");
+		n_debug("createInitCodes 初始化父类的泛型");
 		n_string_append(codes,parentGenericInit);
 		n_free(parentGenericInit);
 	 }

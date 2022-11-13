@@ -75,6 +75,7 @@ void               class_parser_decorate(ClassParser *self);
 void               class_parser_parser_enum_dot(ClassParser *self,struct c_typespec *ret);
 struct c_typespec  class_parser_enum(ClassParser *self,location_t loc);
 void               class_parser_over_enum(ClassParser *self,struct c_declspecs *specs);
+ClassName         *class_parser_get_class_name(ClassParser *self);
 
 
 #endif

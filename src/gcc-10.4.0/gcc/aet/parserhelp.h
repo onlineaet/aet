@@ -24,13 +24,14 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 #define __GCC_PARSER_HELP_H__
 
 #include "nlib.h"
-#include "c-aet.h"
-#include "classinfo.h"
-
 
 
 nboolean parser_help_compare(tree funcType1,tree funcType2);
 void     parser_help_add_magic();//为类声明和接口声明加一个变量作用魔数
+nboolean parser_help_set_class_or_enum_type(c_token *who);
+void     parser_help_set_forbidden(nboolean is);
+nboolean parser_help_parser_left_package_dot_class();
+nboolean parser_help_parser_right_package_dot_class(char *firstId);
 
 
 #endif

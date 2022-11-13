@@ -131,6 +131,7 @@ ClassName      *class_impl_get_class_name(ClassImpl *self);
 struct c_expr   class_impl_nameles_call(ClassImpl *self,struct c_expr expr);
 void            class_impl_replace_self_call_at_statement_after_labels(ClassImpl *self);
 struct c_expr   class_impl_varof_parser(ClassImpl *self,struct c_expr lhs);//解析关键字varof$
+nboolean        class_impl_parser_package_dot_class(ClassImpl *self);//解析com.ai.NLayer
 
 void             class_impl_test_target(tree target);
 

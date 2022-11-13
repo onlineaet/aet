@@ -57,6 +57,8 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 #include "classutil.h"
 #include "enumparser.h"
 #include "accesscontrols.h"
+#include "classimpl.h"
+#include "classparser.h"
 
 /**
  * 一、 public$ enum AeEnums{
@@ -134,6 +136,7 @@ void enum_parser_create_decl(EnumParser *self,location_t loc,ClassName *classNam
 		n_error("EnumData=NULL,不应该出现的错误。");
 	}
     char *typedefName=enumName+1;//跳过第一个下划线
+    data->typedefName=n_strdup(typedefName);
     tree  idx=aet_utils_create_ident(typedefName);
     tree decl = build_decl (loc,TYPE_DECL,idx, type);
     DECL_ARTIFICIAL (decl) = 1;
@@ -146,7 +149,6 @@ void enum_parser_create_decl(EnumParser *self,location_t loc,ClassName *classNam
     finish_decl (decl, loc, NULL_TREE,NULL_TREE, NULL_TREE);
 	data->permission=permission;
 	data->typeDecl=decl;
-	data->typedefName=n_strdup(typedefName);
 }
 
 static EnumData *getEnumDataByName(EnumParser *self,char *sysName,char *name,nboolean orig)
@@ -172,11 +174,122 @@ static EnumData *getEnumDataByName(EnumParser *self,char *sysName,char *name,nbo
     return NULL;
 }
 
+static int getIndex(EnumData **datas,int len,ClassName *className)
+{
+    if(className==NULL)
+        return -1;
+    int i;
+    for(i=0;i<len;i++){
+       EnumData *item=datas[i];
+       if(!strcmp(item->sysName,className->sysName)){
+           printf("ixxx iss %d :%s\n",i,className->sysName);
+          return i;
+       }
+    }
+    return -1;
+}
+
+static int getIndexByShip(EnumData **datas,int len,ClassName *className)
+{
+    if(className==NULL)
+        return -1;
+    int i;
+    for(i=0;i<len;i++){
+       EnumData *item=datas[i];
+       ClassRelationship ship=class_mgr_relationship(class_mgr_get(),className->sysName,item->sysName);
+       if(ship==CLASS_RELATIONSHIP_PARENT || ship==CLASS_RELATIONSHIP_IMPL){
+            if(item->permission!=CLASS_PERMISSION_PRIVATE)
+                return i;
+       }
+    }
+    return -1;
+}
+
+/**
+ * 在本类中找
+ */
+static int selectType(EnumParser *self,EnumData **datas,int len)
+{
+    c_parser *parser=self->parser;
+    if(class_parser_is_parsering(class_parser_get())){
+        ClassName  *className=class_parser_get_class_name(class_parser_get());
+        int index=getIndex(datas,len,className);
+        if(index>=0)
+            return index;
+    }
+
+    if(parser->isAet){
+        ClassName  *className=class_impl_get_class_name(class_impl_get());
+        int index=getIndex(datas,len,className);
+        if(index>=0)
+          return index;
+    }
+
+    if(class_parser_is_parsering(class_parser_get())){
+        ClassName  *className=class_parser_get_class_name(class_parser_get());
+        int index=getIndexByShip(datas,len,className);
+        if(index>=0)
+           return index;
+    }
+
+    if(parser->isAet){
+        ClassName  *className=class_impl_get_class_name(class_impl_get());
+        int index=getIndexByShip(datas,len,className);
+        if(index>=0)
+           return index;
+    }
+
+    int i;
+    for(i=0;i<len;i++){
+        printf("data[i] %d %s\n",i,datas[i]->sysName);
+        EnumData *item=datas[i];
+        if(item->sysName==NULL || strlen(item->sysName)==0){
+            return i;
+        }
+    }
+
+    for(i=0;i<len;i++){
+        printf("data[i] %d %s\n",i,datas[i]->sysName);
+        EnumData *item=datas[i];
+        if(item->sysName!=NULL && strlen(item->sysName)>0 && item->permission==CLASS_PERMISSION_PUBLIC){
+            return i;
+        }
+    }
+
+    return -1;
+}
+
+static nboolean validAccess(EnumParser *self,char *sysName)
+{
+    c_parser *parser=self->parser;
+    printf("validAccess is :%s\n",sysName);
+    if(class_parser_is_parsering(class_parser_get())){
+        ClassName  *className=class_parser_get_class_name(class_parser_get());
+        if(className && !strcmp(sysName,className->sysName)){
+             return TRUE;
+        }
+    }
+
+    if(parser->isAet){
+        ClassName  *className=class_impl_get_class_name(class_impl_get());
+        if(className && !strcmp(sysName,className->sysName)){
+            return TRUE;
+        }
+    }
+
+    if(sysName==NULL || strlen(sysName)==0)
+        return TRUE;
+    return FALSE;
+}
 
 
 /**
  * 由classimpl.c调用
  * 当参数是枚举类型时，当前名字替换成
+ * 如果who是枚举，只能是两种情况。
+ * who是全局的。who是在classparsering 和 isaet中的类的枚举
+ * 只有这两种情况允许不用类.(AObject.Enum)此种方式访问。
+ * 如果AObject.Enum这样的访问，不会进到这里。
  */
 nboolean  enum_parser_set_enum_type(EnumParser *self,c_token *who)
 {
@@ -188,6 +301,8 @@ nboolean  enum_parser_set_enum_type(EnumParser *self,c_token *who)
 	n_hash_table_iter_init(&iter, self->hashTable);
 	int count=0;
 	EnumData *datas[30];
+    location_t loc=who->location;
+	//printf("enum_parser_set_enum_type --id:%s\n",id);
 	while (n_hash_table_iter_next(&iter, &key, &value)) {
 		char *sysName = (char *)key;
 		EnumData *item=getEnumDataByName(self,sysName,id,TRUE);
@@ -196,13 +311,22 @@ nboolean  enum_parser_set_enum_type(EnumParser *self,c_token *who)
 		}
 	}
 	if(count==1){
-	   EnumData *item=datas[0];
-	   tree newValue=aet_utils_create_ident(item->typedefName);
-	   who->value=newValue;
-	 //  printf("只有一个枚举。把token的名字改了----%s %s\n",id,item->typedefName);
-	   return TRUE;
+	      EnumData *item=datas[0];
+	      tree newValue=aet_utils_create_ident(item->typedefName);
+	      who->value=newValue;
+	      return TRUE;
 	}else if(count>1){
-       n_error("enum_parser_set_enum_type 多个枚举。%d,还未处理。",count);
+	    int index=selectType(self,datas,count);
+	    if(index>=0){
+            EnumData *item=datas[index];
+            tree newValue=aet_utils_create_ident(item->typedefName);
+            who->value=newValue;
+            printf("有多个枚举类型:。把token的名字改了-xxx---id:%s typedefName:%s file:%s item:%p index:%d\n",id,item->typedefName,in_fnames[0],item,index);
+            return TRUE;
+	    }else{
+	        error_at(loc,"访问枚举:%qs。要加上类名。",id);
+	        return FALSE;
+	    }
 	}
 	return FALSE;
 }
@@ -303,7 +427,8 @@ static struct c_typespec c_parser_enum_specifier (EnumParser *self,ClassName *cl
   location_t enum_loc;
   location_t ident_loc = UNKNOWN_LOCATION;  /* Quiet warning.  */
   gcc_assert (c_parser_next_token_is_keyword (parser, RID_AET_ENUM));
-  c_parser_consume_token (parser);
+  c_parser_consume_token (parser);//consume enum$
+  aet_print_token(c_parser_peek_token (parser));
   have_std_attrs = c_c_parser_nth_token_starts_std_attributes (parser, 1);
   if (have_std_attrs)
     std_attrs = c_c_parser_std_attribute_specifier_sequence (parser);
@@ -362,7 +487,6 @@ static struct c_typespec c_parser_enum_specifier (EnumParser *self,ClassName *cl
 		  token = c_parser_peek_token (parser);
 		  enum_id = token->value;
 		  char *elementOrigName=n_strdup(IDENTIFIER_POINTER(enum_id));
-		  //printf("enumid is :%s\n",IDENTIFIER_POINTER(enum_id));
 		  enum_id=createElementName(enum_id,sysName);
 		  /* Set the location in case we create a decl now.  */
 		  c_c_parser_set_source_position_from_token (token);
@@ -470,6 +594,8 @@ struct c_typespec  enum_parser_parser(EnumParser *self,location_t loc,ClassName 
 	EnumData *data=NULL;
 	struct c_typespec cc= c_parser_enum_specifier (self,className,&data);
 	if(data!=NULL){
+	    //printf("enum_parser_parser ---- %s %s %s %s %s %d\n",
+	            //className?className->sysName:"",data->sysName,data->origName,data->typedefName,data->enumName,data->elementCount);
 		addEnumData(self,className,data);
 		data->loc=loc;
 	}
@@ -515,11 +641,8 @@ tree  enum_parser_parser_dot(EnumParser *self,struct c_typespec *specs)
 	   return NULL_TREE;
     char *origName=IDENTIFIER_POINTER(t->value);
     EnumData *item=findEnumType(self,sysName,origName,TRUE);
-	//printf("enum_parser_parser_dot 33 origName:%s sysName:%s %p\n",origName,sysName,item);
     if(item==NULL)
         item=findEnumType(self,sysName,origName,FALSE);
-    //printf("enum_parser_parser_dot 44 origName:%s sysName:%s %p\n",origName,sysName,item);
-
     if(item!=NULL){
     	//说明找到一个枚举类型
     	c_parser_consume_token (parser); //consume cpp_dot
@@ -595,7 +718,8 @@ void enum_parser_build_dot (EnumParser *self, location_t loc,struct c_expr *expr
 	}
 	EnumElement *elem=getElement(enumData,IDENTIFIER_POINTER(component));
 	if(elem==NULL){
-		 error_at (end_loc, "枚举%qs没有%qs元素。",enumData->origName,IDENTIFIER_POINTER(component));
+
+		 error_at (end_loc, "枚举%qs没有%qs元素。xxxx",enumData->origName,IDENTIFIER_POINTER(component));
 		 return;
 	}
     n_debug("enum_parser_build_dot 访问枚举:%s %s %s\n",enumData->sysName,enumData->origName,enumData->enumName);
@@ -632,16 +756,15 @@ void   enum_parser_build_class_dot_enum (EnumParser *self, location_t loc,char *
 		location_t end_loc = token->get_finish ();
 		c_parser_consume_token (parser);//consume field
 		EnumElement *elem=getElement(enumData,IDENTIFIER_POINTER(component));
-		n_debug("enum_parser_build_dot 访问枚举:eee xxx %s %s %s\n",enumData->sysName,enumData->origName,enumData->enumName);
 		if(elem==NULL){
-			 error_at (end_loc, "枚举%qs没有%qs元素。",enumData->origName,IDENTIFIER_POINTER(component));
+			 error_at (end_loc, "枚举%qs没有%qs元素。yyyy",enumData->origName,IDENTIFIER_POINTER(component));
 			 return;
 		}
 	    access_controls_access_enum(access_controls_get(),loc, enumData,elem->origName);
 		expr->value =TREE_VALUE(elem->value);
 		set_c_expr_source_range (expr, loc, end_loc);
 	}else if(token->type==CPP_NAME){
-
+        error_at (input_location, "枚举%qs没有%qs元素。wwww",enumData->origName,IDENTIFIER_POINTER(token->value));
 	}else{
 	   c_parser_error (parser, "expected identifier");
 	   expr->set_error ();
@@ -681,7 +804,7 @@ void enum_parser_build_class_enum_dot (EnumParser *self, location_t loc,struct c
 	}
 	EnumElement *elem=getElement(enumData,IDENTIFIER_POINTER(component));
 	if(elem==NULL){
-		 error_at (end_loc, "枚举%qs没有%qs元素。",enumData->origName,IDENTIFIER_POINTER(component));
+		 error_at (end_loc, "枚举%qs没有%qs元素。zzzz",enumData->origName,IDENTIFIER_POINTER(component));
 		 return;
 	}
 	expr->value =TREE_VALUE(elem->value);

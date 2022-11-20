@@ -524,6 +524,7 @@ nchar *n_ascii_formatd (nchar *buffer,nint buf_len,const nchar *format,ndouble d
 }
 #pragma GCC diagnostic pop
 
+#undef  ISSPACE
 #define ISSPACE(c)              ((c) == ' ' || (c) == '\f' || (c) == '\n' || \
                                  (c) == '\r' || (c) == '\t' || (c) == '\v')
 #define ISUPPER(c)              ((c) >= 'A' && (c) <= 'Z')

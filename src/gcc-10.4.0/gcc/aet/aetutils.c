@@ -439,16 +439,11 @@ char* aet_utils_create_init_method(char *className)
    return re;
 }
 
-/**
- * 加入额外的代码，并编译，同时把当前的buffer的状态及数据保存，
- * 当编完额外的代码，恢复。恢复是通过在文件directives.c 中的 _cpp_pop_buffer 启动的
- */
-int aet_utils_add_token(cpp_reader *pfile, const char *str,size_t len)
-{
-  return aet_utils_add_token_with_location(pfile,str,len,input_location);
-}
 
-int aet_utils_add_token_with_location(cpp_reader *pfile, const char *str,size_t len,location_t loc)
+/**
+ * 加入附加代码
+ */
+static int addAetBuiltinCodes(cpp_reader *pfile, const char *str,size_t len,location_t loc,nboolean forceLocation)
 {
    int tokenFrom= aet_utils_in_micro();
    if(tokenFrom==FROM_MACRO){
@@ -464,6 +459,8 @@ int aet_utils_add_token_with_location(cpp_reader *pfile, const char *str,size_t 
    _cpp_clean_line (pfile);
    pfile->cur_token = _cpp_temp_token (pfile);
    cpp_token *token = _cpp_lex_direct (pfile);
+   if(forceLocation)
+     cpp_force_token_locations (pfile, loc);
   //printf("加入新符号 00 ---%s %d %s, %s, %d\n", (char *)str,len,__FILE__, __FUNCTION__, __LINE__);
   if (pfile->context->tokens_kind == TOKENS_KIND_EXTENDED){
       /* We are tracking tokens resulting from macro expansion.
@@ -486,6 +483,28 @@ int aet_utils_add_token_with_location(cpp_reader *pfile, const char *str,size_t 
   }
   return 1;
 }
+
+/**
+ * 加入额外的代码，并编译，同时把当前的buffer的状态及数据保存，
+ * 当编完额外的代码，恢复。恢复是通过在文件directives.c 中的 _cpp_pop_buffer 启动的
+ */
+int aet_utils_add_token(cpp_reader *pfile, const char *str,size_t len)
+{
+  return aet_utils_add_token_with_location(pfile,str,len,input_location);
+}
+
+int aet_utils_add_token_with_location(cpp_reader *pfile, const char *str,size_t len,location_t loc)
+{
+    return addAetBuiltinCodes(pfile,str,len,loc,TRUE);
+}
+/**
+ * 是否要强制屏蔽位置。
+ */
+int aet_utils_add_token_with_force(cpp_reader *pfile, const char *str,size_t len,location_t loc,nboolean force)
+{
+    return addAetBuiltinCodes(pfile,str,len,loc,force);
+}
+
 
 
 static char *getIdent(c_token *token)
@@ -644,7 +663,7 @@ char *aet_utils_create_enum_type_name(char *sysName,char *userName)
 {
 	char temp[255];
 	int hash=aet_utils_create_hash(userName,strlen(userName));
-	sprintf(temp,"_e0%d%s%d%s%u",strlen(sysName),sysName,strlen(userName),userName,hash);
+	sprintf(temp,"_e0%lu%s%lu%s%d",strlen(sysName),sysName,strlen(userName),userName,hash);
 	return n_strdup(temp);
 }
 
@@ -655,7 +674,7 @@ char *aet_utils_create_enum_element_name(char *sysName,char *origElement)
 {
 	char temp[255];
 	int hash=aet_utils_create_hash(origElement,strlen(origElement));
-	sprintf(temp,"_e1%d%s%d%s%u",strlen(sysName),sysName,strlen(origElement),origElement,hash);
+	sprintf(temp,"_e1%lu%s%lu%s%d",strlen(sysName),sysName,strlen(origElement),origElement,hash);
 	return n_strdup(temp);
 }
 

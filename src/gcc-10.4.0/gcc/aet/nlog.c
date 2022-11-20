@@ -325,7 +325,7 @@ void n_log_structured (NLogLevelFlags  log_level,...)
   NLogField *fields = stack_fields;
   NLogField *fields_allocated = NULL;
  // NArray *array = NULL;
-  char *array=n_malloc(sizeof(NLogField)*100);
+  char *array=(char *)n_malloc(sizeof(NLogField)*100);
   int arrayCount=0;
 
   va_start (args, log_level);

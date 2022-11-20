@@ -60,14 +60,6 @@ struct _ClassFunc
     int serialNumber;//在class中的序号
 };
 
-typedef struct _SelectedDecl
-{
-	ClassFunc *mangleEntity;
-	char *className;
-	char *iface;
-	int warnCount;
-}SelectedDecl;
-
 typedef struct _ParmGenInfo
 {
 	char *str;

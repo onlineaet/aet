@@ -161,7 +161,7 @@ void  class_package_parser00(ClassPackage *self)
 		   error_at(loc,"包名与文件所在目录不匹配，正确的是:%qs",pathdot->str);
 		   goto out;
        }else{
-		   PackageInfo *info=n_slice_new0(PackageInfo);
+		   PackageInfo *info=(PackageInfo *)n_slice_new0(PackageInfo);
 		   info->fileName=n_strdup(fileName);
 		   info->path=n_strdup(dir->name);
 		   info->packageName=n_strdup(pathdot->str);
@@ -242,7 +242,7 @@ void  class_package_parser(ClassPackage *self)
 
        NString *classPrefixStr=n_string_new(package->str);
        n_string_replace(classPrefixStr,".","_",-1);
-       PackageInfo *info=n_slice_new0(PackageInfo);
+       PackageInfo *info=(PackageInfo *)n_slice_new0(PackageInfo);
        info->fileName=n_strdup(fileName);
        info->path=n_strdup(dir->name);
        info->packageName=n_strdup(package->str);

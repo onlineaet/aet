@@ -44,6 +44,8 @@ void           aet_print_set_parser(c_parser *parser);
 void           aet_print_tree_skip_debug(tree node);
 void           aet_print_token_skip_debug(c_token *ct);
 void           aet_print_time_from(char *file,char *func ,int linen,char *format,...);
+void           aet_print_location(location_t loc);
+char          *aet_print_get_storage_class_string(int kind);
 
 #endif
 

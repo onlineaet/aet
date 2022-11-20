@@ -903,7 +903,8 @@ nboolean  func_mgr_set_static_func_decl(FuncMgr *self,tree funcDecl,ClassName *c
     //函数名的线索来自
 	tree funName=DECL_NAME(funcDecl); //函数名
 	char *mangleName=IDENTIFIER_POINTER(funName);
-	n_debug("func_mgr_set_static_func_decl 00 %s self:%p\n",mangleName,self);
+	n_debug("func_mgr_set_static_func_decl 00 %s funcDecl:%p",mangleName,funcDecl);
+	aet_print_tree(funcDecl);
 	return setStaticDecl(self,funcDecl,className,STRUCT_DECL);
 }
 
@@ -933,7 +934,14 @@ NPtrArray    *func_mgr_get_static_funcs(FuncMgr *self,ClassName *className)
 	return array;
 }
 
-
+NPtrArray    *func_mgr_get_static_funcs_by_sys_name(FuncMgr *self,char *sysName)
+{
+    if(sysName==NULL){
+        return NULL;
+    }
+    NPtrArray *array=(NPtrArray *)n_hash_table_lookup(self->staticHashTable,sysName);
+    return array;
+}
 
 nboolean func_mgr_static_func_exits_by_recursion(FuncMgr *self,ClassName *srcName,tree component)
 {
@@ -1082,7 +1090,7 @@ ClassFunc *func_mgr_find_static_method(FuncMgr *self,char *sysName,char *origFun
 	int i;
 	for(i=0;i<array->len;i++){
 		ClassFunc *item=(ClassFunc *)n_ptr_array_index(array,i);
-		//printf("func_mgr_find_static_method %s %s\n",item->mangleFunName,funcMangle);
+		printf("func_mgr_find_static_method %s %s\n",item->mangleFunName,funcMangle);
 		if(strcmp(item->mangleFunName,funcMangle)==0){
 			return item;
 		}

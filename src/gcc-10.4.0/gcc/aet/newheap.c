@@ -326,7 +326,7 @@ void new_heap_create_object_no_decl(NewHeap *self,ClassName *className,GenericMo
 	 char *tempVarName=class_util_create_new_object_temp_var_name(className->sysName,CREATE_OBJECT_METHOD_NO_DECL_HEAP);
 	 ClassInit *classInit=((NewStrategy *)self)->classInit;
 	 if(aet_utils_valid_tree(current_function_decl) && isParserParmsState){
-	     printf("在函数内调用new$ Object() isParserParmsState:%d\n",isParserParmsState);
+	     //printf("在函数内调用new$ Object() isParserParmsState:%d\n",isParserParmsState);
 	     c_parser *parser=((NewStrategy *)self)->parser;
 	     tree decl=createNamelessVar(className->sysName,tempVarName);
 	     tree  attr = NULL_TREE;
@@ -343,7 +343,7 @@ void new_heap_create_object_no_decl(NewHeap *self,ClassName *className,GenericMo
 	 char *remain= getRemainToken(self);
 	 if(remain!=NULL){
 	   n_string_append_printf(codes,"%s\n",remain);
-	   printf("remain is :%s\n",remain);
+	   //printf("remain is :%s\n",remain);
 	   n_free(remain);
 	 }
 	 new_strategy_add_new((NewStrategy*)self,className,tempVarName);

@@ -270,14 +270,14 @@ BlockContent *generic_file_get_block_content(GenericFile *self,char *sysName)
 	  if(saveData==NULL || saveData->blockCount==0){
 		  return NULL;
 	  }
-	  BlockContent *bc=n_slice_new(BlockContent);
+	  BlockContent *bc=(BlockContent *)n_slice_new(BlockContent);
 	  bc->blocksCount=saveData->blockCount;
 	  bc->sysName=n_strdup(sysName);
 	  for(i=0;i<saveData->blockCount;i++){
 	 		  //_Z7AObject7AObjectEPN7AObjectE$WWtx$0$WWtx$ void _test_AObject__inner_generic_func_1(test_AObject
 	 		  char *func=saveData->blocks[i].value;
 	 		  nchar **items=n_strsplit(func,NEW_OBJECT_GENERIC_SPERATOR,-1);
-	 		  BlockDetail *detail=n_slice_new(BlockDetail);
+	 		  BlockDetail *detail=(BlockDetail *)n_slice_new(BlockDetail);
 	 		  detail->belongFunc=n_strdup(items[0]);
 	 		  detail->isFuncGeneric=atoi(items[1]);
 	 		  detail->codes=n_strdup(items[2]);

@@ -723,7 +723,7 @@ nboolean n_string_starts_with(NString *self,const char  *prefix)
      char *out = n_malloc (endIndex - beginIndex+1);
      memcpy (out, self->str+beginIndex, endIndex - beginIndex);
      out[endIndex - beginIndex] = '\0';
-     NString *e = n_slice_new (NString);
+     NString *e = (NString *)n_slice_new (NString);
      e->str=out;
      e->len=endIndex - beginIndex;
      e->allocated_len=e->len;
@@ -759,7 +759,7 @@ nboolean n_string_starts_with(NString *self,const char  *prefix)
 
  NString *n_string_sized_new (nsize dfl_size)
  {
-   NString *self = n_slice_new (NString);
+   NString *self = (NString *)n_slice_new (NString);
    self->allocated_len = 0;
    self->len   = 0;
    self->str   = NULL;

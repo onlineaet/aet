@@ -68,7 +68,7 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 
 static SetBlockHelp  *createSetBlockHelp()
 {
-	SetBlockHelp *help=n_slice_new(SetBlockHelp);
+	SetBlockHelp *help=(SetBlockHelp *)n_slice_new(SetBlockHelp);
 	help->codes=n_string_new("");
 	help->setBlockFuncsArray=n_ptr_array_new();
 	help->blockFuncsArray=n_ptr_array_new();
@@ -509,7 +509,7 @@ static void createByDefineFuncCall(GenericDefine *self,NPtrArray **funcClass,NPt
 
         n_debug("createByDefineFuncCall 22 收集的new对象有：%d\n",collectClass1->len);
    		printLastClass(collectClass1);
-   		printf("\n\n");
+   		n_debug("\n\n");
    		n_debug("createByDefineFuncCall 33 从类中收集的调用泛型函数有：%d\n",collectClass2->len);
    		printLastMethod(collectClass2);
    		*funcClass=collectClass1;

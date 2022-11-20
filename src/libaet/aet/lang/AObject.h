@@ -54,8 +54,10 @@ public$ class$ AClass{
 ///////////////---------------以下都是编译器调用的，用户程序不能调用---------------
 /**
  * 配合编译器，清除实参new$ Object()。
+ * void **values会报警告
+ * 警告：传递‘a_object_cleanup_nameless_object’的第 1 个参数时在不兼容的指针类型间转换 [-Wincompatible-pointer-types]
  */
-static inline void a_object_cleanup_nameless_object(void **values)
+static inline void a_object_cleanup_nameless_object(AObject **values)
 {
     AObject *obj=*values;
     obj->unref();

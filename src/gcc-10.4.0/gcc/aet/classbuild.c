@@ -142,9 +142,9 @@ void class_build_create_codes(ClassBuild *self,ClassName *className,NString *cod
    n_string_append(codes,       "{\n");
    n_string_append_printf(codes,"    static AClass *%s=NULL;\n",varName);
    n_string_append_printf(codes,"    if(%s!=NULL){\n",varName);
-   n_string_append_printf(codes,"        return %s;\n",varName);
-   n_string_append(codes,            "}\n");
-   n_string_append_printf(codes,"           %s *obj=({ %s *temp;\n",cName->sysName,cName->sysName);
+   n_string_append_printf(codes,"         return %s;\n",varName);
+   n_string_append(codes,       "    }\n");
+   n_string_append_printf(codes,"    %s *obj=({ %s *temp;\n",cName->sysName,cName->sysName);
    n_string_append_printf(codes,"           temp=%s.newObject(sizeof(%s));\n",cName->sysName,cName->sysName);
    n_string_append_printf(codes,"           temp->objectSize=sizeof(%s);\n",cName->sysName);
    n_string_append_printf(codes,"           %s(temp);\n",initMethod);//调用初始化方法
@@ -154,7 +154,7 @@ void class_build_create_codes(ClassBuild *self,ClassName *className,NString *cod
    n_string_append_printf(codes,"    obj->%s=%d;\n",AET_MAGIC_NAME,AET_MAGIC_NAME_VALUE);//设魔数
    n_string_append_printf(codes,"    %s=obj;\n",varName);
    n_string_append_printf(codes,"     return %s;\n",varName);
-   n_string_append(codes,"       }\n");
+   n_string_append(codes,"}\n");
 }
 
 

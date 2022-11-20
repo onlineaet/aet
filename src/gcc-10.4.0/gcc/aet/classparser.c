@@ -1364,7 +1364,7 @@ void  class_parser_set_parser(ClassParser *self,c_parser *parser)
 	 parser->isAet=FALSE;
 	 parser->isGenericState=FALSE;
 	 parser->isTestGenericBlockState=FALSE;
-	 parser_static_set_parser(parser_static_get(),parser,self->classPermission);
+	 parser_static_set_parser(parser_static_get(),parser);
 	 var_mgr_set_parser(var_mgr_get(),parser);
 	 generic_impl_set_parser(generic_impl_get(),parser);
 	 block_mgr_set_parser(block_mgr_get(),parser);

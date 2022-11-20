@@ -24,6 +24,7 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 
 #include "nlib.h"
 #include "c-aet.h"
+#include "classinfo.h"
 
 /**
  * 实参与形参比较后返回三种状态
@@ -67,6 +68,22 @@ int                   class_util_get_nameless_call_link(tree value,NPtrArray *ar
 nboolean              class_util_is_function_field(tree field);
 nboolean              class_util_have_field(tree type, tree component);//在结构体或UNION中查找component
 
-int                   class_util_erase_warning(tree type,tree lhs);//清除警告信息
+typedef struct _CheckParamCallback CheckParamCallback;
+struct _CheckParamCallback{
+    tree (*callback)(CheckParamCallback *self,int type,location_t loc,tree function,tree origGenericDecl,tree val,
+            nboolean npc,nboolean excessrecision);
+    nboolean (*addFuncPointer)(CheckParamCallback *self,int paramNum,tree actual,tree formal);//实参是一个函数指针，形参与时函数指针。实参来自类的静态变量。
+    struct{
+        int paramNum;
+        tree actual;
+        tree formal;
+    }funcPointers[10];
+    int funcPointerCount;
+    ClassName *className;//ClassName *className;
+    GenericModel *generics;//GenericModel *generics
+};
+
+
+
 
 #endif /* ! GCC_C_AET_H */

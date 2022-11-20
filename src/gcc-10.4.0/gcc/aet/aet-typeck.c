@@ -56,10 +56,11 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 #include "c-aet.h"
 #include "aet-c-fold.h"
 #include "aet-convert.h"
-#include "nlib.h"
 #include "genericcall.h"
 #include "genericutil.h"
 #include "classutil.h"
+#include "aetmicro.h"
+
 
 
 WarnAndError argsFuncsInfo;
@@ -109,7 +110,7 @@ static int   comp_target_types (location_t, tree, tree);
 static int   function_types_compatible_p (const_tree, const_tree, bool *,bool *);
 static int   type_lists_compatible_p (const_tree, const_tree, bool *, bool *);
 static tree  lookup_field (tree, tree);
-static int   convert_arguments (location_t, vec<location_t>, tree,vec<tree, va_gc> *, vec<tree, va_gc> *, tree,tree);
+static int   convert_arguments (location_t, vec<location_t>, tree,vec<tree, va_gc> *, vec<tree, va_gc> *, tree,tree,void *userData);
 static tree  pointer_diff (location_t, tree, tree, tree *);
 static tree  convert_for_assignment (location_t, location_t, tree, tree, tree,enum impl_conv, bool, tree, tree, int,int = 0);
 static tree  valid_compound_expr_initializer (tree, tree);
@@ -2059,7 +2060,7 @@ static void inform_declaration (tree decl)
    PARAMS.  */
 
 tree aet_build_function_call_vec (location_t loc, vec<location_t> arg_loc,tree function,
-		vec<tree, va_gc> *params,vec<tree, va_gc> *origtypes)
+		vec<tree, va_gc> *params,vec<tree, va_gc> *origtypes,void *userData)
 {
 	tree orig_fundecl=NULL;
   tree fntype, fundecl = NULL_TREE;
@@ -2131,7 +2132,7 @@ tree aet_build_function_call_vec (location_t loc, vec<location_t> arg_loc,tree f
         function prototype, or apply default promotions.  */
    //printf("aet_build_function_call_vec 77 %s %p %p \n",funName,function,fundecl);
 
-   nargs = convert_arguments (loc, arg_loc, TYPE_ARG_TYPES (fntype), params,origtypes, function, fundecl);
+   nargs = convert_arguments (loc, arg_loc, TYPE_ARG_TYPES (fntype), params,origtypes, function, fundecl,userData);
    if (nargs < 0)
         return error_mark_node;
       //printf("aet_build_function_call_vec 77 %s\n",name?IDENTIFIER_POINTER(name):"unknown");
@@ -2163,7 +2164,7 @@ tree aet_build_function_call_vec (location_t loc, vec<location_t> arg_loc,tree f
   /* Check that the arguments to the function are valid.  */
   bool warned_p = check_function_arguments (loc, fundecl, fntype, nargs, argarray, &arg_loc);
   if (name != NULL_TREE  && !strncmp (IDENTIFIER_POINTER (name), "__builtin_", 10)){
-	  n_debug("aet_build_function_call_vec 99 调用__builtin_ %s\n",name?IDENTIFIER_POINTER(name):"unknown");
+	  n_debug("aet_build_function_call_vec 99 调用__builtin_ %s",name?IDENTIFIER_POINTER(name):"unknown");
 	 if (require_constant_value)
 		 result= fold_build_call_array_initializer_loc (loc, TREE_TYPE (fntype),function, nargs, argarray);
 	 else
@@ -2171,7 +2172,7 @@ tree aet_build_function_call_vec (location_t loc, vec<location_t> arg_loc,tree f
 	 if (TREE_CODE (result) == NOP_EXPR && TREE_CODE (TREE_OPERAND (result, 0)) == INTEGER_CST)
 		STRIP_TYPE_NOPS (result);
    }else{
-	 n_debug("aet_build_function_call_vec 100 调用数组 %s\n",name?IDENTIFIER_POINTER(name):"unknown");
+	 n_debug("aet_build_function_call_vec 100 调用数组 %s",name?IDENTIFIER_POINTER(name):"unknown");
      result = build_call_array_loc (loc, TREE_TYPE (fntype),function, nargs, argarray);
    }
 		  /* If -Wnonnull warning has been diagnosed, avoid diagnosing it again
@@ -2183,7 +2184,7 @@ tree aet_build_function_call_vec (location_t loc, vec<location_t> arg_loc,tree f
      Create a TARGET_EXPR so that the call always has a LHS, much as
      what the C++ FE does for functions returning non-PODs.  */
    if (variably_modified_type_p (TREE_TYPE (fntype), NULL_TREE)){
-	   n_debug("aet_build_function_call_vec 101 %s\n",name?IDENTIFIER_POINTER(name):"unknown");
+	   n_debug("aet_build_function_call_vec 101 %s",name?IDENTIFIER_POINTER(name):"unknown");
 	  tree tmp = create_tmp_var_raw (TREE_TYPE (fntype));
 	  result = build4 (TARGET_EXPR, TREE_TYPE (fntype), tmp, result, NULL_TREE, NULL_TREE);
    }
@@ -2199,7 +2200,7 @@ tree aet_build_function_call_vec (location_t loc, vec<location_t> arg_loc,tree f
    return aet_require_complete_type (loc, result);
 }
 
-tree aet_check_funcs_param(location_t loc, vec<location_t> arg_loc,tree function, vec<tree, va_gc> *params,vec<tree, va_gc> *origtypes)
+tree aet_check_funcs_param(location_t loc, vec<location_t> arg_loc,tree function, vec<tree, va_gc> *params,vec<tree, va_gc> *origtypes,void *userData)
 {
 	  /* Strip NON_LVALUE_EXPRs, etc., since we aren't using as an lvalue.  */
 	   STRIP_TYPE_NOPS (function);
@@ -2213,7 +2214,7 @@ tree aet_check_funcs_param(location_t loc, vec<location_t> arg_loc,tree function
 	      if (tem)
 		   return tem;
 	   }
-	   return aet_build_function_call_vec (loc, arg_loc, function, params, origtypes);
+	   return aet_build_function_call_vec (loc, arg_loc, function, params, origtypes,userData);
 }
 
 
@@ -2388,7 +2389,7 @@ static tree convert_argument (location_t ploc, tree function, tree fundecl,
    failure.  */
 
 static int convert_arguments (location_t loc, vec<location_t> arg_loc, tree typelist,
-		   vec<tree, va_gc> *values, vec<tree, va_gc> *origtypes, tree function, tree fundecl)
+		   vec<tree, va_gc> *values, vec<tree, va_gc> *origtypes, tree function, tree fundecl,void *userData)
 {
     unsigned int parmnum;
     bool error_args = false;
@@ -2399,7 +2400,7 @@ static int convert_arguments (location_t loc, vec<location_t> arg_loc, tree type
      diagnostics.  */
     if(TREE_CODE (function) == ADDR_EXPR  && TREE_CODE (TREE_OPERAND (function, 0)) == FUNCTION_DECL){
        function = TREE_OPERAND (function, 0);
-       n_debug("aet-typeck convert_arguments 00 function:%p fundecl:%p\n",function,fundecl);
+       n_debug("aet-typeck convert_arguments 00 function:%p fundecl:%p",function,fundecl);
     }
 
   /* For a call to a built-in function declared without a prototype,
@@ -2468,7 +2469,7 @@ static int convert_arguments (location_t loc, vec<location_t> arg_loc, tree type
        tree valtype = TREE_TYPE (val);
         /* The called function (or function selector in Objective C).  */
        tree rname = function;
-       int argnum = ((isFuncGeneric || isQueryGenFunc)&& parmnum==1)?parmnum+2:parmnum + 1;
+       int argnum = ((isFuncGeneric || isQueryGenFunc)&& parmnum==1)?parmnum+2:parmnum + 1;//泛型加两个参数
        const char *invalid_func_diag;
        /* Set for EXCESS_PRECISION_EXPR arguments.  */
        bool excess_precision = false;
@@ -2483,16 +2484,14 @@ static int convert_arguments (location_t loc, vec<location_t> arg_loc, tree type
        if (type == void_type_node){
           //zclei error_at (loc, "too many arguments to function %qE", function);
 	      //inform_declaration (fundecl);
-	      n_debug("convert_arguments 55 进入循环 错误 type == void_type_node 直接返回 parmnum:%d error_args:%d %s %s %d\n",
-	    		   parmnum,error_args,__FILE__,__FUNCTION__,__LINE__);
+	      n_debug("convert_arguments 55 进入循环 错误 type == void_type_node 直接返回 parmnum:%d error_args:%d",parmnum,error_args);
 	      argsFuncsInfo.errors[argsFuncsInfo.errorCount++]=too_many_arguments_to_function;
 	      return error_args ? -1 : (int) parmnum;
 	   }
        if (builtin_type == void_type_node){
 	      //zclei if (warning_at (loc, OPT_Wbuiltin_declaration_mismatch, "too many arguments to built-in function %qE expecting %d", function, parmnum))
 	       //  inform_declaration (fundecl);
-	      printf("convert_arguments 66 进入循环 错误 builtin_type == void_type_node parmnum:%d error_args:%d %s %s %d\n",
-	     	    		   parmnum,error_args,__FILE__,__FUNCTION__,__LINE__);
+	      printf("convert_arguments 66 进入循环 错误 builtin_type == void_type_node parmnum:%d error_args:%d",parmnum,error_args);
 	      argsFuncsInfo.warns[argsFuncsInfo.warnCount++]=too_many_arguments_to_built_in_function_expecting;
 	      builtin_typetail = NULL_TREE;
 	   }
@@ -2511,7 +2510,8 @@ static int convert_arguments (location_t loc, vec<location_t> arg_loc, tree type
 	      excess_precision = true;
 	   }
        tree tempval = aet_c_fully_fold (val, false, NULL);
-       n_debug("convert_arguments aet_c_fully_fold  tempval:%p val:%p 未改变:%d function:%p funcName:%s npc:%d\n",tempval,val,tempval==val,function,funcNameStr,npc);
+       n_debug("convert_arguments aet_c_fully_fold  tempval:%p val:%p 未改变:%d function:%p funcName:%s npc:%d parmnum:%d",
+               tempval,val,tempval==val,function,funcNameStr,npc,parmnum);
        val=tempval;
        STRIP_TYPE_NOPS (val);
        val = aet_require_complete_type (ploc, val);
@@ -2547,21 +2547,41 @@ static int convert_arguments (location_t loc, vec<location_t> arg_loc, tree type
 	      n_debug("convert_arguments 88 进入循环 调convert_argument origtype code:%s  parmnum:%d error_args:%d 是不是泛型:%d function:%p isFuncGeneric:%d isQueryGenFunc:%d\n",
 		         			  origtype?get_tree_code_name(TREE_CODE(origtype)):"NULL", parmnum,error_args,isGenericType,function,isFuncGeneric,isQueryGenFunc);
 		  if(isGenericType){
-			 parmval=generic_call_check_parm(generic_call_get(),ploc,function,type,val,npc,excess_precision);
-			 if(parmval==error_mark_node){
+		      if(userData!=NULL){
+                  CheckParamCallback *check=(CheckParamCallback *)userData;
+                  parmval=check->callback(check,1,ploc,function,type,val,npc,excess_precision);
+		      }
+			  if(parmval==error_mark_node){
 				 argsFuncsInfo.errors[argsFuncsInfo.errorCount++]=error_or_warn_unknown;
 				 return -1;
-			 }
+			  }
 		  }else{
-	         parmval = convert_argument(ploc, function, fundecl, type, origtype,val, valtype, npc, rname, parmnum, argnum,excess_precision, 0);
+//		     printf("check -----形参:\n");
+//		     printNode(origtype);
+//             printf("check -----实参:\n\n");
+//             printNode(val);
+//             printf("check -----type:\n\n");
+//             printNode(type);
+//             printf("check -----valtype:\n\n");
+//             printNode(valtype);
+            // printf("check -----is static func:%d\n\n",is);
+		      if(userData!=NULL){
+                   CheckParamCallback *check=(CheckParamCallback *)userData;
+                   if(check->addFuncPointer(check,parmnum,val,type)){
+                       parmval=val;
+                   }else{
+                       parmval=convert_argument(ploc, function, fundecl, type, origtype,val, valtype, npc, rname, parmnum, argnum,excess_precision, 0);
+                   }
+		      }else{
+	              parmval=convert_argument(ploc, function, fundecl, type, origtype,val, valtype, npc, rname, parmnum, argnum,excess_precision, 0);
+		      }
 		  }
 	   }else if (promote_float_arg){
 	      if (type_generic)
 	         parmval = val;
 	      else{
 	          /* Convert `float' to `double'.  */
-	    	  printf("convert_arguments 99 进入循环 Convert `float' to `double  parmnum:%d error_args:%d %s %s %d\n",
-	    		     	     parmnum,error_args,__FILE__,__FUNCTION__,__LINE__);
+	    	  printf("convert_arguments 99 进入循环 Convert `float' to `double  parmnum:%d error_args:%d",parmnum,error_args);
 	         if (warn_double_promotion && !c_inhibit_evaluation_warnings){
 		        //zclei warning_at (ploc, OPT_Wdouble_promotion,"implicit conversion from %qT to %qT when passing argument to function",valtype, double_type_node);
 			    argsFuncsInfo.warns[argsFuncsInfo.warnCount++]=implicit_conversion_from_xx_to_xx_when_passing_argument_to_function;
@@ -2573,31 +2593,28 @@ static int convert_arguments (location_t loc, vec<location_t> arg_loc, tree type
 			   without a prototype or in variable arguments.
 			   The last argument of __builtin_*_overflow_p should not be
 			   promoted.  */
-	       n_debug("convert_arguments 100 进入循环 还是关于double  parmnum:%d error_args:%d %s %s %d\n",
-	    		     	     parmnum,error_args,__FILE__,__FUNCTION__,__LINE__);
+	       n_debug("convert_arguments 100 进入循环 还是关于double  parmnum:%d error_args:%d",parmnum,error_args);
 	         parmval = aet_convert (valtype, val);
 	   }else if ((invalid_func_diag =targetm.calls.invalid_arg_for_unprototyped_fn (typelist, fundecl, val))){
-	       n_debug("convert_arguments 101 进入循环 出错了返回-1 invalid_func_diag =targetm.calls.invalid_a... parmnum:%d error_args:%d %s %s %d\n",
-		  	    		     	     parmnum,error_args,__FILE__,__FUNCTION__,__LINE__);
+	       n_debug("convert_arguments 101 进入循环 出错了返回-1 invalid_func_diag =targetm.calls.invalid_a... parmnum:%d error_args:%d",parmnum,error_args);
 	      //zclei error (invalid_func_diag);
 		  argsFuncsInfo.errors[argsFuncsInfo.errorCount++]=invalid_func_diag;
 	      return -1;
 	   }else if (TREE_CODE (val) == ADDR_EXPR && reject_gcc_builtin (val)){
-	       n_debug("convert_arguments 102 进入循环 出错了返回-1 TREE_CODE (val) == ADDR_EXPR && reject_gcc_builtin (val) parmnum:%d error_args:%d %s %s %d\n",
-		  		  	    		     	     parmnum,error_args,__FILE__,__FUNCTION__,__LINE__);
+	       n_debug("convert_arguments 102 进入循环 出错了返回-1 TREE_CODE (val) == ADDR_EXPR && reject_gcc_builtin (val) parmnum:%d error_args:%d",
+		  		  	    		     	     parmnum,error_args);
 		   argsFuncsInfo.errors[argsFuncsInfo.errorCount++]=error_or_warn_unknown;
 	      return -1;
 	   }else{
 	      /* Convert `short' and `char' to full-size `int'.  */
-	       n_debug("convert_arguments 103 进入循环  Convert `short' and `char' to full-size `int parmnum:%d error_args:%d %s %s %d\n",
-			  		  	    		     	     parmnum,error_args,__FILE__,__FUNCTION__,__LINE__);
-	      parmval = aet_default_conversion (val);
+	       n_debug("convert_arguments 103 进入循环  Convert `short' and `char' to full-size `int parmnum:%d error_args:%d",parmnum,error_args);
+	       parmval = aet_default_conversion (val);
 	   }
 
        //这句不能用,否则改变了实参，下个函数不能匹配了
        //(*values)[parmnum] = parmval;
        if (parmval == error_mark_node){
-    	   n_debug("convert_arguments 106 出错了 返回-1 parmval == error_mark_node parmnum:%d\n",parmnum);
+    	   n_debug("convert_arguments 106 出错了 返回-1 parmval == error_mark_node parmnum:%d",parmnum);
 	       error_args = true;
 		   argsFuncsInfo.errors[argsFuncsInfo.errorCount++]=error_or_warn_unknown;
 	      //zclei add 直接返回了
@@ -2610,8 +2627,7 @@ static int convert_arguments (location_t loc, vec<location_t> arg_loc, tree type
 	     but issue warnings rather than errors for any mismatches.
 	     Ignore the converted argument and use the PARMVAL obtained
 	     above by applying default conversions instead.  */
-    	   n_debug("convert_arguments 104 进入循环  调用 convert_argument parmnum:%d error_args:%d %s %s %d\n",
- 			  		  	    		     	     parmnum,error_args,__FILE__,__FUNCTION__,__LINE__);
+    	   n_debug("convert_arguments 104 进入循环  调用 convert_argument parmnum:%d error_args:%d",parmnum,error_args);
 	      tree origtype = (!origtypes) ? NULL_TREE : (*origtypes)[parmnum];
 	      convert_argument (ploc, function, fundecl, builtin_type, origtype,
 			    val, valtype, npc, rname, parmnum, argnum,excess_precision,OPT_Wbuiltin_declaration_mismatch);
@@ -2636,15 +2652,15 @@ static int convert_arguments (location_t loc, vec<location_t> arg_loc, tree type
     if (typetail != NULL_TREE && TREE_VALUE (typetail) != void_type_node){
        //zcleierror_at (loc, "too few arguments to function %qE", function);
        //inform_declaration (fundecl);
-        n_debug("convert_arguments 106 出错了 返回-1 typetail != NULL_TREE && TREE_VALUE (typetail) != void_type_node parmnum:%d error_args:%d %s %s %d\n",
-			   parmnum,error_args,__FILE__,__FUNCTION__,__LINE__);
+        n_debug("convert_arguments 106 出错了 返回-1 typetail != NULL_TREE && TREE_VALUE (typetail) != void_type_node parmnum:%d error_args:%d",
+			   parmnum,error_args);
 	   argsFuncsInfo.errors[argsFuncsInfo.errorCount++]=too_few_arguments_to_function;
       return -1;
     }
 
     if (builtin_typetail && TREE_VALUE (builtin_typetail) != void_type_node){
- 	   printf("convert_arguments 107 出错了 builtin_typetail && TREE_VALUE (builtin_typetail) != void_type_node parmnum:%d error_args:%d %s %s %d\n",
- 			   parmnum,error_args,__FILE__,__FUNCTION__,__LINE__);
+ 	   printf("convert_arguments 107 出错了 builtin_typetail && TREE_VALUE (builtin_typetail) != void_type_node parmnum:%d error_args:%d",
+ 			   parmnum,error_args);
        unsigned nargs = parmnum;
        for (tree t = builtin_typetail; t; t = TREE_CHAIN (t))
 	      ++nargs;
@@ -4721,7 +4737,8 @@ static tree convert_for_assignment (location_t location, location_t expr_loc, tr
         		TREE_CODE (type) == ENUMERAL_TYPE && TYPE_MAIN_VARIANT (checktype) != TYPE_MAIN_VARIANT (type)){
 	      gcc_rich_location loc (location);
 	      n_debug("convert_for_assignment 44 ");
-	      warning_at (&loc, OPT_Wenum_conversion,"implicit conversion from %qT to %qT",checktype, type);
+	      //warning_at (&loc, OPT_Wenum_conversion,"implicit conversion from %qT to %qT",checktype, type);
+          argsFuncsInfo.warns[argsFuncsInfo.warnCount++]=implicit_conversion_from_x_to_y;
        }
     }
 
@@ -4964,8 +4981,8 @@ static tree convert_for_assignment (location_t location, location_t expr_loc, tr
 	   where NULL is typically defined in C to be '(void *) 0'.  */
        n_debug("convert_for_assignment 104 !null_pointer_constant_p (rhs)  && asr != asl && !targetm.addr_space.subset_p (asr, asl)");
        if (VOID_TYPE_P (ttr) && rhs != null_pointer_node && !VOID_TYPE_P (ttl))
-	            warning_at (errtype == ic_argpass ? expr_loc : location,OPT_Wc___compat,
-	            		"request for implicit conversion from %qT to %qT not permitted in C++", rhstype, type);
+	        //warning_at (errtype == ic_argpass ? expr_loc : location,OPT_Wc___compat,"request for implicit conversion from %qT to %qT not permitted in C++", rhstype, type);
+            argsFuncsInfo.warns[argsFuncsInfo.warnCount++]=request_for_implicit_conversion_from_x_to_t_not_permitted_in_Cplusplus;
 
       /* See if the pointers point to incompatible address spaces.  */
        asl = TYPE_ADDR_SPACE (ttl);
@@ -5111,9 +5128,6 @@ static tree convert_for_assignment (location_t location, location_t expr_loc, tr
 		              auto_diagnostic_group d;
 		              range_label_for_type_mismatch rhs_label (rhstype, type);
 		              gcc_rich_location richloc (expr_loc, &rhs_label);
-		                pointer_targets_in_assignment_from_$rhstype$_to_$type$_differ_in_signedness,
-		                pointer_targets_in_initialization_of_$type$_from_$rhstype$_differ_in_signedness,
-		                pointer_targets_in_returning_$rhstype$__from_a_function_with_return_type_$type$_differ_in_signedness,
 		             // if (pedwarn (&richloc, OPT_Wpointer_sign,"pointer targets in passing argument %d of %qE differ in signedness", parmnum, rname))
 			            // inform_for_arg (fundecl, expr_loc, parmnum, type,rhstype);
 		               argsFuncsInfo.warns[argsFuncsInfo.warnCount++]=pointer_targets_in_assignment_from_$parmnum$_to_$rename$_differ_in_signedness;
@@ -5210,11 +5224,14 @@ static tree convert_for_assignment (location_t location, location_t expr_loc, tr
 	 unprototyped functions.  */
     	n_debug("convert_for_assignment 113 ");
 
-       const char msg[] = "invalid use of non-lvalue array";
+       //const char msg[] = "invalid use of non-lvalue array";
        if (warnopt)
-	     warning_at (location, warnopt, msg);
+	     //warning_at (location, warnopt, msg);
+         argsFuncsInfo.warns[argsFuncsInfo.warnCount++]=invalid_use_of_non_lvalue_array;
        else
-	     error_at (location, msg);
+	     //error_at (location, msg);
+         argsFuncsInfo.errors[argsFuncsInfo.errorCount++]=invalid_use_of_non_lvalue_array;
+
        return error_mark_node;
     }else if (codel == POINTER_TYPE && coder == INTEGER_TYPE){
       /* An explicit constant 0 can convert to a pointer,
@@ -8078,3 +8095,241 @@ tree aet_lookup_field (tree type, tree component)
 {
   return lookup_field(type,component);
 }
+
+//////////////////////////////---------------------------------比较两个函数的参数是符匹配---------------------
+/**
+ * 右边的参数与左边的比较。如果正确返回 init
+ */
+tree aet_typeck_func_param_compare(location_t init_loc, tree type, tree init,int require_constant)
+{
+  bool strict_string=true;
+  bool  null_pointer_constant = false;
+  if(init)
+      null_pointer_constant=null_pointer_constant_p (init);
+  enum tree_code code = TREE_CODE (type);
+  tree inside_init = init;
+  tree semantic_type = NULL_TREE;
+  bool maybe_const = true;
+  if(type == error_mark_node || !init || error_operand_p (init))
+      return error_mark_node;
+  STRIP_TYPE_NOPS (inside_init);
+  if (TREE_CODE (inside_init) == EXCESS_PRECISION_EXPR){
+      semantic_type = TREE_TYPE (inside_init);
+      inside_init = TREE_OPERAND (inside_init, 0);
+  }
+
+
+  inside_init = c_fully_fold (inside_init, require_constant, &maybe_const);
+
+  /* Initialization of an array of chars from a string constant
+     optionally enclosed in braces.  */
+
+  if (code == ARRAY_TYPE && inside_init  && TREE_CODE (inside_init) == STRING_CST){
+      tree typ1= (TYPE_ATOMIC (TREE_TYPE (type))? aet_c_build_qualified_type (TYPE_MAIN_VARIANT (TREE_TYPE (type)),TYPE_QUAL_ATOMIC):
+                TYPE_MAIN_VARIANT (TREE_TYPE (type)));
+
+      /* Note that an array could be both an array of character type
+         and an array of wchar_t if wchar_t is signed char or unsigned
+         char.  */
+      bool char_array = (typ1 == char_type_node || typ1 == signed_char_type_node || typ1 == unsigned_char_type_node);
+      bool wchar_array = !!aet_comptypes (typ1, wchar_type_node);
+      bool char16_array = !!aet_comptypes (typ1, char16_type_node);
+      bool char32_array = !!aet_comptypes (typ1, char32_type_node);
+      if (char_array || wchar_array || char16_array || char32_array){
+          struct c_expr expr;
+          tree typ2 = TYPE_MAIN_VARIANT (TREE_TYPE (TREE_TYPE (inside_init)));
+          bool incompat_string_cst = false;
+          expr.value = inside_init;
+          expr.original_code = (strict_string ? STRING_CST : ERROR_MARK);
+          expr.original_type = NULL;
+          aet_maybe_warn_string_init (init_loc, type, expr);
+          if (TYPE_DOMAIN (type) && !TYPE_MAX_VALUE (TYPE_DOMAIN (type)))
+              //pedwarn_init (init_loc, OPT_Wpedantic,"initialization of a flexible array member");
+              argsFuncsInfo.warns[argsFuncsInfo.warnCount++]=initialization_of_a_flexible_array_member;
+          if (aet_comptypes (TYPE_MAIN_VARIANT (TREE_TYPE (inside_init)),TYPE_MAIN_VARIANT (type)))
+               return inside_init;
+
+          if (char_array){
+              if (typ2 != char_type_node)
+                incompat_string_cst = true;
+          }else if (!aet_comptypes (typ1, typ2))
+             incompat_string_cst = true;
+          if (incompat_string_cst){
+              //error_init (init_loc, "cannot initialize array of %qT from a string literal with type array of %qT",typ1, typ2);
+              argsFuncsInfo.errors[argsFuncsInfo.errorCount++]=cannot_initialize_array_of_$qT_from_a_string_literal_with_type_array_of_$qT;
+              return error_mark_node;
+          }
+
+          if (TYPE_DOMAIN (type) != NULL_TREE  && TYPE_SIZE (type) != NULL_TREE && TREE_CODE (TYPE_SIZE (type)) == INTEGER_CST){
+              unsigned HOST_WIDE_INT len = TREE_STRING_LENGTH (inside_init);
+              unsigned unit = TYPE_PRECISION (typ1) / BITS_PER_UNIT;
+                  /* Subtract the size of a single (possibly wide) character
+                 because it's ok to ignore the terminating null char
+                 that is counted in the length of the constant.  */
+              if (compare_tree_int (TYPE_SIZE_UNIT (type), len - unit) < 0)
+                  //pedwarn_init (init_loc, 0,("initializer-string for array of %qT is too long"), typ1);
+                  argsFuncsInfo.warns[argsFuncsInfo.warnCount++]=initializer_string_for_array_of_$qT_is_too_long;
+              else if (warn_cxx_compat && compare_tree_int (TYPE_SIZE_UNIT (type), len) < 0)
+                  //warning_at (init_loc, OPT_Wc___compat,("initializer-string for array of %qT is too long for C++"), typ1);
+                  argsFuncsInfo.warns[argsFuncsInfo.warnCount++]=initializer_string_for_array_of_$qT_is_too_long_for_CPP;
+              if (compare_tree_int (TYPE_SIZE_UNIT (type), len) < 0){
+                  unsigned HOST_WIDE_INT size = tree_to_uhwi (TYPE_SIZE_UNIT (type));
+                  const char *p = TREE_STRING_POINTER (inside_init);
+                  inside_init = build_string (size, p);
+              }
+          }
+          TREE_TYPE (inside_init) = type;
+          return inside_init;
+      }else if (INTEGRAL_TYPE_P (typ1)){
+         //error_init (init_loc, "array of inappropriate type initialized from string constant");
+         argsFuncsInfo.errors[argsFuncsInfo.errorCount++]=array_of_inappropriate_type_initialized_from_string_constant;
+         return error_mark_node;
+      }
+  }
+
+  /* Build a VECTOR_CST from a *constant* vector constructor.  If the
+     vector constructor is not constant (e.g. {1,2,3,foo()}) then punt
+     below and handle as a constructor.  */
+  if (code == VECTOR_TYPE && VECTOR_TYPE_P (TREE_TYPE (inside_init))
+      && vector_types_convertible_p (TREE_TYPE (inside_init), type, true)  && TREE_CONSTANT (inside_init)){
+      if (TREE_CODE (inside_init) == VECTOR_CST && aet_comptypes (TYPE_MAIN_VARIANT (TREE_TYPE (inside_init)),TYPE_MAIN_VARIANT (type)))
+         return inside_init;
+
+      if (TREE_CODE (inside_init) == CONSTRUCTOR){
+          unsigned HOST_WIDE_INT ix;
+          tree value;
+          bool constant_p = true;
+
+          /* Iterate through elements and check if all constructor
+             elements are *_CSTs.  */
+         FOR_EACH_CONSTRUCTOR_VALUE (CONSTRUCTOR_ELTS (inside_init), ix, value)
+             if(!CONSTANT_CLASS_P (value)){
+                constant_p = false;
+                break;
+             }
+
+         if (constant_p)
+             return build_vector_from_ctor (type, CONSTRUCTOR_ELTS (inside_init));
+      }
+  }
+
+  if (warn_sequence_point)
+    verify_sequence_points (inside_init);
+
+
+  /* Any type can be initialized
+     from an expression of the same type, optionally with braces.  */
+  if (inside_init && TREE_TYPE (inside_init) != NULL_TREE
+      && (aet_comptypes (TYPE_MAIN_VARIANT (TREE_TYPE (inside_init)),TYPE_MAIN_VARIANT (type))
+      || (code == ARRAY_TYPE && aet_comptypes (TREE_TYPE (inside_init), type))
+      || (gnu_vector_type_p (type) && aet_comptypes (TREE_TYPE (inside_init), type))
+      || (code == POINTER_TYPE  && TREE_CODE (TREE_TYPE (inside_init)) == ARRAY_TYPE
+          && aet_comptypes (TREE_TYPE (TREE_TYPE (inside_init)),TREE_TYPE (type))))){
+
+      if (code == POINTER_TYPE){
+          if (TREE_CODE (TREE_TYPE (inside_init)) == ARRAY_TYPE){
+              if (TREE_CODE (inside_init) == STRING_CST || TREE_CODE (inside_init) == COMPOUND_LITERAL_EXPR)
+                 inside_init = array_to_pointer_conversion(init_loc, inside_init);
+              else{
+                 //error_init (init_loc, "invalid use of non-lvalue array");
+                 argsFuncsInfo.errors[argsFuncsInfo.errorCount++]=invalid_use_of_non_lvalue_array;
+                 return error_mark_node;
+              }
+          }
+      }
+
+      if (code == VECTOR_TYPE)
+        /* Although the types are compatible, we may require a
+           conversion.  */
+         inside_init = aet_convert (type, inside_init);
+
+      if (require_constant && TREE_CODE (inside_init) == COMPOUND_LITERAL_EXPR){
+          /* As an extension, allow initializing objects with static storage
+             duration with compound literals (which are then treated just as
+             the brace enclosed list they contain).  Also allow this for
+             vectors, as we can only assign them with compound literals.  */
+          if (flag_isoc99 && code != VECTOR_TYPE)
+             //pedwarn_init (init_loc, OPT_Wpedantic, "initializer element is not constant");
+             argsFuncsInfo.warns[argsFuncsInfo.warnCount++]=initializer_element_is_not_constant;
+
+          tree decl = COMPOUND_LITERAL_EXPR_DECL (inside_init);
+          inside_init = DECL_INITIAL (decl);
+      }
+
+      if (code == ARRAY_TYPE && TREE_CODE (inside_init) != STRING_CST  && TREE_CODE (inside_init) != CONSTRUCTOR){
+           //error_init (init_loc, "array initialized from non-constant array expression");
+           argsFuncsInfo.errors[argsFuncsInfo.errorCount++]=array_initialized_from_non_constant_array_expression;
+           return error_mark_node;
+      }
+
+      /* Compound expressions can only occur here if -Wpedantic or
+     -pedantic-errors is specified.  In the later case, we always want
+     an error.  In the former case, we simply want a warning.  */
+      if (require_constant && pedantic   && TREE_CODE (inside_init) == COMPOUND_EXPR){
+         inside_init = valid_compound_expr_initializer (inside_init,TREE_TYPE (inside_init));
+         if (inside_init == error_mark_node)
+            //error_init (init_loc, "initializer element is not constant");
+            argsFuncsInfo.errors[argsFuncsInfo.errorCount++]=initializer_element_is_not_constant;
+         else
+            //pedwarn_init (init_loc, OPT_Wpedantic,"initializer element is not constant");
+            argsFuncsInfo.warns[argsFuncsInfo.warnCount++]=initializer_element_is_not_constant;
+
+         if (flag_pedantic_errors)
+            inside_init = error_mark_node;
+      }else if (require_constant && !initializer_constant_valid_p (inside_init, TREE_TYPE (inside_init))){
+         //error_init (init_loc, "initializer element is not constant");
+         argsFuncsInfo.errors[argsFuncsInfo.errorCount++]=initializer_element_is_not_constant;
+         inside_init = error_mark_node;
+      }else if (require_constant && !maybe_const)
+         //pedwarn_init (init_loc, OPT_Wpedantic,"initializer element is not a constant expression");
+         argsFuncsInfo.warns[argsFuncsInfo.warnCount++]=initializer_element_is_not_a_constant_expression;
+
+      /* Added to enable additional -Wsuggest-attribute=format warnings.  */
+      if (TREE_CODE (TREE_TYPE (inside_init)) == POINTER_TYPE)
+         inside_init = convert_for_assignment (init_loc, UNKNOWN_LOCATION,type, inside_init, NULL_TREE/*origtype*/,ic_init, null_pointer_constant,NULL_TREE, NULL_TREE, 0);
+      return inside_init;
+  }
+
+  /* Handle scalar types, including conversions.  */
+  if (code == INTEGER_TYPE || code == REAL_TYPE || code == FIXED_POINT_TYPE
+      || code == POINTER_TYPE || code == ENUMERAL_TYPE || code == BOOLEAN_TYPE
+      || code == COMPLEX_TYPE || code == VECTOR_TYPE){
+
+      if (TREE_CODE (TREE_TYPE (init)) == ARRAY_TYPE && (TREE_CODE (init) == STRING_CST || TREE_CODE (init) == COMPOUND_LITERAL_EXPR))
+           inside_init = init = array_to_pointer_conversion (init_loc, init);
+      if (semantic_type)
+           inside_init = build1 (EXCESS_PRECISION_EXPR, semantic_type,inside_init);
+      inside_init= convert_for_assignment (init_loc, UNKNOWN_LOCATION, type,inside_init, NULL_TREE/*origtype*/, ic_init,null_pointer_constant, NULL_TREE, NULL_TREE,0);
+
+      /* Check to see if we have already given an error message.  */
+      if (inside_init == error_mark_node)
+         ;
+      else if (require_constant && !TREE_CONSTANT (inside_init)){
+         //error_init (init_loc, "initializer element is not constant");
+         argsFuncsInfo.errors[argsFuncsInfo.errorCount++]=initializer_element_is_not_constant;
+         inside_init = error_mark_node;
+      }else if (require_constant && !initializer_constant_valid_p (inside_init,TREE_TYPE (inside_init))){
+         //error_init (init_loc, "initializer element is not computable at load time");
+         argsFuncsInfo.errors[argsFuncsInfo.errorCount++]=initializer_element_is_not_computable_at_load_time;
+         inside_init = error_mark_node;
+      }else if (require_constant && !maybe_const)
+         //pedwarn_init (init_loc, OPT_Wpedantic,"initializer element is not a constant expression");
+         argsFuncsInfo.warns[argsFuncsInfo.warnCount++]=initializer_element_is_not_a_constant_expression;
+
+
+      return inside_init;
+  }
+
+
+   /* Come here only for records and arrays.  */
+   if (COMPLETE_TYPE_P (type) && TREE_CODE (TYPE_SIZE (type)) != INTEGER_CST){
+      //error_init (init_loc, "variable-sized object may not be initialized");
+      argsFuncsInfo.errors[argsFuncsInfo.errorCount++]=variable_sized_object_may_not_be_initialized;
+      return error_mark_node;
+   }
+   //error_init (init_loc, "invalid initializer");
+   argsFuncsInfo.errors[argsFuncsInfo.errorCount++]=invalid_initializer;
+   return error_mark_node;
+}
+
+

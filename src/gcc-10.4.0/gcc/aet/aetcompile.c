@@ -363,7 +363,6 @@ static char *aetgcc="gcc";
 /**
  * 第二次编译泛型和接口有关的文件
  */
-
 static int compileGenericFile (char *gcc,char *objectRootPath)
 {
   int i;
@@ -518,16 +517,30 @@ static int readFileList(char *basePath,char **objs)
     return count;
 }
 
+/**
+ * IFACE_IMPL_INDEX_FILE的内容应该形式如下:
+ * /home/sns/workspace/ai/pc-build/_RandomGenerator_impl_iface.c
+ * /home/sns/workspace/ai/pc-build/_Abx_impl_iface.c
+ * 如果是:
+ * debug_RandomGenerator$#@debug$#@/home/sns/workspace/ai/src/debug/RandomGenerator.h$#@/home/sns/workspace/ai/src/debug/debug-random.c
+ * 说明用引用到接口的.c文件被编译了。但不需要编译接口的三元素实现.c文件。
+ */
+#define SPERATOR "$#@" //与ifacefile.c中的一样。
 static int compileHeaderFile(char *objectRootPath)
 {
        char indexFileName[512];
        sprintf(indexFileName,"%s/%s",objectRootPath,IFACE_IMPL_INDEX_FILE);
        char buffer[1024*10];
        readIfaceFile(indexFileName,buffer,1024*10);
+       if(strstr(buffer,SPERATOR)){
+           printf("aetcompile.c 根据iface_impl_index.tmp内容判断，并不需要编译接口实现文件。%s\n",buffer);
+           return 0;
+       }
        char paramFileName[512];
        sprintf(paramFileName,"%s/%s",objectRootPath,IFACE_IMPL_PARM_FILE);
        char compileParm[4096];
        readIfaceFile(paramFileName,compileParm,4096);
+
        char *headImplCFiles[2048];
        int count=  gsplit (buffer,"\n",headImplCFiles,2048);
        struct command *commands;  /* each command buffer with above info.  */
@@ -542,6 +555,9 @@ static int compileHeaderFile(char *objectRootPath)
            getOFileName(cFile,oFile);
            createCmdForIfaceCompile(cFile,oFile,compileParm,commands,n_commands++);
        }
+
+       if(n_commands==0)
+           return 0;
 
        struct pex_obj *pexes[n_commands];
        for(i=0;i<n_commands;i++){

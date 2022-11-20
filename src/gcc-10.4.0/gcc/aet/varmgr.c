@@ -72,7 +72,7 @@ static int getSerialNumber(VarMgr *self,ClassName *className)
 
 static VarEntity *createEntity(tree decl,char *orgiName,char *mangleVarName,nboolean isStatic,char *sysName)
 {
-	VarEntity *item=n_slice_new(VarEntity);
+	VarEntity *item=(VarEntity *)n_slice_new(VarEntity);
     item->decl=decl;
     item->isStatic=isStatic;
     item->isConst=FALSE;

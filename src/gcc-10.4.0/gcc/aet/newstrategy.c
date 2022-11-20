@@ -88,7 +88,7 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 
 static NewObjectInfo *createInfo(ClassName *className,char *varName)
 {
-	NewObjectInfo *data=n_slice_new(NewObjectInfo);
+	NewObjectInfo *data= (NewObjectInfo *)n_slice_new(NewObjectInfo);
 	data->name=class_name_clone(className);
 	data->varName=n_strdup(varName);
 	data->varType=NEW_OBJECT_LOCAL;
@@ -403,7 +403,7 @@ static void recursionInitParentInfo(NewStrategy *self,char *refVarName,ClassName
 	 ClassName *parentName=&info->parentName;
 	 if(!parentName || !parentName->sysName)
 		 return;
-	 GenericData *data=n_slice_new0(GenericData);
+	 GenericData *data=(GenericData *)n_slice_new0(GenericData);
 	 data->varName=n_strdup(refVarName);
 	 data->info=info;
 	 n_ptr_array_add(genericArray,data);

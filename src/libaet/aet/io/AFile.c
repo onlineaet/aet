@@ -37,8 +37,6 @@
 /**
  * 以下是非AFile类的函数
  */
-static int   canonicalize(char *original, char *resolved, int len);
-
 static char *utf8ToUtf16(char *pathName,int *writtenLen)
 {
 	long len = 0;
@@ -293,7 +291,8 @@ static int prefixLength(char *pathname)
   return (pathname[0]== '/') ? 1 : 0;
 }
 
-static AFile *fileNew(char *pathname, int prefixLength){
+static AFile *fileNew(const char *pathname, int prefixLength)
+{
 	AFile *file=new$ AFile();
 	file->path=a_strdup(pathname);
 	file->prefixLength = prefixLength;
@@ -435,7 +434,7 @@ impl$ AFile{
 
 	AFile *getAbsoluteFile(){
 		char *absPath = getAbsolutePath();
-		AFile *file=fileNew(absPath, prefixLength(absPath));
+		AFile *file=fileNew((const char*)absPath, prefixLength(absPath));
 		a_free(absPath);
 		return file;
 	}
@@ -550,7 +549,7 @@ impl$ AFile{
             closedir(dir);
             return NULL;
 		}
-		AArray *rv = new$ AArray<char *>();
+		AArray<char *> *rv = new$ AArray<char *>();
 		while ((readdir_r(dir, ptr, &result) == 0)  && (result != NULL)) {
             if (!strcmp(ptr->d_name, ".") || !strcmp(ptr->d_name, "..") || !ptr->d_name)
                 continue;
@@ -563,7 +562,7 @@ impl$ AFile{
 		str_array[size]=NULL;
 		int i;
 		for(i=0;i<size;i++){
-			str_array[i]=rv->get(i);
+			str_array[i]=(char *)rv->get(i);
 			//printf("str_array[i] i:%d %s\n",i,str_array[i]);
 		}
 		rv->unref();
@@ -597,7 +596,7 @@ impl$ AFile{
         files[size]=NULL;
         int i;
         for(i=0;i<size;i++)
-            files[i]=rv->get(i);
+            files[i]=(AFile *)rv->get(i);
             //printf("str_array[i] i:%d %s\n",i,files[i]->getAbsolutePath());
         rv->unref();
         return files;
@@ -658,12 +657,9 @@ impl$ AFile{
 		return re;
 	}
 
-
-
-	static int collapsible(char *names){
+	int collapsible(char *names){
 		char *p = names;
 		int dots = 0, n = 0;
-
 		while (*p) {
 			if ((p[0] == '.') && ((p[1] == '\0') || (p[1] == '/') || ((p[1] == '.') && ((p[2] == '\0')	|| (p[2] == '/'))))) {
 				dots = 1;
@@ -682,7 +678,7 @@ impl$ AFile{
 
 
 
-	static void splitNames(char *names, char **ix){
+	void splitNames(char *names, char **ix){
 		char *p = names;
 		int i = 0;
 		while (*p) {
@@ -696,8 +692,6 @@ impl$ AFile{
 			}
 		}
 	}
-
-
 
 	static void joinNames(char *names, int nc, char **ix){
 		int i;
@@ -717,15 +711,12 @@ impl$ AFile{
 		*p = '\0';
 	}
 
-
-
-	static void collapse(char *path){
+	void collapse(char *path){
 		char *names = (path[0] == '/') ? path + 1 : path; /* Preserve first '/' */
 		int nc;
 		char **ix;
 		int i, j;
 		char *p, *q;
-
 		nc = collapsible(names);
 		if (nc < 2) return;         /* Nothing to do */
 		ix = (char **)alloca(nc * sizeof(char *));
@@ -769,13 +760,12 @@ impl$ AFile{
 			}
 			/* i will be incremented at the top of the loop */
 		}
-
 		joinNames(names, nc, ix);
 	}
 
 
 
-	static int canonicalize(char *original, char *resolved, int len){
+	int canonicalize(char *original, char *resolved, int len){
 		if (len < PATH_MAX) {
 			errno = EINVAL;
 			return -1;
@@ -857,7 +847,6 @@ impl$ AFile{
 			}
 		}
 	}
-
 
 	aboolean rename(AFile *dest){
 		if(dest==NULL)

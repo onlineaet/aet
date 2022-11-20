@@ -99,7 +99,7 @@ static tree getType(char *sysName,nboolean  pointer)
 
 }
 /**
- * 把varDecl转成能引用fieldDec的类或接口
+ * 把varDecl转成能引用fieldDecl的类或接口
  */
 static tree convertDest(location_t loc,tree varDecl,tree fieldDecl)
 {
@@ -112,10 +112,10 @@ static tree convertDest(location_t loc,tree varDecl,tree fieldDecl)
        //如果是变量
 //       tree type=TREE_TYPE(fieldDecl);
 //       fieldSysName=class_util_get_class_name(type);
-       if(!fieldSysName){
-          aet_print_tree_skip_debug(fieldDecl);
-          n_error("未知错误：请报告。");
-       }
+         // printf("是一个结构体内的变量\n");
+         // aet_print_tree_skip_debug(fieldDecl);
+          //n_error("未知错误：请报告。");
+          return varDecl;
     }
     ClassRelationship ship=class_mgr_relationship(class_mgr_get(),sysName,fieldSysName);
     //printf("relation ship---- %d isPointer:%d %s %s fieldName:%s\n",ship,isPointer,sysName,fieldSysName,IDENTIFIER_POINTER(DECL_NAME(fieldDecl)));
@@ -360,7 +360,7 @@ static tree processComponentRef(tree call,tree varVal,tree item,location_t loc,i
           *result=1;
           return newCall;
       }else{
-         // printf("processComponentRef 引用域 :%s\n",IDENTIFIER_POINTER(DECL_NAME(fieldDecl)));
+          //printf("processComponentRef 引用域 :%s\n",IDENTIFIER_POINTER(DECL_NAME(fieldDecl)));
           tree ref= createNewRef(loc,varVal,fieldDecl);
           *result=2;
           return ref;
@@ -501,17 +501,17 @@ tree nameless_call_parser(NamelessCall *self,tree call)
 
 void  nameless_call_set_parser(NamelessCall *self,c_parser *parser)
 {
-	 self->parser=parser;
+     self->parser=parser;
 }
 
 NamelessCall *nameless_call_get()
 {
-	static NamelessCall *singleton = NULL;
-	if (!singleton){
-		 singleton =n_slice_alloc0 (sizeof(NamelessCall));
-		 namelessCallInit(singleton);
-	}
-	return singleton;
+    static NamelessCall *singleton = NULL;
+    if (!singleton){
+         singleton =(NamelessCall *)n_slice_alloc0 (sizeof(NamelessCall));
+         namelessCallInit(singleton);
+    }
+    return singleton;
 }
 
 

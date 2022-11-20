@@ -210,7 +210,7 @@ char *link_file_read_text(LinkFile *self)
   	   NFile *f=n_file_new(fn);
   	   nuint64  size=   n_file_get_length(f);
   	   n_file_unref(f);
-  	   char *buffer=n_malloc(size);
+  	   char *buffer=(char *)n_malloc(size);
 	   rev= fread(buffer, sizeof(char), 4096, fp);
   	   fclose(fp);
   	   if(rev==0){

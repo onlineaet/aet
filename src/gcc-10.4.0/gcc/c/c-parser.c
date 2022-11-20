@@ -2344,6 +2344,7 @@ static void c_parser_declaration_or_fndef (c_parser *parser, bool fndef_ok,
 		            maybe_warn_string_init (init_loc, TREE_TYPE (d), init);
 		       	    n_debug("分析声明说明符 111 完成带初始化的定义： finish_decl count:%d extern:%d static:%d pub:%d",
 		       								 testcount,DECL_EXTERNAL(d),TREE_PUBLIC(d),TREE_PUBLIC(d));
+		       	    init.value=class_impl_modify_or_init_func_pointer(classImpl,d,init.value);
 		       	    generic_impl_check_var_and_parm(generic_impl_get(),d,init.value);
 		            finish_decl (d, init_loc, init.value,init.original_type, asm_name);
 		            //如果是aet对象 设变量的对象类名是什么
@@ -7832,11 +7833,11 @@ c_parser_expr_no_commas (c_parser *parser, struct c_expr *after,
   gcc_assert (!after || c_dialect_objc ());
 
   n_debug("c_parser_expr_no_commas 00 作赋值表达式处理，赋值表达式的左值当作条件表达式进行分析 赋值运算符:%s %p",
-		  aet_cpp_ttype_str[c_parser_peek_token (parser)->type],after);
+          cpp_type2name(c_parser_peek_token (parser)->type,0),after);
   aet_print_token(c_parser_peek_token (parser));
   lhs = c_parser_conditional_expression (parser, after, omp_atomic_lhs);
 //  n_debug("c_parser_expr_no_commas 11 作赋值表达式处理，赋值表达式的左值当作条件表达式进行分析 赋值运算符:%s CODE:%s",
-		//  aet_cpp_ttype_str[c_parser_peek_token (parser)->type],get_tree_code_name(code));
+		//  cpp_type2name(c_parser_peek_token (parser)->type,0),get_tree_code_name(code));
   op_location = c_parser_peek_token (parser)->location;
   //zclei
   if(c_parser_peek_token (parser)->type==CPP_EQ &&
@@ -7847,6 +7848,7 @@ c_parser_expr_no_commas (c_parser *parser, struct c_expr *after,
 	  n_debug("abc=new$ Abc()这样的语句处理 用到c_aet_set_modify_stack_new 在c_parser_expression_conv用到 c_aet_get_is_modify_stack_new");
 	  new_object_modify(new_object_get(),lhs.value);
   }
+
   switch (c_parser_peek_token (parser)->type)
     {
     case CPP_EQ:
@@ -7884,7 +7886,7 @@ c_parser_expr_no_commas (c_parser *parser, struct c_expr *after,
       break;
     default:
     	//n_debug("c_parser_expr_no_commas 22 右边作赋值表达式处理，赋值运算符:%s code:%s ",
-    			//  aet_cpp_ttype_str[c_parser_peek_token (parser)->type],get_tree_code_name(code));
+    			//  cpp_type2name(c_parser_peek_token (parser)->type,0),get_tree_code_name(code));
         //zclei
         if(c_parser_next_token_is_keyword(parser,RID_AET_VAROF)){
           lhs=class_impl_varof_parser(classImpl,lhs);
@@ -7897,7 +7899,7 @@ c_parser_expr_no_commas (c_parser *parser, struct c_expr *after,
   c_parser_consume_token (parser);
   exp_location = c_parser_peek_token (parser)->location;
   n_debug("c_parser_expr_no_commas 33 右边作赋值表达式处理，赋值运算符:%s code:%s lhs.value:%p rhs.value:%p",
-		  aet_cpp_ttype_str[c_parser_peek_token (parser)->type],get_tree_code_name(code),lhs.value,rhs.value);
+          cpp_type2name(c_parser_peek_token (parser)->type,0),get_tree_code_name(code),lhs.value,rhs.value);
   aet_print_token(c_parser_peek_token (parser));
   //zclei
   if(c_parser_next_token_is_keyword(parser,RID_AET_GENERIC_BLOCK)){
@@ -7906,7 +7908,7 @@ c_parser_expr_no_commas (c_parser *parser, struct c_expr *after,
   }
   rhs = c_parser_expr_no_commas (parser, NULL);
   //zclei 解决函数指针赋值问题 AHashFunc var=Abc.strHashFunc;
-  rhs.value=class_impl_modify_func_pointer(classImpl,lhs.value,rhs.value);
+  rhs.value=class_impl_modify_or_init_func_pointer(classImpl,lhs.value,rhs.value);
   rhs = convert_lvalue_to_rvalue (exp_location, rhs, true, true);
   generic_impl_check_var_and_parm(generic_impl_get(),lhs.value,rhs.value);
   generic_query_check_var_and_parm(generic_query_get(),lhs.value,rhs.value);
@@ -8588,7 +8590,6 @@ static struct c_expr c_parser_unary_expression (c_parser *parser)
 	    n_debug("c_parser_unary_expression 00nn 分析genericblock$ \n");
 	    return block_mgr_parser(block_mgr_get());
 	case RID_AET_GOTO:
-		printf("RID_AET_GOTO at c_parser_unary_expression\n");
 		{
 		   int action=-1;
 		   nboolean re=class_parser_goto(class_parser_get(),FALSE,&action);
@@ -10661,7 +10662,7 @@ static struct c_expr c_parser_postfix_expression_after_primary (c_parser *parser
     location_t start;
     location_t finish;
     n_debug("c_parser_postfix_expression_after_primary 00 type:%s expr:%p %s, ",
-			  aet_cpp_ttype_str[c_parser_peek_token (parser)->type],expr.value,
+            cpp_type2name(c_parser_peek_token (parser)->type,0),expr.value,
 			  get_tree_code_name(TREE_CODE(expr.value)));
     while (true){
        location_t op_loc = c_parser_peek_token (parser)->location;

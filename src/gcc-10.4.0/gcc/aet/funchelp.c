@@ -65,6 +65,7 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 #include "aet-c-parser-header.h"
 #include "funcmgr.h"
 #include "classutil.h"
+#include "selectfield.h"
 
 static void funcHelpInit(FuncHelp *self)
 {
@@ -183,10 +184,10 @@ static tree castInterfaceRef(tree parmOrVar,ClassName *parentName,ClassName *ifa
 
 
 /**
- *第一种情况:item->className==className并且 className就接口
+ *第一种情况:item->className==className并且 className就是接口
  *又分两种:refVar与className相同，这时只需替换field,如果不同,从refVar递归找接口，
  *如果找不到返回error_mark_node,如果找到。
- *  Abc *abc=newnew Abc(); Abc parent是Second Zhong是接口，由Second实现
+ *  Abc *abc=new$ Abc(); Abc parent是Second Zhong是接口，由Second实现
  *  ((Zhong*)((Second*)abc))->txyopen(1347582);或((Zhong*)abc)->txyopen(1347582); 匹配第二
  */
 
@@ -256,42 +257,11 @@ tree  func_help_component_ref_interface(FuncHelp *self,tree orgiComponentRef,tre
 
 }
 
-
-tree  func_help_create_parent_iface_deref(FuncHelp *self,tree parmOrVar,ClassName *parentName,ClassName *iface,
-		tree ifaceField,location_t loc,tree *firstParm)
-{
-	printf("func_help_create_parent_iface_deref 00 创建父类接口的引用 :parentName:%s iface:%s\n",parentName->sysName,iface->sysName);
-	tree refVar=castInterfaceRef(parmOrVar,parentName,iface,loc);
-	if(!refVar || refVar==NULL_TREE || refVar==error_mark_node)
-		return NULL_TREE;
-	printf("func_help_create_parent_iface_deref 11 创建本身实现的接口的引用 :parentName:%s iface:%s\n",parentName,iface);
-	tree funcCallVar=build_indirect_ref (loc,refVar,RO_ARROW);
-    tree interfaceCall = createComponentRef (funcCallVar,ifaceField,loc);
-    *firstParm=refVar;
-    return interfaceCall;
-}
-
 tree        func_help_cast_to_parent(FuncHelp *self,tree parmOrVar,ClassName *parentName)
 {
 	tree type=createCastType(parentName);
 	tree castParent = build1 (NOP_EXPR, type, parmOrVar);
 	return castParent;
-}
-
-/**
- * 父类的指针引用
- * parmOrVar是函数中的第一个参数，也就是self
- */
-tree  func_help_create_parent_deref(FuncHelp *self,tree parmOrVar,ClassName *parent,tree parentField,location_t loc,tree *firstParm)
-{
-	n_debug("func_help_create_parent_deref 00 创建父类的引用 :%s",parent->sysName);
-	tree type=createCastType(parent);
-    tree castParent = build1 (NOP_EXPR, type, parmOrVar);
-	protected_set_expr_location (castParent, loc);
-	tree datum=build_indirect_ref (loc,castParent,RO_ARROW);
-    tree value = createComponentRef (datum,parentField,loc);
-    *firstParm=castParent;
-    return value;
 }
 
 /**
@@ -318,219 +288,6 @@ static tree recursionDotCallLink(char *child,char *lastSysName,location_t loc,tr
               }
           }
           return NULL_TREE;
-}
-/**
- * 父类的点引用
- * getRandom().getgoo();
- * 实际上是 getRandom().object.getgoo();
- * func是最原始的调用
- */
-
-
-/**
- * 转化成(&parmOrVal->ifaceOpenDoor12345)
- */
-tree  func_help_create_itself_iface_deref(FuncHelp *self,tree parmOrVar,ClassName *className,
-		ClassName *iface,tree ifaceField,location_t loc,tree *firstParm)
-{
-	n_debug("func_help_create_itself_iface_deref 00 创建本身实现的接口的引用 :class:%s iface:%s",className->sysName,iface->sysName);
-	tree type=createCastType(iface);
-	char ifaceVar[256];
-	aet_utils_create_in_class_iface_var(iface->userName,ifaceVar);
-	tree ifaceVarInClass=class_mgr_get_field_by_name(class_mgr_get(),className, ifaceVar);
-	if(!ifaceVarInClass || ifaceVarInClass==NULL_TREE || ifaceVarInClass==error_mark_node)
-		return NULL_TREE;
-	tree datum=build_indirect_ref (loc,parmOrVar,RO_ARROW);
-    tree value = createComponentRef (datum,ifaceVarInClass,loc);
-    tree refVar = build1 (ADDR_EXPR, type, value);
-    n_debug("func_help_create_itself_iface_deref 11 创建本身实现的接口的引用 :class:%s iface:%s",className->sysName,iface->sysName);
-	tree funcCallVar=build_indirect_ref (loc,refVar,RO_ARROW);
-    tree interfaceCall = createComponentRef (funcCallVar,ifaceField,loc);
-    *firstParm=refVar;
-    return interfaceCall;
-}
-
-
-typedef struct _CandidateFun
-{
-	ClassFunc *mangle;
-	WarnAndError *warnErr;
-}CandidateFun;
-
-static void freeCandidate_cb(CandidateFun *item)
-{
-	n_free(item->warnErr);
-	n_slice_free(CandidateFun,item);
-}
-
-
-static nint warnCompare_cb(nconstpointer  cand1,nconstpointer  cand2)
-{
-	CandidateFun *p1 = (CandidateFun *)cand1;
-	CandidateFun *p2 = (CandidateFun *)cand2;
-    int a=p1->warnErr->warnCount;
-    int b=p2->warnErr->warnCount;
-    return (a > b ? +1 : a == b ? 0 : -1);
-}
-
-static ClassFunc * filterGoodFunc(NList *okList)
-{
-	  if(n_list_length(okList)==0){
-	      n_debug("filterGoodFunc 没有匹配的函数!!! %s %s %d\n",__FILE__,__FUNCTION__,__LINE__);
-		  return NULL;
-	  }
-   	  okList=n_list_sort(okList,warnCompare_cb);
-   	  CandidateFun *cand=(CandidateFun *)n_list_nth_data(okList,0);
-	  n_debug("找到了声明的函数 成功匹配参数，只有一个 yy decl code:%s name:%s %s %s %d\n",
-	  		 cand->mangle->orgiName,cand->mangle->mangleFunName,__FILE__,__FUNCTION__,__LINE__);
-	  return cand->mangle;
-}
-
-
-static nboolean isValidDeclOrDefine(tree func)
-{
-	return (func && func!=NULL_TREE && func!=error_mark_node);
-}
-
-
-static CandidateFun * checkParam(FuncHelp *self,ClassFunc *func,tree decl,vec<tree, va_gc> *exprlist,vec<tree, va_gc> *origtypes,
-		vec<location_t> arg_loc,location_t expr_loc)
-{
-   aet_warn_and_error_reset();
-
-   tree  funcType = TREE_TYPE (decl);
-   int count=0;
-   int varargs_p = 1;
-   for (tree al = TYPE_ARG_TYPES (funcType); al; al = TREE_CHAIN (al)){
-        tree type=TREE_VALUE(al);
-        if(type == void_type_node){
-            //n_debug("有void_type_node count:%d 函数名:%s",count,IDENTIFIER_POINTER(DECL_NAME(decl)));
-            varargs_p=0;
-            break;
-        }
-        count++;
-   }
-   int tt=type_num_arguments (funcType);
-
-   n_debug("找到了静态声明的函数 开始匹配参数 name:%s 参数个数:%d varargs_p:%d exprlist->length():%d",
-           IDENTIFIER_POINTER(DECL_NAME(decl)),count,varargs_p,exprlist?exprlist->length():0);
-
-   //跳过FuncGenParmInfo info 形参 在泛型函数中abc(Abc *self,FuncGenParmInfoinfo,....);aet_check_funcs_param会判断是否要跳过参数
-   if(exprlist && count!=exprlist->length()){
-       nboolean ok1=class_func_is_func_generic(func);
-       nboolean ok2=class_func_is_query_generic(func);
-       n_debug("checkParam 参数个数不匹配! 检查是不是泛型函数 形参：%d 实参:%d 是泛型函数：ok:%d 是带问号泛型参数的函数:%d",count,exprlist->length(),ok1,ok2);
-       return NULL;
-   }
-
-   tree value=decl;
-   mark_exp_read (value);
-   value= aet_check_funcs_param (expr_loc, arg_loc, value,exprlist, origtypes);
-   if(value==error_mark_node){
-	   n_debug("找到了静态声明的函数 不能匹配参数 decl code:%s name:%s ",get_tree_code_name(TREE_CODE(decl)),IDENTIFIER_POINTER(DECL_NAME(decl)));
-   }else{
-	   n_debug("找到了静态声明的函数 有错误吗? decl code:%s name:%s 错误数:%d warn:%d ",get_tree_code_name(TREE_CODE(decl)),IDENTIFIER_POINTER(DECL_NAME(decl)),
-			argsFuncsInfo.errorCount,argsFuncsInfo.warnCount);
-	  if(argsFuncsInfo.errorCount==0){
-		CandidateFun *candidate=n_slice_new(CandidateFun);
-		candidate->warnErr=aet_warn_and_error_copy();
-		return candidate;
-	 }
-  }
-  return NULL;
-}
-
-/**
- * 先在本类中找
- * 只找field
- */
-static ClassFunc *getFuncFromClass(FuncHelp *self,ClassName *className,char *orgiFuncName,vec<tree, va_gc> *exprlist,
-        vec<tree, va_gc> *origtypes,vec<location_t> arg_loc,location_t expr_loc)
-{
-	NList *okList=NULL;
-	NPtrArray *array=func_mgr_get_static_funcs(func_mgr_get(),className);
-	if(array==NULL)
-		return NULL;
-	int i;
-	for(i=0;i<array->len;i++){
-		ClassFunc *item=(ClassFunc *)n_ptr_array_index(array,i);
-		if(strcmp(item->orgiName,orgiFuncName))
-		  continue;
-			//查找语句
-		//printf("getFuncFromClass index:%d %s\n",i,className->sysName);
-		tree decl=NULL_TREE;
-		if(isValidDeclOrDefine(item->fieldDecl)){
-			decl=item->fieldDecl;
-		}
-		if(decl==NULL_TREE)
-			continue;
-		CandidateFun *candidate=checkParam(self,item,decl,exprlist, origtypes,arg_loc,expr_loc);
-		if(candidate!=NULL){
-		  candidate->mangle=item;
-		  okList=n_list_append(okList,candidate);
-		}
-	}
-	ClassFunc *result=filterGoodFunc(okList);
-	n_list_free_full(okList,freeCandidate_cb);
-	return result;
-}
-
-
-static SelectedDecl *getSelectedFunc(FuncHelp *self,ClassName *className,char *orgiName,vec<tree, va_gc> *exprlist,
-        vec<tree, va_gc> *origtypes,vec<location_t> arg_loc,location_t expr_loc)
-{
-    if(className==NULL || orgiName==NULL || className->sysName==NULL)
-    	return NULL;
-    SelectedDecl *result=NULL;
-    n_debug("funchelp getSelectedFunc %s %s",className->sysName,orgiName);
-    ClassFunc *last=getFuncFromClass(self,className,orgiName,exprlist,origtypes,arg_loc,expr_loc);
-	//如果是field要加入指针，否则访问不到
-	if(last!=NULL){
-		result=n_slice_new0(SelectedDecl);
-		result->className=n_strdup(className->sysName);
-		result->mangleEntity=last;
-	}
-	return result;
-}
-
-SelectedDecl *func_help_select_static_func(FuncHelp *self,ClassName *className,char *orgiName,vec<tree, va_gc> *exprlist,
-        vec<tree, va_gc> *origtypes,vec<location_t> arg_loc,location_t expr_loc)
-{
-	 if(className==NULL || orgiName==NULL || className->sysName==NULL){
-		n_warning("在func_help_select_static_func className 或 orgiName是空的");
-		return NULL;
-	 }
-	 SelectedDecl *result=getSelectedFunc(self,className,orgiName,exprlist,origtypes,arg_loc,expr_loc);
-	 if(result==NULL){
-	    ClassInfo *info=class_mgr_get_class_info_by_class_name(class_mgr_get(),className);
-		n_debug("再一次从父类找静态方法 selectFunc ---ttt %s %p",className->sysName,info);
-	    result=func_help_select_static_func(self,&info->parentName,orgiName,exprlist,origtypes,arg_loc,expr_loc);
-	 }
-	 return result;
-}
-
-/**
- * 处理函数中的参数 形如 Abc.func
- */
-int func_help_process_static_func_param(FuncHelp *self,ClassName *className,char *orgiName,vec<tree, va_gc> *exprlist,nboolean isStatic)
-{
-	StaticFuncParm *staticParm=parser_static_get_func_parms(parser_static_get(),exprlist);
-	int re=-1;
-	if(staticParm!=NULL){
-       n_debug("func_help_process_static_func_param 有不确定的静态函数参数\n");
-       parser_static_select_static_parm_for_func(parser_static_get(),className,orgiName,staticParm,isStatic);
-       if(staticParm->ok){
-           n_debug("func_help_process_static_func_param 可以替换vec中的参数列表了\n");
-           parser_static_replace(parser_static_get(),staticParm,exprlist);
-       }else{
-    	   //报错
-    	   re=parser_static_get_error_parm_pos(parser_static_get(),staticParm,exprlist);
-       }
-       //free staticParm;
-	   parser_static_free(parser_static_get(),staticParm);
-	   staticParm=NULL;
-    }
-	return re;
 }
 
 FuncHelp *func_help_new()
@@ -569,11 +326,11 @@ static tree  createInfaceAtClass(tree root,ClassName *parent,ClassName *iface,lo
 }
 
 
-tree  func_help_create_parent_iface_deref_new(FuncHelp *self,tree func,ClassName *parentName,ClassName *iface,
+tree  func_help_create_parent_iface_deref(FuncHelp *self,tree func,ClassName *parentName,ClassName *iface,
         tree ifaceField,location_t loc,tree *firstParm)
 {
      int hasNamelessCall= class_util_has_nameless_call(func);
-     n_debug("func_help_create_parent_iface_deref_new 00 nameless:%d 创建父类接口的引用 :parentName:%s iface:%s\n",hasNamelessCall,parentName->sysName,iface->sysName);
+     n_debug("func_help_create_parent_iface_deref 00 nameless:%d 创建父类接口的引用 :parentName:%s iface:%s\n",hasNamelessCall,parentName->sysName,iface->sysName);
      char ifaceVar[256];
      aet_utils_create_in_class_iface_var(iface->userName,ifaceVar);
      tree ifaceVarInParentClass=class_mgr_get_field_by_name(class_mgr_get(),parentName, ifaceVar);
@@ -599,7 +356,7 @@ tree  func_help_create_parent_iface_deref_new(FuncHelp *self,tree func,ClassName
          value=TREE_OPERAND (value, 0);
      tree valueType=TREE_TYPE(value);
      if(!hasNamelessCall || hasNamelessCall==1){
-        printf("func_help_create_parent_iface_deref_new 11 创建父类接口的引用 :parentName:%s iface:%s\n",parentName->sysName,iface->sysName);
+        //printf("func_help_create_parent_iface_deref 11 创建父类接口的引用 :parentName:%s iface:%s\n",parentName->sysName,iface->sysName);
         tree pointer=value;
         if(TREE_CODE(valueType)!=POINTER_TYPE){
             pointer = build_unary_op (loc, ADDR_EXPR, value, FALSE);//转指针
@@ -628,10 +385,10 @@ tree  func_help_create_parent_iface_deref_new(FuncHelp *self,tree func,ClassName
 /**
  * abc->getData 转 ((Parent*)abc)->getData();
  */
-tree  func_help_create_parent_deref_new(FuncHelp *self,tree func,ClassName *parent,tree parentField,location_t loc,tree *firstParm)
+tree  func_help_create_parent_deref(FuncHelp *self,tree func,ClassName *parent,tree parentField,location_t loc,tree *firstParm)
 {
      int hasNamelessCall= class_util_has_nameless_call(func);
-     n_debug("func_help_create_parent_deref_new 00 hasNamelessCall:%d",hasNamelessCall,parent->sysName);
+     n_debug("func_help_create_parent_deref 00 hasNamelessCall:%d",hasNamelessCall,parent->sysName);
      tree componentRef=NULL_TREE;
      if(TREE_CODE(func)==FUNCTION_DECL){
          tree selfTree=lookup_name(aet_utils_create_ident("self"));
@@ -665,7 +422,7 @@ tree  func_help_create_parent_deref_new(FuncHelp *self,tree func,ClassName *pare
                ClassInfo *parentInfo=class_mgr_get_class_info(class_mgr_get(),parent->sysName);
                int find=0;
                tree result=recursionDotCallLink(sysName,parent->sysName,loc,value,&find);
-               n_debug("func_help_create_parent_deref_new 11 hasNamelessCall:%d sysName:%s parent->sysName:%sfind find ----%d",
+               n_debug("func_help_create_parent_deref 11 hasNamelessCall:%d sysName:%s parent->sysName:%sfind find ----%d",
                        hasNamelessCall,sysName,parent->sysName,find);
                if(find){
                    componentRef = build_component_ref (loc, result,DECL_NAME(parentField), loc);
@@ -680,12 +437,11 @@ tree  func_help_create_parent_deref_new(FuncHelp *self,tree func,ClassName *pare
 /**
  * 转化成(&parmOrVal->ifaceOpenDoor12345)
  */
-tree  func_help_create_itself_iface_deref_new(FuncHelp *self,tree func,ClassName *className,
+tree  func_help_create_itself_iface_deref(FuncHelp *self,tree func,ClassName *className,
         ClassName *iface,tree ifaceField,location_t loc,tree *firstParm)
 {
-     n_debug("func_help_create_itself_iface_deref 00 创建本身实现的接口的引用 :class:%s iface:%s",className->sysName,iface->sysName);
      int hasNamelessCall= class_util_has_nameless_call(func);
-     n_debug("func_help_create_itself_iface_deref_new ---%d %s %s\n",hasNamelessCall,className->sysName,iface->sysName);
+     n_debug("func_help_create_itself_iface_deref 创建本身实现的接口的引用 ---%d %s %s\n",hasNamelessCall,className->sysName,iface->sysName);
      tree ifacePointerType=createCastType(iface);
      char ifaceVar[256];
      aet_utils_create_in_class_iface_var(iface->userName,ifaceVar);

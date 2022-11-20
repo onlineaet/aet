@@ -52,7 +52,6 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 #include "ubsan.h"
 
 #include "aet-check.h"
-
 #include "aet-typeck.h"
 #include "aet-c-common.h"
 #include "c-aet.h"

@@ -2,11 +2,12 @@
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
-#include <pthread.h>
 #include <sys/time.h>
 #include <unistd.h>
 #include <sched.h>
 #include <sys/syscall.h>
+#define __USE_GNU
+#include <pthread.h>
 #include "AThread.h"
 #include "AString.h"
 #include "AAssert.h"
@@ -43,8 +44,9 @@ static apointer userExcute_cb(AThread *thread)
 /**
  * 内核对线程的设置。
  */
-static apointer kernelExcute_cb(AThread *thread)
+static apointer kernelExcute_cb(apointer data)
 {
+  AThread *thread=(AThread *)data;
   static aboolean printedWarning= FALSE;
   a_thread_specific_set(&globalThreadSpecific, thread);
   /* 如果有调试，必须先设置*/
@@ -66,13 +68,10 @@ static apointer kernelExcute_cb(AThread *thread)
    return userExcute_cb(thread);
 }
 
-
-
 static void unrefThread_cb (apointer thread)
 {
 	((AThread *)thread)->unref();
 }
-
 
 impl$ AThread{
 
@@ -175,7 +174,7 @@ impl$ AThread{
 			  /* While this is the default, better be explicit about it */
 			  pthread_attr_setinheritsched (&attr, PTHREAD_INHERIT_SCHED);
 		  }
-		  ret = pthread_create (&self->systemThread, &attr, kernelExcute_cb, self);
+		  ret = pthread_create (&self->systemThread, &attr, kernelExcute_cb, (apointer)self);
 		  posix_check_cmd (pthread_attr_destroy (&attr));
 		  if (ret == EAGAIN){
 			  a_warning("创建线程出错。%s",AString.errToStr(ret));

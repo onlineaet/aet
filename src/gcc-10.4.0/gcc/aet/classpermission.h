@@ -22,8 +22,7 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 #ifndef __GCC_CLASS_PERMISSION_H__
 #define __GCC_CLASS_PERMISSION_H__
 
-#include "nlib.h"
-#include "classinfo.h"
+
 #include "c-aet.h"
 
 /**

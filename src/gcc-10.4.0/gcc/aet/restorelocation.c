@@ -164,6 +164,7 @@ static char *popBuffer_cb(const char *header,cpp_dir *dir)
     dir->len=0;
     dir->canonical_name=NULL;
     restore(parse_in,restoreData);
+    cpp_stop_forcing_token_locations (parse_in);
     n_ptr_array_remove(depthArray,restoreData);
     n_slice_free(RestoreInputLocaton,restoreData);
     return NULL;
@@ -186,7 +187,7 @@ void aet_utils_write_cpp_buffer(cpp_buffer *newBuffer,void *restoreData)
 
 void *aet_utils_create_restore_location_data(cpp_reader *pfile,location_t loc)
 {
-    RestoreInputLocaton *restore=n_slice_new0(RestoreInputLocaton);
+    RestoreInputLocaton *restore=(RestoreInputLocaton *)n_slice_new0(RestoreInputLocaton);
     restore->loc=loc;
     restore->order=addCodesCount++;
     restore->line_base=pfile->buffer->line_base;

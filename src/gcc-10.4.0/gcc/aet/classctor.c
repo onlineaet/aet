@@ -68,6 +68,7 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 #include "aet-c-parser-header.h"
 #include "genericcall.h"
 #include "accesscontrols.h"
+#include "selectfield.h"
 
 
 
@@ -191,132 +192,6 @@ static struct c_arg_info *createParam (c_parser *parser, char *className)
   pop_scope ();
   return args;
 
-}
-
-
-typedef struct _CandidateFun
-{
-	ClassFunc *mangle;
-	WarnAndError *warnErr;
-}CandidateFun;
-
-static void freeCandidate_cb(CandidateFun *item)
-{
-	n_free(item->warnErr);
-	n_free(item);
-}
-
-
-static nint warnCompare_cb(nconstpointer  cand1,nconstpointer  cand2)
-{
-	CandidateFun *p1 = (CandidateFun *)cand1;
-	CandidateFun *p2 = (CandidateFun *)cand2;
-    int a=p1->warnErr->warnCount;
-    int b=p2->warnErr->warnCount;
-    return (a > b ? +1 : a == b ? 0 : -1);
-}
-
-static void printWarnInfo(NList *okList)
-{
-	int len=n_list_length(okList);
-	int i;
-	for(i=0;i<len;i++){
-	   	  CandidateFun *cand=(CandidateFun *)n_list_nth_data(okList,i);
-	  	  WarnAndError *warnErr=cand->warnErr;
-	  	  int j;
-	  	  for(j=0;j<warnErr->warnCount;j++){
-             n_debug("warning is :%s %d\n",cand->mangle->mangleFunName,warnErr->warns[j]);
-	  	  }
-	}
-
-}
-
-static CandidateFun *filterGoodFunc(NList *okList)
-{
-	  if(n_list_length(okList)==0){
-		  printf("没有匹配的函数!!! %s %s %d\n",__FILE__,__FUNCTION__,__LINE__);
-		  return NULL;
-	  }
-   	  okList=n_list_sort(okList,warnCompare_cb);
-   	  CandidateFun *cand=(CandidateFun *)n_list_nth_data(okList,0);
-   	printWarnInfo(okList);
-	  n_debug("找到了声明的函数 成功匹配参数，只有一个 decl code:%s name:%s",
-	  		 get_tree_code_name(TREE_CODE(cand->mangle->fieldDecl)),IDENTIFIER_POINTER(DECL_NAME(cand->mangle->fieldDecl)));
-	  return cand;
-}
-
-static tree createTempFunction(tree field)
-{
-
-   tree funid=DECL_NAME(field);
-   tree type=TREE_TYPE(field);
-   tree functionType=TREE_TYPE(type);
-   tree decl = build_decl (0, FUNCTION_DECL, funid, default_function_type);
-   TREE_TYPE(decl)=functionType;
-   return decl;
-}
-
-static int getFieldParmCount(tree field)
-{
-      tree  funcType = TREE_TYPE (field);
-      int count=0;
-      int varargs_p = 1;
-      for (tree al = TYPE_ARG_TYPES (funcType); al; al = TREE_CHAIN (al)){
-           tree type=TREE_VALUE(al);
-           if(type == void_type_node){
-               //n_debug("有void_type_node count:%d 函数名:%s",count,IDENTIFIER_POINTER(DECL_NAME(decl)));
-               varargs_p=0;
-               break;
-           }
-           count++;
-      }
-      return count;
-}
-
-static ClassFunc *candidateFunc(ClassCtor *self,vec<tree, va_gc> *exprlist,vec<tree, va_gc> *origtypes,
-		vec<location_t> arg_loc,location_t expr_loc,NPtrArray *funcs)
-{
-    unsigned int i;
-	NList *okList=NULL;
-	for(i=0;i<funcs->len;i++){
-	   ClassFunc *mangle=(ClassFunc *)n_ptr_array_index(funcs,i);
-	   tree field = mangle->fieldDecl;
-	   aet_warn_and_error_reset();
-	   if(!aet_utils_valid_tree(field)){
-		   n_warning("找到了声明的构造函数 但出错了 name:%s\n",mangle->mangleFunName);
-		   continue;
-	   }
-	   tree decl=createTempFunction(field);
-	   int fieldParmCount=getFieldParmCount(decl);
-	   n_debug("找到了声明的构造函数 开始匹配参数 decl code:%s name:%s 参数个数:%d 实参个数：%d",
-	           get_tree_code_name(TREE_CODE(decl)),IDENTIFIER_POINTER(DECL_NAME(decl)),fieldParmCount,exprlist->length());
-	   //因为有泛型，会增加参数，所以不能用下同的判断。
-	  // if(exprlist->length()!=fieldParmCount)
-	   //    continue;
-	   tree value=decl;
-	   mark_exp_read (value);
-	   value= aet_check_funcs_param (expr_loc, arg_loc, value,exprlist, origtypes);
-	   if(value==error_mark_node){
-		   n_debug("找到了声明的构造函数 不能匹配参数 decl code:%s name:%s", get_tree_code_name(TREE_CODE(decl)),IDENTIFIER_POINTER(DECL_NAME(decl)));
-	   }else{
-		   n_debug("找到了声明的构造函数 有错误吗? decl code:%s name:%s 错误数:%d warn:%d",
-				get_tree_code_name(TREE_CODE(decl)),IDENTIFIER_POINTER(DECL_NAME(decl)),
-				argsFuncsInfo.errorCount,argsFuncsInfo.warnCount);
-		  if(argsFuncsInfo.errorCount==0){
-			CandidateFun *candidate=n_slice_new(CandidateFun);
-			candidate->mangle=mangle;
-			candidate->warnErr=aet_warn_and_error_copy();
-			okList=n_list_append(okList,candidate);
-		 }
-	  }
-	}
-	CandidateFun *cand=filterGoodFunc(okList);
-	ClassFunc *classFunc=NULL;
-	if(cand!=NULL){
-		classFunc=cand->mangle;
-	}
-	n_list_free_full(okList,freeCandidate_cb);
-  	return classFunc;
 }
 
 /**
@@ -829,22 +704,6 @@ static char *getLowClassName(tree field)
    return IDENTIFIER_POINTER(id);
 }
 
-static ClassFunc *getCandidate(ClassCtor *self,ClassName *className,vec<tree, va_gc> *exprlist,
-		vec<tree, va_gc> *origtypes,vec<location_t> arg_loc,location_t expr_loc)
-{
-    NPtrArray *funcs=func_mgr_get_constructors(func_mgr_get(),className);
-    if(funcs==NULL || funcs->len==0){
-        n_info("没有mangle的构造函数名 00:%s",className);
-        if(funcs)
-           	n_ptr_array_unref(funcs);
-       	return NULL;
-    }
-   	ClassFunc *classFunc= candidateFunc(self,exprlist,origtypes,arg_loc,expr_loc,funcs);
-   	n_ptr_array_set_free_func(funcs,NULL);
-   	n_ptr_array_unref(funcs);
-   	return classFunc;
-}
-
 /**
  * 根据参数选择最终的构造函数
  */
@@ -860,25 +719,15 @@ tree  class_ctor_select(ClassCtor *self,tree func,vec<tree, va_gc> *exprlist,
 	ClassName *className=class_mgr_get_class_name_by_sys(class_mgr_get(),lowClassName);
 	if(className==NULL)
 		className=class_mgr_get_class_name_by_user(class_mgr_get(),funName);
-	StaticFuncParm *staticParm=parser_static_get_func_parms(parser_static_get(),exprlist);
-	if(staticParm!=NULL){
-       n_warning("class_ctor_select 有不确定的静态函数参数");
-       parser_static_select_static_parm_for_ctor(parser_static_get(),className,staticParm);
-       if(staticParm->ok){
-    	   n_info("class_ctor_select 可以替换vec中的参数列表了");
-           parser_static_replace(parser_static_get(),staticParm,exprlist);
-       }else{
-    	   //报错
-    	   parser_static_report_error(parser_static_get(),staticParm,exprlist);
-    	   return;
-       }
-       //free staticParm;
-	   parser_static_free(parser_static_get(),staticParm);
-	   staticParm=NULL;
+	ClassFunc *classFunc=NULL;
+    FuncPointerError *errors=NULL;
+	CandidateFunc *candidate=select_field_get_ctor_func(select_field_get(),className,exprlist,origtypes,arg_loc,expr_loc,&errors);
+	if(candidate!=NULL){
+	    classFunc=candidate->classFunc;
 	}
-	ClassFunc *classFunc=getCandidate(self,className ,exprlist, origtypes,arg_loc,expr_loc);
-	if(classFunc==NULL || !aet_utils_valid_tree(classFunc->fieldDecl)){
+	if(classFunc==NULL){
 		n_warning("class_ctor_select 33 error %s %s %s\n",get_tree_code_name(TREE_CODE(field)),className->sysName,funName);
+		select_field_printf_func_pointer_error(errors);
 		error_at(expr_loc,"传递的参数与构造函数%qs不匹配。请检查类%qs中是否声明了构造函数。",funName,className->userName);
 		return error_mark_node;
 	}
@@ -905,25 +754,15 @@ tree  class_ctor_select_from_self(ClassCtor *self,tree func,vec<tree, va_gc> *ex
 	char *lowClassName=funName;
 	BINFO_FLAG_0(func)=0;
 	ClassName *className=class_mgr_get_class_name_by_sys(class_mgr_get(),lowClassName);
-	StaticFuncParm *staticParm=parser_static_get_func_parms(parser_static_get(),exprlist);
-	if(staticParm!=NULL){
-       n_warning("有不确定的静态函数参数\n");
-       parser_static_select_static_parm_for_ctor(parser_static_get(),className,staticParm);
-       if(staticParm->ok){
-    	   n_info("可以替换vec中的参数列表了\n");
-           parser_static_replace(parser_static_get(),staticParm,exprlist);
-       }else{
-    	   //报错
-    	   parser_static_report_error(parser_static_get(),staticParm,exprlist);
-    	   return;
-       }
-       //free staticParm;
-	   parser_static_free(parser_static_get(),staticParm);
-	   staticParm=NULL;
-	}
-	ClassFunc *classFunc=getCandidate(self,className ,exprlist, origtypes,arg_loc,expr_loc);
-	if(classFunc==NULL || !aet_utils_valid_tree(classFunc->fieldDecl)){
-		n_warning("class_ctor_select 33 error %s\n",funName);
+    ClassFunc *classFunc=NULL;
+    FuncPointerError *errors=NULL;
+    CandidateFunc *candidate=select_field_get_ctor_func(select_field_get(),className,exprlist,origtypes,arg_loc,expr_loc,&errors);
+    if(candidate!=NULL){
+        classFunc=candidate->classFunc;
+    }
+	if(classFunc==NULL){
+	    select_field_printf_func_pointer_error(errors);
+		error_at(expr_loc,"构造函数未定义。%qD",func);
 		return error_mark_node;
 	}
 	GenericModel *funcGenericDefine=NULL;

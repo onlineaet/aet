@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <errno.h>
+#include <unistd.h>
 #include "ARandom.h"
 #include "AMutex.h"
 #include "../lang/System.h"
@@ -42,7 +43,7 @@ static void timeSeed( auint32 seed[4]){
             setvbuf (dev_urandom, NULL, _IONBF, 0);
             do{
               errno = 0;
-              r = fread (seed, sizeof (seed), 1, dev_urandom);
+              r = fread (seed, (size_t)sizeof (seed), 1, dev_urandom);
             }while A_UNLIKELY (errno == EINTR);
             if (r != 1)
               dev_urandom_exists = FALSE;
@@ -232,10 +233,10 @@ impl$ ARandom{
 impl$ GlobalRandom {
 
 	GlobalRandom(){
-		lock=new$ AMutex();
+	    lock=new$ AMutex();
 	}
 
-	void setSeed (auint32  seed){
+	void setSeed (auint32 seed){
 		lock.lock();
 		super$->setSeed(seed);
 		lock.unlock();
@@ -247,7 +248,7 @@ impl$ GlobalRandom {
 		lock.unlock();
 	}
 
-	aint32 nextInt(aint32  begin,aint32  end){
+	aint32 nextInt(aint32  begin,aint32 end){
 		aint32 value;
 		lock.lock();
 		value=super$->nextInt(begin,end);

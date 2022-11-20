@@ -99,9 +99,9 @@ static tree buildExpr(location_t loc,tree leftValue,char *rightSysName)
     tree funcName=aet_utils_create_ident(AET_VAR_OF_FUNC_NAME);
     tree decl=lookup_name(funcName);
     vec<tree, va_gc> *parms=createParm(loc,firstParm,rightSysName);
-    aet_print_tree_skip_debug(decl);
+    //aet_print_tree_skip_debug(decl);
     tree newCallExpr = c_build_function_call_vec (loc, vNULL, decl,parms, NULL);
-    aet_print_tree(newCallExpr);
+    //aet_print_tree(newCallExpr);
     return newCallExpr;
 }
 /**

@@ -393,7 +393,7 @@ static tree createElementName(tree ident,char *sysName)
 static void addElement(EnumData *enumData,char *sysName,char *origName,tree value)
 {
     char *newElement=aet_utils_create_enum_element_name(sysName,origName);
-    EnumElement *elem=n_slice_new0(EnumElement);
+    EnumElement *elem=(EnumElement *)n_slice_new0(EnumElement);
     elem->sysName=n_strdup(sysName);
     elem->origName=n_strdup(origName);
     elem->mangleName=n_strdup(newElement);
@@ -404,7 +404,7 @@ static void addElement(EnumData *enumData,char *sysName,char *origName,tree valu
 
 static EnumData *createBaseData(char *sysName,char *origName,char *enumName)
 {
-	EnumData *item=n_slice_new0(EnumData);
+	EnumData *item=(EnumData *)n_slice_new0(EnumData);
 	item->sysName=n_strdup(sysName);
 	item->origName=n_strdup(origName);
 	item->permission=0;

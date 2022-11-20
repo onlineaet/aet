@@ -98,6 +98,8 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
  *OpenDoor *ifaceValue;
  *ifaceValue=newnew HomeOffice();
  */
+static tree ifaceToClass(tree actualParm,tree formulaType);
+
 
 static void classCastInit(ClassCast *self)
 {
@@ -180,11 +182,12 @@ static void castClassToInterface(char *rightName,char *leftName,tree nopexpr,tre
 		   ClassName *belongClass=class_mgr_find_interface(class_mgr_get(),&leftInfo->className,&rightInfo->className);
 		   n_debug("class_cast_parser_decl castClassToInterface 33 左边是类:%s，右边是接口:%s 接口转类 接口实现类是:%s\n",leftName,rightName,belongClass?belongClass->sysName:"null");
 		   if(belongClass!=NULL){
-			   char ifaceVarInClass[255];
-			   aet_utils_create_in_class_iface_var(rightInfo->className.userName,ifaceVarInClass);
-			   tree value= createPointerPlusExpr(belongClass,ifaceVarInClass,EXPR_LOCATION (nopexpr),op,TRUE);
-			   n_debug("class_cast_parser_decl castClassToInterface 44 左边是类:%s，右边是接口:%s 接口转类 %s\n",leftName,rightName,belongClass?belongClass->sysName:"null");
-			   TREE_OPERAND (nopexpr, 0)=value;
+			   //char ifaceVarInClass[255];
+			  // aet_utils_create_in_class_iface_var(rightInfo->className.userName,ifaceVarInClass);
+			   //tree value= createPointerPlusExpr(belongClass,ifaceVarInClass,EXPR_LOCATION (nopexpr),op,TRUE);
+			  // n_debug("class_cast_parser_decl castClassToInterface 44 左边是类:%s，右边是接口:%s 接口转类 %s\n",leftName,rightName,belongClass?belongClass->sysName:"null");
+               error_at(EXPR_LOCATION(nopexpr),"不能转化接口%qs到类qs。",rightName,leftName);
+			   //TREE_OPERAND (nopexpr, 0)=value;
 		   }
 	   }
 }
@@ -593,29 +596,27 @@ tree class_cast_cast(ClassCast *self,struct c_type_name *type_name,tree expr)
           n_warning("强制转化成类%s,但类型不是指针。不处理。",sysName);
           return expr;
       }
-        ClassInfo *info=class_mgr_get_class_info(class_mgr_get(),sysName);
-        if(info==NULL){
+        ClassInfo *leftInfo=class_mgr_get_class_info(class_mgr_get(),sysName);
+        if(leftInfo==NULL){
             n_error("从表达式转化到类%s时出错。原因：找不到类:%s\n",sysName,sysName);
             return expr;
         }
-
-        if(class_info_is_class(info) || class_info_is_abstract_class(info)){
+        if(class_info_is_class(leftInfo) || class_info_is_abstract_class(leftInfo)){
            if(TREE_CODE(expr)==NOP_EXPR){
               tree op=TREE_OPERAND (expr, 0);
               if(isIfaceToClass(type,op)){
-                  printf("接口转类-----\n");
-                 /* class_cast_in_finish_decl 中会把类转为接口，在这里就不再处理。*/
-//                  if(TREE_CODE(op)==CALL_EXPR)
-//                      return expr;
-//                  location_t loc=input_location;
-//                  tree  actualRef=build_indirect_ref (loc,op,RO_ARROW);
-//                  tree _iface_common_var=aet_utils_create_ident(IFACE_COMMON_STRUCT_VAR_NAME);
-//                  tree componetTwo = build_component_ref (loc,actualRef,_iface_common_var, loc);//
-//                  tree atClassVarName=aet_utils_create_ident(IFACE_AT_CLASS);
-//                  tree componetRef = build_component_ref (loc,componetTwo,atClassVarName, loc);//
-//                  tree nopExpr= build1 (NOP_EXPR, type, componetRef);
-//                  TREE_OPERAND (expr, 0)=nopExpr;
-//                  return expr;
+                  char *rightSysName=class_util_get_class_name(TREE_TYPE(op));
+                  ClassInfo *rightInfo=class_mgr_get_class_info(class_mgr_get(),rightSysName);
+                  ClassName *belongClass=class_mgr_find_interface(class_mgr_get(),&leftInfo->className,&rightInfo->className);
+                  if(belongClass==NULL){
+                      location_t loc= type_name->declarator->id_loc;
+                      error_at(loc,"类%qs并未实接口%qs。",leftInfo->className.sysName,rightInfo->className.sysName);
+                      return expr;
+                  }
+                  n_debug("接口转类-----接口：%s 转化的类:%s\n",rightSysName,leftInfo->className.sysName);
+                  tree pointerType=type;//等同 ARandom *;
+                  tree value= ifaceToClass(op,pointerType);
+                  TREE_OPERAND (expr,0)=value;
               }
            }
         }else{

@@ -75,7 +75,7 @@ static TreeLangDecl *getTreeLangDecl(tree dest)
 
 static TreeLangDecl *createTreeLangDecl(tree dest)
 {
-	TreeLangDecl *lang=n_slice_new(TreeLangDecl);
+	TreeLangDecl *lang=(TreeLangDecl *)n_slice_new(TreeLangDecl);
 	lang->dest=dest;
 	memset(&(lang->info),0,sizeof(ObjectNewInfo));
 	lang->info.createMethod=CREATE_CLASS_METHOD_UNKNOWN;

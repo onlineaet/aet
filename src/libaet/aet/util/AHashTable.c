@@ -5,6 +5,7 @@
 #include "AHashTable.h"
 #include "AAssert.h"
 
+
 struct _AHashTablePriv
 {
   asize            size;

@@ -5344,7 +5344,7 @@ void finish_decl (tree decl, location_t init_loc, tree init,tree origtype, tree 
       int failure= complete_array_type (&TREE_TYPE (decl), DECL_INITIAL (decl), do_default);
       /* Get the completed type made by complete_array_type.  */
       type = TREE_TYPE (decl);
-      n_debug("finish_decl ----11 failure:%d",failure);
+      //n_debug("finish_decl ----11 failure:%d",failure);
 
       switch (failure)
 	{
@@ -5399,7 +5399,7 @@ void finish_decl (tree decl, location_t init_loc, tree init,tree origtype, tree 
       //n_debug("finish_decl ----22 %s",IDENTIFIER_POINTER(DECL_NAME(decl)));
 
       if (is_global_var (decl)){
-         // n_debug("finish_decl ----33 %s",IDENTIFIER_POINTER(DECL_NAME(decl)));
+          //n_debug("finish_decl ----33 %s",IDENTIFIER_POINTER(DECL_NAME(decl)));
 
 	      type_context_kind context = (DECL_THREAD_LOCAL_P (decl)? TCTX_THREAD_STORAGE : TCTX_STATIC_STORAGE);
 	      if (!verify_type_context (input_location, context, TREE_TYPE (decl)))
@@ -5407,7 +5407,7 @@ void finish_decl (tree decl, location_t init_loc, tree init,tree origtype, tree 
       }
 
       if (DECL_SIZE (decl) == NULL_TREE && TREE_TYPE (decl) != error_mark_node && COMPLETE_TYPE_P (TREE_TYPE (decl))){
-    	 // n_debug("finish_decl ----44 layout_decl %s",IDENTIFIER_POINTER(DECL_NAME(decl)));
+    	   //n_debug("finish_decl ----44 layout_decl %s",IDENTIFIER_POINTER(DECL_NAME(decl)));
 	       layout_decl (decl, 0);
       }
 
@@ -5497,7 +5497,7 @@ void finish_decl (tree decl, location_t init_loc, tree init,tree origtype, tree 
 	    warning (0, "ignoring %<asm%> specifier for non-static local "
 		     "variable %q+D", decl);
 	  else{
-	      //n_debug("finish_decl ----55 %s",IDENTIFIER_POINTER(DECL_NAME(decl)));
+	     // n_debug("finish_decl ----55 %s",IDENTIFIER_POINTER(DECL_NAME(decl)));
 
 	    set_user_assembler_name (decl, asmspec);
 	  }
@@ -5597,15 +5597,6 @@ void finish_decl (tree decl, location_t init_loc, tree init,tree origtype, tree 
     {
       tree attr = lookup_attribute ("cleanup", DECL_ATTRIBUTES (decl));
       n_debug("finish_decl ----100 cleanup %s cleaupattr:%p",IDENTIFIER_POINTER(DECL_NAME(decl)),attr);
-      tree nameId=DECL_NAME(decl);
-      if(nameId && IDENTIFIER_POINTER(nameId)){
-          char *test=IDENTIFIER_POINTER(nameId);
-          if(!strcmp(test,"tempVarName_0") || !strcmp(test,"tempVarName_1")){
-              printf("createVarDeclStmt xxx--- %d %d %d %d %d\n",VAR_P (decl),DECL_SEEN_IN_BIND_EXPR_P (decl),TREE_STATIC (decl),DECL_EXTERNAL (decl),
-                      decl_function_context (decl) == current_function_decl);
-          }
-      }
-
       if (attr)
 	{
 	  tree cleanup_id = TREE_VALUE (TREE_VALUE (attr));

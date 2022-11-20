@@ -121,7 +121,7 @@ tree           class_impl_build_deref(ClassImpl *self,location_t loc,location_t 
  * 如何知道有多个strHashFunc静态函数时，该选择那一个呢？
  * 用var的参数和strHashFunc生成mangle的函数名，然后再通过funcmgr查找。
  */
-tree            class_impl_modify_func_pointer(ClassImpl *self,tree lhs,tree rhs);
+tree            class_impl_modify_or_init_func_pointer(ClassImpl *self,tree lhs,tree rhs);
 /**
  * 是不是Abc.xxxx表达式
  */

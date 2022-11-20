@@ -51,6 +51,8 @@ c_token       *aet_utils_create_aet_goto_token(c_token *token,location_t start_l
 
 int            aet_utils_add_token(cpp_reader *pfile, const char *str,size_t len);
 int            aet_utils_add_token_with_location(cpp_reader *pfile, const char *str,size_t len,location_t loc);
+int            aet_utils_add_token_with_force(cpp_reader *pfile, const char *str,size_t len,location_t loc,nboolean force);
+
 void          *aet_utils_create_restore_location_data(cpp_reader *pfile,location_t loc);
 location_t     aet_utils_get_location(location_t loc);//classctor.c调用
 void           aet_utils_write_cpp_buffer(cpp_buffer *newBuffer,void *restoreData);

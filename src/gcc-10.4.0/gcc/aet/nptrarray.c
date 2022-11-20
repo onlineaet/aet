@@ -82,7 +82,7 @@ static NPtrArray *ptr_array_new (nuint reserved_size,NDestroyNotify element_free
 {
   NRealPtrArray *array;
 
-  array = n_slice_new (NRealPtrArray);
+  array = (NRealPtrArray *)n_slice_new (NRealPtrArray);
 
   array->pdata = NULL;
   array->len = 0;

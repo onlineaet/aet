@@ -417,7 +417,6 @@ static nboolean  modifyUseHeap(NewObject *self,tree decl)
    GenericModel *genericDefineModel=c_aet_get_generics_model(decl);
    c_parser_consume_token (parser);//consume =
    nboolean check=checkVar(self,decl,genericDefineModel);
-   printf("modifyUseHeap 22 checkVar %d\n",check);
    if(!check)
       return FALSE;
    if (c_parser_peek_token (parser)->type==CPP_SEMICOLON){

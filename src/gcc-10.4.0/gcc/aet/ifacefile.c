@@ -86,12 +86,13 @@ static void saveParm(IfaceFile *self)
 #define SPERATOR "$#@"
 /**
  * 该方法是各个正在编译的文件调用。
+ * 写入正在使用接口的文件到iface_impl_index.tmp中。
  */
 void iface_file_save(IfaceFile *self)
 {
     if(makefile_parm_is_second_compile(makefile_parm_get())){
-           printf("ifacefile.c 是第二次编译 %s 不需要写入任何接口信息。\n",in_fnames[0]);
-           return;
+       printf("ifacefile.c 是第二次编译 %s 不需要写入任何接口信息。\n",in_fnames[0]);
+       return;
     }
     initFile(self);
     NPtrArray *array=class_mgr_get_all_iface_info(class_mgr_get());
@@ -143,7 +144,7 @@ static IfaceData *createRefIfaceData(char *str)
     if(len!=4){
         n_error("接口数据是错的,make clean后，重新编译。%s\n",str);
     }
-    IfaceData *data=n_slice_new(IfaceData);
+    IfaceData *data=(IfaceData *)n_slice_new(IfaceData);
     data->sysName=n_strdup(items[0]);
     data->package=n_strdup(items[1]);
     //转成canonical文件
@@ -316,7 +317,7 @@ static void addFile(NPtrArray *fileArray,char *headerFile,char *sysName)
                 return;
            }
        }
-       IfaceHeader *iface=n_slice_new(IfaceHeader);
+       IfaceHeader *iface=(IfaceHeader *)n_slice_new(IfaceHeader);
        iface->headerFile=n_strdup(headerFile);
        iface->sysNameArray=n_ptr_array_new();
        n_ptr_array_add(iface->sysNameArray, n_strdup(sysName));
@@ -345,13 +346,15 @@ static void deleteIfaceImplFile()
 /**
  * 准备要编译的头文件。调这里说明进入链接阶段了。但还未第二次编译泛型文件。
  * 选出接口.o文件.
+ * 调用这里是靠往temp_func_track_45.c写入aet_goto_compile$ 13
+ * 然后classparser.c中调用class_parser_goto
  */
 void iface_file_compile_ready(IfaceFile *self)
 {
     /*从文件中取出引用的接口文件。内容在编译各个.c是同步写入iface_impl_index.tmp*/
     //删除所有的接口实现.c文件
     deleteIfaceImplFile();
-    NPtrArray *ifaceDataArray=readFile(self);//
+    NPtrArray *ifaceDataArray=readFile(self);//读取iface_impl_index.tmp
     removeImpleIfaceOfLib(ifaceDataArray);
     int i;
     NPtrArray *fileArray=n_ptr_array_new();//去除重复的头文件
@@ -621,7 +624,7 @@ static NPtrArray *getImplIfaceFromOFile()
              int j;
              for(j=0;j<array->len;j++){
                  char  *sysName=n_ptr_array_index(array,j);
-                 IFaceSaveData *saveData=n_slice_new(IFaceSaveData);
+                 IFaceSaveData *saveData=(IFaceSaveData *)n_slice_new(IFaceSaveData);
                  saveData->sysName=n_strdup(sysName);
                  saveData->oFile=n_strdup(ofile);
                  saveData->cFile=convertCFile(ofile);
@@ -670,7 +673,7 @@ static void createIFaceSaveData(char *cFile,NPtrArray *ifaceSaveDataArray)
        for(i=0;i<len;i++){
             if(items[i]==NULL || strlen(items[i])==0)
                 continue;
-            IFaceSaveData *saveData=n_slice_new(IFaceSaveData);
+            IFaceSaveData *saveData=(IFaceSaveData *)n_slice_new(IFaceSaveData);
             saveData->sysName=n_strdup(items[i]);
             saveData->oFile=convertOFile(cFile);
             saveData->cFile=n_strdup(cFile);

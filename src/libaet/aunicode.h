@@ -324,7 +324,7 @@ typedef enum {
 extern const achar * const a_utf8_skip;
 #define a_utf8_next_char(p) (char *)((p) + a_utf8_skip[*(const auchar *)(p)])
 
-
+aboolean a_unichar_isalnum   (aunichar c) ;
 aboolean a_utf8_validate (const achar  *str,assize max_len,const achar **end);
 aboolean a_utf8_validate_len (const char *str,asize max_len,const achar **end);
 aunichar a_utf8_get_char_validated (const  achar *p,assize max_len);

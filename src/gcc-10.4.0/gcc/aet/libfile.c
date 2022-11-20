@@ -134,7 +134,7 @@ static char *readContent(char *fileName,nint64 offset,int size,int *dataSize){
 	}
 	if(dataLen==0)
 	  return NULL;
-	char *data=n_malloc(dataLen);
+	char *data=(char *)n_malloc(dataLen);
 	memcpy(data,content,dataLen);
 	*dataSize=dataLen;
 	return data;
@@ -239,7 +239,7 @@ static SegmentData *createSegmentData(char *str)
 	if(virtAdd<0){
 		n_error("读段数据出错:%s\n",str);
 	}
-	SegmentData *data=n_slice_new0(SegmentData);
+	SegmentData *data=(SegmentData *)n_slice_new0(SegmentData);
 	data->virt_addr=virtAdd;
 	data->offset=offset;
 	data->size=size;
@@ -317,7 +317,7 @@ static VarInfo *getVarInfo(char *src,char *varName)
     }
 	//printf("getVarInfo vir----- is:%s size:%d\n",items[0],size);
     nint64	add=n_ascii_strtoll(items[0],NULL,16);
-    VarInfo *data=n_slice_new0(VarInfo);
+    VarInfo *data=(VarInfo *)n_slice_new0(VarInfo);
     data->virtAdd=add;
     data->size=size;
     data->name=n_strdup(varName);
@@ -415,7 +415,7 @@ static char *readOffset(char *fileName,nint64 offset,int size,int *dataSize){
 	  //printf("readContent 数据多少:%d %s\n",dataLen,content);
 	if(dataLen==0)
 	  return NULL;
-	char *data=n_malloc(dataLen);
+	char *data=(char *)n_malloc(dataLen);
 	memcpy(data,content,dataLen);
 	*dataSize=dataLen;
 	return data;
@@ -657,7 +657,7 @@ static nboolean addLibData(LibFile *self,char *varName,char *value,int size)
     	if(!strcmp(item->varName,varName))
     		return FALSE;
     }
-    XmlData *xml=n_slice_new(XmlData);
+    XmlData *xml=(XmlData *)n_slice_new(XmlData);
     xml->varName=varName;
     xml->data=value;
     xml->size=size;
@@ -838,7 +838,7 @@ LibFile *lib_file_get()
 {
 	static LibFile *singleton = NULL;
 	if (!singleton){
-		 singleton =n_slice_new0(LibFile);
+		 singleton =(LibFile *)n_slice_new0(LibFile);
 		 libFileInit(singleton);
 	}
 	return singleton;

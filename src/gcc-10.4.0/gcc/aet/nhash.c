@@ -747,7 +747,7 @@ NHashTable *n_hash_table_new_full (NHashFunc      hash_func,
 {
   NHashTable *hash_table;
 
-  hash_table = n_slice_new (NHashTable);
+  hash_table = (NHashTable *)n_slice_new (NHashTable);
   hash_table->ref_count=1;
   hash_table->nnodes             = 0;
   hash_table->noccupied          = 0;

@@ -402,7 +402,7 @@ NPtrArray *class_func_get_generic_parm(ClassFunc *self,char *id)
   			 nboolean exits=generic_model_exits_ident(varGen,genStr);
   			 if(exits){
   			   n_debug("class_func_get_generic_parm 22 参数:%d 泛型在对象中有泛型声明:%s\n",count,genStr);
-			    ParmGenInfo *pgi=n_slice_new(ParmGenInfo);
+			    ParmGenInfo *pgi=(ParmGenInfo *)n_slice_new(ParmGenInfo);
 				pgi->str=n_strdup(genStr);
 				pgi->index=count;
 				pgi->independ=FALSE;
@@ -415,7 +415,7 @@ NPtrArray *class_func_get_generic_parm(ClassFunc *self,char *id)
 			char *str=generic_util_get_generic_str(type);
 			if(strcmp(str,genStr)==0){
 			    n_debug("class_func_get_generic_parm 33 参数:%d 泛型声明:%s\n",count,str);
-				ParmGenInfo *pgi=n_slice_new(ParmGenInfo);
+				ParmGenInfo *pgi=(ParmGenInfo *)n_slice_new(ParmGenInfo);
 				pgi->str=n_strdup(str);
 				pgi->index=count;
 				pgi->independ=TRUE;

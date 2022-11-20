@@ -36,9 +36,6 @@ struct _FuncCheck
 	NPtrArray *currentFuncArray;
 };
 
-
-
-
 FuncCheck   *func_check_new();
 void         func_check_check_define(FuncCheck *self,ClassName *className);
 void         func_check_check_all_define(FuncCheck *self);

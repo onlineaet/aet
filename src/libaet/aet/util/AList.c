@@ -223,7 +223,6 @@ impl$ AList{
   auint  removeAll(apointer data){
       ListNode *tmp = first;
       int count=0;
-      ListNode *list;
       while (tmp){
         if (tmp->data != data)
            tmp = tmp->next;
@@ -340,11 +339,10 @@ impl$ AList{
 
 
   void insertSorted(apointer data,ACompareDataFunc  func,apointer userData){
-       self->first= insertSortedReal (data, (AFunc) func, userData);
+       self->first= insertSortedReal(data, (AFunc) func, userData);
        ListNode *node=self->first;
        while (node){
            ListNode *next = node->next;
-           apointer value=node->data;
            if(!next){
                 //printf("最后一个元素是:%p %p %p\n",node,first->next,first->prev);
                 last=node;
@@ -467,7 +465,6 @@ impl$ AList{
        ListNode *node=self->first;
        while (node){
            ListNode *next = node->next;
-           apointer value=node->data;
            if(!next){
                 last=node;
            }
@@ -480,7 +477,6 @@ impl$ AList{
       ListNode *node=self->first;
       while (node){
           ListNode *next = node->next;
-          apointer value=node->data;
           if(!next){
                last=node;
           }

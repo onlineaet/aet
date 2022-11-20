@@ -290,28 +290,22 @@ impl$ AKeyFile{
       }
       a_free (locale);
     }
-    static int ssdss=0;
-    static void g_key_file_parse_line (const char  *line,asize  length,AError **error){
+
+    void parseLine(const char  *line,asize  length,AError **error){
       AError *curErr = NULL;
       char *line_start;
       a_return_if_fail (line != NULL);
       line_start = (char *) line;
       while (a_ascii_isspace (*line_start))
         line_start++;
-      //printf("g_key_file_parse_line --- line:%s\n",line);
-     // printf("g_key_file_parse_line --- line_start:%s\n",line_start);
 
       if (KeyFileUtil.isComment(line_start)){
-        // printf("g_key_file_parse_line --- isComment line:%s\n",line);
          g_key_file_parse_comment (line, length);
       }else if (KeyFileUtil.isGroup(line_start)){
-          //printf("g_key_file_parse_line --- isGroup %d line:%s\n",ssdss++,line);
         g_key_file_parse_group (line_start,length - (line_start - line), &curErr);
       }else if (KeyFileUtil.isKeyValuePair(line_start)){
-        // printf("g_key_file_parse_line --- isKeyValuePair line:%s\n",line);
         g_key_file_parse_key_value_pair (line_start,length - (line_start - line),&curErr);
       }else{
-         // printf("g_key_file_parse_line --- 出错了 line:%s\n",line);
           achar *line_utf8 = a_utf8_make_valid (line, length);
           a_error_printf(error, ERROR_DOMAIN,-1,"键值对文件包含的行“%s”不是键值对、组或注释",line_utf8);
           a_free (line_utf8);
@@ -325,7 +319,7 @@ impl$ AKeyFile{
       AError *curErr = NULL;
       if (strBuffer->length() > 0){
           //printf("g_key_file_flush_parse_buffer ---00 %s %d\n",strBuffer->str,strBuffer->length);
-          g_key_file_parse_line (strBuffer->getString(),strBuffer->length(),&curErr);
+          parseLine(strBuffer->getString(),strBuffer->length(),&curErr);
           //printf("g_key_file_flush_parse_buffer ---11 %d\n",strBuffer->length);
           strBuffer->erase (0, -1);
          // printf("g_key_file_flush_parse_buffer ---22 %d\n", strBuffer->length);
@@ -1062,8 +1056,6 @@ impl$ AKeyFile{
                return FALSE;
            }
      }
-
-
 
      ~AKeyFile(){
         clear();

@@ -23,7 +23,7 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 #define __GCC_IMPLICITLY_CALL_H__
 
 #include "c-aet.h"
-#include "nlib.h"
+#include "classutil.h"
 #include "funchelp.h"
 
 /**

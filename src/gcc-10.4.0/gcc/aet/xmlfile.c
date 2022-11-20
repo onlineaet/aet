@@ -131,7 +131,7 @@ static NPtrArray *createFuncCheckData(char *content)
                 NString *objectFile=n_string_substring_from(re,pos7+strlen(OBJECT_FILE),pos8);
 
 
-                FuncCheckData *check=n_slice_new(FuncCheckData);
+                FuncCheckData *check=(FuncCheckData *)n_slice_new(FuncCheckData);
                 check->sysName=dupStr(sysName);
                 check->title=dupStr(title);
                 check->item=dupStr(item);
@@ -159,7 +159,7 @@ static void add(NPtrArray *array,char *sysName,char *title,char *item,char *obje
             break;
         }
     }
-    FuncCheckData *check=n_slice_new(FuncCheckData);
+    FuncCheckData *check=(FuncCheckData *)n_slice_new(FuncCheckData);
     check->sysName=n_strdup(sysName);
     check->title=n_strdup(title);
     check->item=n_strdup(item);
@@ -589,7 +589,7 @@ NPtrArray *xml_file_get_generic_data(XmlFile *self)
 
 GenericSaveData *xml_file_create_generic_data()
 {
-    GenericSaveData *data=n_slice_new0(GenericSaveData);
+    GenericSaveData *data=(GenericSaveData *)n_slice_new0(GenericSaveData);
     data->undefine.key=NULL;
     data->undefine.value=NULL;
     return data;
@@ -708,7 +708,7 @@ static NPtrArray *createIfaceData(char *content)
         NString *codes=(NString *)n_ptr_array_index(contentArray,i);
         int pos=n_string_indexof(codes,CLASS_CONTENT_HALF);
         int end=n_string_indexof_from(codes,CLASS_CONTENT_END,pos);
-        IFaceSaveData *ifaceData=n_slice_new0(IFaceSaveData);
+        IFaceSaveData *ifaceData=(IFaceSaveData *)n_slice_new0(IFaceSaveData);
         char *sysName= getProperty(codes,XML_SYS_NAME,&pos);
         ifaceData->sysName=sysName;
         fillCFileOrOFile(codes,&pos,end,ifaceData,TRUE);

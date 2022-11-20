@@ -55,6 +55,7 @@ nboolean   class_mgr_about_generic(ClassMgr *self,ClassName *className);
 int        class_mgr_get_distance(ClassMgr *self,char *sysName);
 char      *class_mgr_find_field(ClassMgr *self,char *fromSysName,char *fieldName);
 NPtrArray *class_mgr_get_all_iface_info(ClassMgr *self);
+nboolean   class_mgr_is_root_object(ClassMgr *self,char *sysName);
 
 
 #endif

@@ -897,8 +897,7 @@ tree aet_resolve_overloaded_builtin (location_t loc, tree function, vec<tree, va
 	if (targetm.have_speculation_safe_value (true))
 	  {
 	    new_function = builtin_decl_explicit (fncode);
-	    result = aet_build_function_call_vec (loc, vNULL, new_function, params,
-					      NULL);
+	    result = aet_build_function_call_vec (loc, vNULL, new_function, params,NULL,NULL);
 
 	    if (result == error_mark_node)
 	      return result;
@@ -1043,7 +1042,7 @@ tree aet_resolve_overloaded_builtin (location_t loc, tree function, vec<tree, va
 	  return error_mark_node;
 
 	first_param = (*params)[0];
-	result = aet_build_function_call_vec (loc, vNULL, new_function, params,NULL);
+	result = aet_build_function_call_vec (loc, vNULL, new_function, params,NULL,NULL);
 	if (result == error_mark_node)
 	  return result;
 	if (orig_code != BUILT_IN_SYNC_BOOL_COMPARE_AND_SWAP_N

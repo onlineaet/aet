@@ -55,7 +55,7 @@ static char *getExec(){
 
 static void callbackSignal_cb (int signal){
     char *processName=getExec();
-    printf("\n段错误: pid:%lu %s\n",getpid(),processName);
+    printf("\n段错误: pid:%d %s\n",getpid(),processName);
     a_log_print_stack();
     exit(0);
 }
@@ -120,7 +120,6 @@ impl$ ABackTrace{
         FILE *fd = popen(cmd, "r");
         //printf("readContent is 00 :%s\n",cmd);
         char tempBuff[1024];
-        int dataLen=0;
         int count=0;
         if(fd){
             while(TRUE){
@@ -143,7 +142,6 @@ impl$ ABackTrace{
         sprintf(cmd,"cat /proc/%d/maps", getpid());
         FILE *fd = popen(cmd, "r");
         char tempBuff[1024];
-        int count=0;
         AString *strs=new$ AString("");
         if(fd){
            while(TRUE){

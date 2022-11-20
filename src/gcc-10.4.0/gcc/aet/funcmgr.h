@@ -62,6 +62,7 @@ nboolean      func_mgr_set_static_func_decl(FuncMgr *self,tree decl,ClassName *c
 char         *func_mgr_create_static_var_name(FuncMgr *self,ClassName *className,tree varName,tree type);
 nboolean      func_mgr_static_func_exits(FuncMgr *self,ClassName *className,char *orgiName);
 NPtrArray    *func_mgr_get_static_funcs(FuncMgr *self,ClassName *className);
+NPtrArray    *func_mgr_get_static_funcs_by_sys_name(FuncMgr *self,char *sysName);
 nboolean      func_mgr_static_func_exits_by_recursion(FuncMgr *self,ClassName *srcName,tree component);
 ClassFunc    *func_mgr_find_static_method(FuncMgr *self,char *sysName,char *origFunName,tree argTypes);
 char         *func_mgr_get_static_class_name_by_mangle(FuncMgr *self,char *mangle);

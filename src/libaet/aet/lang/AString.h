@@ -23,8 +23,8 @@ public$ class$ AString{
 
   public$ ~AString();
   public$ void append(const char *value);
-  public$ void append(const achar *val,assize len);
-  public$ void append(achar c);
+  public$ void append(const char *val,assize len);
+  public$ void append(char c);
 
 
   public$ aint length();

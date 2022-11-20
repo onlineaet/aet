@@ -88,7 +88,7 @@ static DataReturn *getDataReturn(ObjectReturn *self,tree func)
 
 static DataReturn *createDataReturn(tree func)
 {
-	DataReturn *item=n_slice_new(DataReturn);
+	DataReturn *item=(DataReturn *)n_slice_new(DataReturn);
 	item->function=func;
 	item->named_ret_val=BITMAP_GGC_ALLOC ();
 	item->other_ret_val=make_tree_vector ();
@@ -145,6 +145,8 @@ struct add_cleanup_data
 
 static inline nboolean is_nrv_p (bitmap nrv, tree t)
 {
+//    printf("is_nrv_p %p %p\n",nrv,t);
+//    printf("is_nrv_p %p %d %d\n",nrv,DECL_UID (t),TREE_CODE (t) == VAR_DECL);
   return TREE_CODE (t) == VAR_DECL && bitmap_bit_p (nrv, DECL_UID (t));
 }
 
@@ -355,7 +357,7 @@ static tree walkCleaup_cb(tree *tp, int *walk_subtrees, void *data)
 			  nboolean e1= atReturnExpr(dp->other,var);
 			  if(e0 || e1){
 				  char *varName=IDENTIFIER_POINTER(DECL_NAME(var));
-		         printf("移走 clearup语句 bitmap:%d other:%d %s\n",e0,e1,varName);
+		         n_debug("移走 clearup语句 bitmap:%d other:%d %s\n",e0,e1,varName);
 			    *tp =build_empty_stmt (EXPR_LOCATION (t));
 			  }else{
 				  aet_print_tree_skip_debug(t);
@@ -417,7 +419,7 @@ static void finalize_remove_cleanup(ObjectReturn *self,tree fndecl)
   unsigned int i;
   tree iter;
   DataReturn *dataReturn=getDataReturn(self,fndecl);
-  printf("finalize_remove_cleanup 00 dataReturn:%p fndecl:%p\n\n",dataReturn,fndecl);
+  n_debug("finalize_remove_cleanup 00 dataReturn:%p fndecl:%p\n\n",dataReturn,fndecl);
   if(dataReturn==NULL){
 	  printf("finalize_remove_cleanup 11 dataReturn是空的，返回值声明。\n");
 	  return;

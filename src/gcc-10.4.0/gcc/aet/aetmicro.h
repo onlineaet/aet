@@ -189,6 +189,17 @@ enum warn_error_info{
 		pointer_targets_in_assignment_from_$rhstype$_to_$type$_differ_in_signedness,
 		pointer_targets_in_initialization_of_$type$_from_$rhstype$_differ_in_signedness,
 		pointer_targets_in_returning_$rhstype$__from_a_function_with_return_type_$type$_differ_in_signedness,
+		initialization_of_a_flexible_array_member,
+		cannot_initialize_array_of_$qT_from_a_string_literal_with_type_array_of_$qT,
+		initializer_string_for_array_of_$qT_is_too_long,
+		initializer_string_for_array_of_$qT_is_too_long_for_CPP,
+		array_of_inappropriate_type_initialized_from_string_constant,
+		initializer_element_is_not_constant,
+		array_initialized_from_non_constant_array_expression,
+		initializer_element_is_not_a_constant_expression,
+		initializer_element_is_not_computable_at_load_time,
+		variable_sized_object_may_not_be_initialized,
+		invalid_initializer,
 		go_unreachable,
 	    error_or_warn_unknown,
 };
@@ -261,7 +272,7 @@ typedef enum{
 
 //////////////////编译期生成的临时文件---------------------------------
 #define GENERIC_BLOCK_INTO_FILE_NAME       "aet_generic_block_xml.tmp" //在编译期中存放new$泛型的有关信息。重要
-#define IFACE_IMPL_INDEX_FILE              "iface_impl_index.tmp" //需要编译的头文件
+#define IFACE_IMPL_INDEX_FILE              "iface_impl_index.tmp" //按行保存的需要编译的头文件
 #define IFACE_IMPL_PARM_FILE               "iface_impl_parm.tmp" //编译参数
 #define CLASS_FUNC_CHECK_FILE              "aet_class_func_check_xml.tmp"//存放类的方法，是一个xml文件
 
@@ -367,6 +378,8 @@ typedef struct _aet_generic_info{
     char pointerCount;
 	int  size;
 }aet_generic_info;
+
+
 
 extern int enter_aet;//是否进入aet 如果classparser中
 

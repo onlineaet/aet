@@ -51,10 +51,10 @@ typedef struct _ClassName
 	char *package; //包名如 com_aet
 }ClassName;
 
-typedef struct InterfaceGenerics{
+typedef struct _InterfaceGenerics{
 	tree generics;
 	ClassName *className;
-};
+}InterfaceGenerics;
 
 typedef struct _IfaceGenModel{
 	GenericModel *model;

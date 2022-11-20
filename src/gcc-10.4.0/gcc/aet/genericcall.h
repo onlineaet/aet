@@ -39,13 +39,13 @@ struct _GenericCall
 
 
 GenericCall  *generic_call_get();
-void          generic_call_set_global(GenericCall *self,ClassName *className,GenericModel * genDefine);
-tree          generic_call_check_parm(GenericCall *self,location_t loc,tree function,tree origGenericDecl,tree val,nboolean npc,nboolean excessrecision);
-int           generic_call_replace_parm(GenericCall *self,location_t ploc,tree function,vec<tree, va_gc> *values);
 GenericModel *generic_call_get_generic_from_component_ref(GenericCall *self,tree componentRef);
 tree          generic_call_convert_generic_to_user(GenericCall *self,tree expr);
 void          generic_call_add_fpgi_parm(GenericCall *self,ClassFunc *func,ClassName *className,vec<tree, va_gc> *exprlist,GenericModel *funcGenericDefine);
-
+tree          generic_call_check_parm(GenericCall *self,location_t loc,tree function,tree origGenericDecl,tree val,
+                       nboolean npc,nboolean excessrecision,ClassName *globalClassName,GenericModel *globalGenericsDefine);
+int           generic_call_replace_parm(GenericCall *self,location_t ploc,tree function,vec<tree, va_gc> *values,
+                         ClassName *globalClassName,GenericModel *globalGenericsDefine);
 
 #endif
 

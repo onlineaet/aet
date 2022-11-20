@@ -53,7 +53,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "attribs.h"
 #include "asan.h"
 #include "aet/nlib.h"       //zclei
-#include "aet/classutil.h" //zclei
+#include "aet/clearwarning.h" //zclei
 
 /* Possible cases of implicit bad conversions.  Used to select
    diagnostic messages in convert_for_assignment.  */
@@ -2213,11 +2213,8 @@ perform_integral_promotions (tree exp)
   if (c_promoting_integer_type_p (type))
     {
       /* Preserve unsignedness if not really getting any wider.  */
-      if (TYPE_UNSIGNED (type)
-	  && TYPE_PRECISION (type) == TYPE_PRECISION (integer_type_node))
-	return convert (unsigned_type_node, exp);
-//      printf("perform_integral_promotions----\n");
-//      printNode(exp);
+      if (TYPE_UNSIGNED (type)  && TYPE_PRECISION (type) == TYPE_PRECISION (integer_type_node))
+	       return convert (unsigned_type_node, exp);
       return convert (integer_type_node, exp);
     }
 
@@ -2459,14 +2456,6 @@ tree build_component_ref (location_t loc, tree datum, tree component,location_t 
   /* See if there is a field or component with name COMPONENT.  */
 
   if (code == RECORD_TYPE || code == UNION_TYPE){
-  	//n_debug("build_component_ref 00 name:%s code:%s component:%p ",
-		    			//IDENTIFIER_POINTER(component),get_tree_code_name(code),component);
-//  	  tree xx=TYPE_NAME(type);
-//  	  printf("build_component_ref ---00 name:%s code1:%s component:%p ",
-//  			    			IDENTIFIER_POINTER(component),get_tree_code_name(TREE_CODE(xx)),component);
-//  	  tree dd=DECL_NAME(xx);
-//  	  printf("build_component_ref ---00---- name:%s code1:%s component:%p ",
-//  			    			IDENTIFIER_POINTER(component),IDENTIFIER_POINTER(dd),component);
       if (!COMPLETE_TYPE_P (type)){
 	     c_incomplete_type_error (loc, NULL_TREE, type);
 	     return error_mark_node;
@@ -2996,13 +2985,7 @@ c_expr_sizeof_type (location_t loc, struct c_type_name *t)
   tree type_expr = NULL_TREE;
   bool type_expr_const = true;
   type = groktypename (t, &type_expr, &type_expr_const);
- // printf("c_expr_sizeof_type ---code:%s\n",get_tree_code_name(TREE_CODE(type)));
-//  printNode(ret.value );
   ret.value = c_sizeof (loc, type);
- // printf("c_expr_sizeof_type ---11 code:%s\n",get_tree_code_name(TREE_CODE(type)));
-
- // printNode(ret.value );
-
   c_last_sizeof_arg = type;
   c_last_sizeof_loc = loc;
   ret.original_code = SIZEOF_EXPR;
@@ -3255,43 +3238,27 @@ convert_argument (location_t ploc, tree function, tree fundecl,
 
   /* Optionally warn about conversions that differ from the default
      conversions.  */
-    if (warn_traditional_conversion || warn_traditional)
-    {
+    if (warn_traditional_conversion || warn_traditional){
 
       unsigned int formal_prec = TYPE_PRECISION (type);
 
-      if (INTEGRAL_TYPE_P (type)
-	  && TREE_CODE (valtype) == REAL_TYPE)
-	warning_at (ploc, OPT_Wtraditional_conversion,
-		    "passing argument %d of %qE as integer rather "
-		    "than floating due to prototype",
-		    argnum, rname);
-      if (INTEGRAL_TYPE_P (type)
-	  && TREE_CODE (valtype) == COMPLEX_TYPE)
-	warning_at (ploc, OPT_Wtraditional_conversion,
-		    "passing argument %d of %qE as integer rather "
-		    "than complex due to prototype",
-		    argnum, rname);
-      else if (TREE_CODE (type) == COMPLEX_TYPE
-	       && TREE_CODE (valtype) == REAL_TYPE)
-	warning_at (ploc, OPT_Wtraditional_conversion,
-		    "passing argument %d of %qE as complex rather "
-		    "than floating due to prototype",
-		    argnum, rname);
-      else if (TREE_CODE (type) == REAL_TYPE
-	       && INTEGRAL_TYPE_P (valtype))
+      if (INTEGRAL_TYPE_P (type) && TREE_CODE (valtype) == REAL_TYPE)
+	     warning_at (ploc, OPT_Wtraditional_conversion,"passing argument %d of %qE as integer rather than floating due to prototype", argnum, rname);
+      if (INTEGRAL_TYPE_P (type) && TREE_CODE (valtype) == COMPLEX_TYPE)
+	     warning_at (ploc, OPT_Wtraditional_conversion, "passing argument %d of %qE as integer rather than complex due to prototype", argnum, rname);
+      else if (TREE_CODE (type) == COMPLEX_TYPE  && TREE_CODE (valtype) == REAL_TYPE)
+	     warning_at (ploc, OPT_Wtraditional_conversion,"passing argument %d of %qE as complex rather than floating due to prototype", argnum, rname);
+      else if (TREE_CODE (type) == REAL_TYPE && INTEGRAL_TYPE_P (valtype))
 	warning_at (ploc, OPT_Wtraditional_conversion,
 		    "passing argument %d of %qE as floating rather "
 		    "than integer due to prototype",
 		    argnum, rname);
-      else if (TREE_CODE (type) == COMPLEX_TYPE
-	       && INTEGRAL_TYPE_P (valtype))
+      else if (TREE_CODE (type) == COMPLEX_TYPE  && INTEGRAL_TYPE_P (valtype))
 	warning_at (ploc, OPT_Wtraditional_conversion,
 		    "passing argument %d of %qE as complex rather "
 		    "than integer due to prototype",
 		    argnum, rname);
-      else if (TREE_CODE (type) == REAL_TYPE
-	       && TREE_CODE (valtype) == COMPLEX_TYPE)
+      else if (TREE_CODE (type) == REAL_TYPE  && TREE_CODE (valtype) == COMPLEX_TYPE)
 	warning_at (ploc, OPT_Wtraditional_conversion,
 		    "passing argument %d of %qE as floating rather "
 		    "than complex due to prototype",
@@ -3299,8 +3266,7 @@ convert_argument (location_t ploc, tree function, tree fundecl,
       /* ??? At some point, messages should be written about
 	 conversions between complex types, but that's too messy
 	 to do now.  */
-      else if (TREE_CODE (type) == REAL_TYPE
-	       && TREE_CODE (valtype) == REAL_TYPE)
+      else if (TREE_CODE (type) == REAL_TYPE   && TREE_CODE (valtype) == REAL_TYPE)
 	{
 	  /* Warn if any argument is passed as `float',
 	     since without a prototype it would be `double'.  */
@@ -3389,7 +3355,6 @@ convert_argument (location_t ploc, tree function, tree fundecl,
 			argnum, rname);
 	}
     }
-
   /* Possibly restore an EXCESS_PRECISION_EXPR for the
      sake of better warnings from convert_and_check.  */
   if (excess_precision)
@@ -3523,7 +3488,6 @@ static int convert_arguments (location_t loc, vec<location_t> arg_loc, tree type
 	    position 0.  */
        location_t ploc= !arg_loc.is_empty () && values->length () == arg_loc.length ()
 	  ? expansion_point_location_if_in_system_header (arg_loc[parmnum]): input_location;
-      // printf("convert_arguments 44 进入循环 parmnum:%d origtypes:%p %s %s %d\n",parmnum,origtypes,__FILE__,__FUNCTION__,__LINE__);
        if (type == void_type_node){
 	      if (selector)
 	         error_at (loc, "too many arguments to method %qE", selector);
@@ -6026,17 +5990,12 @@ c_cast_expr (location_t loc, struct c_type_name *type_name, tree expr)
     warn_strict_prototypes = 0;
   type = groktypename (type_name, &type_expr, &type_expr_const);
   warn_strict_prototypes = saved_wsp;
-  //if(TREE_CODE(type)==POINTER_TYPE)
-	  //printf("c_cast_expr ---00XX %s\n",get_tree_code_name(TREE_CODE(TREE_TYPE(type))));
-
- // printf("c_cast_expr ---00 %s\n",get_tree_code_name(TREE_CODE(type)));
 
   if (TREE_CODE (expr) == ADDR_EXPR && !VOID_TYPE_P (type)
       && reject_gcc_builtin (expr))
     return error_mark_node;
 
   ret = build_c_cast (loc, type, expr);
-  //printf("c_cast_expr ---11 %s\n",get_tree_code_name(TREE_CODE(ret)));
   if (type_expr)
     {
       bool inner_expr_const = true;
@@ -6045,8 +6004,6 @@ c_cast_expr (location_t loc, struct c_type_name *type_name, tree expr)
       C_MAYBE_CONST_EXPR_NON_CONST (ret) = !(type_expr_const
 					     && inner_expr_const);
       SET_EXPR_LOCATION (ret, loc);
-      //printf("c_cast_expr ---22 %s\n",get_tree_code_name(TREE_CODE(ret)));
-
     }
 
   if (!EXPR_HAS_LOCATION (ret))
@@ -7091,7 +7048,6 @@ convert_for_assignment (location_t location, location_t expr_loc, tree type,
          /* Check if the right-hand side has a format attribute but the
 	     left-hand side doesn't.  */
       if (warn_suggest_attribute_format  && check_missing_format_attribute (type, rhstype)){
-    	  printf("convert_for_assignment ----6666 arn_suggest_attribute_format  && check_missing_format_attribute (type, rhstype)\n");
           switch (errtype)
           {
           case ic_argpass:
@@ -7244,17 +7200,17 @@ convert_for_assignment (location_t location, location_t expr_loc, tree type,
 	    {
 	    case ic_argpass:
 	      {
-		auto_diagnostic_group d;
-		range_label_for_type_mismatch rhs_label (rhstype, type);
-		gcc_rich_location richloc (expr_loc, &rhs_label);
-		if (pedwarn (&richloc, OPT_Wincompatible_pointer_types,
-			     "passing argument %d of %qE from incompatible "
-			     "pointer type", parmnum, rname))
-		  inform_for_arg (fundecl, expr_loc, parmnum, type, rhstype);
+	        if(!clear_warning_modify(type,rhs)){ //zclei
+                auto_diagnostic_group d;
+                range_label_for_type_mismatch rhs_label (rhstype, type);
+                gcc_rich_location richloc (expr_loc, &rhs_label);
+                if (pedwarn (&richloc, OPT_Wincompatible_pointer_types, "passing argument %d of %qE from incompatible pointer type", parmnum, rname))
+                   inform_for_arg (fundecl, expr_loc, parmnum, type, rhstype);
+	        }
 	      }
 	      break;
 	    case ic_assign:
-	       if(!class_util_erase_warning(type,rhs)){
+	       if(!clear_warning_modify(type,rhs)){ //zclei
 	          if (bltin)
 		        pedwarn (location, OPT_Wincompatible_pointer_types,"assignment to %qT from pointer to %qD with incompatible type %qT", type, bltin, rhstype);
 	         else
@@ -7262,27 +7218,18 @@ convert_for_assignment (location_t location, location_t expr_loc, tree type,
 	       }
 	       break;
 	    case ic_init:
-	      if (bltin)
-		pedwarn_init (location, OPT_Wincompatible_pointer_types,
-			      "initialization of %qT from pointer to "
-			      "%qD with incompatible type %qT",
-			      type, bltin, rhstype);
-	      else
-		pedwarn_init (location, OPT_Wincompatible_pointer_types,
-			      "initialization of %qT from incompatible "
-			      "pointer type %qT",
-			      type, rhstype);
+          if(!clear_warning_modify(type,rhs)){ //zclei
+              if (bltin)
+                 pedwarn_init (location, OPT_Wincompatible_pointer_types,"initialization of %qT from pointer to %qD with incompatible type %qT",type, bltin, rhstype);
+              else
+                 pedwarn_init (location, OPT_Wincompatible_pointer_types,"initialization of %qT from incompatible pointer type %qT", type, rhstype);
+          }
 	      break;
 	    case ic_return:
 	      if (bltin)
-		pedwarn (location, OPT_Wincompatible_pointer_types,
-			 "returning pointer to %qD of type %qT from "
-			 "a function with incompatible type %qT",
-			 bltin, rhstype, type);
+		      pedwarn (location, OPT_Wincompatible_pointer_types,"returning pointer to %qD of type %qT from a function with incompatible type %qT", bltin, rhstype, type);
 	      else
-		pedwarn (location, OPT_Wincompatible_pointer_types,
-			 "returning %qT from a function with incompatible "
-			 "return type %qT", rhstype, type);
+		      pedwarn (location, OPT_Wincompatible_pointer_types,"returning %qT from a function with incompatible return type %qT", rhstype, type);
 	      break;
 	    default:
 	      gcc_unreachable ();
@@ -7487,7 +7434,6 @@ store_init_value (location_t init_loc, tree decl, tree init, tree origtype)
     return;
 
   /* Digest the specified initializer into an expression.  */
-
   if (init)
     npc = null_pointer_constant_p (init);
   value = digest_init (init_loc, type, init, origtype, npc,
@@ -7524,6 +7470,7 @@ store_init_value (location_t init_loc, tree decl, tree init, tree origtype)
 
 	  if (TYPE_DOMAIN (TREE_TYPE (cldecl)))
 	    {
+
 	      /* For int foo[] = (int [3]){1}; we need to set array size
 		 now since later on array initializer will be just the
 		 brace enclosed list of the compound literal.  */
@@ -11009,7 +10956,6 @@ c_finish_bc_stmt (location_t loc, tree *label_p, bool is_break)
 {
   bool skip;
   tree label = *label_p;
-  //printf("c_finish_bc_stmt -----\n");
   /* In switch statements break is sometimes stylistically used after
      a return statement.  This can lead to spurious warnings about
      control reaching the end of a non-void function when it is

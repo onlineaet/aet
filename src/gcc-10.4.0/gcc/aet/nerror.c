@@ -34,7 +34,7 @@ NError* n_error_new_valist (NQuark domain,   nint code, const nchar *format, va_
   n_warn_if_fail (domain != 0);
   n_warn_if_fail (format != NULL);
 
-  error = n_slice_new (NError);
+  error = (NError *)n_slice_new (NError);
 
   error->domain = domain;
   error->code = code;
@@ -66,7 +66,7 @@ NError* n_error_new_literal (NQuark  domain,nint code, const nchar   *message)
 
   n_return_val_if_fail (message != NULL, NULL);
   n_return_val_if_fail (domain != 0, NULL);
-  err = n_slice_new (NError);
+  err = (NError *) n_slice_new (NError);
   err->domain = domain;
   err->code = code;
   err->message = n_strdup (message);
@@ -90,7 +90,7 @@ NError* n_error_copy (const NError *error)
   n_warn_if_fail (error->domain != 0);
   n_warn_if_fail (error->message != NULL);
 
-  copy = n_slice_new (NError);
+  copy =  (NError *)n_slice_new (NError);
 
   *copy = *error;
 

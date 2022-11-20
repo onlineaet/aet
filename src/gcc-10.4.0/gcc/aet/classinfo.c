@@ -176,14 +176,14 @@ void       class_name_free(ClassName *className)
 
 ClassName *class_info_clone_class_name(ClassInfo *self)
 {
-	ClassName *dest=n_slice_new0(ClassName);
+	ClassName *dest=(ClassName *)n_slice_new0(ClassName);
 	copyClassName(dest,&self->className);
 	return dest;
 }
 
 ClassName *class_name_clone(ClassName *className)
 {
-	ClassName *dest=n_slice_new0(ClassName);
+	ClassName *dest=(ClassName *)n_slice_new0(ClassName);
 	copyClassName(dest,className);
 	return dest;
 }

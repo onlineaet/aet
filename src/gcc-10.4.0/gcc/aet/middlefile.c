@@ -102,7 +102,7 @@ static char *readFile(char *fileName)
         fclose(fp);
         return NULL;
     }
-    char *data=n_malloc(size+1);
+    char *data=(char *)n_malloc(size+1);
     int rev = fread(data, sizeof(char), size, fp);
     if(rev!=size){
         n_error("文件的大小是:%llu,读出的大小是:%d 文件:%s",size,rev,fileName);
@@ -124,13 +124,13 @@ static char *compressData(char *data,int *returnLen)
 {
     int dataLen=strlen(data);
     int calaLen=dataLen+10;
-    char *compressBuffer =n_malloc(calaLen);
+    char *compressBuffer =(char *)n_malloc(calaLen);
     nulong compressLen=calaLen;
-    int result=compress(compressBuffer, &compressLen, data, dataLen + 1);
+    int result=compress((unsigned char*)compressBuffer, &compressLen, (unsigned char*)data, dataLen + 1);
     if (Z_OK == result){
         nulong uncompressLen =calaLen;
-        char *uncompressBuffer =n_malloc(calaLen);
-        result= uncompress(uncompressBuffer, &uncompressLen, compressBuffer, compressLen);
+        char *uncompressBuffer =(char *)n_malloc(calaLen);
+        result= uncompress((unsigned char*)uncompressBuffer, &uncompressLen, (unsigned char*)compressBuffer, compressLen);
         if (Z_OK == result)
         {
             if(strcmp(data,uncompressBuffer)){
@@ -144,7 +144,7 @@ static char *compressData(char *data,int *returnLen)
         n_error("压缩数据时出错。error:%d\n%s\n",result,data);
     }
     int total=sizeof(int)+sizeof(int)+compressLen;
-    char *newData=n_malloc(total);
+    char *newData=(char *)n_malloc(total);
     int cl=(int)compressLen;
     memcpy(newData,&calaLen,sizeof(int));
     memcpy(newData+sizeof(int),&cl,sizeof(int));
@@ -325,7 +325,7 @@ char *middle_file_decode(char *value,int size)
     memcpy(&compressLen,value+sizeof(int),sizeof(int));
     char *compressBuffer=value+2*sizeof(int);
     nulong uncompressLen =calcLen;
-    char *uncompressBuffer =n_malloc(calcLen);
+    char *uncompressBuffer =(char *)n_malloc(calcLen);
     int result= uncompress(uncompressBuffer, &uncompressLen, compressBuffer, compressLen);
     if (Z_OK == result)
     {

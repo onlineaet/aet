@@ -189,7 +189,7 @@ typedef struct _ImplIfaceFunc{
 
 static void addImplMethod(NPtrArray *array,ClassName *from,char *atSysName,ClassFunc *implFunc,ClassName *iface,ClassFunc *interfaceMethod)
 {
-	ImplIfaceFunc *data=n_slice_new0(ImplIfaceFunc);
+	ImplIfaceFunc *data=(ImplIfaceFunc *)n_slice_new0(ImplIfaceFunc);
 	data->from=from;
 	data->atSysName=atSysName;
 	data->implFunc=implFunc;
@@ -275,7 +275,7 @@ static void createInterfaceMethodAssignmentCode(ImplIfaceFunc *item,NPtrArray *a
 //	 n_string_append_printf(modify,"((%s *)&self->%s)->%s",item->iface->sysName,ifaceVar,superFieldName);
 //	 n_string_append_printf(modify,"=%s;\n",item->classMangleName);
  	 n_debug("class_interface 获取的接口赋值原代码：%s\n",modify->str);
- 	 IFaceSourceCode *code=n_slice_new(IFaceSourceCode);
+ 	 IFaceSourceCode *code=(IFaceSourceCode *)n_slice_new(IFaceSourceCode);
  	 code->define=NULL;
  	 code->modify=n_strdup(modify->str);
  	 n_string_free(modify,TRUE);
@@ -302,7 +302,7 @@ static void assignmentAtClass(ClassInfo *info,NPtrArray *array)
 		   ClassInfo *faceInfo=class_mgr_get_class_info_by_class_name(class_mgr_get(),&iface);
 		   char ifaceVar[255];
 		   aet_utils_create_in_class_iface_var(faceInfo->className.userName,ifaceVar);//一定与classparser中创建的接口变量名相同
-		   IFaceSourceCode *code=n_slice_new(IFaceSourceCode);
+		   IFaceSourceCode *code=(IFaceSourceCode *)n_slice_new(IFaceSourceCode);
 		   code->define=NULL;
 		   code->modify=n_strdup_printf("self->%s.%s.%s=(void *)self;\n",ifaceVar,IFACE_COMMON_STRUCT_VAR_NAME,IFACE_AT_CLASS);
 		   n_ptr_array_add(array,code);
@@ -350,7 +350,7 @@ static void assignmentIfaceRefFunction(ClassInfo *info,NPtrArray *array)
 
 
 
-		   IFaceSourceCode *code=n_slice_new(IFaceSourceCode);
+		   IFaceSourceCode *code=(IFaceSourceCode *)n_slice_new(IFaceSourceCode);
 		   code->define=NULL;
 		   code->modify=n_strdup_printf("self->%s.%s=%s;\n",ifaceVar,refMangle,IFACE_REF_FUNC_DEFINE_NAME);
 		   n_ptr_array_add(array,code);
@@ -360,7 +360,7 @@ static void assignmentIfaceRefFunction(ClassInfo *info,NPtrArray *array)
 //		   code->modify=n_strdup_printf("self->%s.%s=%s;\n",ifaceVar,superRefFieldName,IFACE_REF_FUNC_DEFINE_NAME);
 //		   n_ptr_array_add(array,code);
 
-		   code=n_slice_new(IFaceSourceCode);
+		   code=(IFaceSourceCode *)n_slice_new(IFaceSourceCode);
 		   code->define=NULL;
 		   code->modify=n_strdup_printf("self->%s.%s=%s;\n",ifaceVar,unRefMangle,IFACE_UNREF_FUNC_DEFINE_NAME);
 		   n_ptr_array_add(array,code);
@@ -385,7 +385,7 @@ static void assignmentMagic(ClassInfo *info,NPtrArray *array)
               ClassInfo *faceInfo=class_mgr_get_class_info_by_class_name(class_mgr_get(),&iface);
               char ifaceVar[255];
               aet_utils_create_in_class_iface_var(faceInfo->className.userName,ifaceVar);//一定与classparser中创建的接口变量名相同
-              IFaceSourceCode *code=n_slice_new(IFaceSourceCode);
+              IFaceSourceCode *code=(IFaceSourceCode *)n_slice_new(IFaceSourceCode);
               code->define=NULL;
               code->modify=n_strdup_printf("self->%s.%s.%s=%d;\n",ifaceVar,IFACE_COMMON_STRUCT_VAR_NAME,AET_MAGIC_NAME,AET_IFACE_MAGIC_NAME_VALUE);
               n_ptr_array_add(array,code);
@@ -483,6 +483,19 @@ void class_interface_add_var_ref_unref_methodxxrrrr0000(ClassInterface *self)
    return TRUE;
 }
 
+/**
+ * interface$ XXX{
+ * };
+ * 以classparser.c中调用该方法给接口加入第一个变量IfaceCommonData123。
+ * 所以接口名XXX也可强转成IfaceCommonData123.
+ * 生成的接口内部声明如下:
+ * interface$ IFACE{
+ *   IfaceCommonData123 _iface_common_var;
+ *   IfaceCommonData123 *_iface_reserve_ref_field_123();
+ *   void _iface_reserve_unref_field_123();
+ *   //以面是用户的代码。
+ * }
+ */
 void class_interface_add_var_ref_unref_method(ClassInterface *self)
 {
   c_parser *parser=self->parser;

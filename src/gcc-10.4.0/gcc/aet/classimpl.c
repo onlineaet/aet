@@ -56,6 +56,7 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 #include "enumparser.h"
 #include "namelesscall.h"
 #include "accesscontrols.h"
+#include "selectfield.h"
 
 /**
  * class的实现样式如下：
@@ -348,7 +349,8 @@ void class_impl_parser(ClassImpl *self)
 		  n_free(fillSuperAddress);
 	  //创建类的类型
       n_debug("重要的初始化方法源代码 ----addInitDefine---- :\n%s\n",buf->str);
-	  aet_utils_add_token(parse_in,buf->str,buf->len);
+	  //aet_utils_add_token(parse_in,buf->str,buf->len);
+	  aet_utils_add_token_with_force(parse_in,buf->str,buf->len,input_location,FALSE);
 	  n_string_free(buf,TRUE);
 	  tempClassName=class_name_clone(self->className);
 	  updateClassName(self,NULL);
@@ -472,7 +474,7 @@ nboolean  class_impl_add_static_to_declspecs(ClassImpl *self,location_t loc,stru
 		  return TRUE;
 	  }
 	  if(specs->storage_class!=csc_none){
-		  n_debug("已经有其它存储声明说明符了 %d %s %s",specs->storage_class,aet_c_storage_class_str[specs->storage_class],self->className->sysName);
+		  n_debug("已经有其它存储声明说明符了 %d %s %s",specs->storage_class,aet_print_get_storage_class_string(specs->storage_class),self->className->sysName);
           return FALSE;
 	  }
 	  specs->storage_class=csc_static;
@@ -655,7 +657,7 @@ struct c_expr class_impl_process_expression(ClassImpl *self,struct c_expr expr,l
 				* AHashFunc var=strHashFunc;
 				*/
 			   if(exists){
-	              expr.value=parser_static_create_temp_tree(parser_static_get(),className,IDENTIFIER_POINTER(id));
+	              expr.value=parser_static_create_temp_tree(parser_static_get(),loc,className,IDENTIFIER_POINTER(id));
 	    		  *action=2;
 			   }else{
 			       //是不是com.ARandom 模式
@@ -735,8 +737,8 @@ struct c_expr class_impl_replace_func_id(ClassImpl *self,struct c_expr expr,vec<
     }
     n_debug("class_impl_replace_func_id 33 id:%s returnType:%s ",get_tree_code_name(TREE_CODE (id)),get_tree_code_name(TREE_CODE (returnType)));
     tree last=NULL_TREE;
+    FuncPointerError *errors =NULL;
     //对于构造函数的调用一定是指针引用
-
     if(TREE_CODE (func)==COMPONENT_REF && BINFO_FLAG_4(func)==1){
         nboolean mayBeSelfOrSuperCall=FALSE;
         tree field=TREE_OPERAND(func,1);
@@ -766,14 +768,14 @@ struct c_expr class_impl_replace_func_id(ClassImpl *self,struct c_expr expr,vec<
     }else if(TREE_CODE (func)==FUNCTION_DECL &&  BINFO_FLAG_2(func)==1){
     	char *funcName=IDENTIFIER_POINTER(DECL_NAME(func));
     	n_debug("class_impl_replace_func_id 55 这是在implimpl中的函数调用，没有加self-> %s funcName:%s",IDENTIFIER_POINTER(id),funcName);
-    	last=func_call_select(self->funcCall,func,exprlist,origtypes,arg_loc,expr_loc);
+    	last=func_call_select(self->funcCall,func,exprlist,origtypes,arg_loc,expr_loc,&errors);
     	class_cast_parm_convert_from_deref(self->classCast,last,exprlist);
     }else if(TREE_CODE (func)==FUNCTION_DECL && BINFO_FLAG_3(func)==1 && TREE_STATIC(func)){
     	//这是Class.func调用
     	char *funcName=IDENTIFIER_POINTER(DECL_NAME(func));
         nboolean fromDot=DECL_ARTIFICIAL (func);
     	n_debug("class_impl_replace_func_id 66 这是Class.func调用，没有加self-> %s funcName:%s",IDENTIFIER_POINTER(id),funcName);
-    	last=func_call_static_select(self->funcCall,func,exprlist,origtypes,arg_loc,expr_loc);
+    	last=func_call_static_select(self->funcCall,func,exprlist,origtypes,arg_loc,expr_loc,&errors);
     	if(last==NULL){
     		//说明没找到方法，可能是参数不对也可能是没有这个函数。
     	    last= implicitly_call_call_from_static(self->implicitlyCall,expr,exprlist,origtypes,arg_loc,expr_loc,fromDot);
@@ -787,14 +789,14 @@ struct c_expr class_impl_replace_func_id(ClassImpl *self,struct c_expr expr,vec<
         tree id=DECL_NAME (field);
     	char *funcName=IDENTIFIER_POINTER(id);
     	n_debug("class_impl_replace_func_id 77 这是指针引用  funcName:%s",IDENTIFIER_POINTER(id));
-    	last=func_call_deref_select(self->funcCall,func,exprlist,origtypes,arg_loc,expr_loc);
+    	last=func_call_deref_select(self->funcCall,func,exprlist,origtypes,arg_loc,expr_loc,&errors);
     	class_cast_parm_convert_from_deref(self->classCast,last,exprlist);
     }else if(TREE_CODE (func)==COMPONENT_REF && BINFO_FLAG_5(func)==1){
         tree field=TREE_OPERAND(func,1);
         tree id=DECL_NAME (field);
     	char *funcName=IDENTIFIER_POINTER(id);
     	n_debug("class_impl_replace_func_id 88 这是super指针引用  funcName:%s",IDENTIFIER_POINTER(id));
-    	last=func_call_super_select(self->funcCall,func,exprlist,origtypes,arg_loc,expr_loc);
+    	last=func_call_super_select(self->funcCall,func,exprlist,origtypes,arg_loc,expr_loc,&errors);
         class_cast_parm_convert_from_deref(self->classCast,last,exprlist);
         if(aet_utils_valid_tree(last)){
     		last=super_call_replace_super_call(self->superCall,last);
@@ -993,16 +995,14 @@ void class_impl_build_class_dot (ClassImpl *self, location_t loc,struct c_expr *
 			   nboolean exits=func_mgr_static_func_exits_by_recursion(func_mgr_get(),&info->className,component);
 			   if(!exits){
 				  if(!strcmp(IDENTIFIER_POINTER(component),"class")){
-					  printf("这是一个获取AClass的方法 类:%s\n",sysClassName);
+					  n_debug("这是一个获取AClass的方法 类:%s\n",sysClassName);
 					  expr->value =class_build_get_func(self->classBuild,&info->className);
 					  set_c_expr_source_range (expr, loc, end_loc);
 					  return;
 				  }else{
 					  //查找是不是枚举 Class和CPP_DOT已被consume了
 					  char *enumOrigName=IDENTIFIER_POINTER(component);
-					  printf("查找是不是枚举 Class和CPP_DOT已被consume了 %s\n",enumOrigName);
 					  nboolean isClassDotEnum=enum_parser_is_class_dot_enum(enum_parser_get(),sysClassName,enumOrigName);
-					  printf("isEnumDot-----%d %s %s\n",isClassDotEnum,sysClassName,enumOrigName);
 					  if(isClassDotEnum){
 					      parser_help_set_forbidden(TRUE);
 						  enum_parser_build_class_dot_enum(enum_parser_get(),loc,sysClassName,enumOrigName,expr);
@@ -1015,7 +1015,8 @@ void class_impl_build_class_dot (ClassImpl *self, location_t loc,struct c_expr *
 				  }
 			   }else{
 				  n_info("通过%s名，找到了函数,在这里不能判断是不是参数。",IDENTIFIER_POINTER(component));
-                  var=parser_static_create_temp_tree(parser_static_get(),&info->className,IDENTIFIER_POINTER(component));
+                  var=parser_static_create_temp_tree(parser_static_get(),loc,&info->className,IDENTIFIER_POINTER(component));
+                  n_info("通过%s名，11 找到了函数,在这里不能判断是不是参数。%s",IDENTIFIER_POINTER(component),IDENTIFIER_POINTER(DECL_NAME(var)));
 			   }
 			}else{
 				//找到了变量，获取该该变量是属于那个类的
@@ -1188,14 +1189,12 @@ struct c_expr class_impl_nameles_call(ClassImpl *self,struct c_expr expr)
     return expr;
 }
 
-
-
 /**
  * 检查是不是给函数变量赋值，如果右边是类中的静态函数。需要重新生成新的tree
  */
-tree class_impl_modify_func_pointer(ClassImpl *self,tree lhs,tree rhs)
+tree class_impl_modify_or_init_func_pointer(ClassImpl *self,tree lhs,tree rhs)
 {
-   return parser_static_modify_func_pointer(parser_static_get(),lhs,rhs);
+   return parser_static_modify_or_init_func_pointer(parser_static_get(),lhs,rhs);
 }
 
 /**

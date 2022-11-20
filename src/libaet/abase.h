@@ -142,8 +142,18 @@ typedef apointer	    (*ACopyFunc)            (aconstpointer  src,apointer       
 #  endif /* !__cplusplus */
 #endif
 
-#define	FALSE	(0)
-#define	TRUE	(!FALSE)
+//#define	FALSE	(0)
+//#define	TRUE	(!FALSE)
+
+#undef TRUE
+#undef FALSE
+#ifndef FALSE
+#define FALSE   (0)         //GCC 已有
+#endif
+#ifndef TRUE
+#define TRUE    (!FALSE)    //GCC 已有
+#endif
+
 
 #define a_abort() abort ()
 

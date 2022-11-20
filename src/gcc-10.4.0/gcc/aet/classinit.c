@@ -245,7 +245,7 @@ static void createSourceCode(OverrideFuncs *item,NPtrArray *codes,char *varName)
 static void addResult(NPtrArray *array,int error,ClassName *childName,ClassName *belongChildClass,
 		ClassName *parentName,ClassName *belongParentClass,ClassFunc *parentItem,tree childFieldDecl,char *childMangleName)
 {
-	OverrideFuncs *data=n_slice_new0(OverrideFuncs);
+	OverrideFuncs *data=(OverrideFuncs *)n_slice_new0(OverrideFuncs);
 	data->childName=class_name_clone(childName);
 	data->belongChildClass=class_name_clone(belongChildClass);
 	if(childMangleName)
@@ -611,10 +611,12 @@ void class_init_create_init_define(ClassInit *self,ClassName *className,NPtrArra
 	 char *initMethod=aet_utils_create_init_method(className->sysName);
 	 n_string_append_printf(buf,"void * %s(%s *self)\n{\n",initMethod,className->sysName);
 	 n_free(initMethod);
-	 n_string_append(buf,"if(self==NULL)\n");//说明要获取class类信息
+	 n_string_append(buf,"   if(self==NULL){\n");//说明要获取class类信息
 	 char getAClassFuncName[255];
 	 class_build_create_func_name(className,getAClassFuncName);
-	 n_string_append_printf(buf,"return (void *)%s((AObject *)self);\n",getAClassFuncName);
+	 n_string_append_printf(buf,"       return (void *)%s((AObject *)self);\n",getAClassFuncName);
+	 n_string_append(buf,"   }\n");
+
 	 if(info->parentName.sysName){
 		 char *parentInitMethod=aet_utils_create_init_method(info->parentName.sysName);
 		 n_string_append_printf(buf,"%s((%s *)self);\n",parentInitMethod,info->parentName.sysName);
@@ -662,7 +664,7 @@ void class_init_create_init_define_for_interface(ClassInit *self,char *sysName,N
 	 n_free(initMethod);
 	 char getAClassFuncName[255];
 	 class_build_create_func_name(className,getAClassFuncName);
-	 n_string_append_printf(buf,"return (void *)%s(self);\n",getAClassFuncName);
+	 n_string_append_printf(buf,"return (void *)%s((AObject *)self);\n",getAClassFuncName);
 	 n_string_append(buf,"}\n");
 }
 

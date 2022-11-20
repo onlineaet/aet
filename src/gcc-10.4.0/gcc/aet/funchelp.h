@@ -35,30 +35,18 @@ struct _FuncHelp
 	c_parser *parser;
 };
 
-
-
-
 FuncHelp  *func_help_new();
 tree       func_help_create_itself_deref(FuncHelp *self,tree parmOrVar,tree field,location_t loc);
 tree       func_help_component_ref_interface(FuncHelp *self,tree orgiComponentRef,tree parmOrVar,
 		      ClassName *refVarClassName,ClassName *className,ClassFunc *selectedFunc,location_t loc,tree *firstParm);
-tree       func_help_create_parent_iface_deref(FuncHelp *self,tree parmOrVar,ClassName *parentName,ClassName *iface,
-		       tree ifaceField,location_t loc,tree *firstParm);
 tree       func_help_cast_to_parent(FuncHelp *self,tree parmOrVar,ClassName *parentName);
-tree       func_help_create_parent_deref(FuncHelp *self,tree parmOrVar,ClassName *parent,tree parentField,location_t loc,tree *firstParm);
-tree       func_help_create_itself_iface_deref(FuncHelp *self,tree parmOrVar,ClassName *className,
-		      ClassName *iface,tree ifaceField,location_t loc,tree *firstParm);
-SelectedDecl *func_help_select_static_func(FuncHelp *self,ClassName *className,char *orgiName,vec<tree, va_gc> *exprlist,
-                     vec<tree, va_gc> *origtypes,vec<location_t> arg_loc,location_t expr_loc);
-int        func_help_process_static_func_param(FuncHelp *self,ClassName *className,char *orgiName,vec<tree, va_gc> *exprlist,nboolean isStaic);
 
 
-tree       func_help_create_parent_iface_deref_new(FuncHelp *self,tree func,ClassName *parentName,ClassName *iface,
+
+tree       func_help_create_parent_iface_deref(FuncHelp *self,tree func,ClassName *parentName,ClassName *iface,
                    tree ifaceField,location_t loc,tree *firstParm);
-
-tree       func_help_create_parent_deref_new(FuncHelp *self,tree func,ClassName *parent,tree parentField,location_t loc,tree *firstParm);
-
-tree       func_help_create_itself_iface_deref_new(FuncHelp *self,tree func,ClassName *className,
+tree       func_help_create_parent_deref(FuncHelp *self,tree func,ClassName *parent,tree parentField,location_t loc,tree *firstParm);
+tree       func_help_create_itself_iface_deref(FuncHelp *self,tree func,ClassName *className,
                         ClassName *iface,tree ifaceField,location_t loc,tree *firstParm);
 tree       func_help_create_itself_deref_new(FuncHelp *self,tree func,tree field,location_t loc,tree *firstParm);
 

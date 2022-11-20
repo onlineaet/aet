@@ -272,7 +272,7 @@ void access_controls_save_access_code(AccessControls *self,ClassName *className)
     if(funcArray!=NULL){
         for(i=0;i<funcArray->len;i++){
             ClassFunc *func=n_ptr_array_index(funcArray,i);
-            AccessCode *code=n_slice_new(AccessCode);
+            AccessCode *code=(AccessCode *)n_slice_new(AccessCode);
             code->serialNumber=func->serialNumber;
             code->permission=func->permission;
             code->type=NORMAL_METHOD;
@@ -284,7 +284,7 @@ void access_controls_save_access_code(AccessControls *self,ClassName *className)
     if(staticFuncArray!=NULL){
         for(i=0;i<staticFuncArray->len;i++){
            ClassFunc *func=n_ptr_array_index(staticFuncArray,i);
-           AccessCode *code=n_slice_new(AccessCode);
+           AccessCode *code=(AccessCode *)n_slice_new(AccessCode);
            code->serialNumber=func->serialNumber;
            code->permission=func->permission;
            code->type=STATIC_METHOD;
@@ -296,7 +296,7 @@ void access_controls_save_access_code(AccessControls *self,ClassName *className)
     if(varArray!=NULL){
          for(i=0;i<varArray->len;i++){
               VarEntity *var=n_ptr_array_index(varArray,i);
-              AccessCode *code=n_slice_new(AccessCode);
+              AccessCode *code=(AccessCode *)n_slice_new(AccessCode);
               code->serialNumber=var->serialNumber;
               code->permission=var->permission;
               code->type=var->isStatic?STATIC_VAR:NORMAL_VAR;
@@ -359,7 +359,7 @@ static nboolean exitsImpl(AccessControls *self,char *sysName)
 
 static void addCall(AccessControls *self,ClassFunc *calleeFunc,nboolean isAet,char *callSysName,location_t loc)
 {
-    AccessEnv *env=n_slice_new(AccessEnv);
+    AccessEnv *env=(AccessEnv *)n_slice_new(AccessEnv);
     char *currentFile=in_fnames[0];
     env->file=NULL;
     if(in_fnames[0])
@@ -381,7 +381,7 @@ static void addCall(AccessControls *self,ClassFunc *calleeFunc,nboolean isAet,ch
 
 static void addVar(AccessControls *self,char  *calleeSystem,VarEntity *var,nboolean isAet,char *callSysName,location_t loc)
 {
-    AccessEnv *env=n_slice_new(AccessEnv);
+    AccessEnv *env=(AccessEnv *)n_slice_new(AccessEnv);
     char *currentFile=in_fnames[0];
     env->file=NULL;
     if(in_fnames[0])
@@ -403,7 +403,7 @@ static void addVar(AccessControls *self,char  *calleeSystem,VarEntity *var,nbool
 
 static void addEnum(AccessControls *self,char  *calleeSystem,EnumData *enumData,char *enumVar,nboolean isAet,char *callSysName,location_t loc)
 {
-    AccessEnv *env=n_slice_new(AccessEnv);
+    AccessEnv *env=(AccessEnv *)n_slice_new(AccessEnv);
     char *currentFile=in_fnames[0];
     env->file=NULL;
     if(in_fnames[0])
@@ -704,7 +704,7 @@ nboolean access_controls_access_method(AccessControls *self,location_t loc,Class
     //如果调用是在类中，但是该类
     //第一种：公共方法，返回TRUE
     c_parser *parser=self->parser;
-    n_debug("访问类方法---- %s permission:%d parser->isAet:%d\n",func->mangleFunName,func->permission,parser->isAet);
+    n_debug("访问类方法---xxx- %s permission:%d parser->isAet:%d\n",func->mangleFunName,func->permission,parser->isAet);
     if(!aet_utils_valid_tree(func->classTree)){
         n_error("在访问控制时出错了,调用的函数:%s,没有类信息",func->mangleFunName);
         return FALSE;
@@ -865,7 +865,7 @@ AccessControls *access_controls_get()
 {
     static AccessControls *singleton = NULL;
     if (!singleton){
-         singleton =n_slice_alloc0 (sizeof(AccessControls));
+         singleton =(AccessControls *)n_slice_alloc0 (sizeof(AccessControls));
          accessControlsInit(singleton);
     }
     return singleton;

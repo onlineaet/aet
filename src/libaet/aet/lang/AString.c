@@ -28,14 +28,7 @@ static AMutex strErrorLock=new$ AMutex();
 
 impl$ AString{
 
-  static int charAt(char *data,int index){
-	 char *re=a_utf8_offset_to_pointer(data,index);
-	 auint32  c = a_utf8_get_char (re);
-	 return c;
-  }
-
-
-  static void maybeExpand (asize len){
+  void maybeExpand (asize len){
       if (self->length + len >= self->allocatedLen){
         self->allocatedLen = nearest_power (1, self->length + len + 1);
         self->str = a_realloc (self->str, self->allocatedLen);
@@ -50,7 +43,7 @@ impl$ AString{
 	  return insert (-1, val, -1);
   }
 
-  void append(achar c){
+  void append(char c){
       insert(-1,c);
   }
 
@@ -71,9 +64,7 @@ impl$ AString{
     str[pos_unsigned] = c;
     length += 1;
     str[length] = 0;
-
   }
-
 
   const char *getBytes(){
 	  return str;
@@ -467,7 +458,7 @@ impl$ AString{
 	    else{
 	  	  initSize(len);
 	        if (init)
-	          append(init, len);
+	          append((const char *)init, len);
 
 	    }
   }

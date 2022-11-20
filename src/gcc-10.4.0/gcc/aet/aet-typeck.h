@@ -48,7 +48,7 @@ void aet_pop_maybe_used (bool used);//no
 struct c_expr aet_c_expr_sizeof_expr (location_t loc, struct c_expr expr); //no
 struct c_expr aet_c_expr_sizeof_type (location_t loc, struct c_type_name *t);//no
 tree aet_build_function_call (location_t loc, tree function, tree params);//no
-tree aet_build_function_call_vec (location_t, vec<location_t>, tree,vec<tree, va_gc> *, vec<tree, va_gc> *);
+tree aet_build_function_call_vec (location_t, vec<location_t>, tree,vec<tree, va_gc> *, vec<tree, va_gc> *,void *userData);
 tree aet_c_build_function_call_vec (location_t loc, vec<location_t> arg_loc,tree function, vec<tree, va_gc> *params,vec<tree, va_gc> *origtypes);//no
 struct c_expr aet_parser_build_unary_op (location_t loc, enum tree_code code, struct c_expr arg);//no
 struct c_expr aet_parser_build_binary_op (location_t location, enum tree_code code,struct c_expr arg1, struct c_expr arg2);//no
@@ -117,8 +117,9 @@ bool aet_c_decl_implicit (const_tree fndecl);//no
  * 检查函数参数类型与实参是否匹配
  * zclei 加的
  */
-tree aet_check_funcs_param(location_t loc, vec<location_t> arg_loc,tree function, vec<tree, va_gc> *params,vec<tree, va_gc> *origtypes);
+tree aet_check_funcs_param(location_t loc, vec<location_t> arg_loc,tree function, vec<tree, va_gc> *params,vec<tree, va_gc> *origtypes,void *userData);
 tree aet_lookup_field(tree,tree);
+tree aet_typeck_func_param_compare(location_t init_loc, tree type, tree init,int require_constant);
 
 
 #endif /* ! GCC_AET_TYPECK_H */

@@ -177,62 +177,6 @@ static tree buildExternalRef (location_t loc, tree id)
      return ref;
 }
 
-
-typedef struct _CandidateFun
-{
-	ClassFunc *mangle;
-	WarnAndError *warnErr;
-}CandidateFun;
-
-static void freeCandidate_cb(CandidateFun *item)
-{
-	if(item==NULL)
-		return;
-	n_free(item->warnErr);
-	n_slice_free(CandidateFun,item);
-}
-
-static nint warnCompare_cb(nconstpointer  cand1,nconstpointer  cand2)
-{
-	CandidateFun *p1 = (CandidateFun *)cand1;
-	CandidateFun *p2 = (CandidateFun *)cand2;
-    int a=p1->warnErr->warnCount;
-    int b=p2->warnErr->warnCount;
-    return (a > b ? +1 : a == b ? 0 : -1);
-}
-
-/**
- * 找最好的，最好的定义为警告最少的。
- * 如果list中有两个警告数相同的，取不是泛型函数的那个。
- */
-static CandidateFun * filterGoodFunc(NList *okList)
-{
-  if(n_list_length(okList)==0){
-    n_debug("filterGoodFunc 没有匹配的函数!!! ");
-    return NULL;
-  }
-  okList=n_list_sort(okList,warnCompare_cb);
-  int len=n_list_length(okList);
-  if(len==1){
-    CandidateFun *cand=(CandidateFun *)n_list_nth_data(okList,0);
-    n_debug("找到了声明的函数 成功匹配参数，只有一个 xxx decl code:%s name:%s ",cand->mangle->orgiName,cand->mangle->mangleFunName);
-    return cand;
-  }else{
-	 int i;
-	 CandidateFun *first=(CandidateFun *)n_list_nth_data(okList,0);
-	 nboolean genericFunc=class_func_is_func_generic(first->mangle);
-	 if(!genericFunc){
-        return first;
-	 }
-	 CandidateFun *compare=(CandidateFun *)n_list_nth_data(okList,1);
-	 if(first->warnErr->warnCount==compare->warnErr->warnCount){
-		 return compare;
-	 }else{
-	     return first;
-	 }
-  }
-}
-
 static tree createTempFunction(tree field)
 {
    tree funid=DECL_NAME(field);
@@ -244,53 +188,6 @@ static tree createTempFunction(tree field)
    return decl;
 }
 
-static CandidateFun * checkParam(FuncCall *self,ClassFunc *func,tree decl,vec<tree, va_gc> *exprlist,vec<tree, va_gc> *origtypes,
-		vec<location_t> arg_loc,location_t expr_loc)
-{
-   tree  funcType = TREE_TYPE (decl);
-   int count=0;
-   int varargs_p = 1;
-   for (tree al = TYPE_ARG_TYPES (funcType); al; al = TREE_CHAIN (al)){
-		tree type=TREE_VALUE(al);
-		if(type == void_type_node){
-			//n_debug("有void_type_node count:%d 函数名:%s",count,IDENTIFIER_POINTER(DECL_NAME(decl)));
-			varargs_p=0;
-			break;
-		}
-		count++;
-   }
-   //跳过FuncGenParmInfo info 形参 在泛型函数中abc(Abc *self,FuncGenParmInfoinfo,....);aet_check_funcs_param会判断是否要跳过参数
-   if(count!=exprlist->length() && varargs_p==0){
-	   nboolean ok1=class_func_is_func_generic(func);
-	   nboolean ok2=class_func_is_query_generic(func);
-	   n_debug("checkParam 参数个数不匹配! 检查是不是泛型函数 形参：%d 实参:%d 是泛型函数：ok:%d 是带问号泛型参数的函数:%d",count,exprlist->length(),ok1,ok2);
-	   if(!ok1 && !ok2){
-	      return NULL;
-	   }
-   }
-
-   aet_warn_and_error_reset();
-   if(varargs_p)
-       n_debug("checkParam 开始匹配参数 decl code:%s name:%s 是否有可变参数：%d",
-						get_tree_code_name(TREE_CODE(decl)),IDENTIFIER_POINTER(DECL_NAME(decl)),varargs_p);
-   tree value=decl;
-   mark_exp_read (value);
-   value= aet_check_funcs_param (expr_loc, arg_loc, value,exprlist, origtypes);
-   if(value==error_mark_node){
-	  n_debug("checkParam 不能匹配参数 decl code:%s name:%s ",
-			  get_tree_code_name(TREE_CODE(decl)),IDENTIFIER_POINTER(DECL_NAME(decl)));
-   }else{
-	  n_debug("checkParam 有错误吗? decl code:%s name:%s 错误数:%d warn:%d ",
-			get_tree_code_name(TREE_CODE(decl)),IDENTIFIER_POINTER(DECL_NAME(decl)),
-			argsFuncsInfo.errorCount,argsFuncsInfo.warnCount);
-	  if(argsFuncsInfo.errorCount==0){
-		CandidateFun *candidate=n_slice_new(CandidateFun);
-		candidate->warnErr=aet_warn_and_error_copy();
-		return candidate;
-	 }
-  }
-  return NULL;
-}
 
 static char *getLowClassName(tree field)
 {
@@ -396,15 +293,35 @@ static void addSelfToFunc(c_parser *parser,ClassName *className)
 }
 
 /**
+ * 从当前类遍历父类和接口
+ */
+static CandidateFunc *selectFunc(FuncCall *self,ClassName *className,char *orgiName,vec<tree, va_gc> *exprlist,
+        vec<tree, va_gc> *origtypes,vec<location_t> arg_loc,location_t expr_loc,nboolean allscope,
+        GenericModel *generics,GenericModel * funcGenericDefine,FuncPointerError **errors)
+{
+    CandidateFunc * item=select_field_get_func_by_recursion(select_field_get(),className,orgiName,
+                exprlist,origtypes,arg_loc,expr_loc,allscope,generics,errors);
+    if(item!=NULL){
+        if(class_func_is_func_generic(item->classFunc) || class_func_is_query_generic(item->classFunc)){
+            ClassName *selectClassName=class_mgr_get_class_name_by_sys(class_mgr_get(),item->sysName);
+            //printf("funcall selectFunc generic_call_add_fpgi_parm exprlist:%d\n",exprlist->length());
+            generic_call_add_fpgi_parm(generic_call_get(),item->classFunc,selectClassName,exprlist,funcGenericDefine);
+           // printf("funcall selectFunc generic_call_add_fpgi_parm exprlist:1---%d\n",exprlist->length());
+        }
+    }
+    return item;
+}
+
+
+/**
  * 把泛型形参对应的实参转化为:实参--中间形参:如<int>---void*
  */
-static void convertParmForGenerics(FuncCall *self,SelectedDecl *selectedDecl,vec<tree, va_gc> *exprlist,
+static void convertParmForGenerics(FuncCall *self,CandidateFunc *candidate,vec<tree, va_gc> *exprlist,
         location_t expr_loc,nboolean allscope,GenericModel *generics)
 {
-        ClassName *className=class_mgr_get_class_name_by_sys(class_mgr_get(),selectedDecl->className?selectedDecl->className:selectedDecl->iface);
-	    generic_call_set_global(generic_call_get(),className,generics);
+        ClassName *className=class_mgr_get_class_name_by_sys(class_mgr_get(),candidate->sysName);
 		tree decl=NULL_TREE;
-		ClassFunc *item=selectedDecl->mangleEntity;
+		ClassFunc *item=candidate->classFunc;
 		n_debug("convertParmForGenerics xxx %s allscope:%d  field?:%d exprlist:%d\n",
 			className->sysName,allscope,aet_utils_valid_tree(item->fieldDecl),exprlist->length());
 		if(allscope){
@@ -421,354 +338,62 @@ static void convertParmForGenerics(FuncCall *self,SelectedDecl *selectedDecl,vec
 			}
 		}
 		if(decl==NULL_TREE){
-			generic_call_set_global(generic_call_get(),NULL,NULL);
 			return;
 		}
-		int count=generic_call_replace_parm(generic_call_get(),expr_loc,decl, exprlist);
-	    generic_call_set_global(generic_call_get(),NULL,NULL);
+		int count=generic_call_replace_parm(generic_call_get(),expr_loc,decl, exprlist,className,generics);
 	   // printf("泛型转化成功的个数:%d\n",count);
 }
-
-static CandidateFun *cloneCand(CandidateFun *src)
-{
-	if(src==NULL)
-		return NULL;
-	CandidateFun *candidate=n_slice_new(CandidateFun);
-	candidate->mangle=src->mangle;
-	candidate->warnErr=xmalloc(sizeof(WarnAndError));
-	candidate->warnErr->warnCount=src->warnErr->warnCount;
-	return candidate;
-}
-
-
-
-/**
- * 先在本类中找
- * allscope==TRUE 找定义、声明、field，否则只找field
- */
-static CandidateFun *getFuncFromClass(FuncCall *self,ClassName *className,char *orgiFuncName,vec<tree, va_gc> *exprlist,
-        vec<tree, va_gc> *origtypes,vec<location_t> arg_loc,location_t expr_loc,nboolean allscope,GenericModel *generics)
-{
-	NList *okList=NULL;
-	NPtrArray *array=func_mgr_get_funcs(func_mgr_get(),className);
-	if(array==NULL)
-		return NULL;
-	int i;
-	generic_call_set_global(generic_call_get(),className,generics);
-	for(i=0;i<array->len;i++){
-		ClassFunc *item=(ClassFunc *)n_ptr_array_index(array,i);
-		if(strcmp(item->orgiName,orgiFuncName))
-		  continue;
-			//查找语句
-		n_debug("getFuncFromClass index:%d %s allscope:%d orgiFuncName:%s field?:%d",
-				i,className->sysName,allscope,orgiFuncName,aet_utils_valid_tree(item->fieldDecl));
-		tree decl=NULL_TREE;
-		if(allscope){
-			if(aet_utils_valid_tree(item->fieldDecl)){
-				decl=createTempFunction(item->fieldDecl);
-			}else if(aet_utils_valid_tree(item->fromImplDefine)){
-				decl=item->fromImplDefine;
-			}else{
-				decl=item->fromImplDecl;
-			}
-		}else{
-			if(aet_utils_valid_tree(item->fieldDecl)){
-				decl=createTempFunction(item->fieldDecl);
-			}
-		}
-		if(decl==NULL_TREE)
-			continue;
-		CandidateFun *candidate=checkParam(self,item,decl,exprlist, origtypes,arg_loc,expr_loc);
-		if(candidate!=NULL){
-		  candidate->mangle=item;
-		  if(candidate->warnErr->errorCount==0 && candidate->warnErr->warnCount==0){
-				n_list_free_full(okList,freeCandidate_cb);
-				generic_call_set_global(generic_call_get(),NULL,NULL);
-			    n_debug("checkParm 检查没有错误，没有警告，直接返回:%s %s className:%s\n",item->orgiName,item->mangleFunName,className->sysName);
-                return candidate;
-		  }
-		  okList=n_list_append(okList,candidate);
-		}
-	}
-	CandidateFun *okCand=filterGoodFunc(okList);
-	CandidateFun *result=cloneCand(okCand);
-	n_list_free_full(okList,freeCandidate_cb);
-	generic_call_set_global(generic_call_get(),NULL,NULL);
-	return result;
-}
-
-static nint compareSelectedDecl_cb(nconstpointer  cand1,nconstpointer  cand2)
-{
-	//SelectedDecl *p1 = (SelectedDecl *)cand1;
-	//SelectedDecl *p2 = (SelectedDecl *)cand2;
-	SelectedDecl *p1 = *((SelectedDecl **) cand1);
-    SelectedDecl *p2 = *((SelectedDecl **) cand2);
-    int a=p1->warnCount;
-    int b=p2->warnCount;
-    return (a > b ? +1 : a == b ? 0 : -1);
-}
-
-/**
- * 找最好的，最好的定义为警告最少的。
- * 如果list中有两个警告数相同的，取不是泛型函数的那个。
- */
-static SelectedDecl * filterGoodSelectedDecl(NList *okList)
-{
-  if(n_list_length(okList)==0){
-    n_debug("filterGoodSelectedDecl 没有匹配的函数!!! ");
-    return NULL;
-  }
-  okList=n_list_sort(okList,compareSelectedDecl_cb);
-  int len=n_list_length(okList);
-  if(len==1){
-	SelectedDecl *cand=(SelectedDecl *)n_list_nth_data(okList,0);
-    n_debug("filterGoodSelectedDecl 找到了声明的函数 成功匹配参数，只有一个 decl code:%s name:%s ",cand->mangleEntity->orgiName,cand->mangleEntity->mangleFunName);
-    return cand;
-  }else{
-	 int i;
-	 SelectedDecl *first=(SelectedDecl *)n_list_nth_data(okList,0);
-	 nboolean genericFunc=class_func_is_func_generic(first->mangleEntity);
-	 if(!genericFunc){
-        return first;
-	 }
-	 SelectedDecl *compare=(SelectedDecl *)n_list_nth_data(okList,1);
-	 if(first->warnCount==compare->warnCount){
-		 return compare;
-	 }else{
-	     return first;
-	 }
-  }
-}
-
-static SelectedDecl *cloneSelectedDecl(SelectedDecl *src)
-{
-	if(src==NULL)
-		return NULL;
-	SelectedDecl *select=n_slice_new(SelectedDecl);
-	select->mangleEntity=src->mangleEntity;
-	select->className=n_strdup(src->className);
-	select->iface=NULL;
-	if(src->iface!=NULL)
-		select->iface=n_strdup(src->iface);
-	select->warnCount=src->warnCount;
-	return select;
-}
-
-static void freeSelectedDecl_cb(SelectedDecl *item)
-{
-	if(item==NULL)
-		return;
-	n_free(item->className);
-	if(item->iface){
-		n_free(item->iface);
-	}
-	n_slice_free(SelectedDecl,item);
-}
-
-static SelectedDecl *getSelectedFunc(FuncCall *self,ClassName *className,char *orgiName,vec<tree, va_gc> *exprlist,
-        vec<tree, va_gc> *origtypes,vec<location_t> arg_loc,location_t expr_loc,nboolean allscope,GenericModel *generics)
-{
-    if(className==NULL || orgiName==NULL || className->sysName==NULL)
-    	return NULL;
-	 NList *okList=NULL;
-     n_debug("getSelectedFunc 00 类名：%s 函数名：%s",className->sysName,orgiName);
-     CandidateFun *candidate=getFuncFromClass(self,className,orgiName,exprlist,origtypes,arg_loc,expr_loc,allscope,generics);
-     if(candidate!=NULL){
-		SelectedDecl *result=n_slice_new0(SelectedDecl);
-		result->className=n_strdup(className->sysName);
-		result->iface=NULL;
-		result->mangleEntity=candidate->mangle;
-		result->warnCount=candidate->warnErr->warnCount;
-		freeCandidate_cb(candidate);
-		if(result->warnCount==0){
-			n_list_free_full(okList,freeSelectedDecl_cb);
-			return result;
-		}
-		okList=n_list_append(okList,result);
-     }
-
-   //如果是field要加入指针，否则访问不到
-    ClassInfo *info=class_mgr_get_class_info_by_class_name(class_mgr_get(),className);
-    int i;
-    for(i=0;i<info->ifaceCount;i++){
-	   ClassName *iface=&info->ifaces[i];
-	   n_debug("getSelectedFunc 11 在类%s中的接口%s中找方法。函数名：%s",className->sysName,iface->sysName,orgiName);
-	   CandidateFun *ifaceCandidate=getFuncFromClass(self,iface,orgiName,exprlist,origtypes,arg_loc,expr_loc,allscope,generics);
-	   n_debug("getSelectedFunc 22 在类%s中的接口%s中找方法。函数名：%s",className->sysName,iface->sysName,orgiName);
-	   if(ifaceCandidate!=NULL){
-		  SelectedDecl *result=n_slice_new0(SelectedDecl);
-		  result->className=n_strdup(className->sysName);
-		  result->iface=n_strdup(iface->sysName);
-		  result->mangleEntity=ifaceCandidate->mangle;
-		  result->warnCount=ifaceCandidate->warnErr->warnCount;
-		  freeCandidate_cb(ifaceCandidate);
-		  if(result->warnCount==0){
-			  n_list_free_full(okList,freeSelectedDecl_cb);
-			  return result;
-		  }
-		  okList=n_list_append(okList,result);
-	   }
-	 }
-    SelectedDecl *selected=filterGoodSelectedDecl(okList);
-    SelectedDecl *result=cloneSelectedDecl(selected);
-	n_list_free_full(okList,freeSelectedDecl_cb);
-    return result;
-}
-
-static void selectGoodFunc(FuncCall *self,ClassName *className,char *orgiName,vec<tree, va_gc> *exprlist,
-        vec<tree, va_gc> *origtypes,vec<location_t> arg_loc,location_t expr_loc,nboolean allscope,GenericModel *generics,
-		NPtrArray *selectedArray)
-{
-	if(className==NULL || orgiName==NULL || className->sysName==NULL){
-		n_warning("调用selectFunc传递的参数是空的 className==NULL || orgiName==NULL");
-		return;
-	}
-	SelectedDecl *result=getSelectedFunc(self,className,orgiName,exprlist,origtypes,arg_loc,expr_loc,allscope,generics);
-	if(result!=NULL){
-		if(result->warnCount==0){
-			n_ptr_array_remove_range(selectedArray,0,selectedArray->len);
-			n_ptr_array_add(selectedArray,result);
-			return;
-		}
-		n_ptr_array_add(selectedArray,result);
-	}
-     ClassInfo *info=class_mgr_get_class_info_by_class_name(class_mgr_get(),className);
-     if(info==NULL)
-    	 return;
-	 n_debug("当前类%s找不到匹配的函数，递归的向父类再找。classInfo:%p",className->sysName,info);
-	 selectGoodFunc(self,&info->parentName,orgiName,exprlist,origtypes,arg_loc,expr_loc,allscope,generics,selectedArray);
-}
-
-static SelectedDecl *findBest(SelectedDecl **arrays,int count,ClassName *className)
-{
-	 //按从子类到父类的顺序取
-	int i;
-	for(i=0;i<count;i++){
-		SelectedDecl *selected=arrays[i];
-		if(!strcmp(selected->className,className->sysName)){
-			return selected;
-		}
-	}
-	ClassInfo *info=class_mgr_get_class_info_by_class_name(class_mgr_get(),className);
-	if(info->parentName.sysName==NULL){
-		n_error("报告此错误。findBest count:%d sysName:%s",count,className->sysName);
-	}
-	return findBest(arrays,count,&info->parentName);
-}
-
-
-/**
- *找出warnCount是一样的，并且从子类开始找到父类
- */
-static SelectedDecl *getBest(NPtrArray *selectArray,ClassName *className)
-{
-	SelectedDecl *first=n_ptr_array_index(selectArray,0);
-	if(selectArray->len==1)
-		return first;
-	SelectedDecl *arrays[selectArray->len];//warnCount是一样的，并且是最少的。
-	int i;
-	int warnCount=0;
-	int sameWarnCountDeclCount=0;
-	for(i=0;i<selectArray->len;i++){
-		SelectedDecl *item=n_ptr_array_index(selectArray,i);
-		if(i==0){
-			warnCount=item->warnCount;
-			arrays[i]=item;
-		}else{
-			if(item->warnCount==warnCount)
-				arrays[i]=item;
-			else
-				break;
-		}
-	}
-	sameWarnCountDeclCount=i;
-	if(sameWarnCountDeclCount==1)
-		return first;
-    //按从子类到父类的顺序取
-	return findBest(arrays,sameWarnCountDeclCount,className);
-}
-
-static SelectedDecl *selectFunc(FuncCall *self,ClassName *className,char *orgiName,vec<tree, va_gc> *exprlist,
-        vec<tree, va_gc> *origtypes,vec<location_t> arg_loc,location_t expr_loc,nboolean allscope,GenericModel *generics,GenericModel * funcGenericDefine)
-{
-	NPtrArray *selectArray=n_ptr_array_new_with_free_func(freeSelectedDecl_cb);
-    selectGoodFunc(self,className,orgiName,exprlist,origtypes,arg_loc,expr_loc,allscope,generics,selectArray);
-    if(selectArray->len==0){
-    	n_ptr_array_unref(selectArray);
-    	return NULL;
-    }
-	n_ptr_array_sort(selectArray,compareSelectedDecl_cb);
-#if 0
-	int i;
-	for(i=0;i<selectArray->len;i++){
-		SelectedDecl *item=n_ptr_array_index(selectArray,i);
-		printf("候选的类是 i:%d sysName:%s iface:%s warnCount:%d func:%s\n",i,item->className,item->iface,item->warnCount,item->mangleEntity->orgiName);
-	}
-#endif
-	SelectedDecl *result=getBest(selectArray,className);
-    SelectedDecl *last=cloneSelectedDecl(result);
-	n_ptr_array_unref(selectArray);
-	if(class_func_is_func_generic(last->mangleEntity) || class_func_is_query_generic(last->mangleEntity)){
-		ClassName *selectClassName=class_mgr_get_class_name_by_sys(class_mgr_get(),last->className);
-        //printf("funcall selectFunc generic_call_add_fpgi_parm exprlist:%d\n",exprlist->length());
-
-	    generic_call_add_fpgi_parm(generic_call_get(),last->mangleEntity,selectClassName,exprlist,funcGenericDefine);
-       // printf("funcall selectFunc generic_call_add_fpgi_parm exprlist:1---%d\n",exprlist->length());
-
-	}
-	return last;
-}
-
 
 /**
  * 加入self,从func调用
  */
-static tree callParentOrParentIface(FuncCall *self,tree func,SelectedDecl *selected,vec<tree, va_gc> *exprlist,location_t loc,nboolean allscope)
+static tree callParentOrParentIface(FuncCall *self,tree func,CandidateFunc *selected,vec<tree, va_gc> *exprlist,location_t loc,nboolean allscope)
 {
-    ClassFunc *item=selected->mangleEntity;
+    ClassInfo *info=class_mgr_get_class_info(class_mgr_get(),selected->sysName);
+    ClassFunc *item=selected->classFunc;
     tree decl=NULL_TREE;
-    if(selected->iface!=NULL){
+    if(class_info_is_interface(info)){
         if(aet_utils_valid_tree(item->fromImplDefine)){
-            error_at(DECL_SOURCE_LOCATION(item->fromImplDefine),"接口%qs不应有定义。",selected->iface);
+            error_at(DECL_SOURCE_LOCATION(item->fromImplDefine),"接口%qs不应有定义。",selected->sysName);
             return NULL_TREE;
         }
         if(aet_utils_valid_tree(item->fromImplDecl)){
-            error_at(DECL_SOURCE_LOCATION(item->fromImplDecl),"接口%qs不应有声明。",selected->iface);
+            error_at(DECL_SOURCE_LOCATION(item->fromImplDecl),"接口%qs不应有声明。",selected->sysName);
             return NULL_TREE;
         }
-        n_debug("callParentOrParentIface localClass 00 在这里创建父类接口方法的引用。接口所属类:%s 接口:%s\n",selected->className,selected->iface);
+        n_debug("callParentOrParentIface localClass 00 在这里创建父类接口方法的引用。接口所属类:%s 接口:%s\n",selected->implSysName,selected->sysName);
         tree firstParm=NULL_TREE;
-        ClassName *className=class_mgr_get_class_name_by_sys(class_mgr_get(),selected->className);
-        ClassName *iface=class_mgr_get_class_name_by_sys(class_mgr_get(),selected->iface);
-        decl=func_help_create_parent_iface_deref_new(self->funcHelp,func,className,iface,item->fieldDecl,loc,&firstParm);
+        ClassName *implClassName=class_mgr_get_class_name_by_sys(class_mgr_get(),selected->implSysName);
+        ClassName *iface=class_mgr_get_class_name_by_sys(class_mgr_get(),selected->sysName);
+        decl=func_help_create_parent_iface_deref(self->funcHelp,func,implClassName,iface,item->fieldDecl,loc,&firstParm);
         if(aet_utils_valid_tree(decl)){
-            n_debug("callParentOrParentIface localClass 11 在这里创建父类接口方法的引用。接口所属类:%s 接口:%s\n",selected->className,selected->iface);
+            n_debug("callParentOrParentIface localClass 11 在这里创建父类接口方法的引用。接口所属类:%s 接口:%s\n",selected->implSysName,selected->sysName);
             exprlist->ordered_remove(0);
             vec_safe_insert (exprlist, 0, firstParm);
         }
     }else{
         if(aet_utils_valid_tree(item->fieldDecl)){
             //创建指指针引用
-            n_debug("func_call_select parentclass 33 在这里创建父类的field引用 类:%s\n",selected->className);
+            n_debug("func_call_select parentclass 33 在这里创建父类的field引用 类:%s\n",selected->sysName);
             tree firstParm=NULL_TREE;
-            ClassName *parentClassName=class_mgr_get_class_name_by_sys(class_mgr_get(),selected->className);
-            decl=func_help_create_parent_deref_new(self->funcHelp,func,parentClassName,item->fieldDecl,loc,&firstParm);
+            ClassName *parentClassName=class_mgr_get_class_name_by_sys(class_mgr_get(),selected->sysName);
+            decl=func_help_create_parent_deref(self->funcHelp,func,parentClassName,item->fieldDecl,loc,&firstParm);
             if(aet_utils_valid_tree(decl)){
                exprlist->ordered_remove(0);
                vec_safe_insert (exprlist, 0, firstParm);
             }
         }else   if(aet_utils_valid_tree(item->fromImplDefine) && allscope){
-            n_debug("func_call_select parentClass 11 有定义直接用,说明两个类的实现都在同一个c文件 类:%s\n",selected->className);
+            n_debug("func_call_select parentClass 11 有定义直接用,说明两个类的实现都在同一个c文件 类:%s\n",selected->sysName);
             tree selfVarOrParm = (*exprlist)[0];
-            ClassName *parentClassName=class_mgr_get_class_name_by_sys(class_mgr_get(),selected->className);
+            ClassName *parentClassName=class_mgr_get_class_name_by_sys(class_mgr_get(),selected->sysName);
             tree castToParent=func_help_cast_to_parent(self->funcHelp,selfVarOrParm,parentClassName);
             exprlist->ordered_remove(0);
             vec_safe_insert (exprlist, 0, castToParent);
             decl=item->fromImplDefine;
         }else if(aet_utils_valid_tree(item->fromImplDecl) && allscope){
-            n_debug("func_call_select parentClass 22 有声明直接用,说明两个类的实现都在同一个c文件 类:%s\n",selected->className);
+            n_debug("func_call_select parentClass 22 有声明直接用,说明两个类的实现都在同一个c文件 类:%s\n",selected->sysName);
             tree selfVarOrParm = (*exprlist)[0];
-            ClassName *parentClassName=class_mgr_get_class_name_by_sys(class_mgr_get(),selected->className);
+            ClassName *parentClassName=class_mgr_get_class_name_by_sys(class_mgr_get(),selected->sysName);
             tree castToParent=func_help_cast_to_parent(self->funcHelp,selfVarOrParm,parentClassName);
             exprlist->ordered_remove(0);
             vec_safe_insert (exprlist, 0, castToParent);
@@ -796,43 +421,44 @@ static void test_print_exprlist(vec<tree, va_gc> *exprlist)
  * exprlist->ordered_remove(0);
 *  vec_safe_insert (exprlist, 0, firstParm);
  */
-static tree callItself(FuncCall *self,tree func,SelectedDecl *selected,vec<tree, va_gc> *exprlist,location_t loc,nboolean allscope)
+static tree callItself(FuncCall *self,tree func,CandidateFunc *selected,vec<tree, va_gc> *exprlist,location_t loc,nboolean allscope)
 {
-	ClassFunc *item=selected->mangleEntity;
+    ClassInfo *info=class_mgr_get_class_info(class_mgr_get(),selected->sysName);
+	ClassFunc *item=selected->classFunc;
     tree decl=NULL_TREE;
-	if(selected->iface!=NULL){
+	if(class_info_is_interface(info)){
 		if(aet_utils_valid_tree(item->fromImplDefine)){
-			error_at(DECL_SOURCE_LOCATION(item->fromImplDefine),"接口%qs不应有定义。",selected->iface);
+			error_at(DECL_SOURCE_LOCATION(item->fromImplDefine),"接口%qs不应有定义。",selected->sysName);
 			return NULL_TREE;
 		}
 		if(aet_utils_valid_tree(item->fromImplDecl)){
-			error_at(DECL_SOURCE_LOCATION(item->fromImplDecl),"接口%qs不应有声明。",selected->iface);
+			error_at(DECL_SOURCE_LOCATION(item->fromImplDecl),"接口%qs不应有声明。",selected->sysName);
 			return NULL_TREE;
 	    }
-		n_debug("func_call_select callItself 00 在这里创建本身接口方法的引用。接口所属类:%s 接口:%s\n",selected->className,selected->iface);
+		n_debug("func_call_select callItself 00 在这里创建本身接口方法的引用。接口所属类:%s 接口:%s\n",selected->implSysName,selected->sysName);
 		tree firstParm=NULL_TREE;
-		ClassName *className=class_mgr_get_class_name_by_sys(class_mgr_get(),selected->className);
-		ClassName *iface=class_mgr_get_class_name_by_sys(class_mgr_get(),selected->iface);
-		decl=func_help_create_itself_iface_deref_new(self->funcHelp,func,className,iface,item->fieldDecl,loc,&firstParm);
+		ClassName *implClassName=class_mgr_get_class_name_by_sys(class_mgr_get(),selected->implSysName);
+		ClassName *iface=class_mgr_get_class_name_by_sys(class_mgr_get(),selected->sysName);
+		decl=func_help_create_itself_iface_deref(self->funcHelp,func,implClassName,iface,item->fieldDecl,loc,&firstParm);
 		if(aet_utils_valid_tree(decl)){
 			exprlist->ordered_remove(0);
 			vec_safe_insert (exprlist, 0, firstParm);
 		}
 	}else{
 		if(aet_utils_valid_tree(item->fieldDecl)){
-			//printf("func_call_select localClass 11 在这里创建本身的field引用 类:%s\n",selected->className);
+			//printf("func_call_select localClass 11 在这里创建本身的field引用 类:%s\n",selected->sysName);
             tree firstParm= NULL;//(*exprlist)[0];
             decl=func_help_create_itself_deref_new(self->funcHelp,func,item->fieldDecl,loc,&firstParm);
-            //printf("func_call_select localClass 11ccccc 在这里创建本身的field引用 类:%s\n",selected->className);
+            //printf("func_call_select localClass 11ccccc 在这里创建本身的field引用 类:%s\n",selected->sysName);
             if(aet_utils_valid_tree(decl)){
                 exprlist->ordered_remove(0);
                 vec_safe_insert (exprlist, 0, firstParm);
             }
 		}else if(aet_utils_valid_tree(item->fromImplDefine) && allscope){
-		    //printf("func_call_select localClass 11 有定义直接用 类:%s\n",selected->className);
+		    //printf("func_call_select localClass 11 有定义直接用 类:%s\n",selected->sysName);
 			decl=item->fromImplDefine;
 		}else if(aet_utils_valid_tree(item->fromImplDecl) && allscope){
-			//printf("func_call_select localClass 11 有声明直接用 类:%s\n",selected->className);
+			//printf("func_call_select localClass 11 有声明直接用 类:%s\n",selected->sysName);
 			decl=item->fromImplDecl;
 		}
 	}
@@ -844,24 +470,24 @@ static tree callItself(FuncCall *self,tree func,SelectedDecl *selected,vec<tree,
  * 2.函数有泛型参数
  *
  */
-static void setGenericQuery(FuncCall *self,SelectedDecl *item,tree last)
+static void setGenericQuery(FuncCall *self,CandidateFunc *item,tree last)
 {
-	 if(class_func_is_query_generic(item->mangleEntity) || class_func_have_generic_parm(item->mangleEntity)){
-	     n_debug("在funcall.c调用:%s 是问号泛型:%d 方法有泛型参数：%d\n",item->mangleEntity->orgiName,
-				class_func_is_query_generic(item->mangleEntity),class_func_have_generic_parm(item->mangleEntity));
-		nboolean ok=generic_query_have_query_caller(generic_query_get(),item->mangleEntity,last);
+	 if(class_func_is_query_generic(item->classFunc) || class_func_have_generic_parm(item->classFunc)){
+	     n_debug("在funcall.c调用:%s 是问号泛型:%d 方法有泛型参数：%d\n",item->classFunc->orgiName,
+				class_func_is_query_generic(item->classFunc),class_func_have_generic_parm(item->classFunc));
+		nboolean ok=generic_query_have_query_caller(generic_query_get(),item->classFunc,last);
 		//printf("在funcall.c是问号泛型---xx--- %d\n",ok);
 		if(ok){
 			nboolean isGenericClass=generic_query_is_generic_class(generic_query_get(),last);
 			if(isGenericClass){ //真正的调用者是泛型类
 				GenericModel *model=generic_query_get_call_generic(generic_query_get(),last);
 				if(model==NULL){
-					error_at(input_location,"调用方法%qs的对象，并没有定义泛型。",item->mangleEntity->orgiName);
+					error_at(input_location,"调用方法%qs的对象，并没有定义泛型。",item->classFunc->orgiName);
 					return;
 				}
 				if(generic_model_get_undefine_count(model)==0 && !generic_model_have_query(model)){
 				    n_debug("调用转成new$形式的泛型定义对象 model:%s file:%s\n",generic_model_tostring(model),in_fnames[0]);
-				   ClassName *className=class_mgr_get_class_name_by_sys(class_mgr_get(),item->className);
+				   ClassName *className=class_mgr_get_class_name_by_sys(class_mgr_get(),item->sysName);
 				   block_mgr_add_define_new_object(block_mgr_get(),className,model);
 				   generic_expand_add_define_object(generic_expand_get(),className,model);
 				}else{
@@ -872,12 +498,31 @@ static void setGenericQuery(FuncCall *self,SelectedDecl *item,tree last)
      }
 }
 
+/**
+ * 从当前找到父类找静态的
+ */
+static CandidateFunc *selectStaticByRecursion(FuncCall *self,ClassName *className,char *orgiName,vec<tree, va_gc> *exprlist,
+        vec<tree, va_gc> *origtypes,vec<location_t> arg_loc,location_t expr_loc,FuncPointerError **errors)
+{
+     if(className==NULL || orgiName==NULL || className->sysName==NULL){
+        return NULL;
+     }
+     CandidateFunc *result=select_field_get_static_func(select_field_get(),className,orgiName,exprlist,origtypes,arg_loc,expr_loc,errors);
+     if(result==NULL){
+        ClassInfo *info=class_mgr_get_class_info_by_class_name(class_mgr_get(),className);
+        n_debug("func_help_select_static_func_by_recursion 再一次从父类找静态方法 selectFunc ---ttt %s %p",className->sysName,info);
+        result=selectStaticByRecursion(self,&info->parentName,orgiName,exprlist,origtypes,arg_loc,expr_loc,errors);
+     }
+     return result;
+}
+
+
 
 /**
  * 指针调用形式
  */
 tree func_call_deref_select(FuncCall *self,tree func,vec<tree, va_gc> *exprlist,
-		         vec<tree, va_gc> *origtypes,vec<location_t> arg_loc,location_t expr_loc )
+		         vec<tree, va_gc> *origtypes,vec<location_t> arg_loc,location_t expr_loc,FuncPointerError **errors)
 {
 	BINFO_FLAG_6(func)=0;
 	tree field=TREE_OPERAND(func,1);
@@ -896,21 +541,19 @@ tree func_call_deref_select(FuncCall *self,tree func,vec<tree, va_gc> *exprlist,
 	ClassName *lowClassName=class_mgr_get_class_name_by_sys(class_mgr_get(),fromLowClassName);
 	if(className==NULL || lowClassName==NULL)
 		return error_mark_node;
-   	SelectedDecl *item=NULL;
+	CandidateFunc *item=NULL;
 	GenericModel *generics=generic_call_get_generic_from_component_ref(generic_call_get(),func);//对象是否有泛型的真实类型.
 	GenericModel *funcGenericDefine=c_aet_get_func_generics_model(func);//如果funcGenericDefine是有效的说明这是一个泛型函数
     if(class_mgr_is_interface(class_mgr_get(),className)){
     	//这是接口引用，首先检查接口是不是在lowClassName范围内或lowClassName父类中
-    	int re=func_help_process_static_func_param(self->funcHelp,className,funName,exprlist,FALSE);
-    	if(re==-1)
-    	   item=getSelectedFunc(self,className,funName,exprlist,origtypes,arg_loc,expr_loc,FALSE,generics);
+    	item=select_field_get_func(select_field_get(),className,funName,exprlist,origtypes,arg_loc,expr_loc,FALSE,generics,errors);
     	if(item==NULL){
     		error_at(expr_loc,"接口类%qs找不到%qs方法。",className,funName);
     		return last;
     	}
-		if(class_func_is_func_generic(item->mangleEntity) || class_func_is_query_generic(item->mangleEntity)){
+		if(class_func_is_func_generic(item->classFunc) || class_func_is_query_generic(item->classFunc)){
 			printf("funccall.c 这里可能有问题。注意！！！！ sysName:%s func:%s\n",className->sysName,funName);
-		   generic_call_add_fpgi_parm(generic_call_get(),item->mangleEntity,className,exprlist,funcGenericDefine);
+		   generic_call_add_fpgi_parm(generic_call_get(),item->classFunc,className,exprlist,funcGenericDefine);
 		}
     	tree firstParm=NULL_TREE;
 	    tree selfVarOrParm = (*exprlist)[0];
@@ -918,7 +561,7 @@ tree func_call_deref_select(FuncCall *self,tree func,vec<tree, va_gc> *exprlist,
        // aet_print_tree(func);
        // aet_print_tree(selfVarOrParm);
 	    last=func_help_component_ref_interface(self->funcHelp,func, selfVarOrParm,lowClassName,
-	    		className,item->mangleEntity,expr_loc,&firstParm);
+	    		className,item->classFunc,expr_loc,&firstParm);
        // printf("接口的第一个参数 22 firstParm\n");
        // aet_print_tree(firstParm);
        // printf("接口的第一个参数 33 last\n");
@@ -931,48 +574,32 @@ tree func_call_deref_select(FuncCall *self,tree func,vec<tree, va_gc> *exprlist,
     }else{
     	n_debug("func_call_deref_select bbb name:%s className:%s func:%s %d refVarClassName:%s generics:%p exprlist:%p %d\n",
     			IDENTIFIER_POINTER(id),currentClassName,funName,len,fromLowClassName,generics,exprlist,exprlist->length());
-       int re=func_help_process_static_func_param(self->funcHelp,lowClassName,funName,exprlist,FALSE);
-       if(re==-1)
-	     item=selectFunc(self,lowClassName,funName,exprlist,origtypes,arg_loc,expr_loc,FALSE,generics,funcGenericDefine);
+	   item=selectFunc(self,lowClassName,funName,exprlist,origtypes,arg_loc,expr_loc,FALSE,generics,funcGenericDefine,errors);
 	   if(item!=NULL){
 		   convertParmForGenerics(self,item,exprlist,expr_loc,FALSE,generics);//转化实参到void*
-	       if(!strcmp(item->className,lowClassName->sysName)){
-		       //printf("func_call_deref_select 找到了 11 方法就在本类中 class:%s face:%s mangleFunName:%s lowClassName:%s\n",
-				   //item->className,item->iface,item->mangleEntity->mangleFunName,lowClassName->userName);
+	       if(!strcmp(item->sysName,lowClassName->sysName)){
+		       //printf("func_call_deref_select 找到了 11 方法就在本类中 class:%s  mangleFunName:%s lowClassName:%s\n",
+				   //item->sysName,item->classFunc->mangleFunName,lowClassName->userName);
 		      last=callItself(self,func,item,exprlist,expr_loc,FALSE);
 	       }else{
-		      //printf("func_call_deref_select 找到了 22 方法就在父类中 class:%s face:%s mangleFunName:%s lowClassName:%s\n",
-					  // item->className,item->iface,item->mangleEntity->mangleFunName,lowClassName->sysName);
+		      //printf("func_call_deref_select 找到了 22 方法就在父类中 class:%s mangleFunName:%s lowClassName:%s\n",
+					  // item->sysName,item->classFunc->mangleFunName,lowClassName->sysName);
 		      last=callParentOrParentIface(self,func,item,exprlist,expr_loc,FALSE);
 	       }
 	       setGenericQuery(self,item,last);
-		   generic_check_parm(item->className,item->mangleEntity,exprlist,last);
+		   generic_check_parm(item->sysName,item->classFunc,exprlist,last);
        }else{
     	    printf("func_call_deref_select 找静态函数\n");
 			exprlist->ordered_remove(0);//把self参数移走
 			origtypes->ordered_remove(0);//把self参数移走
-		    re=func_help_process_static_func_param(self->funcHelp,className,funName,exprlist,TRUE);
-		    if(re==-1)
-			   item=func_help_select_static_func(self->funcHelp,className,funName,exprlist,origtypes,arg_loc,expr_loc);
-			if(item!=NULL){
-				last=item->mangleEntity->fieldDecl;
-			}else{
-				if(re>=0){
-					parser_static_report_error_by_pos(parser_static_get(),re,exprlist);
-				}else{
-				   error_at(expr_loc,"类%qs中找不到%qs方法。检查在类声明中是否声明过。",className->sysName,funName);
-				}
-				return last;
-			}
+			item=selectStaticByRecursion(self,className,funName,exprlist,origtypes,arg_loc,expr_loc,errors);
+			if(item!=NULL)
+				last=item->classFunc->fieldDecl;
        }
     }
     if(item!=NULL){
-        access_controls_access_method(access_controls_get(),expr_loc,item->mangleEntity);
-	   if(item->className)
-		   n_free(item->className);
-	   if(item->iface)
-		   n_free(item->iface);
-	   n_slice_free(SelectedDecl,item);
+        access_controls_access_method(access_controls_get(),expr_loc,item->classFunc);
+        select_field_free_candidate(item);
     }
 	return last;
 }
@@ -986,7 +613,7 @@ tree func_call_deref_select(FuncCall *self,tree func,vec<tree, va_gc> *exprlist,
  * 如果是静态函数，要把exprlist中的第一个参数移走，不加类引用而直接调用
  */
 tree func_call_select(FuncCall *self,tree func,vec<tree, va_gc> *exprlist,
-		         vec<tree, va_gc> *origtypes,vec<location_t> arg_loc,location_t expr_loc )
+		         vec<tree, va_gc> *origtypes,vec<location_t> arg_loc,location_t expr_loc,FuncPointerError **errors)
 {
 	BINFO_FLAG_2(func)=0;
 	tree id=DECL_NAME (func);
@@ -996,54 +623,40 @@ tree func_call_select(FuncCall *self,tree func,vec<tree, va_gc> *exprlist,
 	int len=aet_utils_get_orgi_func_and_class_name(IDENTIFIER_POINTER(id),currentClassName,funName);
 	if(len==0)
 		return error_mark_node;
-	n_debug("func_call_select 00 name:%s className:%s func:%s %d\n",IDENTIFIER_POINTER(id),currentClassName,funName,len);
+	n_debug("func_call_select 00 name:%s className:%s func:%s %d",IDENTIFIER_POINTER(id),currentClassName,funName,len);
 	//第一步从本地找
 	ClassName *className=class_mgr_get_class_name_by_sys(class_mgr_get(),currentClassName);
 	if(className==NULL)
 		return error_mark_node;
-	SelectedDecl *item=NULL;
+	CandidateFunc *item=NULL;
 	GenericModel *generics=NULL;//在这里的调用都是在类实现中，不会有具体的泛型找到，所以是空的.
 	GenericModel *funcGenericDefine=c_aet_get_func_generics_model(func);//如果funcGenericDefine是有效的说明这是一个泛型函数
-	int re=func_help_process_static_func_param(self->funcHelp,className,funName,exprlist,FALSE);
-	if(re==-1)
-	   item=selectFunc(self,className,funName,exprlist,origtypes,arg_loc,expr_loc,TRUE,generics,funcGenericDefine);
+	item=selectFunc(self,className,funName,exprlist,origtypes,arg_loc,expr_loc,TRUE,generics,funcGenericDefine,errors);
 	//如果是field要加入指针，否则访问不到
 	if(item!=NULL){
-       n_debug("func_call_select is 找到了 00 class:%s face:%s mangleFunName:%s\n",item->className,item->iface,item->mangleEntity->mangleFunName);
+       n_debug("func_call_select is 找到了 00 class:%s mangleFunName:%s\n",item->sysName,item->classFunc->mangleFunName);
 	   convertParmForGenerics(self,item,exprlist,expr_loc,TRUE,generics);//转化实参到void*
-       if(!strcmp(item->className,className->sysName)){
-    	   n_debug("func_call_select is 找到了 11 方法就在本类中 class:%s face:%s mangleFunName:%s\n",
-        		   item->className,item->iface,item->mangleEntity->mangleFunName);
+       if(!strcmp(item->sysName,className->sysName)){
+    	   n_debug("func_call_select is 找到了 11 方法就在本类中 class:%s mangleFunName:%s\n",
+        		   item->sysName,item->classFunc->mangleFunName);
            last=callItself(self,func,item,exprlist,expr_loc,TRUE);
        }else{
     	   last=callParentOrParentIface(self,func,item,exprlist,expr_loc,TRUE);
        }
        setGenericQuery(self,item,last);
-	   generic_check_parm(item->className,item->mangleEntity,exprlist,last);
+	   generic_check_parm(item->sysName,item->classFunc,exprlist,last);
 	}else{
 		n_debug("func_call_select 找静态函数 找之前把self移走。\n");
 		exprlist->ordered_remove(0);//把self参数移走
 		origtypes->ordered_remove(0);//把self参数移走
-		re=func_help_process_static_func_param(self->funcHelp,className,funName,exprlist,TRUE);
-		if(re==-1)
-		   item=func_help_select_static_func(self->funcHelp,className,funName,exprlist,origtypes,arg_loc,expr_loc);
+		item=selectStaticByRecursion(self,className,funName,exprlist,origtypes,arg_loc,expr_loc,errors);
+		printf("func_call_select 找静态函数 找之前把self移走。item:%p\n",item);
 		if(item!=NULL)
-			last=item->mangleEntity->fieldDecl;
-		else{
-			if(re>=0){
-			   parser_static_report_error_by_pos(parser_static_get(),re,exprlist);
-			}else{
-			   error_at(expr_loc,"类%qs中找不到%qs方法。",className->sysName,funName);
-		    }
-		}
+			last=item->classFunc->fieldDecl;
 	}
     if(item!=NULL){
-        access_controls_access_method(access_controls_get(),expr_loc,item->mangleEntity);
-	   if(item->className)
-		   n_free(item->className);
-	   if(item->iface)
-		   n_free(item->iface);
-	   n_slice_free(SelectedDecl,item);
+        access_controls_access_method(access_controls_get(),expr_loc,item->classFunc);
+        select_field_free_candidate(item);
     }
 	return last;
 }
@@ -1052,7 +665,7 @@ tree func_call_select(FuncCall *self,tree func,vec<tree, va_gc> *exprlist,
  * super调用形式
  */
 tree func_call_super_select(FuncCall *self,tree func,vec<tree, va_gc> *exprlist,
-		         vec<tree, va_gc> *origtypes,vec<location_t> arg_loc,location_t expr_loc )
+		         vec<tree, va_gc> *origtypes,vec<location_t> arg_loc,location_t expr_loc,FuncPointerError **errors)
 {
 	BINFO_FLAG_5(func)=0;
 	tree field=TREE_OPERAND(func,1);
@@ -1070,7 +683,7 @@ tree func_call_super_select(FuncCall *self,tree func,vec<tree, va_gc> *exprlist,
 	ClassName *lowClassName=class_mgr_get_class_name_by_sys(class_mgr_get(),fromLowClassName);
 	if(className==NULL || lowClassName==NULL)
 		return error_mark_node;
-   	SelectedDecl *item=NULL;
+	CandidateFunc *item=NULL;
 	GenericModel *generics=NULL;
 	GenericModel *funcGenericDefine=c_aet_get_func_generics_model(func);//如果funcGenericDefine是有效的说明这是一个泛型函数
     if(class_mgr_is_interface(class_mgr_get(),className)){
@@ -1078,46 +691,31 @@ tree func_call_super_select(FuncCall *self,tree func,vec<tree, va_gc> *exprlist,
 		error_at(expr_loc,"接口类%qs的方法%qs不能通过super调用。",className->sysName,funName);
 		return last;
     }else{
-    	int re=func_help_process_static_func_param(self->funcHelp,lowClassName,funName,exprlist,FALSE);
-        if(re==-1)
-	       item=selectFunc(self,lowClassName,funName,exprlist,origtypes,arg_loc,expr_loc,FALSE,generics,funcGenericDefine);
+       item=selectFunc(self,lowClassName,funName,exprlist,origtypes,arg_loc,expr_loc,FALSE,generics,funcGenericDefine,errors);
 	   if(item!=NULL){
 		   //参数总是self，也是className的最子类
 		  // printf("func_call_super_select 找到了 11 方法就在父类中 class:%s face:%s mangleFunName:%s lowClassName:%s\n",
-					//	   item->className,item->iface,item->mangleEntity->mangleFunName,lowClassName);
+					//	   item->sysName,item->iface,item->mangleEntity->mangleFunName,lowClassName);
 		   last=callParentOrParentIface(self,func,item,exprlist,expr_loc,FALSE);
 	   }else{
 		  n_debug("func_call_super_select 找静态函数\n");
 		  exprlist->ordered_remove(0);//把self参数移走
 		  origtypes->ordered_remove(0);//把self参数移走
-	      re=func_help_process_static_func_param(self->funcHelp,lowClassName,funName,exprlist,TRUE);
-	      if(re==-1)
-		     item=func_help_select_static_func(self->funcHelp,lowClassName,funName,exprlist,origtypes,arg_loc,expr_loc);
-		  if(item!=NULL){
-			 last=item->mangleEntity->fieldDecl;
-		  }else{
-			 if(re>=0){
-				parser_static_report_error_by_pos(parser_static_get(),re,exprlist);
-			 }else{
-			    error_at(expr_loc,"类%qs中找不到%qs方法。请检查参数是否正确。",className,funName);
-			 }
-		  }
+		  item=selectStaticByRecursion(self,lowClassName,funName,exprlist,origtypes,arg_loc,expr_loc,errors);
+		  if(item!=NULL)
+			 last=item->classFunc->fieldDecl;
 	   }
 
     }
     if(item!=NULL){
-        access_controls_access_method(access_controls_get(),expr_loc,item->mangleEntity);
-	   if(item->className)
-		   n_free(item->className);
-	   if(item->iface)
-		   n_free(item->iface);
-	   n_slice_free(SelectedDecl,item);
+        access_controls_access_method(access_controls_get(),expr_loc,item->classFunc);
+        select_field_free_candidate(item);
     }
 	return last;
 }
 
 tree func_call_static_select(FuncCall *self,tree func,vec<tree, va_gc> *exprlist,
-		         vec<tree, va_gc> *origtypes,vec<location_t> arg_loc,location_t expr_loc )
+		         vec<tree, va_gc> *origtypes,vec<location_t> arg_loc,location_t expr_loc,FuncPointerError **errors)
 {
 	BINFO_FLAG_3(func)==0;
 	tree id=DECL_NAME (func);
@@ -1133,25 +731,14 @@ tree func_call_static_select(FuncCall *self,tree func,vec<tree, va_gc> *exprlist
 	ClassName *className=class_mgr_get_class_name_by_sys(class_mgr_get(),currentClassName);
 	if(className==NULL)
 		return error_mark_node;
-	SelectedDecl *item=NULL;
-	int re=func_help_process_static_func_param(self->funcHelp,className,funName,exprlist,TRUE);
-	if(re==-1)
-	  item=func_help_select_static_func(self->funcHelp,className,funName,exprlist,origtypes,arg_loc,expr_loc);
+	CandidateFunc *item=NULL;
+	item=selectStaticByRecursion(self,className,funName,exprlist,origtypes,arg_loc,expr_loc,errors);
 	//如果是field要加入指针，否则访问不到
-	if(item!=NULL){
-	   last=item->mangleEntity->fieldDecl;
-	}else{
-		if(re>=0){
-			parser_static_report_error_by_pos(parser_static_get(),re,exprlist);
-		}
-	}
+	if(item!=NULL)
+	   last=item->classFunc->fieldDecl;
     if(item!=NULL){
-        access_controls_access_method(access_controls_get(),expr_loc,item->mangleEntity);
-	   if(item->className)
-		   n_free(item->className);
-	   if(item->iface)
-		   n_free(item->iface);
-	   n_slice_free(SelectedDecl,item);
+        access_controls_access_method(access_controls_get(),expr_loc,item->classFunc);
+        select_field_free_candidate(item);
     }
 	return last;
 }

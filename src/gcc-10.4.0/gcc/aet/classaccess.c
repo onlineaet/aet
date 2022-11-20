@@ -444,7 +444,7 @@ VarRefRelation *class_access_create_relation_ship(ClassAccess *self,location_t l
 		 return NULL;
 	 char *lowestClass=lows[2];
 	 char *className=lows[3];
-	 VarRefRelation *item=n_slice_new0(VarRefRelation);
+	 VarRefRelation *item=(VarRefRelation *)n_slice_new0(VarRefRelation);
 	 item->refClass=n_strdup(className);
 	 item->lowClass=n_strdup(lows[0]);
 	 item->varName=n_strdup(lows[1]);

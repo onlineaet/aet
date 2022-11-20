@@ -47,6 +47,93 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 
 static c_parser *aetPrintParser=NULL;
 
+/**
+ * c/c-tree.h 存储说明符的类型
+ * INLINE RID_NORETURN RID_THREAD 没有列出
+*/
+static char *storage_class_str[]={
+  "csc_none",
+  "csc_auto",
+  "csc_extern",
+  "csc_register",
+  "csc_static",
+  "csc_typedef"
+};
+
+/* The various kinds of declarators in C.  */
+static char *aet_c_declarator_kind_str[]= {
+  /* An identifier.  */
+  "cdk_id",
+  /* A function.  */
+  "cdk_function",
+  /* An array.  */
+  "cdk_array",
+  /* A pointer.  */
+  "cdk_pointer",
+  /* Parenthesized declarator with nested attributes.  */
+  "cdk_attrs"
+};
+
+static char *aet_c_typespec_kind_str[]= {
+  /* No typespec.  This appears only in struct c_declspec.  */
+  "ctsk_none",
+  /* A reserved keyword type specifier.  */
+  "ctsk_resword",
+  /* A reference to a tag, previously declared, such as "struct foo".
+     This includes where the previous declaration was as a different
+     kind of tag, in which case this is only valid if shadowing that
+     tag in an inner scope.  */
+  "ctsk_tagref",
+  /* Likewise, with standard attributes present in the reference.  */
+  "ctsk_tagref_attrs",
+  /* A reference to a tag, not previously declared in a visible
+     scope.  */
+  "ctsk_tagfirstref",
+  /* Likewise, with standard attributes present in the reference.  */
+  "ctsk_tagfirstref_attrs",
+  /* A definition of a tag such as "struct foo { int a; }".  */
+  "ctsk_tagdef",
+  /* A typedef name.  */
+  "ctsk_typedef",
+  /* An ObjC-specific kind of type specifier.  */
+  "ctsk_objc",
+  /* A typeof specifier, or _Atomic ( type-name ).  */
+  "ctsk_typeof"
+};
+
+/**
+ * c/c-tree.h 类型说明符关键字
+ */
+static char *aet_c_typespec_keyword_str[]={
+  "cts_none",
+  "cts_void",
+  "cts_bool",
+  "cts_char",
+  "cts_int",
+  "cts_float",
+  "cts_int_n",
+  "cts_double",
+  "cts_dfloat32",
+  "cts_dfloat64",
+  "cts_dfloat128",
+  "cts_floatn_nx",
+  "cts_fract",
+  "cts_accum",
+  "cts_auto_type"
+};
+
+/**
+ * 与c-parser.h中的c_id_kind对应
+ * 标识符类型名称的字符串数组
+ */
+static char * aet_c_id_kind_str[] = {
+"C_ID_ID",
+"C_ID_TYPENAME",
+"C_ID_CLASSNAME",
+"C_ID_ADDRSPACE",
+"C_ID_NONE"
+};
+
 
 #define tree_info(file,func,line,format,...)   \
 		n_log_structured_standard(N_LOG_LEVEL_INFO,file,line,func,format, ##__VA_ARGS__);
@@ -98,7 +185,7 @@ void  aet_print_specs_from(struct c_declspecs *specs,char *file,char *func,int l
 		loc=specs->locations[cdw_storage_class];//用一个枚举作为数组index c-tree.h中定义
 	    xloc = expand_location(loc);
 		tree_info(file,func,line,"是存储类型的声明说明符 count:%d %s %s %d %d\n",countStrogeClass++,
-				aet_c_storage_class_str[specs->storage_class],xloc.file, xloc.line, xloc.column);
+		        aet_print_get_storage_class_string(specs->storage_class),xloc.file, xloc.line, xloc.column);
 
 	}
     if(specs->inline_p){
@@ -317,7 +404,7 @@ static void printToken(c_token *ct,char *file,char *func,char *line)
    //只有CPP_NAME才有IDENTIFIER_POINTER,否则编译app时出段错误。
   static int pp=1;
   tree_debug(file,func,line ,"c_token:[%d] name:%s cpp_ttype:%-12s c_id_kind:%-10s rid:%d ridStr:%-12s %d,%d %8s %u",
-		  pp++, isData?numberStr:str1,aet_cpp_ttype_str[ct->type], aet_c_id_kind_str[ct->id_kind],
+		  pp++, isData?numberStr:str1,cpp_type2name(ct->type,0), aet_c_id_kind_str[ct->id_kind],
 				  ct->type==CPP_KEYWORD?ct->keyword:-1,ct->type==CPP_KEYWORD?aet_utils_get_keyword_string(ct):"no",
 		  xloc.line, xloc.column,xloc.file,ct->location);/* 打印符号值的基本信息 */
 }
@@ -385,33 +472,33 @@ void           aet_print_tree_skip_debug(tree node)
 	  dump_node(node,TDF_ALL_VALUES|local_dump_flags,dump_orig);
 }
 
-void           aet_print_token_skip_debug(c_token *ct)
+void  aet_print_token_skip_debug(c_token *ct)
 {
-	      if(!ct)
-			return;
-	      tree value=ct->value;
-	       expanded_location xloc;
-	       xloc = expand_location(ct->location);
-	       const char *str1;
-	       char  numberStr[25];
-	       int isData=0;
-	       if(ct->type==CPP_NAME)
-	          str1=IDENTIFIER_POINTER (value);
-	       else if(ct->type==CPP_NUMBER){
-	    	   wide_int result=wi::to_wide(value);
-	    	   int v=result.to_shwi();
-	    	   sprintf(numberStr,"%d",v);
-	    	   isData=1;
-	       }else if(ct->type==CPP_STRING){
-	    	   str1  = TREE_STRING_POINTER (value);
-	       }else{
-	    	   str1="unknown";
-	       }
-	       int pp=0;
-	      printf("c_token:[%d] name:%s cpp_ttype:%-12s c_id_kind:%-10s rid:%d ridStr:%-12s %d,%d %8s\n",
-	    		  pp++, isData?numberStr:str1,aet_cpp_ttype_str[ct->type], aet_c_id_kind_str[ct->id_kind],
-	    				  ct->type==CPP_KEYWORD?ct->keyword:-1,ct->type==CPP_KEYWORD?aet_utils_get_keyword_string(ct):"no",
-	    		  xloc.line, xloc.column,xloc.file);/* 打印符号值的基本信息 */
+      if(!ct)
+        return;
+      tree value=ct->value;
+       expanded_location xloc;
+       xloc = expand_location(ct->location);
+       const char *str1;
+       char  numberStr[25];
+       int isData=0;
+       if(ct->type==CPP_NAME)
+          str1=IDENTIFIER_POINTER (value);
+       else if(ct->type==CPP_NUMBER){
+           wide_int result=wi::to_wide(value);
+           int v=result.to_shwi();
+           sprintf(numberStr,"%d",v);
+           isData=1;
+       }else if(ct->type==CPP_STRING){
+           str1  = TREE_STRING_POINTER (value);
+       }else{
+           str1="unknown";
+       }
+       int pp=0;
+      printf("c_token:[%d] name:%s cpp_ttype:%-12s c_id_kind:%-10s rid:%d ridStr:%-12s %d,%d %8s\n",
+              pp++, isData?numberStr:str1,cpp_type2name(ct->type,0), aet_c_id_kind_str[ct->id_kind],
+                      ct->type==CPP_KEYWORD?ct->keyword:-1,ct->type==CPP_KEYWORD?aet_utils_get_keyword_string(ct):"no",
+              xloc.line, xloc.column,xloc.file);/* 打印符号值的基本信息 */
 }
 
 static inline  nuint64 getTime()
@@ -441,7 +528,19 @@ void  aet_print_time_from(char *file,char *func ,int linen,char *format,...)
 	  printf("  time:%llu,",time-ctime);
 	  ctime=time;
 	  printf("\n");
-
 }
 
+void    aet_print_location(location_t loc)
+{
+     expanded_location xloc;
+     xloc = expand_location(loc);
+     printf("位置是:%d %d %s\n",xloc.line, xloc.column,xloc.file);
+}
+
+
+
+char *aet_print_get_storage_class_string(int kind)
+{
+   return  storage_class_str[kind];
+}
 

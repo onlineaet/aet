@@ -91,7 +91,7 @@ static void reloveFuncCall(char *content,NPtrArray *array)
 		char *gen=genStrs[4];
 		char **getModelStr=n_strsplit(gen,",",-1);
 		genCount=n_strv_length(getModelStr);
-		GenericCallFunc *func=n_slice_new(GenericCallFunc);
+		GenericCallFunc *func=(GenericCallFunc *)n_slice_new(GenericCallFunc);
 		func->sysName=n_strdup(sysName);
 		func->funcName=n_strdup(funcName);
 		func->atClass=n_strdup(atClass);
@@ -149,7 +149,7 @@ static void reloveNewObject(char *content,NPtrArray *array)
 		char *gen=genStrs[3];
 		char **getModelStr=n_strsplit(gen,",",-1);
 		genCount=n_strv_length(getModelStr);
-	    GenericNewClass *obj=n_slice_new(GenericNewClass);
+	    GenericNewClass *obj=(GenericNewClass *)n_slice_new(GenericNewClass);
 	    obj->sysName=n_strdup(sysName);
 	    obj->atClass=n_strdup(atClass);
 	    obj->atFunc=n_strdup(atFuncName);
@@ -220,7 +220,7 @@ static void fillAtClassAndFunc(char **atClass,char **atFunc)
 
 GenericCallFunc *generic_call_func_new(ClassName *className,char *funcName,GenericModel *defines)
 {
-   	GenericCallFunc *func=n_slice_new(GenericCallFunc);
+   	GenericCallFunc *func=(GenericCallFunc *)n_slice_new(GenericCallFunc);
 	func->sysName=n_strdup(className->sysName);
 	func->funcName=n_strdup(funcName);
 	fillAtClassAndFunc(&func->atClass,&func->atFunc);
@@ -255,7 +255,7 @@ void generic_new_class_free(GenericNewClass *self)
 
 GenericNewClass *generic_new_class_new(char *sysName,GenericModel *defines)
 {
-	GenericNewClass *obj=n_slice_new(GenericNewClass);
+	GenericNewClass *obj=(GenericNewClass *)n_slice_new(GenericNewClass);
 	obj->sysName=n_strdup(sysName);
 	fillAtClassAndFunc(&obj->atClass,&obj->atFunc);
 	obj->model=defines;

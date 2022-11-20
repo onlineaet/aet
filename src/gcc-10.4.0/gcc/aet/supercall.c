@@ -437,7 +437,7 @@ static char **getParents(char *sysName)
 	if(info==NULL)
 		return NULL;
 	int distance=class_mgr_get_distance(class_mgr_get(),sysName);
-	printf("getParents --- distnce:%d sysName:%s\n",distance,sysName);
+	n_debug("getParents --- distnce:%d sysName:%s\n",distance,sysName);
 	char **res=n_new(char *,distance+2);
 	int count=0;
 	while(info->parentName.sysName!=NULL){
@@ -456,7 +456,6 @@ static void createCode(char *fromSysName,char **parents,SuperCallInfo *info,int 
 	ClassName *aObjectClassName=class_mgr_get_class_name_by_user(class_mgr_get(), AET_ROOT_OBJECT);
     char *funcName=info->primitive->rawMangleName;
 	nuint len=n_strv_length(parents);
-	printf("createCode super len:%d %s",len,fromSysName);
 	int i;
 	for(i=0;i<len;i++){
 	   if(i==0){
@@ -466,7 +465,7 @@ static void createCode(char *fromSysName,char **parents,SuperCallInfo *info,int 
 	      n_string_append_printf(codes,"}else if(%s((%s *)self,\"%s\",%d,%d,%d,\"%s\",\"%s\")>0){\n",
 	        		  SUPER_FILL_ADDRESS_FUNC,aObjectClassName->sysName,fromSysName,info->distance,superCallCount,info->index, parents[i],funcName);
 	   }
-       n_string_append(codes,";\n");
+       n_string_append(codes,"    ;\n");
        if(i==len-1){
     		n_string_append(codes,"}\n");
        }

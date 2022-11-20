@@ -198,7 +198,7 @@ static void printDefines(NPtrArray *array,char *sysName)
  */
 static BlockFuncParmInfo *newGenericParmInfo(char *sysName,char *parmName,int pointer)
 {
-	 BlockFuncParmInfo *info=n_slice_new(BlockFuncParmInfo);
+	 BlockFuncParmInfo *info=(BlockFuncParmInfo *)n_slice_new(BlockFuncParmInfo);
 	 info->sysName=n_strdup(sysName);
 	 info->parmName=n_strdup(parmName);
 	 info->pointer=pointer;

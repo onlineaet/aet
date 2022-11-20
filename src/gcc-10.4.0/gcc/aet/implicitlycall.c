@@ -25,28 +25,17 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 #include "system.h"
 #include "coretypes.h"
 #include "target.h"
-
 #include "function.h"
 #include "tree.h"
 #include "timevar.h"
 #include "stringpool.h"
 #include "attribs.h"
 #include "toplev.h"
-#include "opts.h"
-
 #include "varasm.h"
 #include "c-family/c-common.h"
 #include "c-family/c-pragma.h"
-
 #include "c/c-tree.h"
-
-#include "c-family/name-hint.h"
-#include "c-family/known-headers.h"
-#include "c-family/c-spellcheck.h"
-#include "c-aet.h"
-#include "../libcpp/internal.h"
 #include "c/c-parser.h"
-#include "../libcpp/include/cpplib.h"
 
 #include "aetutils.h"
 #include "aetinfo.h"
@@ -60,6 +49,7 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 #include "funcmgr.h"
 #include "aet-typeck.h"
 #include "genericcall.h"
+#include "selectfield.h"
 
 static int number=0;//创建的函数声明编号
 
@@ -79,12 +69,12 @@ typedef struct _ImplicitlyData {
     nboolean isStatic;//作为静态函数调用吗
 }ImplicitlyData;
 
+
 /**
  * 函数调用分两种情况
  * 在implimpl的没有加self->访问
  * 在implimpl加self->或其它对象的 如abc->
  */
-
 static void implicitlyCallInit(ImplicitlyCall *self)
 {
     self->implicitlyArray=n_ptr_array_new();
@@ -167,7 +157,7 @@ static tree  createImplicitlyId(location_t loc,tree id,int *order)
 
 static void add(ImplicitlyCall *self,char *sysName,location_t loc,tree oldId,tree decl,int order,tree selfTree,nboolean isStatic)
 {
-    ImplicitlyData *item=n_slice_new(ImplicitlyData);
+    ImplicitlyData *item=(ImplicitlyData *)n_slice_new(ImplicitlyData);
     item->sysName=n_strdup(sysName);
     item->loc=loc;
     item->origFuncName=n_strdup(IDENTIFIER_POINTER(oldId));
@@ -235,250 +225,21 @@ static ImplicitlyData *find(ImplicitlyCall *self,char *sysName,char *funcName)
     return NULL;
 }
 
-typedef struct _CandidateFun
-{
-    ClassFunc *mangle;
-    WarnAndError *warnErr;
-}CandidateFun;
-
-
-static CandidateFun *cloneCand(CandidateFun *src)
-{
-    if(src==NULL)
-        return NULL;
-    CandidateFun *candidate=n_slice_new(CandidateFun);
-    candidate->mangle=src->mangle;
-    candidate->warnErr=xmalloc(sizeof(WarnAndError));
-    candidate->warnErr->warnCount=src->warnErr->warnCount;
-    return candidate;
-}
-
-static void freeCandidate_cb(CandidateFun *item)
-{
-    if(item==NULL)
-        return;
-    n_free(item->warnErr);
-    n_slice_free(CandidateFun,item);
-}
-
-static nint warnCompare_cb(nconstpointer  cand1,nconstpointer  cand2)
-{
-    CandidateFun *p1 = (CandidateFun *)cand1;
-    CandidateFun *p2 = (CandidateFun *)cand2;
-    int a=p1->warnErr->warnCount;
-    int b=p2->warnErr->warnCount;
-    return (a > b ? +1 : a == b ? 0 : -1);
-}
-
-static CandidateFun * filterGoodFunc(NList *okList)
-{
-  if(n_list_length(okList)==0){
-      n_debug("filterGoodFunc 没有匹配的函数!!! %s %s %d\n",__FILE__,__FUNCTION__,__LINE__);
-    return NULL;
-  }
-  okList=n_list_sort(okList,warnCompare_cb);
-  int len=n_list_length(okList);
-  if(len==1){
-    CandidateFun *cand=(CandidateFun *)n_list_nth_data(okList,0);
-    n_debug("找到了声明的函数 成功匹配参数，只有一个 xxx decl code:%s name:%s ",cand->mangle->orgiName,cand->mangle->mangleFunName);
-    return cand;
-  }else{
-     int i;
-     CandidateFun *first=(CandidateFun *)n_list_nth_data(okList,0);
-     nboolean genericFunc=class_func_is_func_generic(first->mangle);
-     if(!genericFunc){
-        return first;
-     }
-     CandidateFun *compare=(CandidateFun *)n_list_nth_data(okList,1);
-     if(first->warnErr->warnCount==compare->warnErr->warnCount){
-         return compare;
-     }else{
-         return first;
-     }
-  }
-}
-
-static CandidateFun * checkParam(ImplicitlyCall *self,ClassFunc *func,tree decl,vec<tree, va_gc> *exprlist,vec<tree, va_gc> *origtypes,
-        vec<location_t> arg_loc,location_t expr_loc)
-{
-   tree  funcType = TREE_TYPE (decl);
-   int count=0;
-   int varargs_p = 1;
-   for (tree al = TYPE_ARG_TYPES (funcType); al; al = TREE_CHAIN (al)){
-        tree type=TREE_VALUE(al);
-        if(type == void_type_node){
-            //n_debug("有void_type_node count:%d 函数名:%s",count,IDENTIFIER_POINTER(DECL_NAME(decl)));
-            varargs_p=0;
-            break;
-        }
-        count++;
-   }
-   //跳过FuncGenParmInfo info 形参 在泛型函数中abc(Abc *self,FuncGenParmInfoinfo,....);aet_check_funcs_param会判断是否要跳过参数
-   if(count!=exprlist->length() && varargs_p==0){
-       nboolean ok1=class_func_is_func_generic(func);
-       nboolean ok2=class_func_is_query_generic(func);
-       n_debug("checkParam 参数个数不匹配! 检查是不是泛型函数 形参：%d 实参:%d 是泛型函数：ok:%d 是带问号泛型参数的函数:%d",count,exprlist->length(),ok1,ok2);
-       if(!ok1 && !ok2){
-          return NULL;
-       }
-   }
-
-   aet_warn_and_error_reset();
-   if(varargs_p)
-     n_debug("checkParam 开始匹配参数 decl code:%s name:%s 是否有可变参数：%d",
-                        get_tree_code_name(TREE_CODE(decl)),IDENTIFIER_POINTER(DECL_NAME(decl)),varargs_p);
-   tree value=decl;
-   mark_exp_read (value);
-   value= aet_check_funcs_param (expr_loc, arg_loc, value,exprlist, origtypes);
-   if(value==error_mark_node){
-      n_debug("checkParam 不能匹配参数 decl code:%s name:%s ",
-              get_tree_code_name(TREE_CODE(decl)),IDENTIFIER_POINTER(DECL_NAME(decl)));
-   }else{
-      n_debug("checkParam 有错误吗? decl code:%s name:%s 错误数:%d warn:%d ",
-            get_tree_code_name(TREE_CODE(decl)),IDENTIFIER_POINTER(DECL_NAME(decl)),
-            argsFuncsInfo.errorCount,argsFuncsInfo.warnCount);
-      if(argsFuncsInfo.errorCount==0){
-        CandidateFun *candidate=n_slice_new(CandidateFun);
-        candidate->warnErr=aet_warn_and_error_copy();
-        return candidate;
-     }
-  }
-  return NULL;
-}
-
-static CandidateFun *getFuncFromClass(ImplicitlyCall *self,ClassName *className,char *orgiFuncName,vec<tree, va_gc> *exprlist,
-        vec<tree, va_gc> *origtypes,vec<location_t> arg_loc,location_t expr_loc,GenericModel *generics)
-{
-    NList *okList=NULL;
-    NPtrArray *array=func_mgr_get_funcs(func_mgr_get(),className);
-    if(array==NULL)
-        return NULL;
-    int i;
-    generic_call_set_global(generic_call_get(),className,generics);
-    for(i=0;i<array->len;i++){
-        ClassFunc *item=(ClassFunc *)n_ptr_array_index(array,i);
-        if(strcmp(item->orgiName,orgiFuncName))
-          continue;
-            //查找语句
-        n_debug("getFuncFromClass index:%d %s orgiFuncName:%s field?:%d",
-                i,className->sysName,orgiFuncName,aet_utils_valid_tree(item->fieldDecl));
-        tree decl=NULL_TREE;
-        if(aet_utils_valid_tree(item->fromImplDefine)){
-            decl=item->fromImplDefine;
-        }
-
-        if(decl==NULL_TREE)
-            continue;
-        CandidateFun *candidate=checkParam(self,item,decl,exprlist, origtypes,arg_loc,expr_loc);
-        if(candidate!=NULL){
-          candidate->mangle=item;
-          if(candidate->warnErr->errorCount==0 && candidate->warnErr->warnCount==0){
-                n_list_free_full(okList,freeCandidate_cb);
-                generic_call_set_global(generic_call_get(),NULL,NULL);
-                n_debug("checkParm 检查没有错误，没有警告，直接返回:%s %s className:%s\n",item->orgiName,item->mangleFunName,className->sysName);
-                return candidate;
-          }
-          okList=n_list_append(okList,candidate);
-        }
-    }
-    CandidateFun *okCand=filterGoodFunc(okList);
-    CandidateFun *result=cloneCand(okCand);
-    n_list_free_full(okList,freeCandidate_cb);
-    generic_call_set_global(generic_call_get(),NULL,NULL);
-    return result;
-}
-
-
-static CandidateFun *selectFunc(ImplicitlyCall *self,ClassName *className,char *origName,vec<tree, va_gc> *exprlist,
-        vec<tree, va_gc> *origtypes,vec<location_t> arg_loc,location_t expr_loc,GenericModel *generics,GenericModel * funcGenericDefine)
-{
-    CandidateFun *last=getFuncFromClass(self,className,origName,exprlist,origtypes,arg_loc,expr_loc,generics);
-    if(last==NULL)
-        return NULL;
-
-    if(class_func_is_func_generic(last->mangle) || class_func_is_query_generic(last->mangle)){
-        printf("implicitlycall selectFunc\n");
-        generic_call_add_fpgi_parm(generic_call_get(),last->mangle,className,exprlist,funcGenericDefine);
-    }
-    return last;
-}
-
 /**
  * 把泛型形参对应的实参转化为:实参--中间形参:如<int>---void*
  */
-static void convertParmForGenerics(ImplicitlyCall *self,ClassName *className,CandidateFun *selectedDecl,vec<tree, va_gc> *exprlist,
+static void convertParmForGenerics(ImplicitlyCall *self,ClassName *className,CandidateFunc *selectedDecl,vec<tree, va_gc> *exprlist,
         location_t expr_loc,GenericModel *generics)
 {
-        generic_call_set_global(generic_call_get(),className,generics);
         tree decl=NULL_TREE;
-        ClassFunc *item=selectedDecl->mangle;
+        ClassFunc *item=selectedDecl->classFunc;
         n_debug("convertParmForGenerics  %s  field?:%d\n",className->sysName,aet_utils_valid_tree(item->fieldDecl));
         decl=item->fromImplDefine;
         if(decl==NULL_TREE){
-            generic_call_set_global(generic_call_get(),NULL,NULL);
             return;
         }
-        int count=generic_call_replace_parm(generic_call_get(),expr_loc,decl, exprlist);
-        generic_call_set_global(generic_call_get(),NULL,NULL);
+        int count=generic_call_replace_parm(generic_call_get(),expr_loc,decl, exprlist,className,generics);
        // printf("泛型转化成功的个数:%d\n",count);
-}
-
-static CandidateFun * checkStaticParam(ImplicitlyCall *self,tree decl,vec<tree, va_gc> *exprlist,vec<tree, va_gc> *origtypes,
-        vec<location_t> arg_loc,location_t expr_loc)
-{
-   aet_warn_and_error_reset();
-   n_debug("找到了静态声明的函数 开始匹配参数 decl code:%s name:%s",get_tree_code_name(TREE_CODE(decl)),IDENTIFIER_POINTER(DECL_NAME(decl)));
-   tree value=decl;
-   mark_exp_read (value);
-   value= aet_check_funcs_param (expr_loc, arg_loc, value,exprlist, origtypes);
-   if(value==error_mark_node){
-       n_debug("找到了静态声明的函数 不能匹配参数 decl code:%s name:%s ",get_tree_code_name(TREE_CODE(decl)),IDENTIFIER_POINTER(DECL_NAME(decl)));
-   }else{
-       n_debug("找到了静态声明的函数 有错误吗? decl code:%s name:%s 错误数:%d warn:%d ",get_tree_code_name(TREE_CODE(decl)),IDENTIFIER_POINTER(DECL_NAME(decl)),
-            argsFuncsInfo.errorCount,argsFuncsInfo.warnCount);
-      if(argsFuncsInfo.errorCount==0){
-        CandidateFun *candidate=n_slice_new(CandidateFun);
-        candidate->warnErr=aet_warn_and_error_copy();
-        return candidate;
-     }
-  }
-  return NULL;
-}
-
-/**
- * 在本类中找静态函数
- * 只找define
- */
-static CandidateFun *getStaticFunc(ImplicitlyCall *self,ClassName *className,char *orgiFuncName,vec<tree, va_gc> *exprlist,
-        vec<tree, va_gc> *origtypes,vec<location_t> arg_loc,location_t expr_loc)
-{
-    NList *okList=NULL;
-    NPtrArray *array=func_mgr_get_static_funcs(func_mgr_get(),className);
-    if(array==NULL)
-        return NULL;
-    int i;
-    for(i=0;i<array->len;i++){
-        ClassFunc *item=(ClassFunc *)n_ptr_array_index(array,i);
-        if(strcmp(item->orgiName,orgiFuncName))
-          continue;
-            //查找语句
-        //printf("getFuncFromClass index:%d %s\n",i,className->sysName);
-        tree decl=NULL_TREE;
-        if(aet_utils_valid_tree(item->fromImplDefine)){
-            decl=item->fromImplDefine;
-        }
-        if(decl==NULL_TREE)
-            continue;
-        CandidateFun *candidate=checkStaticParam(self,decl,exprlist, origtypes,arg_loc,expr_loc);
-        if(candidate!=NULL){
-          candidate->mangle=item;
-          okList=n_list_append(okList,candidate);
-        }
-    }
-     CandidateFun *okCand=filterGoodFunc(okList);
-     CandidateFun *result=cloneCand(okCand);
-     n_list_free_full(okList,freeCandidate_cb);
-     return result;
 }
 
 /**
@@ -495,7 +256,7 @@ static tree selectedFromStatic(ImplicitlyCall *self,ImplicitlyData *data)
        vec<tree, va_gc> *origtypes=data->origtypes;
        location_t expr_loc =data->loc;
        vec<location_t> arg_loc=data->arg_loc;
-       CandidateFun *item=NULL;
+       CandidateFunc *item=NULL;
        n_debug("selecImplicitly 00 name:%s className:%s origFunName:%s",IDENTIFIER_POINTER(id),sysName,origFunName);
        ClassName *className=class_mgr_get_class_name_by_sys(class_mgr_get(),sysName);
        if(className==NULL){
@@ -504,17 +265,29 @@ static tree selectedFromStatic(ImplicitlyCall *self,ImplicitlyData *data)
        n_debug("selecImplicitly 找静态函数 找之前把self移走。\n");
        exprlist->ordered_remove(0);//把self参数移走
        origtypes->ordered_remove(0);//把self参数移走
-       int re=func_help_process_static_func_param(self->funcHelp,className,origFunName,exprlist,TRUE);
-       if(re==-1)
-            item=getStaticFunc(self,className,origFunName,exprlist,origtypes,arg_loc,expr_loc);
+       item=select_field_get_implicitly_static_func(select_field_get(),className,origFunName,exprlist,origtypes,arg_loc,expr_loc,NULL);
        if(item!=NULL)
-           last=item->mangle->fromImplDefine;
+           last=item->classFunc->fromImplDefine;
        else{
           ;
        }
        return last;
 }
 
+/**
+ * 根据实参选择类方法。
+ */
+static CandidateFunc *selectFunc(ImplicitlyCall *self,ClassName *className,char *origName,vec<tree, va_gc> *exprlist,
+        vec<tree, va_gc> *origtypes,vec<location_t> arg_loc,location_t expr_loc,GenericModel *generics,GenericModel * funcGenericDefine)
+{
+    CandidateFunc *last=select_field_get_implicitly_func(select_field_get(),className,origName,exprlist,origtypes,arg_loc,expr_loc,generics,NULL);
+    if(last==NULL)
+        return NULL;
+    if(class_func_is_func_generic(last->classFunc) || class_func_is_query_generic(last->classFunc)){
+        generic_call_add_fpgi_parm(generic_call_get(),last->classFunc,className,exprlist,funcGenericDefine);
+    }
+    return last;
+}
 
 static tree selecImplicitly(ImplicitlyCall *self,ImplicitlyData *data)
 {
@@ -527,40 +300,31 @@ static tree selecImplicitly(ImplicitlyCall *self,ImplicitlyData *data)
     vec<tree, va_gc> *origtypes=data->origtypes;
     location_t expr_loc =data->loc;
     vec<location_t> arg_loc=data->arg_loc;
-
-    n_debug("selecImplicitly 00 name:%s className:%s origFunName:%s",IDENTIFIER_POINTER(id),sysName,origFunName);
+    n_debug("selecImplicitly 00 name:%s className:%s origFunName:%s\n",IDENTIFIER_POINTER(id),sysName,origFunName);
     ClassName *className=class_mgr_get_class_name_by_sys(class_mgr_get(),sysName);
     if(className==NULL){
         return NULL_TREE;
     }
-    CandidateFun *item=NULL;
+    CandidateFunc *item=NULL;
     GenericModel *generics=NULL;//在这里的调用都是在类实现中，不会有具体的泛型找到，所以是空的.
     GenericModel *funcGenericDefine=NULL;//如果funcGenericDefine是有效的说明这是一个泛型函数
-    int re=func_help_process_static_func_param(self->funcHelp,className,origFunName,exprlist,FALSE);
-    if(re==-1)
-       item=selectFunc(self,className,origFunName,exprlist,origtypes,arg_loc,expr_loc,generics,funcGenericDefine);
+    item=selectFunc(self,className,origFunName,exprlist,origtypes,arg_loc,expr_loc,generics,funcGenericDefine);
     //如果是field要加入指针，否则访问不到
     if(item!=NULL){
-       n_debug("selecImplicitly is 找到了 00 class:%s mangleFunName:%s",className->sysName,item->mangle->mangleFunName);
+        n_debug("selecImplicitly is 找到了 00 class:%s mangleFunName:%s\n",className->sysName,item->classFunc->mangleFunName);
        convertParmForGenerics(self,className,item,exprlist,expr_loc,generics);//转化实参到void*
-       last=item->mangle->fromImplDefine;
-      // setGenericQuery(self,item,last);
-       generic_check_parm(sysName,item->mangle,exprlist,last);
+       last=item->classFunc->fromImplDefine;
+       generic_check_parm(sysName,item->classFunc,exprlist,last);
     }else{
         n_debug("selecImplicitly 找静态函数 找之前把self移走。\n");
         exprlist->ordered_remove(0);//把self参数移走
         origtypes->ordered_remove(0);//把self参数移走
-        re=func_help_process_static_func_param(self->funcHelp,className,origFunName,exprlist,TRUE);
-        if(re==-1)
-           item=getStaticFunc(self,className,origFunName,exprlist,origtypes,arg_loc,expr_loc);
+        item=select_field_get_implicitly_static_func(select_field_get(),className,origFunName,exprlist,origtypes,arg_loc,expr_loc,NULL);
         if(item!=NULL)
-            last=item->mangle->fromImplDefine;
-        else{
-
-        }
+            last=item->classFunc->fromImplDefine;
     }
     if(item!=NULL){
-       n_slice_free(CandidateFun,item);
+        select_field_free_candidate(item);
     }
     return last;
 }

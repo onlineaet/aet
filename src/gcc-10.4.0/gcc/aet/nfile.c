@@ -79,7 +79,7 @@ static int   canonicalize(char *original, char *resolved, int len);
 
 static  void n_file_init (NFile *self)
 {
-	self->priv=n_slice_new(NFilePrivate);
+	self->priv=(NFilePrivate *)n_slice_new(NFilePrivate);
 	NFilePrivate *priv=self->priv;
 	priv->path=NULL;
 	priv->prefixLength=0;
@@ -342,7 +342,7 @@ const char *n_file_get_parent(NFile *self)
 
 static NFile *fileNew(char *pathname, int prefixLength)
 {
-	NFile *self= n_slice_new(NFile);
+	NFile *self= (NFile *)n_slice_new(NFile);
 	n_file_init(self);
 	NFilePrivate *priv=self->priv;
 	priv->path=n_strdup(pathname);
@@ -1172,7 +1172,7 @@ NFile  *n_file_new(const char *pathname)
 	nboolean re=checkNamValid(pathname);
 	if(!re)
 		return NULL;
-    NFile *self= n_slice_new(NFile);
+    NFile *self= (NFile *)n_slice_new(NFile);
     n_file_init(self);
 	NFilePrivate *priv=self->priv;
 	priv->path=normalize(pathname);
@@ -1206,7 +1206,7 @@ NFile      *n_file_new_by_parent(NFile *parent, const char *child)
     	   lastPath = normalize(child);
        }
        int prefixLength0 = prefixLength(lastPath);
-       NFile *self= n_slice_new(NFile);
+       NFile *self= (NFile *)n_slice_new(NFile);
        n_file_init(self);
        	NFilePrivate *priv=self->priv;
        	priv->path=lastPath;

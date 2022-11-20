@@ -332,7 +332,10 @@ static int getParentByClassName(char *my,char *other)
 
 /**
  * my与other的关系
- *
+ * my是other的父
+ * my是other的子
+ * my是ohter接口的实现。
+ * ohter是my的接口实现。
  */
 ClassRelationship   class_mgr_relationship(ClassMgr *self,char *my,char *other)
 {
@@ -469,6 +472,15 @@ NPtrArray *class_mgr_get_all_iface_info(ClassMgr *self)
         }
         return array;
 }
+
+nboolean   class_mgr_is_root_object(ClassMgr *self,char *sysName)
+{
+    ClassInfo *info=class_mgr_get_class_info(self,sysName);
+    if(info==NULL)
+        return FALSE;
+    return class_info_is_root(info);
+}
+
 
 
 ClassMgr *class_mgr_get()

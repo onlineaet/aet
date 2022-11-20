@@ -25,35 +25,14 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 #include "system.h"
 #include "coretypes.h"
 #include "target.h"
-
 #include "function.h"
 #include "tree.h"
 #include "timevar.h"
 #include "stringpool.h"
-#include "cgraph.h"
-#include "attribs.h"
-#include "toplev.h"
-#include "opts.h"
-
-#include "stor-layout.h"
-#include "varasm.h"
-#include "trans-mem.h"
 #include "c-family/c-pragma.h"
-#include "gcc-rich-location.h"
-#include "c-family/c-common.h"
-#include "gimple-expr.h"
-
 #include "c/c-tree.h"
-
-#include "c-family/name-hint.h"
-#include "c-family/known-headers.h"
-#include "c-family/c-spellcheck.h"
-#include "c-aet.h"
-#include "../libcpp/internal.h"
 #include "c/c-parser.h"
-#include "c/gimple-parser.h"
 
-#include "../libcpp/include/cpplib.h"
 #include "aetutils.h"
 #include "classmgr.h"
 #include "funccheck.h"
@@ -518,7 +497,7 @@ static InnerClassInfo *createClass(char *classInfoStr)
 		  n_error("类信息格式不正确。%s\n",classInfoStr);
 		  return NULL;
 	  }
-	  InnerClassInfo *info=n_slice_new0(InnerClassInfo);
+	  InnerClassInfo *info=(InnerClassInfo *)n_slice_new0(InnerClassInfo);
 	  info->sysName=n_strdup(items[0]);
 	  info->type=atoi(items[1]);
 	  if(items[2]!=NULL && strlen(items[2])>0){
@@ -554,7 +533,7 @@ static InnerClassImpl *createImpl(char *implInfoStr)
 		  n_error("类方法实现的信息格式不正确。%s\n",implInfoStr);
 		  return NULL;
 	  }
-	  InnerClassImpl *info=n_slice_new0(InnerClassImpl);
+	  InnerClassImpl *info=(InnerClassImpl *)n_slice_new0(InnerClassImpl);
 	  info->sysName=n_strdup(items[0]);
 	  info->type=atoi(items[1]);
 	  nchar **fields=n_strsplit(items[2],",",-1);
@@ -586,7 +565,7 @@ static CollectInfo *createCollect(char *upperPortion,char *lowerPart)
 	  InnerClassInfo *info=createClass(upperPortion);
 	 // printf("InnerClassInfo %s %s %d %d %d\n",info->sysName,info->parentName,info->type,info->parentType,info->ifaceCount);
 	  InnerClassImpl *impl=createImpl(lowerPart);
-	  collect=n_slice_new(CollectInfo);
+	  collect=(CollectInfo *)n_slice_new(CollectInfo);
 	  collect->info=info;
 	  collect->impl=impl;
 	  if(info->type==CLASS_TYPE_NORMAL){

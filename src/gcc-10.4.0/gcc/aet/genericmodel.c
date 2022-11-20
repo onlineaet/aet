@@ -98,7 +98,7 @@ static void getExtendsClass(c_parser *parser,char **parentClass,tree *parentTree
  */
 static GenericUnit *createGenUnit(tree generic,char *parentName,tree parentTree)
 {
-	   GenericUnit *unit=n_slice_new0(GenericUnit);
+	   GenericUnit *unit=(GenericUnit *)n_slice_new0(GenericUnit);
 	   if(TREE_CODE(generic)!=IDENTIFIER_NODE){
 		   tree type=TREE_TYPE(generic);
 		   class_util_get_type_name(type,&unit->name);
@@ -739,7 +739,7 @@ nboolean  generic_unit_is_query(GenericUnit *self)
 
 GenericUnit  *generic_unit_clone(GenericUnit *unit)
 {
-   GenericUnit *dest=n_slice_new0(GenericUnit);
+   GenericUnit *dest=(GenericUnit *)n_slice_new0(GenericUnit);
    if(unit->parent.name){
 	   printf("generic_unit_clone 11 unit->parent.name %s\n",unit->parent.name);
 	   dest->parent.name=n_strdup(unit->parent.name);

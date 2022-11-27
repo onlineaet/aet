@@ -172,19 +172,19 @@ static void class_impl_external_declaration (ClassImpl *self)
 	 	}
 	 		break;
 	    default:
-		  n_debug("跳出处理关键词--- %s, %s, %d\n", __FILE__, __FUNCTION__, __LINE__);
+		  n_debug("跳出处理关键词--- %s, %s, %d", __FILE__, __FUNCTION__, __LINE__);
 		  aet_print_token(c_parser_peek_token (parser));
 	      goto decl_or_fndef;
 	   }
         break;
     case CPP_SEMICOLON:
       {
-    	 n_debug("处理分号 --- %s, %s, %d\n", __FILE__, __FUNCTION__, __LINE__);
+    	 n_debug("处理分号 --- %s, %s, %d", __FILE__, __FUNCTION__, __LINE__);
          if(self->readyEnd==1)
     	    self->readyEnd=2;
          c_parser_consume_token (parser);
          if(!class_mgr_is_interface(class_mgr_get(),self->className)){
-             n_debug("class-impl 在class中加函数定义 00 加unref --- className:%s readyEnd:%d %s, %s, %d\n",
+             n_debug("class-impl 在class中加函数定义 00 加unref --- className:%s readyEnd:%d %s, %s, %d",
              		self->className->sysName,self->readyEnd,__FILE__, __FUNCTION__, __LINE__);
             nboolean result=class_finalize_build_unref_define(self->classFinalize,self->className);
             if(result)
@@ -289,83 +289,151 @@ static char *strCat(char *one,char *two)
 		result=n_strdup(codes->str);
 	n_string_free(codes,TRUE);
 	return result;
-
 }
+
+/**
+ * 解析助记符
+ * impl$ XXX extends$ Parent
+ * extends$ Parent仅仅起到助记作用，应为在.h文件中已经声明了。
+ */
+static void  getInterface(ClassImpl *self,NPtrArray *ifaceArray)
+{
+      c_parser *parser=self->parser;
+      int i;
+      for(i=0;i<20;i++){
+          if (c_parser_next_token_is (parser, CPP_NAME)){
+              tree id=c_parser_peek_token(parser)->value;
+              n_ptr_array_add(ifaceArray,id);
+              c_parser_consume_token (parser);
+          }else if(c_parser_next_token_is (parser, CPP_COMMA)){
+              c_parser_consume_token (parser);
+              if (c_parser_next_token_is (parser, CPP_NAME)){
+                  tree id=c_parser_peek_token(parser)->value;
+                  c_parser_consume_token (parser);
+                  n_ptr_array_add(ifaceArray,id);
+              }
+          }else if (c_parser_next_token_is (parser, CPP_OPEN_BRACE)){
+              break;
+          }else{
+              c_parser_consume_token (parser);
+          }
+      }
+}
+
+/**
+ * 解析助记符
+ * impl$ XXX extends$ Parent
+ * extends$ Parent仅仅起到助记作用，应为在.h文件中已经声明了。
+ */
+static void parserExentdsAndImplements(ClassImpl *self,char *sysName)
+{
+      c_parser *parser=self->parser;
+      NPtrArray *parentArray=n_ptr_array_new();
+      NPtrArray *ifaceArray=n_ptr_array_new();
+      location_t loc=c_parser_peek_token (parser)->location;
+      while(!c_parser_next_token_is (parser, CPP_OPEN_BRACE)){
+          switch (c_parser_peek_token (parser)->keyword){
+             case RID_AET_EXTENDS:
+             {
+                 c_parser_consume_token (parser);
+                 if(c_parser_next_token_is (parser, CPP_NAME)){
+                     tree id=c_parser_peek_token(parser)->value;
+                     c_parser_consume_token (parser);
+                     n_ptr_array_add(parentArray,id);
+                 }
+             }
+                 break;
+             case RID_AET_IMPLEMENTS:
+             {
+                 c_parser_consume_token (parser);
+                 if(c_parser_next_token_is (parser, CPP_NAME)){
+                     getInterface(self,ifaceArray);
+                 }
+             }
+                 break;
+             default:
+                 c_parser_consume_token (parser);
+                 break;
+          }
+          if(!c_parser_next_token_is (parser, CPP_OPEN_BRACE))
+              c_parser_consume_token (parser);
+      }
+      ClassInfo *info=class_mgr_get_class_info(class_mgr_get(),sysName);
+      nboolean re= class_info_decl_equal_impl(info,parentArray,ifaceArray);
+      if(!re){
+          warning_at(loc,0,"类实现的助记符与类声明不符。");
+      }
+}
+
 
 void class_impl_parser(ClassImpl *self)
 {
-   c_parser *parser=self->parser;
-   tree ident = NULL_TREE;
-   location_t impl_loc;
-   location_t ident_loc = UNKNOWN_LOCATION;
-   ClassName *tempClassName=NULL;
-   self->readyEnd=0;
-   parser_help_set_forbidden(TRUE);//禁止下一个C_TOKEN被parser_help_set_class_or_enum_type改名了。
-   impl_loc = c_parser_peek_token (parser)->location;
-   c_parser_consume_token (parser);//consume impl$
-   c_c_parser_set_source_position_from_token (c_parser_peek_token (parser));
+    c_parser *parser=self->parser;
+    tree ident = NULL_TREE;
+    location_t impl_loc;
+    ClassName *tempClassName=NULL;
+    self->readyEnd=0;
+    parser_help_set_forbidden(TRUE);//禁止下一个C_TOKEN被parser_help_set_class_or_enum_type改名了。
+    impl_loc = c_parser_peek_token (parser)->location;
+    c_parser_consume_token (parser);//consume impl$
+    c_c_parser_set_source_position_from_token (c_parser_peek_token (parser));
+    if (c_parser_next_token_is (parser, CPP_NAME)){
+        ident = c_parser_peek_token (parser)->value;//类名Abc
+        if(c_parser_peek_token (parser)->id_kind!=C_ID_TYPENAME){
+          ClassName *className=class_mgr_get_class_name_by_user(class_mgr_get(),IDENTIFIER_POINTER (ident));
+          if(className==NULL){
+              error_at(impl_loc, "找不到类名:%qs,是否引入了类的头文件?",IDENTIFIER_POINTER (ident));
+          }else{
+              ident= aet_utils_create_ident(className->sysName);
+          }
+        }
+        impl_loc = c_parser_peek_token (parser)->location;
+        c_parser_consume_token (parser); //consume XXX 类名
+        parserExentdsAndImplements(self,IDENTIFIER_POINTER (ident));
+        c_parser_consume_token (parser);//consume {
+    }else{
+        error_at(impl_loc, "关键字impl$后应是类名!");
+    }
 
-   if (c_parser_next_token_is (parser, CPP_NAME)){
-      ident = c_parser_peek_token (parser)->value;//类名Abc
-	  if(c_parser_peek_token (parser)->id_kind!=C_ID_TYPENAME){
-		  ClassName *className=class_mgr_get_class_name_by_user(class_mgr_get(),IDENTIFIER_POINTER (ident));
-		  if(className==NULL){
-             error_at(impl_loc, "找不到类名:%qs,是否引入了类的头文件?",IDENTIFIER_POINTER (ident));
-		  }else{
-			ident= aet_utils_create_ident(className->sysName);
-		  }
-	  }
-      const char *str1=IDENTIFIER_POINTER (ident);
-      ident_loc = c_parser_peek_token (parser)->location;
-      impl_loc = ident_loc;
-      c_parser_consume_token (parser);
-   }else{
-      error_at(impl_loc, "关键字impl$后应是类名!");
-   }
-   parser_help_set_forbidden(FALSE);//禁止下一个C_TOKEN被parser_help_set_class_or_enum_type改名了。
-   access_controls_add_impl(access_controls_get(),n_strdup(IDENTIFIER_POINTER (ident)));
-   if (c_parser_next_token_is (parser, CPP_OPEN_BRACE)){
-	  n_debug("开始编译 impl{中的代码 class:%s %s\n",IDENTIFIER_POINTER (ident),in_fnames[0]);
-	  c_parser_consume_token (parser);
-	  updateClassName(self,IDENTIFIER_POINTER (ident));
-	  c_c_parser_set_enter_aet(parser,true);
-	  class_impl_translation_unit(self);
-	  implicitly_call_link(self->implicitlyCall);
-	  cmp_ref_opt_opt(self->cmpRefOpt);
-	  c_c_parser_set_enter_aet(parser,false);
-	  NString *buf=n_string_new("");
-	  class_build_create_codes(self->classBuild,self->className,buf);
-	  NPtrArray *codes=class_interface_add_define(self->classInterface,self->className);
-	  char *superDefine=super_define_add(self->superDefine,self->className);
-	  char *fillSuperAddress=super_call_create_codes(self->superCall,self->className);
-	  char *superCodes=strCat(superDefine,fillSuperAddress);
-	  class_init_create_init_define(self->classInit,self->className,codes,superCodes,buf);
-	  var_mgr_define_class_static_var(var_mgr_get(),self->className,buf);
-	  if(superCodes!=NULL)
-		  n_free(superCodes);
-	  if(superDefine!=NULL)
-		  n_free(superDefine);
-	  if(fillSuperAddress!=NULL)
-		  n_free(fillSuperAddress);
-	  //创建类的类型
-      n_debug("重要的初始化方法源代码 ----addInitDefine---- :\n%s\n",buf->str);
-	  //aet_utils_add_token(parse_in,buf->str,buf->len);
-	  aet_utils_add_token_with_force(parse_in,buf->str,buf->len,input_location,FALSE);
-	  n_string_free(buf,TRUE);
-	  tempClassName=class_name_clone(self->className);
-	  updateClassName(self,NULL);
-	  if(codes!=NULL){
-	    n_ptr_array_set_free_func(codes,freeIfaceCode_cb);
-	    n_ptr_array_unref(codes);
-	  }
-   }else if(!ident){
-      c_parser_error (parser, "expected 没有类名 %<{%>");
-   }
-   n_debug("impl 结束 加入泛型的5种全局变量并存储到文件中%s %s\n",IDENTIFIER_POINTER (ident),in_fnames[0]);
-   func_check_check_define(self->funcCheck,tempClassName);
-   generic_file_save(generic_file_get(),tempClassName);
-   access_controls_save_access_code(access_controls_get(),tempClassName);//保存访问控制码到当前文件中的全局变量中。
-   class_name_free(tempClassName);
+    parser_help_set_forbidden(FALSE);//禁止下一个C_TOKEN被parser_help_set_class_or_enum_type改名了。
+    access_controls_add_impl(access_controls_get(),n_strdup(IDENTIFIER_POINTER (ident)));
+    n_debug("开始编译 impl{中的代码 class:%s %s\n",IDENTIFIER_POINTER (ident),in_fnames[0]);
+    updateClassName(self,IDENTIFIER_POINTER (ident));
+    c_c_parser_set_enter_aet(parser,true);
+    class_impl_translation_unit(self);
+    implicitly_call_link(self->implicitlyCall);
+    cmp_ref_opt_opt(self->cmpRefOpt);
+    c_c_parser_set_enter_aet(parser,false);
+    NString *buf=n_string_new("");
+    class_build_create_codes(self->classBuild,self->className,buf);
+    NPtrArray *codes=class_interface_add_define(self->classInterface,self->className);
+    char *superDefine=super_define_add(self->superDefine,self->className);
+    char *fillSuperAddress=super_call_create_codes(self->superCall,self->className);
+    char *superCodes=strCat(superDefine,fillSuperAddress);
+    class_init_create_init_define(self->classInit,self->className,codes,superCodes,buf);
+    var_mgr_define_class_static_var(var_mgr_get(),self->className,buf);
+    if(superCodes!=NULL)
+      n_free(superCodes);
+    if(superDefine!=NULL)
+      n_free(superDefine);
+    if(fillSuperAddress!=NULL)
+      n_free(fillSuperAddress);
+    //创建类的类型
+    n_debug("重要的初始化方法源代码 ----addInitDefine---- :\n%s\n",buf->str);
+    aet_print_token(c_parser_peek_token (parser));
+    aet_utils_add_token_with_force(parse_in,buf->str,buf->len,input_location,FALSE);
+    n_string_free(buf,TRUE);
+    tempClassName=class_name_clone(self->className);
+    updateClassName(self,NULL);
+    if(codes!=NULL){
+      n_ptr_array_set_free_func(codes,freeIfaceCode_cb);
+      n_ptr_array_unref(codes);
+    }
+    n_debug("impl 结束 加入泛型的5种全局变量并存储到文件中 %s %s",IDENTIFIER_POINTER (ident),in_fnames[0]);
+    func_check_check_define(self->funcCheck,tempClassName);
+    generic_file_save(generic_file_get(),tempClassName);
+    access_controls_save_access_code(access_controls_get(),tempClassName);//保存访问控制码到当前文件中的全局变量中。
+    class_name_free(tempClassName);
 }
 
 /**
@@ -410,7 +478,7 @@ static void rearrangeMode(ClassImpl *self,int openParenPos,nboolean isFuncGeneri
 	  aet_utils_create_token(&parser->tokens[openParenPos],CPP_NAME,className->sysName,(int)strlen(className->sysName));
 	  parser->tokens[openParenPos].id_kind=C_ID_TYPENAME;//关键
 	  if(addGenToken>0){
-	      n_debug("rearrangeMode generic add 如果是泛型函数需要一个参数据到函数参数列表中\n");
+	      n_debug("rearrangeMode generic add 如果是泛型函数需要一个参数据到函数参数列表中。");
 		  char *varName=AET_FUNC_GENERIC_PARM_NAME;
 		  if(dhaoAfter){
 	  		 aet_utils_create_token(&parser->tokens[openParenPos+6],CPP_COMMA,",",1);
@@ -432,23 +500,23 @@ nboolean  class_impl_add_self_to_param(ClassImpl *self,nboolean isFuncGeneric)
 {
 	  c_parser *parser=self->parser;
 	  if(self->className==NULL)
-		  error("加入self到当前函数时出错。因为没有在类实现中。");
+		  error_at(input_location,"加入self到当前函数时出错。因为没有在类实现中。");
 	  nboolean ok=FALSE;
 	  if(c_parser_next_token_is (parser, CPP_MULT) && c_parser_peek_2nd_token(parser)->type==CPP_NAME
 			  && !c_token_starts_typename(c_parser_peek_2nd_token(parser)) && c_parser_peek_nth_token(parser,3)->type==CPP_OPEN_PAREN){
-		  n_debug("在classimpl实现中，加入self --11--int * getName('重整为'int *getName(Abc *self'    %s, %s, %d\n", __FILE__, __FUNCTION__, __LINE__);
+		  n_debug("在classimpl实现中，加入self --11--int * getName('重整为'int *getName(Abc *self'  ");
 		  /*匹配 * getName(*/
 		  ok=TRUE;
 		  rearrangeMode(self,3,isFuncGeneric);
 	  }else  if(c_parser_next_token_is (parser, CPP_NAME) && c_parser_peek_2nd_token(parser)->type==CPP_OPEN_PAREN){
-		  n_debug("在classimpl实现中，加入self --22--int  getName('重整为'int getName(Abc *self'    %s, %s, %d\n", __FILE__, __FUNCTION__, __LINE__);
+		  n_debug("在classimpl实现中，加入self --22--int  getName('重整为'int getName(Abc *self'\n");
 		  /*匹配 getName(*/
 		  ok=TRUE;
 		  rearrangeMode(self,2,isFuncGeneric);
 	  }else if(c_parser_next_token_is (parser, CPP_MULT) && c_parser_peek_2nd_token(parser)->type==CPP_MULT &&
 			  c_parser_peek_nth_token(parser,3)->type==CPP_NAME
 			  && !c_token_starts_typename(c_parser_peek_nth_token(parser,3)) && c_parser_peek_nth_token(parser,4)->type==CPP_OPEN_PAREN){
-		  n_debug("在classimpl实现中，加入self --33--int ** getName('重整为'int ** getName(Abc *self'    %s, %s, %d\n", __FILE__, __FUNCTION__, __LINE__);
+		  n_debug("在classimpl实现中，加入self --33--int ** getName('重整为'int ** getName(Abc *self' \n");
 		  /*匹配 ** getName(*/
 		  ok=TRUE;
 		  rearrangeMode(self,4,isFuncGeneric);
@@ -456,7 +524,7 @@ nboolean  class_impl_add_self_to_param(ClassImpl *self,nboolean isFuncGeneric)
 			  c_parser_peek_nth_token(parser,3)->type==CPP_MULT &&
 			  c_parser_peek_nth_token(parser,4)->type==CPP_NAME
 			  && !c_token_starts_typename(c_parser_peek_nth_token(parser,4)) && c_parser_peek_nth_token(parser,5)->type==CPP_OPEN_PAREN){
-		  n_debug("在classimpl实现中，加入self --33--int ** getName('重整为'int ** getName(Abc *self'    %s, %s, %d\n", __FILE__, __FUNCTION__, __LINE__);
+		  n_debug("在classimpl实现中，加入self --33--int ** getName('重整为'int ** getName(Abc *self'  ");
 		  /*匹配 ** getName(*/
 		  ok=TRUE;
 		  rearrangeMode(self,5,isFuncGeneric);
@@ -530,7 +598,8 @@ void class_impl_nest_op (ClassImpl *self,bool add)
 	}
 }
 
-nboolean  class_impl_start_function(ClassImpl *self,struct c_declspecs *specs,struct c_declarator *declarator,nboolean isFuncGeneric)
+nboolean  class_impl_start_function(ClassImpl *self,struct c_declspecs *specs,struct c_declarator *declarator,
+                    nboolean isFuncGeneric,location_t permissionLoc,nboolean havePermission,ClassPermissionType permission)
 {
    ClassName *className=self->className;
    self->isConstructor=class_ctor_is(self->classCtor,declarator,className);
@@ -542,6 +611,12 @@ nboolean  class_impl_start_function(ClassImpl *self,struct c_declspecs *specs,st
    nboolean changeNameOk=func_mgr_change_class_impl_func_define(func_mgr_get(),specs,declarator,className);
    n_debug("class_impl_start_function 00： 改函数定义中函数名 className:%s isCtor:%d changeNameOk:%d 是不是问号泛型函数：%d isFuncGeneric:%d\n",
 		   className->sysName,self->isConstructor,changeNameOk,isQueryFunction,isFuncGeneric);
+   if(changeNameOk){
+      struct c_declarator *funcdel=class_util_get_function_declarator(declarator);
+      struct c_declarator *funcId=class_util_get_function_id(funcdel);
+      tree id= funcId->u.id.id;
+      func_mgr_check_permission_decl_between_define(func_mgr_get(),permissionLoc,className,IDENTIFIER_POINTER(id),havePermission,permission);
+   }
    return changeNameOk;
 }
 
@@ -769,6 +844,10 @@ struct c_expr class_impl_replace_func_id(ClassImpl *self,struct c_expr expr,vec<
     	char *funcName=IDENTIFIER_POINTER(DECL_NAME(func));
     	n_debug("class_impl_replace_func_id 55 这是在implimpl中的函数调用，没有加self-> %s funcName:%s",IDENTIFIER_POINTER(id),funcName);
     	last=func_call_select(self->funcCall,func,exprlist,origtypes,arg_loc,expr_loc,&errors);
+    	if(!aet_utils_valid_tree(last)){
+    	    error_at(expr_loc,"找不到与实参匹配的方法%qs。",funcName);
+    	    return expr;
+    	}
     	class_cast_parm_convert_from_deref(self->classCast,last,exprlist);
     }else if(TREE_CODE (func)==FUNCTION_DECL && BINFO_FLAG_3(func)==1 && TREE_STATIC(func)){
     	//这是Class.func调用
@@ -1291,13 +1370,10 @@ nboolean class_impl_parser_package_dot_class(ClassImpl *self)
       return parser_help_parser_left_package_dot_class();
 }
 
-
 ClassName      *class_impl_get_class_name(ClassImpl *self)
 {
     return self->className;
 }
-
-
 
 void  class_impl_set_parser(ClassImpl *self, c_parser *parser)
 {

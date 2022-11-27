@@ -20,7 +20,7 @@ typedef struct
 
 static apointer spawn_cb(apointer data);
 
-static const apointer wakeup_thread_marker={'0','1','2','7','r','2','a'};
+static const char wakeup_thread_marker[7]={'0','1','2','7','r','2','a'};
 
 /**
  * 管理整个进程中由线程池生成的线程
@@ -78,7 +78,7 @@ impl$ UnusedThread{
               a_atomic_int_inc (&wakeupSerial);
               unusedQueue->lock();
               do{
-                  unusedQueue->pushUnlocked(wakeup_thread_marker);
+                  unusedQueue->pushUnlocked((apointer)wakeup_thread_marker);
               } while (++maxThreads);
               unusedQueue->unlock();
           }
@@ -108,7 +108,7 @@ impl$ UnusedThread{
           a_atomic_int_inc (&wakeupSerial);
           unusedQueue->lock();
           do{
-              unusedQueue->pushUnlocked(wakeup_thread_marker);
+              unusedQueue->pushUnlocked((apointer)wakeup_thread_marker);
           }while (--i);
           unusedQueue->unlock();
       }
@@ -184,12 +184,12 @@ impl$ UnusedThread{
               pool = unusedQueue->pop();
           }
 
-          if (pool == wakeup_thread_marker){
+          if (pool == (apointer)wakeup_thread_marker){
               local_wakeup_thread_serial = a_atomic_int_get (&wakeupSerial);
               if (last_wakeup_thread_serial == local_wakeup_thread_serial){
                   if (!have_relayed_thread_marker){
                         a_debug("thread %p relaying wakeup message to waiting thread with lower serial.",selfThread);
-                        unusedQueue->push(wakeup_thread_marker);
+                        unusedQueue->push((apointer)wakeup_thread_marker);
                         have_relayed_thread_marker = TRUE;
 
                         /*如果已中继唤醒标记，则此线程
@@ -210,7 +210,7 @@ impl$ UnusedThread{
                    have_relayed_thread_marker = FALSE;
               }
            }
-        }while (pool == wakeup_thread_marker);
+        }while (pool == (apointer)wakeup_thread_marker);
 
         a_atomic_int_add (&unusedThreads, -1);
         return pool;
@@ -240,15 +240,15 @@ static void bindCpu(AThreadPool *self)
 {
        cpu_set_t mask;
        cpu_set_t get;
-       char buf[256];
+       //char buf[256];
 //       int i=2;
 //       if(numThreads==1)
 //           i=2;
 //       else if(numThreads==2)
 //           i=4;
        int i=self->numThreads*2+1;
-       int j;
-       int num= System.getCpuThreads();
+//       int j;
+//       int num= System.getCpuThreads();
        AThread *thread=AThread.current();
        pthread_t   systemThread=thread->getSystemThread();
 
@@ -275,7 +275,7 @@ static apointer  proxy_cb (apointer userData)
     AThreadPool *pool=userData;
     AThread *selfThread=AThread.current();
     bindCpu(pool);
-   // a_debug("g_thread_pool_thread_proxy 00 %p rnning:%d immediate:%d self:%p\n",pool,pool->running,pool->immediate,selfThread);
+    a_debug("a_thread_pool_thread_proxy 00 %p rnning:%d immediate:%d self:%p\n",pool,pool->running,pool->immediate,selfThread);
     pool->queue->lock();
    // a_debug("g_thread_pool_thread_proxy 11 %p rnning:%d immediate:%d self:%p\n",pool,pool->running,pool->immediate,selfThread);
     while (TRUE){
@@ -359,10 +359,8 @@ static apointer spawn_cb(apointer data)
   while (TRUE){
       SpawnThreadData *spawn_thread_data;
       AThread *thread = NULL;
-      AError *error = NULL;
-      const char *prgname ="unknown";// g_get_prgname ();
+      const char *prgname ="unknown";// a_get_prgname ();
       char name[16] = "pool";
-
       if (prgname)
         a_snprintf (name, sizeof (name), "pool-%s", prgname);
       printf("spawn_cb ----\n");
@@ -449,8 +447,8 @@ impl$ AThreadPool{
       t1=Time.monotonic();
       /* 运行的线程已达到设定的最大值 */
       if (maxThreads != -1 && numThreads >= (auint)maxThreads){
-          printf(" 运行的线程已达到设定的最大值:maxThreads:%d numThreads:%d\n",numThreads);
-        return TRUE;
+          printf(" 运行的线程已达到设定的最大值:maxThreads:%d numThreads:%d\n",maxThreads,numThreads);
+          return TRUE;
       }
       success=unusedThread->addPool(self);
       t2=Time.monotonic();
@@ -497,12 +495,9 @@ impl$ AThreadPool{
           t3=Time.monotonic();
           totalTime+=(t3-t1);
           counts++;
-          //printf("startThread ----%lli %lli %p %lli %d %f\n",(long long)(t3-t2),(long long)(t2-t1),thread,totalTime,counts,(totalTime*1.0)/counts);
+          a_debug("startThread ----%lli %lli %p %lli %d %f\n",(long long)(t3-t2),(long long)(t2-t1),thread,totalTime,counts,(totalTime*1.0)/counts);
         }
 
-      /* See comment in g_thread_pool_thread_proxy as to why this is done
-       * here and not there
-       */
       self->numThreads++;
       return TRUE;
     }

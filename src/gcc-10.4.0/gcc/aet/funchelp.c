@@ -124,7 +124,7 @@ static tree createComponentRef(tree datum,tree selectedField,location_t loc)
  */
 tree  func_help_create_itself_deref(FuncHelp *self,tree parmOrVar,tree field,location_t loc)
 {
-	n_debug("func_help_create_itself_deref 00 创建本身的引用 :\n");
+	n_debug("func_help_create_itself_deref 00 创建本身的引用 。");
 	tree datum=build_indirect_ref (loc,parmOrVar,RO_ARROW);
     tree value = createComponentRef (datum,field,loc);
     return value;

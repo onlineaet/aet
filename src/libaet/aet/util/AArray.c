@@ -1,8 +1,6 @@
 
 #include <string.h>
 #include <stdlib.h>
-#include <stdio.h>
-
 #include "AArray.h"
 #include "AQSort.h"
 #include "AAssert.h"
@@ -32,7 +30,7 @@ impl$ AArray{
    static inline void setZeroTerminate(){
 	   if(zero_terminated){
 		  int elementLen=getElementLen(self->len);
-		  char *newData=self->data+elementLen;
+		  char *newData=(char*)(self->data+elementLen);
 		  memset(newData,0,self->elementSize);
 	   }
    }
@@ -170,7 +168,7 @@ impl$ AArray{
 	  		 canRemove=(memcmp(item,data,elementSize)==0);
 	  	}
 	    if (canRemove){
-		   remove (i);
+		   self->remove (i);//与stdio.h中的remove冲突。所以加self->
 		   return TRUE;
 	    }
      }
@@ -199,7 +197,7 @@ impl$ AArray{
    E get(int index) {
 	  if(index<0 || index>self->elementCount-1)
 		  return NULL;
-	  char *posData=self->data+index*self->elementSize;
+	  char *posData=(char *)(self->data+index*self->elementSize);
 	  if(isPointer){
 	       unsigned long temp=0;
 	       memcpy(&temp,posData,self->elementSize);
@@ -256,9 +254,9 @@ impl$ AArray{
 	     apointer src=self->data;
 		 if(isPointer){
 			apointer *srcp=(apointer)src;
-	        AQSort.sort(srcp,self->elementCount,self->elementSize,compareFunc,userData);
+	        AQSort.sort(srcp,self->elementCount,self->elementSize,(ACompareDataFunc)compareFunc,userData);
 		 }else{
-            AQSort.sort(src,self->elementCount,self->elementSize,compareFunc,userData);
+            AQSort.sort(src,self->elementCount,self->elementSize,(ACompareDataFunc)compareFunc,userData);
 		 }
    }
 

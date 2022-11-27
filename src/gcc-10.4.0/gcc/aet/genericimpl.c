@@ -568,7 +568,7 @@ tree generic_impl_cast(GenericImpl *self,struct c_type_name *type_name,tree expr
 //		return ret;
 		return expr;
 	}else{
-		n_debug("generic_impl_cast 22 转非指针\n");
+		n_debug("generic_impl_cast 22 转非指针。");
 	   tree realType=realGen;
 	   tree pointer=build_pointer_type(realType);
 	   tree ret = build1 (NOP_EXPR, pointer,expr);
@@ -760,7 +760,7 @@ nboolean  generic_impl_check_var(GenericImpl *self,tree decl,GenericModel *varGe
 	    		   return FALSE;
 			   }
 	        }else{
-	            n_debug("应该检查具体的类型是否是 extends下的类型\n");
+	            n_debug("应该检查具体的类型是否是 extends下的类型。");
 	        }
 	    }else{
 	    	//检果是不是有undefine如果有，就是错了
@@ -771,7 +771,7 @@ nboolean  generic_impl_check_var(GenericImpl *self,tree decl,GenericModel *varGe
 				  return FALSE;
 			   }
 	    	}else{
-	    	    n_debug("应该检查具体的类型是否是 extends下的类型\n");
+	    	    n_debug("应该检查具体的类型是否是 extends下的类型。");
 	    	}
 	    }
     }

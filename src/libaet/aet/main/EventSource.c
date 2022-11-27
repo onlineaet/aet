@@ -8,8 +8,8 @@
 impl$ EventSource{
 
     EventSource(char *name){
-         if(name!=NULL)
-           self->name=a_strdup(name);
+       if(name!=NULL)
+          self->name=a_strdup(name);
         priority=Priority.DEFAULT;
         flags = HookFlagMask.ACTIVE;
         //printf("flags is ---%d %d\n",flags,(flags & HookFlagMask.ACTIVE));
@@ -120,7 +120,7 @@ impl$ EventSource{
 
      aint64   getTime(){
         if(eventMgr==NULL)
-            return 0;
+           return 0;
         return eventMgr->getTime();
      }
 

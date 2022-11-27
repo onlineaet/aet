@@ -249,7 +249,7 @@ static tree findSelf(tree value)
 		if(TREE_CODE(type)==RECORD_TYPE){
 			//此种情况(&abc)->getName(5);
 			char *className=class_util_get_class_name_by_record(type);
-			n_debug("这是一个点引用\n");
+			n_debug("这是一个点引用。");
 			if(className){
 				selfTree = build_unary_op (input_location, ADDR_EXPR, indirectRef, false);
 			}
@@ -617,6 +617,30 @@ struct c_declarator * class_util_get_function_declarator(struct c_declarator *de
 	}
 	return NULL;
 }
+
+/**
+ * 获得函数的ID，也即函数名
+ */
+struct c_declarator *class_util_get_function_id(struct c_declarator *funcdel)
+{
+    struct c_declarator *funid=funcdel->declarator;
+    if(funid==NULL)
+        return NULL;
+    enum c_declarator_kind kind=funid->kind;
+    if(kind==cdk_id)
+        return funid;
+    if(kind==cdk_pointer){
+        funid=funid->declarator;
+        if(funid==NULL)
+            return NULL;
+        kind=funid->kind;
+        if(kind!=cdk_id)
+            return NULL;
+        return funid;
+    }
+    return NULL;
+}
+
 
 char *class_util_get_option()
 {

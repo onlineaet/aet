@@ -400,27 +400,6 @@ static nboolean findFuncGenericOrQueryParm(struct c_declarator *funcdecl)
 
 }
 
-static struct c_declarator *getFunId(struct c_declarator *funcdel)
-{
-	struct c_declarator *funid=funcdel->declarator;
-	if(funid==NULL)
-		return NULL;
-	enum c_declarator_kind kind=funid->kind;
-	if(kind==cdk_id)
-		return funid;
-	if(kind==cdk_pointer){
-		funid=funid->declarator;
-		if(funid==NULL)
-			return NULL;
-		kind=funid->kind;
-		if(kind!=cdk_id)
-			return NULL;
-		return funid;
-	}
-	return NULL;
-}
-
-
 /**
  * 泛型函数的第二参数是 FuncGenParmInfo *tempFgpi1234,如果从funcdecl找到，说明是一个泛型函数
  * 当改变函数名时要跳过FuncGenParmInfo * tempFgpi1234这个参数
@@ -428,7 +407,7 @@ static struct c_declarator *getFunId(struct c_declarator *funcdel)
 static nboolean addFunc(FuncMgr *self,tree structTree,ClassName *className,enum func_from_code fromType,
 		location_t id_loc,struct c_declarator *funcdecl,struct c_declspecs *specs)
 {
-	    struct c_declarator *funid=getFunId(funcdecl);
+	    struct c_declarator *funid=class_util_get_function_id(funcdecl);
 	    if(funid==NULL)
 	    	return FALSE;
 	    tree argTypes = funcdecl->u.arg_info->types;
@@ -1075,30 +1054,21 @@ ClassFunc *func_mgr_get_interface_impl(FuncMgr *self,ClassName *from,ClassFunc *
  *   public$ static auint strHashFunc(aconstpointer key);
  * }
  */
-ClassFunc *func_mgr_find_static_method(FuncMgr *self,char *sysName,char *origFunName,tree argTypes)
+ClassFunc *func_mgr_get_static_method(FuncMgr *self,char *sysName,char *mangle)
 {
-	if(sysName==NULL || origFunName==NULL || !aet_utils_valid_tree(argTypes))
+	if(sysName==NULL || mangle==NULL)
 		return NULL;
-	ClassName *className=class_mgr_get_class_name_by_sys(class_mgr_get(),sysName);
-	if(className==NULL)
-		return NULL;
-	tree  funcName=         aet_utils_create_ident(origFunName);
-	char  *funcMangle=aet_mangle_create(self->mangle, funcName,argTypes,className->sysName);
-	NPtrArray *array=(NPtrArray *)n_hash_table_lookup(self->staticHashTable,className->sysName);
+	NPtrArray *array=(NPtrArray *)n_hash_table_lookup(self->staticHashTable,sysName);
 	if(array==NULL)
 			return NULL;
 	int i;
 	for(i=0;i<array->len;i++){
 		ClassFunc *item=(ClassFunc *)n_ptr_array_index(array,i);
-		printf("func_mgr_find_static_method %s %s\n",item->mangleFunName,funcMangle);
-		if(strcmp(item->mangleFunName,funcMangle)==0){
+		if(strcmp(item->mangleFunName,mangle)==0){
 			return item;
 		}
 	}
-	ClassInfo *info=class_mgr_get_class_info(class_mgr_get(),sysName);
-	if(info->parentName.sysName==NULL)
-		return NULL;
-	return func_mgr_find_static_method(self,info->parentName.sysName,origFunName,argTypes);
+	return NULL;
 }
 
 static ClassFunc *getStaticClassFuncByMangleName(FuncMgr *self,char *sysName,char *mangle)
@@ -1159,6 +1129,25 @@ int func_mgr_get_max_serial_number(FuncMgr *self,ClassName *className)
           }
        }
        return max;
+}
+
+void func_mgr_check_permission_decl_between_define(FuncMgr *self,location_t loc,ClassName *className,
+        char *mangle,nboolean havePermission,ClassPermissionType permission)
+{
+    if(!havePermission)
+        return;
+    ClassFunc *func=func_mgr_get_entity_by_sys_name(self,className->sysName,mangle);
+    if(func==NULL){
+        func=func_mgr_get_static_method(self,className->sysName,mangle);
+    }
+    if(func==NULL)
+        return ;
+    if((func->permission==CLASS_PERMISSION_DEFAULT || func->permission==CLASS_PERMISSION_PROTECTED) &&
+            (permission==CLASS_PERMISSION_DEFAULT || permission==CLASS_PERMISSION_PROTECTED))
+        return;
+    if(func->permission!=permission){
+        warning_at(loc,0,"在类实现中函数%qs的访问控制方法与类声明中的不一致。",func->orgiName);
+    }
 }
 
 FuncMgr *func_mgr_get()

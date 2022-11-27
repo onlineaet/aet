@@ -117,6 +117,8 @@ static void printSafeCode(ClassName *className,NPtrArray *array)
             premission="私有";
         n_string_append_printf(str,"%d\t%s\t%s\t%s\n",item->serialNumber,type,premission,item->name);
     }
+    if(!n_log_is_debug())
+       return;
     printf("类：%s 所有方法和变量如下\n",className->sysName);
     printf("序号\t类型\t权限\t名字\n");
     printf("%s\n",str->str);
@@ -704,7 +706,7 @@ nboolean access_controls_access_method(AccessControls *self,location_t loc,Class
     //如果调用是在类中，但是该类
     //第一种：公共方法，返回TRUE
     c_parser *parser=self->parser;
-    n_debug("访问类方法---xxx- %s permission:%d parser->isAet:%d\n",func->mangleFunName,func->permission,parser->isAet);
+    n_debug("访问类方法---xxx- %s permission:%d parser->isAet:%d",func->mangleFunName,func->permission,parser->isAet);
     if(!aet_utils_valid_tree(func->classTree)){
         n_error("在访问控制时出错了,调用的函数:%s,没有类信息",func->mangleFunName);
         return FALSE;
@@ -717,7 +719,7 @@ nboolean access_controls_access_method(AccessControls *self,location_t loc,Class
     }
     if(!aet_utils_valid_tree(func->fieldDecl)){
         //类中的私有方法。不可能访问到。
-        n_debug("访问类方法---11- %s permission:%d parser->isAet:%d\n",func->mangleFunName,func->permission,parser->isAet);
+        n_debug("访问类方法---11- %s permission:%d parser->isAet:%d",func->mangleFunName,func->permission,parser->isAet);
         return TRUE;
     }
     calleeSysName=calleeSysName+1;//去除下划线 _debug_ARandom
@@ -726,18 +728,18 @@ nboolean access_controls_access_method(AccessControls *self,location_t loc,Class
         char *sysName=implClassName->sysName;
         if(!strcmp(sysName,calleeSysName)){
             //1.在类实现中，调用的是本类的方法，不需要判断权限
-            n_debug("访问类方法---22- %s permission:%d parser->isAet:%d\n",func->mangleFunName,func->permission,parser->isAet);
+            n_debug("访问类方法---22- %s permission:%d parser->isAet:%d",func->mangleFunName,func->permission,parser->isAet);
             return TRUE;
         }else{
             //2.在类实现中，调用的是其它类的方法，保存调用信息，当整个文件编译完后再判断权限
-            n_debug("访问类方法---33- %s permission:%d parser->isAet:%d\n",func->mangleFunName,func->permission,parser->isAet);
+            n_debug("访问类方法---33- %s permission:%d parser->isAet:%d",func->mangleFunName,func->permission,parser->isAet);
 
             addCall(self,func,TRUE,sysName,loc);
         }
     }else{
         if(filter(self)) //过滤编译器内部创建的初始化代码
            return TRUE;
-        n_debug("访问类方法---44- %s permission:%d parser->isAet:%d\n",func->mangleFunName,func->permission,parser->isAet);
+        n_debug("访问类方法---44- %s permission:%d parser->isAet:%d",func->mangleFunName,func->permission,parser->isAet);
 
         addCall(self,func,FALSE,NULL,loc);
     }
@@ -758,7 +760,7 @@ nboolean access_controls_access_var(AccessControls *self,location_t loc,char *va
         return TRUE;
     }
     if(aet_utils_compile_additional_code_status()){ //正在编译附加代码
-       n_debug("访问的变量属于附加代码:%s %s\n",varName,calleeSysName);
+       n_debug("访问的变量属于附加代码:%s %s",varName,calleeSysName);
        return TRUE;
     }
     char *atFuncName=NULL;

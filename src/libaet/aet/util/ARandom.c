@@ -30,7 +30,8 @@
 
 #define RAND_DOUBLE_TRANSFORM 2.3283064365386962890625e-10
 
-static void timeSeed( auint32 seed[4]){
+static void timeSeed( auint32 seed[4])
+{
   static aboolean dev_urandom_exists = TRUE;
   if (dev_urandom_exists){
       FILE* dev_urandom;
@@ -43,7 +44,7 @@ static void timeSeed( auint32 seed[4]){
             setvbuf (dev_urandom, NULL, _IONBF, 0);
             do{
               errno = 0;
-              r = fread (seed, (size_t)sizeof (seed), 1, dev_urandom);
+              r = fread (seed, sizeof ((auint32*)seed), 1, dev_urandom);
             }while A_UNLIKELY (errno == EINTR);
             if (r != 1)
               dev_urandom_exists = FALSE;
@@ -227,8 +228,6 @@ impl$ ARandom{
 		return singleton;
 	}
 };
-
-
 
 impl$ GlobalRandom {
 

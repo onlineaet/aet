@@ -29,7 +29,7 @@ struct _KeyFileGroup
   AHashTable *lookup_map;
 };
 
-static void g_key_file_key_value_pair_free (KeyFileKeyValuePair *pair)
+static void keyValuePairFree(KeyFileKeyValuePair *pair)
 {
     if (pair != NULL){
       a_free (pair->key);
@@ -52,7 +52,7 @@ impl$ AKeyFile{
 
     static void freeKeyFileGroup_cb(KeyFileGroup *item){
        if(item->name!=NULL){
-           a_free(item->name);
+           a_free((char*)item->name);
        }
        if(item->lookup_map){
            item->lookup_map->unref();
@@ -100,24 +100,24 @@ impl$ AKeyFile{
         strBuffer = new$ AString(128);
         list_separator = ';';
         flags = 0;
-        locales =NULL;// a_strdupv ((gchar **)g_get_language_names ());
+        locales =NULL;//
     }
 
-    static void g_key_file_parse_comment (const char  *line,asize length){
+    static void parseComment (const char  *line,asize length){
         KeyFileKeyValuePair *pair;
         if (!(flags & KeyFileFlags.KEEP_COMMENTS))
           return;
-        printf("g_key_file_parse_comment 00 %s self->currentGroup:%p groupName:%s\n",line,self->currentGroup,self->currentGroup->name);
+        printf("parseComment 00 %s self->currentGroup:%p groupName:%s\n",line,self->currentGroup,self->currentGroup->name);
         a_warn_if_fail (self->currentGroup != NULL);
         pair = a_slice_new (KeyFileKeyValuePair);
         pair->key = NULL;
         pair->value = a_strndup (line, length);
-        printf("g_key_file_parse_comment 11 %s self->currentGroup:%p\n",line,currentGroup->keyValuePairList);
+        printf("parseComment 11 %s self->currentGroup:%p\n",line,currentGroup->keyValuePairList);
         currentGroup->keyValuePairList->add(pair);
 
     }
 
-    static KeyFileGroup *g_key_file_lookup_group (const char *groupName){
+    static KeyFileGroup *lookupGroup (const char *groupName){
         ListIterator *iter=groups->initIter();
         apointer value=NULL;
         while(iter->hasNext(&value)){
@@ -131,8 +131,8 @@ impl$ AKeyFile{
     /**
      * 加组，如果当前组是最后是注释，要移到新组的头部，作为组的注释。
      */
-    static void g_key_file_add_group (const char *groupName){
-      KeyFileGroup *group = g_key_file_lookup_group(groupName);
+    static void addGroup(const char *groupName){
+      KeyFileGroup *group = lookupGroup(groupName);
       if (group != NULL){
           if(!repeatGroup){
               a_error("有重复的组。%s\n",groupName);
@@ -179,7 +179,7 @@ impl$ AKeyFile{
 
     }
 
-    static aboolean g_key_file_locale_is_interesting (const char *locale){
+    static aboolean localIsInteresting(const char *locale){
        asize i;
        if (flags & KeyFileFlags.KEEP_TRANSLATIONS)
          return TRUE;
@@ -190,7 +190,7 @@ impl$ AKeyFile{
        return FALSE;
     }
 
-    static void     g_key_file_parse_group (const char  *line,asize length,AError  **error){
+    static void  parseGroup(const char  *line,asize length,AError  **error){
       const achar *group_name_start, *group_name_end;
 
       /* advance past opening '['
@@ -209,23 +209,23 @@ impl$ AKeyFile{
           a_free (groupName);
           return;
       }
-      g_key_file_add_group (groupName);
+      addGroup (groupName);
       a_free (groupName);
     }
 
-    static void g_key_file_add_key_value_pair (KeyFileGroup *group,KeyFileKeyValuePair *pair){
-        //printf("g_key_file_add_key_value_pair 00--- %p %s %p\n",group->lookup_map,pair->key,pair);
+    static void addKeyValuePair(KeyFileGroup *group,KeyFileKeyValuePair *pair){
+        //printf("addKeyValuePair 00--- %p %s %p\n",group->lookup_map,pair->key,pair);
         group->lookup_map->replace(pair->key, pair);
-        //printf("g_key_file_add_key_value_pair 11--- %p %s %p\n",group->keyValuePairList,pair->key,pair);
+        //printf("addKeyValuePair 11--- %p %s %p\n",group->keyValuePairList,pair->key,pair);
         group->keyValuePairList->add(pair);
     }
 
-    static void g_key_file_parse_key_value_pair (const char  *line,asize length,AError **error){
+    static void parseKeyValuePair(const char  *line,asize length,AError **error){
       char *key, *value, *key_end, *value_start, *locale;
       asize key_len, value_len;
 
       if (currentGroup == NULL || currentGroup->name == NULL){
-          printf("g_key_file_parse_key_value_pair --文件内容并不是从组开始的- %s %d\n",line,length);
+          a_debug("parseKeyValuePair --文件内容并不是从组开始的- %s %lu\n",line,length);
           a_error_set (error, ERROR_DOMAIN,-1,"文件内容并不是从组开始的。");
           return;
       }
@@ -234,7 +234,7 @@ impl$ AKeyFile{
       a_warn_if_fail (key_end != NULL);
       key_end--;
       value_start++;
-      //printf("g_key_file_parse_key_value_pair 00-- %s\n",key_end);
+      //printf("parseKeyValuePair 00-- %s\n",key_end);
 
       /* Pull the key name from the line (chomping trailing whitespace)
        */
@@ -244,9 +244,9 @@ impl$ AKeyFile{
       key_len = key_end - line + 2;
 
       a_warn_if_fail (key_len <= length);
-      //printf("g_key_file_parse_key_value_pair 11-- %s %s %d\n",key_end,line,key_len);
+      //printf("parseKeyValuePair 11-- %s %s %d\n",key_end,line,key_len);
       key = a_strndup (line, key_len - 1);
-      //printf("g_key_file_parse_key_value_pair 22-- %s %s %d\n",key,line,key_len);
+      //printf("parseKeyValuePair 22-- %s %s %d\n",key,line,key_len);
       if (!KeyFileUtil.isKeyName(key)){
           a_error_printf (error, ERROR_DOMAIN,-1,"无效的key: %s", key);
           a_free (key);
@@ -257,10 +257,10 @@ impl$ AKeyFile{
        */
       while (a_ascii_isspace (*value_start))
         value_start++;
-      //printf("g_key_file_parse_key_value_pair 33-- %s %s %d\n",key,line,key_len);
+      //printf("parseKeyValuePair 33-- %s %s %d\n",key,line,key_len);
       value_len = line + length - value_start + 1;
       value = a_strndup (value_start, value_len);
-      //printf("g_key_file_parse_key_value_pair 44-- %s %s %d\n",key,value,key_len);
+      //printf("parseKeyValuePair 44-- %s %s %d\n",key,value,key_len);
       a_warn_if_fail (startGroup != NULL);
       if (currentGroup && currentGroup->name && strcmp(startGroup->name,currentGroup->name)== 0  && strcmp (key, "Encoding") == 0){
           if (a_ascii_strcasecmp (value, "UTF-8") != 0){
@@ -277,12 +277,12 @@ impl$ AKeyFile{
        */
       locale = KeyFileUtil.getLocal(key);
       //printf("local iss %s\n",locale);
-      if (locale == NULL || g_key_file_locale_is_interesting (locale)){
+      if (locale == NULL || localIsInteresting (locale)){
           KeyFileKeyValuePair *pair;
           pair = a_slice_new (KeyFileKeyValuePair);
           pair->key = key;
           pair->value = value;
-          g_key_file_add_key_value_pair (currentGroup, pair);
+          addKeyValuePair (currentGroup, pair);
           //printf("local vvv wwwwidddss %s %s %d\n",key,value,strlen(value));
       }else{
           a_free (key);
@@ -300,11 +300,11 @@ impl$ AKeyFile{
         line_start++;
 
       if (KeyFileUtil.isComment(line_start)){
-         g_key_file_parse_comment (line, length);
+          parseComment (line, length);
       }else if (KeyFileUtil.isGroup(line_start)){
-        g_key_file_parse_group (line_start,length - (line_start - line), &curErr);
+          parseGroup (line_start,length - (line_start - line), &curErr);
       }else if (KeyFileUtil.isKeyValuePair(line_start)){
-        g_key_file_parse_key_value_pair (line_start,length - (line_start - line),&curErr);
+          parseKeyValuePair (line_start,length - (line_start - line),&curErr);
       }else{
           achar *line_utf8 = a_utf8_make_valid (line, length);
           a_error_printf(error, ERROR_DOMAIN,-1,"键值对文件包含的行“%s”不是键值对、组或注释",line_utf8);
@@ -315,14 +315,14 @@ impl$ AKeyFile{
         a_error_transfer(error, curErr);
     }
 
-    static void g_key_file_flush_parse_buffer (AError **error){
+    static void flushParseBuffer(AError **error){
       AError *curErr = NULL;
       if (strBuffer->length() > 0){
-          //printf("g_key_file_flush_parse_buffer ---00 %s %d\n",strBuffer->str,strBuffer->length);
+          //printf("flushParseBuffer ---00 %s %d\n",strBuffer->str,strBuffer->length);
           parseLine(strBuffer->getString(),strBuffer->length(),&curErr);
-          //printf("g_key_file_flush_parse_buffer ---11 %d\n",strBuffer->length);
+          //printf("flushParseBuffer ---11 %d\n",strBuffer->length);
           strBuffer->erase (0, -1);
-         // printf("g_key_file_flush_parse_buffer ---22 %d\n", strBuffer->length);
+         // printf("flushParseBuffer ---22 %d\n", strBuffer->length);
           if (curErr){
               a_error_transfer(error, curErr);
               return;
@@ -331,7 +331,7 @@ impl$ AKeyFile{
     }
 
 
-    static void g_key_file_parse_data (const char *data,asize  length,AError **error){
+    static void parseData(const char *data,asize  length,AError **error){
       AError *curErr=NULL;
       asize i;
       a_return_if_fail (data != NULL || length == 0);
@@ -339,9 +339,9 @@ impl$ AKeyFile{
       //strBuffer->getString()
       while (i < length){
           if (data[i] == '\n'){
-              //printf("g_key_file_parse_data 换行 %d %s\n",strBuffer->length,strBuffer->str);
+              //printf("parseData 换行 %d %s\n",strBuffer->length,strBuffer->str);
               if (strBuffer->length() > 0  && (strBuffer->getString()[strBuffer->length() - 1] == '\r')){
-                   printf("g_key_file_parse_data 11 换行 %d\n",strBuffer->length());
+                   printf("parseData 11 换行 %d\n",strBuffer->length());
                    strBuffer->erase (strBuffer->length() - 1,1);
               }
 
@@ -350,11 +350,11 @@ impl$ AKeyFile{
                * up in the parse buffer, so they get parsed directly.
                */
               if (strBuffer->length() > 0){
-                  //printf("g_key_file_parse_data 22 换行 %d\n",strBuffer->length);
-                  g_key_file_flush_parse_buffer (&curErr);
+                  //printf("parseData 22 换行 %d\n",strBuffer->length);
+                  flushParseBuffer (&curErr);
               }else{
-                   //printf("g_key_file_parse_data 00 ----\n");
-                   g_key_file_parse_comment ("", 1);
+                   //printf("parseData 00 ----\n");
+                  parseComment ("", 1);
               }
 
               if (curErr){
@@ -372,13 +372,13 @@ impl$ AKeyFile{
                   end = data + length;
               lineLen = end - start;
               strBuffer->append(start, lineLen);
-              //printf("g_key_file_parse_data 22 ----%d %s\n",lineLen,start);
+              //printf("parseData 22 ----%d %s\n",lineLen,start);
               i += lineLen;
            }
         }
     }
 
-    static KeyFileKeyValuePair *g_key_file_lookup_key_value_pair (KeyFileGroup *group,const char *key){
+    static KeyFileKeyValuePair *lookupKeyValuePair (KeyFileGroup *group,const char *key){
         return (KeyFileKeyValuePair *) group->lookup_map->get(key);
     }
 
@@ -396,12 +396,12 @@ impl$ AKeyFile{
       char *value = NULL;
       a_return_val_if_fail (groupName != NULL, NULL);
       a_return_val_if_fail (key != NULL, NULL);
-      group = g_key_file_lookup_group(groupName);
+      group = lookupGroup(groupName);
       if (!group){
           a_error_printf(error, ERROR_DOMAIN,-2,"Key file does not have group “%s”",groupName);
           return NULL;
       }
-      pair = g_key_file_lookup_key_value_pair (group, key);
+      pair = lookupKeyValuePair(group, key);
       if (pair)
         value = pair->value;
       else
@@ -409,7 +409,7 @@ impl$ AKeyFile{
       return value;
     }
 
-    static char *g_key_file_parse_value_as_string (const char  *value,ASList *pieces,AError **error){
+    static char *parseValueAsString(const char  *value,ASList *pieces,AError **error){
       char *string_value, *p, *q0, *q;
       string_value = a_new (char, strlen (value) + 1);
       p = (char *) value;
@@ -494,7 +494,7 @@ impl$ AKeyFile{
           a_free (value_utf8);
           return NULL;
       }
-      string_value = g_key_file_parse_value_as_string (value, NULL,&curErr);
+      string_value = parseValueAsString (value, NULL,&curErr);
       if (curErr){
           if (a_error_matches (curErr, ERROR_DOMAIN,-3)){
               a_error_printf(error, ERROR_DOMAIN,-3,"Key file contains key “%s” which has a value that cannot be interpreted.", key);
@@ -510,7 +510,7 @@ impl$ AKeyFile{
           char **keys;
           asize i, num_keys;
           a_return_val_if_fail (groupName != NULL, NULL);
-          group = g_key_file_lookup_group(groupName);
+          group = lookupGroup(groupName);
           if (!group){
               a_error_printf(error, ERROR_DOMAIN, KeyFileError.GROUP_NOT_FOUND,"Key file does not have group “%s”",groupName);
               return NULL;
@@ -538,7 +538,7 @@ impl$ AKeyFile{
           return keys;
     }
 
-    static ListNode *g_key_file_lookup_key_value_pair_node (KeyFileGroup  *group,const char *key){
+    static ListNode *lookupKeyValuePairNode(KeyFileGroup  *group,const char *key){
           apointer value=NULL;
           ListIterator *iter=group->keyValuePairList->initIter();
           while(iter->hasNext(&value)){
@@ -550,18 +550,7 @@ impl$ AKeyFile{
           return NULL;
     }
 
-    static ListNode *g_key_file_lookup_group_node (const char *groupName){
-         apointer value=NULL;
-         ListIterator *iter=groups->initIter();
-         while(iter->hasNext(&value)){
-             KeyFileGroup *group = (KeyFileGroup *)value;
-             if (group && group->name && strcmp (group->name, groupName) == 0)
-                 return iter->getPrevNode();
-         }
-         return NULL;
-     }
-
-    static char *g_key_file_parse_value_as_comment (char *value,aboolean is_final_line){
+    static char *parseValueAsComment (char *value,aboolean is_final_line){
       char **lines;
       asize i;
       AString *string = new$ AString(512);
@@ -593,24 +582,24 @@ impl$ AKeyFile{
       AString *string=NULL;
       char *comment;
       a_return_val_if_fail (KeyFileUtil.isGroupName(groupName), NULL);
-      group= g_key_file_lookup_group(groupName);
+      group= lookupGroup(groupName);
       if (!group){
           a_error_printf(error, ERROR_DOMAIN, KeyFileError.GROUP_NOT_FOUND,"Key file does not have group “%s”",groupName ? groupName:"(null)");
           return NULL;
       }
-      key_node = g_key_file_lookup_key_value_pair_node (group, key);
+      key_node = lookupKeyValuePairNode (group, key);
       if (key_node == NULL){
           set_not_found_key_error (group->name, key, error);
           return NULL;
       }
       tmp =AList.prev(key_node);
       while(tmp){
-          KeyFileKeyValuePair *pair = (KeyFileKeyValuePair *)AList.nodeData(tmp);
+          pair = (KeyFileKeyValuePair *)AList.nodeData(tmp);
           if(!pair->key){
               printf("这是注释--keyxxx- %s\n",pair->value);
               if (string == NULL)
                 string = new$ AString(512);
-              comment = g_key_file_parse_value_as_comment (pair->value,FALSE);
+              comment = parseValueAsComment (pair->value,FALSE);
               string->insert (0,comment);
               a_free (comment);
           }else{
@@ -638,7 +627,7 @@ impl$ AKeyFile{
                   printf("这是注释--- %s\n",pair->value);
                   if (string == NULL)
                     string = new$ AString(512);
-                  comment = g_key_file_parse_value_as_comment (pair->value,FALSE);
+                  comment = parseValueAsComment (pair->value,FALSE);
                   string->append (comment);
                   a_free (comment);
               }else{
@@ -652,12 +641,11 @@ impl$ AKeyFile{
           return NULL;
     }
 
-
     char *getComment(const char *groupName,const char *key,AError **error){
           if (groupName != NULL && key != NULL)
             return getKeyComment(groupName, key, error);
           else if (groupName != NULL){
-             KeyFileGroup *group = g_key_file_lookup_group (groupName);
+             KeyFileGroup *group = lookupGroup (groupName);
              if (!group){
                  a_error_printf(error, ERROR_DOMAIN, KeyFileError.GROUP_NOT_FOUND,"Key file does not have group “%s”",groupName ? groupName:"(null)");
                  return NULL;
@@ -669,44 +657,40 @@ impl$ AKeyFile{
           }
     }
 
-
-
-    static char *g_key_file_parse_comment_as_value (const char   *comment){
-      char **lines;
-      asize i;
-      AString *string = new$ AString(512);
-      lines = a_strsplit (comment, "\n", 0);
-      for (i = 0; lines[i] != NULL; i++)
-          string->appendPrintf("#%s%s", lines[i],lines[i + 1] == NULL? "" : "\n");
-      a_strfreev (lines);
-      return string->unrefStr();
+    static char *createCommentAsValue (const char   *comment){
+          char **lines;
+          asize i;
+          AString *string = new$ AString(512);
+          lines = a_strsplit (comment, "\n", 0);
+          for (i = 0; lines[i] != NULL; i++)
+              string->appendPrintf("#%s%s", lines[i],lines[i + 1] == NULL? "" : "\n");
+          a_strfreev (lines);
+          return string->unrefStr();
     }
 
-
-    static void  g_key_file_remove_key_value_pair_node (KeyFileGroup *group,ListNode *pairNode){
-      KeyFileKeyValuePair *pair;
-      pair = (KeyFileKeyValuePair *)AList.nodeData(pairNode);
-      printf("移走前的大小:%d\n",group->keyValuePairList->length());
-      group->keyValuePairList->removeNode(pairNode);
-      printf("移走后的大小:%d\n",group->keyValuePairList->length());
-      a_warn_if_fail (pair->value != NULL);
-      g_key_file_key_value_pair_free (pair);
-      AList.nodeFree(pairNode);
+    void  removePairNode (KeyFileGroup *group,ListNode *pairNode){
+       KeyFileKeyValuePair *pair;
+       pair = (KeyFileKeyValuePair *)AList.nodeData(pairNode);
+       printf("移走前的大小:%d\n",group->keyValuePairList->length());
+       group->keyValuePairList->removeNode(pairNode);
+       printf("移走后的大小:%d\n",group->keyValuePairList->length());
+       a_warn_if_fail (pair->value != NULL);
+       keyValuePairFree(pair);
+       AList.nodeFree(pairNode);
     }
 
     aboolean   setKeyComment(const char *groupName, const char *key,const char *comment,AError **error){
       KeyFileGroup *group;
       KeyFileKeyValuePair *pair;
       ListNode *key_node, *comment_node, *tmp;
-
-      group = g_key_file_lookup_group (groupName);
+      group = lookupGroup (groupName);
       if (!group){
           a_error_printf(error, ERROR_DOMAIN, KeyFileError.GROUP_NOT_FOUND,"Key file does not have group “%s”",groupName ? groupName:"(null)");
          return FALSE;
       }
 
      /* 首先找到注释应该与之关联的键*/
-      key_node = g_key_file_lookup_key_value_pair_node (group, key);
+      key_node = lookupKeyValuePairNode (group, key);
       if (key_node == NULL){
           set_not_found_key_error (group->name, key, error);
           return FALSE;
@@ -716,10 +700,9 @@ impl$ AKeyFile{
       while(tmp){
            pair = (KeyFileKeyValuePair *)AList.nodeData(tmp);
            if(!pair->key){
-               printf("移走的 这是注释--keyxxx- %s\n",pair->value);
                comment_node = tmp;
                tmp =AList.prev(tmp);
-               g_key_file_remove_key_value_pair_node (group,comment_node);
+               removePairNode(group,comment_node);
            }else{
                break;
            }
@@ -731,21 +714,19 @@ impl$ AKeyFile{
       /* 现在可以加入新的注释了*/
       pair = a_slice_new (KeyFileKeyValuePair);
       pair->key = NULL;
-      pair->value = g_key_file_parse_comment_as_value (comment);
-      group->keyValuePairList->insert(pair,key_node);
+      pair->value = createCommentAsValue (comment);
+      int pos=group->keyValuePairList->indexOf(key_node);//获取节点位置，然后pair加在其后。
+      group->keyValuePairList->insert(pos+1,pair);
       return TRUE;
     }
 
-
-
     static aboolean setComment(KeyFileGroup *group,const char  *comment,AError **error) {
           int i;
-          int length=group->keyValuePairList->length();
           for(i=0;i<group->keyValuePairList->length();i++){
               KeyFileKeyValuePair *pair = (KeyFileKeyValuePair *)group->keyValuePairList->get(i);
               if(!pair->key){
                   group->keyValuePairList->remove(pair);
-                  g_key_file_key_value_pair_free (pair);
+                  keyValuePairFree(pair);
                   i--;
                   continue;
               }
@@ -754,7 +735,7 @@ impl$ AKeyFile{
           if(comment!=NULL){
               KeyFileKeyValuePair *pair = a_slice_new (KeyFileKeyValuePair);
               pair->key = NULL;
-              pair->value = g_key_file_parse_comment_as_value (comment);
+              pair->value = createCommentAsValue (comment);
               group->keyValuePairList->addFirst(pair);
           }
           return TRUE;
@@ -768,7 +749,7 @@ impl$ AKeyFile{
           return setKeyComment (groupName, key, NULL, error);
        else if (groupName != NULL){
          a_return_val_if_fail (KeyFileUtil.isGroupName(groupName), FALSE);
-         KeyFileGroup *group = g_key_file_lookup_group (groupName);
+         KeyFileGroup *group = lookupGroup (groupName);
          if (!group){
              a_error_printf(error, ERROR_DOMAIN, KeyFileError.GROUP_NOT_FOUND,"Key file does not have group “%s”",groupName ? groupName:"(null)");
              return FALSE;
@@ -790,7 +771,7 @@ impl$ AKeyFile{
            return setKeyComment (groupName, key, comment, error);
         else if (groupName != NULL){
           a_return_val_if_fail (KeyFileUtil.isGroupName(groupName), FALSE);
-          KeyFileGroup *group = g_key_file_lookup_group (groupName);
+          KeyFileGroup *group = lookupGroup (groupName);
           if (!group){
               a_error_printf(error, ERROR_DOMAIN, KeyFileError.GROUP_NOT_FOUND,"Key file does not have group “%s”",groupName ? groupName:"(null)");
               return FALSE;
@@ -840,14 +821,14 @@ impl$ AKeyFile{
                  a_error_set(error, ERROR_DOMAIN,errsv,AString.errToStr(errsv));
                  return FALSE;
              }
-             g_key_file_parse_data (read_buf, bytes_read,&curError);
+             parseData (read_buf, bytes_read,&curError);
          }while (!curError);
          if (curError){
              a_error_transfer(error, curError);
              return FALSE;
          }
 
-         g_key_file_flush_parse_buffer (&curError);
+         flushParseBuffer (&curError);
          if (curError){
              a_error_transfer (error, curError);
              return FALSE;
@@ -951,7 +932,7 @@ impl$ AKeyFile{
 
    aboolean removeGroup(const char *groupName,AError  **error){
      a_return_val_if_fail (groupName != NULL, FALSE);
-     KeyFileGroup *group=g_key_file_lookup_group (groupName);
+     KeyFileGroup *group=lookupGroup (groupName);
      if (!group){
        a_error_printf(error, ERROR_DOMAIN, KeyFileError.GROUP_NOT_FOUND,"Key file does not have group “%s”",groupName);
        return FALSE;
@@ -996,20 +977,6 @@ impl$ AKeyFile{
      return TRUE;
    }
 
-//    aboolean removeGroup(const char *groupName,AError  **error){
-//        ListNode *groupNode;
-//        a_return_val_if_fail (groupName != NULL, FALSE);
-//        groupNode = g_key_file_lookup_group_node (groupName);
-//        if (!groupNode){
-//            a_error_printf(error, ERROR_DOMAIN, KeyFileError.GROUP_NOT_FOUND,"Key file does not have group “%s”",groupName);
-//            return FALSE;
-//        }
-//        g_key_file_remove_group_node (groupNode);
-//        AList.nodeFree(groupNode);
-//        return TRUE;
-//    }
-
-
     AKeyFile(const char *file,AError **error){
            int fd;
            int errsv;
@@ -1045,12 +1012,12 @@ impl$ AKeyFile{
            clear();
            init();
            self->flags = flags;
-           g_key_file_parse_data (data, length, &curErrr);
+           parseData (data, length, &curErrr);
            if (curErrr){
                a_error_transfer(error, curErrr);
                return;
            }
-           g_key_file_flush_parse_buffer (&curErrr);
+           flushParseBuffer (&curErrr);
            if (curErrr){
                a_error_transfer (error, curErrr);
                return FALSE;

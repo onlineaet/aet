@@ -1,6 +1,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <unistd.h>
 #include <errno.h>
 #include  <sys/eventfd.h>
 #include <sys/epoll.h>

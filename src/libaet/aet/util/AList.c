@@ -124,21 +124,12 @@ impl$ AList{
       return index >= 0 && index < size;
   }
 
-  static aboolean isPositionIndex(int index) {
-       return index >= 0 && index <= size;
-   }
-
   static void checkElementIndex(int index) {
       if (!isElementIndex(index))
           a_error("索引不在范围内,index:%d 当前List的大小：%d",index,size);
   }
 
-  static void checkPositionIndex(int index) {
-      if (!isPositionIndex(index))
-          a_error("索引不在范围内,index:%d 当前List的大小：%d",index,size);
-  }
-
-  static ListNode* insertSortedReal(apointer  data,AFunc func,apointer  user_data){
+  static ListNode* insertSortedReal(apointer  data,ACompareDataFunc func,apointer  user_data){
       ListNode *list=first;
       ListNode *tmp_list = list;
       ListNode *new_list;
@@ -149,10 +140,10 @@ impl$ AList{
          return first;
       }
       size++;
-     cmp = ((ACompareDataFunc) func) (data, tmp_list->data, user_data);
+     cmp = func(data, tmp_list->data, user_data);
      while ((tmp_list->next) && (cmp > 0)){
         tmp_list = tmp_list->next;
-        cmp = ((ACompareDataFunc) func) (data, tmp_list->data, user_data);
+        cmp = func (data, tmp_list->data, user_data);
      }
 
     new_list = createNode(NULL,data,NULL);
@@ -325,7 +316,7 @@ impl$ AList{
   }
 
   void  insertSorted(apointer data,ACompareFunc  func){
-      insertSorted (data, (AFunc) func, NULL);
+      insertSorted (data, (ACompareDataFunc) func, NULL);
   }
 
   void foreach (AFunc func,apointer  user_data){
@@ -339,7 +330,7 @@ impl$ AList{
 
 
   void insertSorted(apointer data,ACompareDataFunc  func,apointer userData){
-       self->first= insertSortedReal(data, (AFunc) func, userData);
+       self->first= insertSortedReal(data, func, userData);
        ListNode *node=self->first;
        while (node){
            ListNode *next = node->next;
@@ -406,19 +397,35 @@ impl$ AList{
       clear();
   }
 
-  void setDestroyFunc(ADestroyNotify fun){
-      destoryItemFunc=fun;
-  }
+  /**
+   * 节点位置
+   */
+   int indexOf(ListNode *node) {
+        int index = 0;
+        ListNode *x;
+        if (node != NULL) {
+            for (x = first; x != NULL; x = x->next) {
+                if (x == node)
+                    return index;
+                index++;
+            }
+        }
+        return -1;
+   }
 
-  ListIterator *initIter(){
+   void setDestroyFunc(ADestroyNotify fun){
+      destoryItemFunc=fun;
+   }
+
+   ListIterator *initIter(){
       if(iter==NULL)
           iter=new$ ListIterator();
       iter->node=first;
       iter->prevNode=first;
       return iter;
-  }
+   }
 
-  ListNode *sortMerge(ListNode *l1,ListNode *l2,AFunc compareFunc,apointer  userData){
+   ListNode *sortMerge(ListNode *l1,ListNode *l2,AFunc compareFunc,apointer  userData){
     ListNode list, *l,*lprev;
     int cmp;
     l = &list;

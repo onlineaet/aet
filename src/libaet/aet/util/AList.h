@@ -54,6 +54,7 @@ public$ class$ AList{
     public$ apointer getLast();
     public$ apointer get(int index);
     public$ int      indexOf(apointer data);
+    public$ int      indexOf(ListNode *node);//节点位置
     public$ void     insert(int index, apointer element);
     public$ void     insertSorted(apointer data,ACompareFunc  func);
     public$ void     insertSorted(apointer data,ACompareDataFunc func,apointer userData);

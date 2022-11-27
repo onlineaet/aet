@@ -262,7 +262,7 @@ static tree selectedFromStatic(ImplicitlyCall *self,ImplicitlyData *data)
        if(className==NULL){
            return NULL_TREE;
        }
-       n_debug("selecImplicitly 找静态函数 找之前把self移走。\n");
+       n_debug("selecImplicitly 找静态函数 找之前把self移走。");
        exprlist->ordered_remove(0);//把self参数移走
        origtypes->ordered_remove(0);//把self参数移走
        item=select_field_get_implicitly_static_func(select_field_get(),className,origFunName,exprlist,origtypes,arg_loc,expr_loc,NULL);
@@ -316,7 +316,7 @@ static tree selecImplicitly(ImplicitlyCall *self,ImplicitlyData *data)
        last=item->classFunc->fromImplDefine;
        generic_check_parm(sysName,item->classFunc,exprlist,last);
     }else{
-        n_debug("selecImplicitly 找静态函数 找之前把self移走。\n");
+        n_debug("selecImplicitly 找静态函数 找之前把self移走。");
         exprlist->ordered_remove(0);//把self参数移走
         origtypes->ordered_remove(0);//把self参数移走
         item=select_field_get_implicitly_static_func(select_field_get(),className,origFunName,exprlist,origtypes,arg_loc,expr_loc,NULL);

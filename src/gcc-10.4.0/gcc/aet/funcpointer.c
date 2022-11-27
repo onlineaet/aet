@@ -38,19 +38,7 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 #include "aetinfo.h"
 #include "c-aet.h"
 #include "aetprinttree.h"
-//#include "parserstatic.h"
-//#include "aet-c-parser-header.h"
-//#include "classfunc.h"
-//#include "genericutil.h"
-//#include "funcmgr.h"
-//#include "genericcall.h"
-//#include "blockmgr.h"
-//#include "genericquery.h"
-//#include "parserhelp.h"
-//#include "funccheck.h"
-//#include "makefileparm.h"
 #include "classutil.h"
-//#include "middlefile.h"
 
 
 static int getParams(tree funcType,int *varargs)
@@ -127,7 +115,7 @@ static nboolean find (tree lhs_main_type, tree rhs_struct_type)
 
 
 /**
- * 右边的参数与左边的比较。如果正确返回 init
+ * 右边的参数与左边的比较。如果正确返回 0
  */
 static int  compare(tree ltype, tree rtype)
 {
@@ -356,7 +344,54 @@ int func_pointer_check(tree lhs,tree rhs,int *paramNum)
     return 0;
 }
 
+/**
+ * 两个函数指针的比较，可以参数不一样
+ */
+int func_pointer_check_two(tree lhs,tree rhs,int *paramNum)
+{
+       tree lfunctype=getFunctionType(lhs);
+       tree rfunctype=getFunctionType(rhs);
+       int lvarargs=1;
+       int rvarargs=1;
+//       printf("func_pointer_check_two---- 00\n");
+//       aet_print_tree_skip_debug(lhs);
+//       printf("func_pointer_check_two---- 11\n");
+//
+//       aet_print_tree_skip_debug(rhs);
+//       printf("func_pointer_check_two---- 22\n");
 
+
+       int lcount=getParams(lfunctype,&lvarargs);
+       int rcount=getParams(rfunctype,&rvarargs);
+       tree lretn=TREE_TYPE (lfunctype);
+       tree rretn=TREE_TYPE (rfunctype);
+       int ret=compare(lretn,rretn);
+       if(ret!=0){
+           printf("左值的返回值与右值类型不一样。ret:%d\n",ret);
+           return ret;
+       }
+
+       tree lparams[100];
+       getParamTree(lfunctype,lparams);
+       tree rparams[100];
+       getParamTree(rfunctype,rparams);
+       int i;
+       for(i=0;i<lcount;i++){
+           //printf("there ------ i: %d lcount:%d rcount:%d\n",i,lcount,rcount);
+           if(i==rcount)
+               return 0;
+           ret=compare(lparams[i],rparams[i]);
+           if(ret!=0){
+               printf("func_pointer_check_two 参数不匹配。i:%d ret:%d\n",i,ret);
+               *paramNum=i;
+               return ret;
+           }
+       }
+
+       //取出参数个数
+       return 0;
+
+}
 
 
 

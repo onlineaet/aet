@@ -142,13 +142,6 @@ static const char integer_type_codes[itk_none] =
   '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0'
 };
 
-
-
-static void freeClass_cb(npointer userData)
-{
-  printf("aet_managle free free %p\n",userData);
-}
-
 static void aetInit(AetMangle *self)
 {
 	self->strBuf=n_string_new("");
@@ -983,22 +976,6 @@ static void add_substitution (AetMangle *self,tree node)
   dump_substitution_candidates (self);
 }
 
-
-
-/* Done with mangling. If WARN is true, and the name of G.entity will
-   be mangled differently in a future version of the ABI, issue a
-   warning.  */
-
-static void finish_mangling_internal (AetMangle *self)
-{
-  /* Clear all the substitutions.  */
-  //vec_safe_truncate (G.substitutions, 0);
-
-  /* Null-terminate the string.  */
-  //write_char ('\0');
-}
-
-
 /* Start mangling ENTITY.  */
 
 static inline void startMangling (AetMangle *self,const tree entity)
@@ -1007,50 +984,6 @@ static inline void startMangling (AetMangle *self,const tree entity)
 	//n_string_erase(self->strBuf,0,-1);//这个方法引用内存错误
 	n_string_free(self->strBuf,TRUE);
 	self->strBuf=n_string_new("");
-//  G.entity = entity;
-//  G.need_abi_warning = false;
-//  G.need_cxx17_warning = false;
-//  obstack_free (&name_obstack, name_base);
-//  mangle_obstack = &name_obstack;
-//  name_base = obstack_alloc (&name_obstack, 0);
-}
-
-
-
-static bool unmangled_name_p (const tree decl)
-{
-  if (TREE_CODE (decl) == FUNCTION_DECL){
-      /* The names of `extern "C"' functions are not mangled.  */
-	  n_info("这是一个 FUNCTION_DECL unmangled_name_p");
-      return true; //(DECL_EXTERN_C_FUNCTION_P (decl)  /* But overloaded operator names *are* mangled.  *//*zclei   && !DECL_OVERLOADED_OPERATOR_P (decl)*/);
-  }else if (VAR_P (decl)){
-	  n_info("这是一个 VAR_P unmangled_name_p ");
-
-      /* static variables are mangled.  */
-//      if (!DECL_EXTERNAL_LINKAGE_P (decl))
-//	     return false;
-//
-//      /* extern "C" declarations aren't mangled.  */
-//      if (DECL_EXTERN_C_P (decl))
-//	      return true;
-//
-//      /* Other variables at non-global scope are mangled.  */
-//      if (CP_DECL_CONTEXT (decl) !=NULL_TREE/*zclei global_namespace*/)
-//	       return false;
-
-      /* Variable template instantiations are mangled.  */
-//      if (DECL_LANG_SPECIFIC (decl) && DECL_TEMPLATE_INFO (decl) && variable_template_p (DECL_TI_TEMPLATE (decl)))
-//	     return false;
-
-      /* Declarations with ABI tags are mangled.  */
-//      if (get_abi_tags (decl))
-//	      return false;
-
-      /* The names of non-static global variables aren't mangled.  */
-      return true;
-    }
-
-    return false;
 }
 
 

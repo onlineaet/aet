@@ -247,7 +247,7 @@ static void parser_var_or_fun_declaration(ParserStatic *self,struct c_declspecs 
 			 int flag_sanitize_save = flag_sanitize;
 			 if (TREE_CODE (d) == PARM_DECL)
 				flag_sanitize = 0;
-			 n_debug("静态声明分析 初始化做准备\n");
+			 n_debug("静态声明分析 初始化做准备。");
 			 if (c_parser_next_token_is_keyword (parser, RID_AET_NEW)){
                  //生成new$的原始代码
 				 char *codes=new_object_parser_for_static(new_object_get(),d,NULL);

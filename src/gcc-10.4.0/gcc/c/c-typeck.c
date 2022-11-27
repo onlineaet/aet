@@ -6770,13 +6770,13 @@ convert_for_assignment (location_t location, location_t expr_loc, tree type,
     }
 
     if (TYPE_MAIN_VARIANT (type) == TYPE_MAIN_VARIANT (rhstype)){
-	     n_debug("convert_for_assignment ---+++-222 实参与型参相同返回实参--------------\n");
+	     n_debug("convert_for_assignment ---+++-222 实参与型参相同返回实参--------------");
         warn_for_address_or_pointer_of_packed_member (type, orig_rhs);
         return rhs;
     }
 
     if (coder == VOID_TYPE){
-	    n_debug("convert_for_assignment ----333 coder == VOID_TYPE\n");
+	    n_debug("convert_for_assignment ----333 coder == VOID_TYPE");
 
           /* Except for passing an argument to an unprototyped function,
          this is a constraint violation.  When passing an argument to
@@ -6801,7 +6801,7 @@ convert_for_assignment (location_t location, location_t expr_loc, tree type,
   /* A non-reference type can convert to a reference.  This handles
      va_start, va_copy and possibly port built-ins.  */
    if (codel == REFERENCE_TYPE && coder != REFERENCE_TYPE){
-	  n_debug("convert_for_assignment ----4444 codel == REFERENCE_TYPE && coder != REFERENCE_TYPE\n");
+	  n_debug("convert_for_assignment ----4444 codel == REFERENCE_TYPE && coder != REFERENCE_TYPE");
       if (!lvalue_p (rhs)){
 	     const char msg[] = "cannot pass rvalue to reference parameter";
 	     if (warnopt)
@@ -6996,7 +6996,7 @@ convert_for_assignment (location_t location, location_t expr_loc, tree type,
       asl = TYPE_ADDR_SPACE (ttl);
       asr = TYPE_ADDR_SPACE (ttr);
       if (!null_pointer_constant_p (rhs)  && asr != asl && !targetm.addr_space.subset_p (asr, asl)){
-    	  n_debug("convert_for_assignment ----5555 !null_pointer_constant_p (rhs)  && asr != asl && !targetm.addr_space.subset_p (asr, asl)\n");
+    	  n_debug("convert_for_assignment ----5555 !null_pointer_constant_p (rhs)  && asr != asl && !targetm.addr_space.subset_p (asr, asl)");
           switch (errtype)
             {
             case ic_argpass:
@@ -7226,10 +7226,13 @@ convert_for_assignment (location_t location, location_t expr_loc, tree type,
           }
 	      break;
 	    case ic_return:
-	      if (bltin)
-		      pedwarn (location, OPT_Wincompatible_pointer_types,"returning pointer to %qD of type %qT from a function with incompatible type %qT", bltin, rhstype, type);
-	      else
-		      pedwarn (location, OPT_Wincompatible_pointer_types,"returning %qT from a function with incompatible return type %qT", rhstype, type);
+          if(!clear_warning_modify(type,rhs)){ //zclei
+              if (bltin)
+                  pedwarn (location, OPT_Wincompatible_pointer_types,"returning pointer to %qD of type %qT from a function with incompatible type %qT",
+                          bltin, rhstype, type);
+              else
+                  pedwarn (location, OPT_Wincompatible_pointer_types,"returning %qT from a function with incompatible return type %qT", rhstype, type);
+          }
 	      break;
 	    default:
 	      gcc_unreachable ();

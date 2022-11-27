@@ -646,7 +646,7 @@ tree func_call_select(FuncCall *self,tree func,vec<tree, va_gc> *exprlist,
        setGenericQuery(self,item,last);
 	   generic_check_parm(item->sysName,item->classFunc,exprlist,last);
 	}else{
-		n_debug("func_call_select 找静态函数 找之前把self移走。\n");
+		n_debug("func_call_select 找静态函数 找之前把self移走。");
 		exprlist->ordered_remove(0);//把self参数移走
 		origtypes->ordered_remove(0);//把self参数移走
 		item=selectStaticByRecursion(self,className,funName,exprlist,origtypes,arg_loc,expr_loc,errors);
@@ -698,7 +698,7 @@ tree func_call_super_select(FuncCall *self,tree func,vec<tree, va_gc> *exprlist,
 					//	   item->sysName,item->iface,item->mangleEntity->mangleFunName,lowClassName);
 		   last=callParentOrParentIface(self,func,item,exprlist,expr_loc,FALSE);
 	   }else{
-		  n_debug("func_call_super_select 找静态函数\n");
+		  n_debug("func_call_super_select 找静态函数。");
 		  exprlist->ordered_remove(0);//把self参数移走
 		  origtypes->ordered_remove(0);//把self参数移走
 		  item=selectStaticByRecursion(self,lowClassName,funName,exprlist,origtypes,arg_loc,expr_loc,errors);

@@ -429,14 +429,42 @@ void aet_utils_create_string_token(c_token *token,uchar *str,int len)
 
 /**
  * 在class声明最后加入一个初始化方法
- * Abc_init_$12345678@_Abc
+ * package_Abc_init_$12345678@_package_Abc
  */
-char* aet_utils_create_init_method(char *className)
+char* aet_utils_create_init_method(char *sysName)
 {
    char buffer[256];
-   sprintf(buffer,"%s_%s_%s",className,AET_INIT_GLOBAL_METHOD_STRING,className);
+   sprintf(buffer,"%s_%s_%s",sysName,AET_INIT_GLOBAL_METHOD_STRING,sysName);
    char *re=n_strdup(buffer);
    return re;
+}
+
+/**
+ * 从初始化函数名，获取类的系统名.
+ * 形如：
+ * debug_ATxy_init_1234ergR5678_debug_ATxy
+ */
+char   *aet_utils_get_sys_name_from_init_method(char *funcName)
+{
+       char temp[255];
+       sprintf(temp,"_%s_",AET_INIT_GLOBAL_METHOD_STRING);
+       if(!strstr(funcName,temp))
+           return NULL;
+       NString *cn=n_string_new(funcName);
+       int index=n_string_indexof(cn,temp);
+       NString *sysNameStr=n_string_substring_from(cn,0,index);
+       //再检查最后是不是也是类名
+       nboolean ok=n_string_ends_with(cn,sysNameStr->str);
+       n_string_free(cn,TRUE);
+       if(!ok){
+           n_string_free(sysNameStr,TRUE);
+           return NULL;
+       }
+       ClassInfo *info=class_mgr_get_class_info(class_mgr_get(),sysNameStr->str);
+       if(info!=NULL)
+           return n_string_free(sysNameStr,FALSE);
+       n_string_free(sysNameStr,TRUE);
+       return NULL;
 }
 
 
@@ -461,7 +489,10 @@ static int addAetBuiltinCodes(cpp_reader *pfile, const char *str,size_t len,loca
    cpp_token *token = _cpp_lex_direct (pfile);
    if(forceLocation)
      cpp_force_token_locations (pfile, loc);
-  //printf("加入新符号 00 ---%s %d %s, %s, %d\n", (char *)str,len,__FILE__, __FUNCTION__, __LINE__);
+  else
+     cpp_stop_forcing_token_locations (pfile);
+
+  //printf("加入新符号 00 ---%s\n", (char *)str);
   if (pfile->context->tokens_kind == TOKENS_KIND_EXTENDED){
       /* We are tracking tokens resulting from macro expansion.
      Create a macro line map and generate a virtual location for
@@ -685,4 +716,34 @@ char   *aet_utils_get_keyword_string(c_token *token)
 {
     return getKeyword(token);
 }
+
+/**
+ *返回当前输入加上行数和列数后的新位置。
+ *lines 在当前行再加的行数
+ *cols  在当前列于加的列数
+ */
+location_t  aet_utils_create_location(nuint lines,nuint cols)
+{
+  /* Use input_location to get the relevant line_map */
+    const struct line_map_ordinary *line_map
+        = (const line_map_ordinary *)(linemap_lookup (line_table,input_location));
+     expanded_location xloc;
+     xloc = expand_location(input_location);
+     printf("aet_utils_create_location当前位置:%d %d %s\n",xloc.line, xloc.column,xloc.file);
+     nuint newLine=xloc.line+lines;
+     nuint newColumn=xloc.column+cols;
+     /* Convert from 0-based column numbers to 1-based column numbers.  */
+     location_t newLoc= linemap_position_for_line_and_column (line_table,line_map,newLine, newColumn);
+     expanded_location exloc;
+     exloc = expand_location(newLoc);
+     if(exloc.line==xloc.line){
+         printf("再加一行\n");
+         newLoc= linemap_position_for_line_and_column (line_table,line_map,newLine+1, newColumn);
+     }
+     exloc = expand_location(newLoc);
+     printf("aet_utils_create_location创建的位置:%d %d %s\n",exloc.line, exloc.column,exloc.file);
+     return newLoc;
+}
+
+
 

@@ -82,7 +82,7 @@ impl$ EventPoll{
                }
             }
             if(fd==destFd){
-                err=error?1:0;
+                *err=error?1:0;
                 return got;
             }
             a_warning("epoll ##$$## epoll tt -- event is fd:%x got: %d",fd,got);
@@ -93,31 +93,28 @@ impl$ EventPoll{
 
 
     int process(int eventcnt){
-              int i;
-              for (i = 0; i < eventcnt; i++) {
-                  a_warning("epoll.c wait_od line:%d ",__LINE__);
-                  struct epoll_event *ev =&self->events[i];
-                  int fd = ev->data.fd;
-                  a_warning("epoll.c wait_od line:%d fd:%x",__LINE__,fd);
-                  int what=ev->events;
-                  int got=0;
-                  aboolean error=FALSE;
-                  if (what & (EPOLLHUP|EPOLLERR)) {
-                     got = EPOLLIN | EPOLLOUT;
-                     error=TRUE;
-                     a_warning("epoll -error - event is %p fd:%d got %d",fd,got);
-                  } else {
-                     if (what & EPOLLIN){
-                        got=EPOLLIN;
-                     }
-                     if (what & EPOLLOUT){
-                        got=EPOLLOUT;
-                     }
-                  }
-                  a_warning("liuyue ##$$## epoll tt -- event is fd:%x got: %d",fd,got);
-               }
-               return TRUE;
-
+      int i;
+      for (i = 0; i < eventcnt; i++) {
+          a_warning("epoll.c wait_od line:%d ",__LINE__);
+          struct epoll_event *ev =&self->events[i];
+          int fd = ev->data.fd;
+          a_warning("epoll.c wait_od line:%d fd:%x",__LINE__,fd);
+          int what=ev->events;
+          int got=0;
+          if (what & (EPOLLHUP|EPOLLERR)) {
+             got = EPOLLIN | EPOLLOUT;
+             a_warning("epoll -error - event is %p fd:%d got %d",fd,got);
+          } else {
+             if (what & EPOLLIN){
+                got=EPOLLIN;
+             }
+             if (what & EPOLLOUT){
+                got=EPOLLOUT;
+             }
+          }
+          a_warning("liuyue ##$$## epoll tt -- event is fd:%x got: %d",fd,got);
+       }
+       return TRUE;
     }
 
     int modify (int fd, int events){

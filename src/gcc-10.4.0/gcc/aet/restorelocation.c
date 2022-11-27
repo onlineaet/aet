@@ -82,28 +82,26 @@ typedef struct _RestoreInputLocaton{
     location_t highest_line;
     unsigned char *cur;
     unsigned char *next_line;  /* Start of to-be-cleaned logical line.  */
+    unsigned int max_column_hint;
+    nboolean seen_line_directive;
+    location_t builtin_location;
+    /* The default value of range_bits in ordinary line maps.  */
+    unsigned int default_range_bits;
+    unsigned int num_optimized_ranges;
+    unsigned int num_unoptimized_ranges;
+    int need_line;//这个变量会引起token的行差一行
 
-
-
-           unsigned int max_column_hint;
-          nboolean seen_line_directive;
-          location_t builtin_location;
-          /* The default value of range_bits in ordinary line maps.  */
-          unsigned int default_range_bits;
-          unsigned int num_optimized_ranges;
-          unsigned int num_unoptimized_ranges;
-
-          int reason;
-          unsigned char sysp;
-          unsigned int m_column_and_range_bits : 8;
-          unsigned int m_range_bits : 8;
-          linenum_type to_line;
-          location_t included_from;
+    int reason;
+    unsigned char sysp;
+    unsigned int m_column_and_range_bits : 8;
+    unsigned int m_range_bits : 8;
+    linenum_type to_line;
+    location_t included_from;
+    location_t start_location;//这个变量会引起token的行差一行
 }RestoreInputLocaton;
 
 static int addCodesCount=0;
 static NPtrArray *depthArray=n_ptr_array_new();
-
 
 static void restore(cpp_reader *pfile,RestoreInputLocaton *item)
 {
@@ -115,43 +113,44 @@ static void restore(cpp_reader *pfile,RestoreInputLocaton *item)
                return;
            }
 
-//input_location=item->loc;
-//pfile->buffer->line_base=item->line_base;
-//pfile->line_table->highest_location=item->highest_location;
+input_location=item->loc;
+pfile->buffer->line_base=item->line_base;
+pfile->line_table->highest_location=item->highest_location;
 
 
            pfile->line_table->highest_line=item->highest_line;
            pfile->buffer->cur=item->cur;
 
-           //pfile->buffer->need_line=1;
+pfile->buffer->need_line=item->need_line;
 
 
            pfile->buffer->next_line=item->next_line;
 
 
 
-//           pfile->line_table->max_column_hint= item->max_column_hint;
-//           pfile->line_table->seen_line_directive=item->seen_line_directive;
-//           pfile->line_table->builtin_location=item->builtin_location;
-//            /* The default value of range_bits in ordinary line maps.  */
-//           pfile->line_table->default_range_bits =item->default_range_bits;
-//           pfile->line_table->num_optimized_ranges=item->num_optimized_ranges;
-//           pfile->line_table->num_unoptimized_ranges=item->num_unoptimized_ranges;
+pfile->line_table->max_column_hint= item->max_column_hint;
+pfile->line_table->seen_line_directive=item->seen_line_directive;
+pfile->line_table->builtin_location=item->builtin_location;
+/* The default value of range_bits in ordinary line maps.  */
+pfile->line_table->default_range_bits =item->default_range_bits;
+pfile->line_table->num_optimized_ranges=item->num_optimized_ranges;
+pfile->line_table->num_unoptimized_ranges=item->num_unoptimized_ranges;
 
            line_maps *set=pfile->line_table;
            line_map_ordinary *map = LINEMAPS_LAST_ORDINARY_MAP (set);
 
 
-//         map->reason=item->reason;
-//         map->sysp=item->sysp;
+map->reason=item->reason;
+map->sysp=item->sysp;
 
 
            map->m_column_and_range_bits=item->m_column_and_range_bits;
            map->m_range_bits=item->m_range_bits;
 
 
-//         map->to_line=item->to_line;
-//         map->included_from=item->included_from;
+map->to_line=item->to_line;
+map->included_from=item->included_from;
+map->start_location=item->start_location;
 
 
 }
@@ -182,7 +181,6 @@ void aet_utils_write_cpp_buffer(cpp_buffer *newBuffer,void *restoreData)
     newBuffer->dir.len=3;
     newBuffer->dir.construct=popBuffer_cb;
     newBuffer->dir.canonical_name=(char*)restoreData;
-   // printf("createBufferChange ---- %p %p\n",newBuffer->dir.name,newBuffer->dir.canonical_name);
 }
 
 void *aet_utils_create_restore_location_data(cpp_reader *pfile,location_t loc)
@@ -195,6 +193,7 @@ void *aet_utils_create_restore_location_data(cpp_reader *pfile,location_t loc)
     restore->highest_line=pfile->line_table->highest_line;
     restore->cur=pfile->buffer->cur;
     restore->next_line=pfile->buffer->next_line;
+    restore->need_line=pfile->buffer->need_line;
 
     restore->max_column_hint=pfile->line_table->max_column_hint;
     restore->builtin_location=pfile->line_table->builtin_location;
@@ -213,8 +212,8 @@ void *aet_utils_create_restore_location_data(cpp_reader *pfile,location_t loc)
     restore->m_range_bits=map->m_range_bits;
     restore->to_line=map->to_line;
     restore->included_from=map->included_from;
+    restore->start_location=map->start_location;
     n_ptr_array_add(depthArray,restore);
-   // printf("aet_utils_create_restore_location_data restoreData:%p\n",restore);
     return (void*)restore;
 }
 

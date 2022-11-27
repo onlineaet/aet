@@ -195,18 +195,15 @@ impl$ ASourceMgr{
 
     aboolean getTimeout(int *priority,int *needTimeout,aint64 *needStartTime,int *timeFresh){
            int lastTimeout = *needTimeout;
-           int i;
            int nReady = 0;
            int current_priority = A_MAXINT;
            EventSource *source=NULL;
            aboolean time_is_fresh=FALSE;
            aint64 startTime=*needStartTime;
           // printf("getTimeout 00-----\n");
-
            storage->initIter();
            while( storage->nextIter(&source)){
                //printf("getTimeout 11-----source: %p name:%s id:%d\n",source,source->name,source->id);
-
                 int source_timeout = -1;
                 if ((nReady > 0) && (source->priority > current_priority))
                     break;
@@ -277,9 +274,6 @@ impl$ ASourceMgr{
       * prepare是为了获得超时间
       */
     aboolean prepare (int  *priority){
-          auint i;
-          int n_ready = 0;
-          int current_priority = A_MAXINT;
           mutex.lock();
           self->eventTime.timeout=-1;
           self->eventTime.time_is_fresh=FALSE;
@@ -298,7 +292,6 @@ impl$ ASourceMgr{
            EventSource *source=NULL;
            aushort events;
            int count=0;
-           int i;
            storage->pollInitIter();
            while( storage->pollNextIter(&source)){
                int fd=source->getFd();
@@ -325,9 +318,9 @@ impl$ ASourceMgr{
           //printf("poll is ----- timeout:%d\n",timeout);
           int eventCount= poll->wait(timeout);
           //printf("poll is 111----- timeout:%d\n",timeout);
-          int ret, errsv;
+          int errsv;
           errsv = errno;
-          if (ret < 0 && errsv != EINTR) {
+          if (eventCount < 0 && errsv != EINTR) {
              a_warning ("poll(2) failed due to: %s.",AString.errToStr(errsv));
           }
           return eventCount;
@@ -358,7 +351,7 @@ impl$ ASourceMgr{
                      continue;
                   if ((nReady > 0) && (source->priority > max_priority))
                      break;
-                  if(source==self->wakeupSource){
+                  if(source==(EventSource *)self->wakeupSource){
                       continue;
                   }
                   if (!(source->flags & Flags.READY)){
@@ -435,7 +428,6 @@ impl$ ASourceMgr{
           source->flags &= ~Flags.READY;
           if (!SOURCE_DESTROYED (source)){
               aboolean was_in_call;
-              apointer user_data = NULL;
               aboolean need_destroy;
               was_in_call = source->flags & HookFlagMask.IN_CALL;
               source->flags |= HookFlagMask.IN_CALL;
@@ -464,12 +456,9 @@ impl$ ASourceMgr{
       int timeout=0;
       aboolean some_ready=FALSE;
       self->pendingDispatchesCount=0;
-      int nfds, allocated_nfds;
      // printf("iterate 00cccc block:%d %lli\n",block,Time.monotonic()/1000);
-
       unlock();
      // printf("iterate 00bbbb block:%d %lli\n",block,Time.monotonic()/1000);
-
       if (!acquire ()){
           aboolean got_ownership;
           lock();
@@ -592,7 +581,7 @@ impl$ ASourceMgr{
          EventSource *source=find(id);
          if(source==NULL)
              return FALSE;
-         return remove(source);
+         return self->remove(source);
      }
 
 
@@ -610,7 +599,6 @@ impl$ ASourceMgr{
 
     void   setReadyTime(apointer eventSource,aint64 readyTime){
         mutex.lock();
-
         EventSource *source=(EventSource *)eventSource;
         //printf("g_source_set_ready_time %p id:%d new:%lli old:%lli\n",source,source->id,readyTime/1000,source->ready_time/1000);
         if (source->ready_time == readyTime){

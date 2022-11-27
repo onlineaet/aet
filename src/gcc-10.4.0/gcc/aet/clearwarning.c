@@ -43,6 +43,9 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 #include "classmgr.h"
 #include "c-aet.h"
 #include "funcmgr.h"
+#include "aet-c-parser-header.h"
+#include "classimpl.h"
+#include "funcpointer.h"
 
 
 static char *getIfaceCommonData123ByRecord(tree type)
@@ -188,9 +191,61 @@ static nboolean isRef(tree rhs)
        return  isRefCall(rhs);
     }
     return FALSE;
-
 }
 
+static int atAetCompare(tree lhtype,tree rhs)
+{
+      ClassImpl *impl=class_impl_get();
+      c_parser *parser=impl->parser;
+      if(parser->isAet){
+          int parmNum=0;//出错在第几个参数
+          int ok=func_pointer_check_two(lhtype,rhs,&parmNum);
+          printf("比较函数指针的参数======%d %d\n",ok,parmNum);
+          if(ok==0)
+              return 1;
+      }
+      return 0;
+}
+
+/**
+ * 在ic_argpass:参数传递中
+ * lhtype 函数的参数类型
+ * rhs 实参
+ */
+static int funcPointer(tree lhtype,tree rhs)
+{
+    tree lhtype_2=TREE_TYPE (lhtype);
+    if(TREE_CODE(lhtype_2)!=FUNCTION_TYPE)
+        return 0;
+    if(TREE_CODE(rhs)!=ADDR_EXPR && TREE_CODE(rhs)!=NOP_EXPR)
+        return 0;
+    if(TREE_CODE(rhs)==ADDR_EXPR){
+        tree funcdecl = TREE_OPERAND(rhs,0);
+        if(TREE_CODE(funcdecl)!=FUNCTION_DECL)
+             return 0;
+        char *funcName=IDENTIFIER_POINTER(DECL_NAME(funcdecl));
+        char   *sysName=func_mgr_get_static_class_name_by_mangle(func_mgr_get(),funcName);
+        printf("说明实参是一个类静态函数:%s %s\n",sysName,funcName);
+        if(sysName!=NULL){
+            //进这里说明在selectfield.c中已能过了实参的检查，否则不会选取funcName的。
+            return 1;
+        }else{
+            //说明给函数指针赋值的是一个外部函数，或一个结构体的field,如果当前是在aet中，等同于类静态函数处理。
+            return atAetCompare(lhtype,rhs);
+        }
+    }else if(TREE_CODE(rhs)==NOP_EXPR){
+        tree type=TREE_TYPE(rhs);
+        if(TREE_CODE(type)==POINTER_TYPE){
+            tree functype=TREE_TYPE(type);
+            if(TREE_CODE(functype)==FUNCTION_TYPE){
+                printf("进这里了------left ACompareDataFunc right ACompareFunc\n");
+                return atAetCompare(lhtype,type);
+            }
+        }
+    }
+    return 0;
+
+}
 
 
 /**
@@ -213,6 +268,26 @@ static nboolean isRef(tree rhs)
  *  警告：传递‘a_object_cleanup_nameless_object’的第 1 个参数时在不兼容的指针类型间转换 [-Wincompatible-pointer-types]
  *  getRandom(new$ ARandom());
  *
+ *  四、
+ *  调用ref()函数，总是返回AObject 与左值对应不上。但不能报警告。
+ *
+ *  五、
+ *  说明ARandomGenerator是ARandom的儿子，同时也实现了接口RandomGenerator，但它的实现方法在父类ARandom中
+ *   *  public$ class$ ARandomGenerator extends$ ARandom implements$ RandomGenerator{
+ *  }
+ *
+ *  public$ class$ ARandom{
+ *      public$ auint32 nextInt();
+ *  }
+ *  ARandom并未实现RandomGenerator的接口，但它的类方法与RandomGenerator接口的一样。如果调用
+ *  ARandomGenerator的接口RandomGenerator的方法nextInt，则会调用到ARandom中的方法nextInt
+ *  因为在ARandomGenerator初始化中给接口RandomGenerator的方法nextInt赋值的正是ARandom的方法
+ *  的nextInt
+ *  ((com_ai_probability_RandomGenerator *)&self->ifaceRandomGenerator2066046634)->
+ *  _Z15RandomGenerator7nextIntEPN15RandomGeneratorE=((aet_util_ARandom *)self)->_Z7ARandom7nextIntEPN7ARandomE;
+ *  所以会出现警告.....
+ *  解决：判断当有所在的函数是不是初始化函数，从中找于是类名。如果类是继承ARandom并实现了接口，可以跳过
+ *  这样的警告。
  */
 int  clear_warning_modify(tree lhtype,tree rhs)
 {
@@ -230,8 +305,10 @@ int  clear_warning_modify(tree lhtype,tree rhs)
        return 0;
     leftObjectName=getClassName(lhtype_2);
     n_debug("class_util_erase_warning leftObjectName:%s",leftObjectName);
-    if(leftObjectName==NULL)
-        return 0;
+    if(leftObjectName==NULL){ //如查左值不是类，判断是不是函数指针。
+        //按函数指针判断
+        return funcPointer(lhtype,rhs);
+    }
     if(TREE_CODE(rhs)!=ADDR_EXPR && TREE_CODE(rhs)!=COMPONENT_REF
             && TREE_CODE(rhs)!=NOP_EXPR && TREE_CODE(rhs)!=VAR_DECL
             && TREE_CODE(rhs)!=PARM_DECL && TREE_CODE(rhs)!=TARGET_EXPR
@@ -296,6 +373,20 @@ int  clear_warning_modify(tree lhtype,tree rhs)
                     */
                     if(rightInfo!=NULL && class_info_is_root(rightInfo) && TREE_CODE(rhs)==NOP_EXPR)
                         return 1;
+                    tree currentDecl=current_function_decl;//匹配第五种情况
+                    if(aet_utils_valid_tree(currentDecl)){
+                        char *funcName=IDENTIFIER_POINTER(DECL_NAME(currentDecl));
+                        char *sysName=aet_utils_get_sys_name_from_init_method(funcName);
+                        if(sysName!=NULL){
+                           ClassRelationship ship1=  class_mgr_relationship(class_mgr_get(),sysName,rightObjectName);
+                           ClassRelationship ship2=  class_mgr_relationship(class_mgr_get(),sysName,leftObjectName);
+                           n_free(sysName);
+                           //说明sysName是rightObjectName的儿子，同时也实现了接口leftObjectName，但它的实现方法在父类rightObjectName中
+                           if(ship1==CLASS_RELATIONSHIP_CHILD && ship2==CLASS_RELATIONSHIP_IMPL){
+                               return 1;
+                           }
+                        }
+                    }
                }
            }
       }

@@ -537,8 +537,6 @@ void    aet_print_location(location_t loc)
      printf("位置是:%d %d %s\n",xloc.line, xloc.column,xloc.file);
 }
 
-
-
 char *aet_print_get_storage_class_string(int kind)
 {
    return  storage_class_str[kind];

@@ -117,7 +117,7 @@ typedef void* apointer;
 typedef const void *aconstpointer;
 
 typedef aint            (*ACompareFunc)         (aconstpointer  a,aconstpointer  b);
-typedef aint            (*ACompareDataFunc)     (aconstpointer  a,aconstpointer  b,apointer       user_data);
+typedef aint            (*ACompareDataFunc)     (aconstpointer  a,aconstpointer  b,apointer user_data);
 typedef aboolean        (*AEqualFunc)           (aconstpointer  a,aconstpointer  b);
 typedef void            (*ADestroyNotify)       (apointer data);
 typedef void            (*AFunc)                (apointer data,apointer user_data);

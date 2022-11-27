@@ -77,9 +77,9 @@ static void classCtorCtor(ClassCtor *self)
     self->funcHelp=func_help_new();
     int i;
     for(i=0;i<30;i++){
-    	self->superInfos[i].sysCreate=FALSE;
-    	self->superInfos[i].funcName=NULL;
-    	self->superInfos[i].sysName=NULL;
+        self->superInfos[i].sysCreate=FALSE;
+        self->superInfos[i].funcName=NULL;
+        self->superInfos[i].sysName=NULL;
     }
     self->superInfoCount=0;
     self->superOfSelfParseing=FALSE;
@@ -91,34 +91,35 @@ static void classCtorCtor(ClassCtor *self)
  */
 static void addSelfToReturn(ClassCtor *self)
 {
-	  c_parser *parser=self->parser;
-	  c_token *token=c_parser_peek_token(parser); //}
-	  if (token->type!=CPP_SEMICOLON){
-		  return ;
-	  }
-	  int tokenCount=parser->tokens_avail;
-	  if(tokenCount+1>AET_MAX_TOKEN){
-			error("token太多了");
-			return;
-	  }
-	  location_t  decl_loc = token->location;
-	  int i;
-	  for(i=tokenCount;i>0;i--){
-			 aet_utils_copy_token(&parser->tokens[i-1],&parser->tokens[i-1+1]);
-	  }
-	  aet_utils_create_token(&parser->tokens[0],CPP_NAME,"self",4);
-	  parser->tokens_avail=tokenCount+1;
-	  aet_print_token_in_parser("addSelfToReturn ------");
+      c_parser *parser=self->parser;
+      c_token *token=c_parser_peek_token(parser); //}
+      if (token->type!=CPP_SEMICOLON){
+          return ;
+      }
+      int tokenCount=parser->tokens_avail;
+      if(tokenCount+1>AET_MAX_TOKEN){
+            error("token太多了");
+            return;
+      }
+      location_t  decl_loc = token->location;
+      int i;
+      for(i=tokenCount;i>0;i--){
+             aet_utils_copy_token(&parser->tokens[i-1],&parser->tokens[i-1+1]);
+      }
+      aet_utils_create_token(&parser->tokens[0],CPP_NAME,"self",4);
+      //parser->tokens[0].location=decl_loc;
+      parser->tokens_avail=tokenCount+1;
+      aet_print_token_in_parser("addSelfToReturn ------");
 }
 
 void  class_ctor_parser_return(ClassCtor *self,nboolean isConstructor)
 {
    c_parser *parser=self->parser;
    if(parser->isAet && isConstructor){
-	 if (c_parser_next_token_is (parser, CPP_SEMICOLON)){
-					//加一个self;
-	    addSelfToReturn(self);
-	 }
+     if (c_parser_next_token_is (parser, CPP_SEMICOLON)){
+                    //加一个self;
+        addSelfToReturn(self);
+     }
    }
 }
 
@@ -127,27 +128,29 @@ void  class_ctor_parser_return(ClassCtor *self,nboolean isConstructor)
  */
 nboolean class_ctor_add_return_stmt(ClassCtor *self)
 {
-	  c_parser *parser=self->parser;
-	  c_token *token=c_parser_peek_token(parser); //}
-	  if (token->type!=CPP_CLOSE_BRACE){
-		  return FALSE;
-	  }
-	  int tokenCount=parser->tokens_avail;
-	  if(tokenCount+3>AET_MAX_TOKEN){
-			error("token太多了");
-			return FALSE;
-	  }
-	  location_t  decl_loc = token->location;
-	  int i;
-	  for(i=tokenCount;i>0;i--){
-			 aet_utils_copy_token(&parser->tokens[i-1],&parser->tokens[i-1+3]);
-	  }
-	  aet_utils_create_token(&parser->tokens[2],CPP_SEMICOLON,";",1);
-	  aet_utils_create_token(&parser->tokens[1],CPP_NAME,"self",4);
-	  aet_utils_create_return_token(&parser->tokens[0],decl_loc);
-	  parser->tokens_avail=tokenCount+3;
-	  aet_print_token_in_parser("class_ctor_add_return_stmt ----");
-	  return TRUE;
+      c_parser *parser=self->parser;
+      c_token *token=c_parser_peek_token(parser); //}
+      if (token->type!=CPP_CLOSE_BRACE){
+          return FALSE;
+      }
+      int tokenCount=parser->tokens_avail;
+      if(tokenCount+3>AET_MAX_TOKEN){
+            error("token太多了");
+            return FALSE;
+      }
+      location_t  decl_loc = token->location;
+      int i;
+      for(i=tokenCount;i>0;i--){
+             aet_utils_copy_token(&parser->tokens[i-1],&parser->tokens[i-1+3]);
+      }
+      aet_utils_create_token(&parser->tokens[2],CPP_SEMICOLON,";",1);
+      aet_utils_create_token(&parser->tokens[1],CPP_NAME,"self",4);
+      aet_utils_create_return_token(&parser->tokens[0],decl_loc);
+      //for(i=0;i<=2;i++)
+         // parser->tokens[i].location=decl_loc;
+      parser->tokens_avail=tokenCount+3;
+      aet_print_token_in_parser("class_ctor_add_return_stmt ----");
+      return TRUE;
 }
 
 static struct c_arg_info *createParam (c_parser *parser, char *className)
@@ -176,7 +179,7 @@ static struct c_arg_info *createParam (c_parser *parser, char *className)
 
   c_declarator *id_declarator = pointer;
   while (id_declarator && id_declarator->kind != cdk_id){
-	 n_debug("创建c_parm 99 00 %s, %s, %d\n",__FILE__, __FUNCTION__, __LINE__);
+     n_debug("创建c_parm 99 00 ");
      id_declarator = id_declarator->declarator;
   }
 
@@ -184,7 +187,7 @@ static struct c_arg_info *createParam (c_parser *parser, char *className)
 
   location_t caret_loc = (id_declarator->u.id.id ? id_declarator->id_loc : start_loc);
   location_t param_loc = make_location (caret_loc, start_loc, end_loc);
-  n_debug("创建c_parm 99  11 %s %s, %d\n",__FILE__, __FUNCTION__, __LINE__);
+  n_debug("创建c_parm 99  11 ");
   tree expr;
   struct c_parm *parm= build_c_parm (specs, NULL_TREE,pointer, param_loc);
   push_parm_decl (parm, &expr);
@@ -199,26 +202,26 @@ static struct c_arg_info *createParam (c_parser *parser, char *className)
  */
 static tree rebuildComponentRef(ClassCtor *self,tree componentref ,tree field)
 {
-	tree datum=TREE_OPERAND(componentref,0);
-	if(TREE_CODE(datum)!=INDIRECT_REF && TREE_CODE(datum)!=VAR_DECL && TREE_CODE(datum)!=COMPONENT_REF && TREE_CODE(datum)!=ARRAY_REF){
-		n_warning("在classctor中 rebuildComponentRef所需要的类型不符,不是 INDIRECT_REF VAR_DECL COMPONENT_REF ！！！%s",get_tree_code_name(TREE_CODE(datum)));
-		return error_mark_node;
-	}
+    tree datum=TREE_OPERAND(componentref,0);
+    if(TREE_CODE(datum)!=INDIRECT_REF && TREE_CODE(datum)!=VAR_DECL && TREE_CODE(datum)!=COMPONENT_REF && TREE_CODE(datum)!=ARRAY_REF){
+        n_warning("在classctor中 rebuildComponentRef所需要的类型不符,不是 INDIRECT_REF VAR_DECL COMPONENT_REF ！！！%s",get_tree_code_name(TREE_CODE(datum)));
+        return error_mark_node;
+    }
     tree type = TREE_TYPE (datum);
     tree ref;
     bool datum_lvalue = lvalue_p (datum);
     tree subdatum =field;
     //printf("rebuildComponentRef 22 ---%p\n",subdatum);
     //printf("rebuildComponentRef 33 ---%s\n",get_tree_code_name(TREE_CODE(subdatum)));
-	//printf("rebuildComponentRef 44 field:%s subdatum:%s %s %s %d\n",
-	//		   get_tree_code_name(TREE_CODE(field)), get_tree_code_name(TREE_CODE(TREE_TYPE (subdatum))),__FILE__,__FUNCTION__,__LINE__);
+    //printf("rebuildComponentRef 44 field:%s subdatum:%s %s %s %d\n",
+    //         get_tree_code_name(TREE_CODE(field)), get_tree_code_name(TREE_CODE(TREE_TYPE (subdatum))),__FILE__,__FUNCTION__,__LINE__);
     int quals;
     tree subtype;
     bool use_datum_quals;
-	use_datum_quals = (datum_lvalue || TREE_CODE (TREE_TYPE (subdatum)) != ARRAY_TYPE);
-	quals = TYPE_QUALS (strip_array_types (TREE_TYPE (subdatum)));
-	if (use_datum_quals)
-	  quals |= TYPE_QUALS (TREE_TYPE (datum));
+    use_datum_quals = (datum_lvalue || TREE_CODE (TREE_TYPE (subdatum)) != ARRAY_TYPE);
+    quals = TYPE_QUALS (strip_array_types (TREE_TYPE (subdatum)));
+    if (use_datum_quals)
+      quals |= TYPE_QUALS (TREE_TYPE (datum));
     subtype = c_build_qualified_type (TREE_TYPE (subdatum), quals);
     TREE_TYPE(componentref)=subtype;
     TREE_OPERAND(componentref,1)=subdatum;
@@ -235,9 +238,9 @@ static int getParamsNumber(tree parm_types)
      int count=0;
      for (first_parm_type = parm_types; parm_types;parm_types = TREE_CHAIN (parm_types)){
          tree parm = TREE_VALUE (parm_types);
-		 //printf("getParamsNumber  %s args:%d\n",get_tree_code_name(TREE_CODE(parm)),count);
+         //printf("getParamsNumber  %s args:%d\n",get_tree_code_name(TREE_CODE(parm)),count);
          if (parm !=void_type_node)
-	         count++;
+             count++;
      }
      return count;
 }
@@ -247,28 +250,28 @@ static int getParamsNumber(tree parm_types)
  */
 static void rearrangeConstructor(c_parser *parser,ClassName *className)
 {
-	  c_token *funName=c_parser_peek_token(parser); //Abc
-	  c_token *openParen=c_parser_peek_2nd_token (parser);//"(";
-	  int tokenCount=parser->tokens_avail;
-	  if(tokenCount+2>AET_MAX_TOKEN){
-			 error("token太多了");
-			 return;
-	  }
+      c_token *funName=c_parser_peek_token(parser); //Abc
+      c_token *openParen=c_parser_peek_2nd_token (parser);//"(";
+      int tokenCount=parser->tokens_avail;
+      if(tokenCount+2>AET_MAX_TOKEN){
+             error("token太多了");
+             return;
+      }
 
-	  int i;
-	  for(i=tokenCount;i>0;i--){
-			aet_utils_copy_token(&parser->tokens[i-1],&parser->tokens[i-1+2]);
-	  }
-	  aet_utils_create_token(&parser->tokens[3],CPP_OPEN_PAREN,"(",1);
-	  aet_utils_copy_token(funName,&parser->tokens[2]);
-	  tree value=aet_utils_create_ident(className->userName);
-	  parser->tokens[2].value=value;
-	  parser->tokens[2].id_kind=C_ID_ID;//关键
-	  aet_utils_create_token(&parser->tokens[1],CPP_MULT,"*",1);
-	  aet_utils_create_token(&parser->tokens[0],CPP_NAME,className->sysName,(int)strlen(className->sysName));
-	  parser->tokens[0].id_kind=C_ID_TYPENAME;//关键
-	  parser->tokens_avail=tokenCount+2;
-	  aet_print_token_in_parser("class ctor rearrangeConstructor className ---- %s %s",className->sysName,className->userName);
+      int i;
+      for(i=tokenCount;i>0;i--){
+            aet_utils_copy_token(&parser->tokens[i-1],&parser->tokens[i-1+2]);
+      }
+      aet_utils_create_token(&parser->tokens[3],CPP_OPEN_PAREN,"(",1);
+      aet_utils_copy_token(funName,&parser->tokens[2]);
+      tree value=aet_utils_create_ident(className->userName);
+      parser->tokens[2].value=value;
+      parser->tokens[2].id_kind=C_ID_ID;//关键
+      aet_utils_create_token(&parser->tokens[1],CPP_MULT,"*",1);
+      aet_utils_create_token(&parser->tokens[0],CPP_NAME,className->sysName,(int)strlen(className->sysName));
+      parser->tokens[0].id_kind=C_ID_TYPENAME;//关键
+      parser->tokens_avail=tokenCount+2;
+      aet_print_token_in_parser("class ctor rearrangeConstructor className ---- %s %s",className->sysName,className->userName);
 }
 
 
@@ -279,28 +282,28 @@ static void rearrangeConstructor(c_parser *parser,ClassName *className)
 nboolean class_ctor_parser_constructor(ClassCtor *self,ClassName *className)
 {
     if(className==NULL)
-    	return FALSE;
+        return FALSE;
     c_parser *parser=self->parser;
-	if(c_parser_next_token_is (parser, CPP_NAME)){
-		tree ident = c_parser_peek_token (parser)->value;
-		const char *str1=IDENTIFIER_POINTER (ident);
-		if(strcmp(str1,className->sysName)==0 && c_parser_peek_2nd_token(parser)->type==CPP_OPEN_PAREN){
-			n_info("class_ctor_parser_constructor 这是一个构函数 name:%s current_function_decl:%p", str1,current_function_decl);
-			if(current_function_decl){
-			    location_t loc = c_parser_peek_token (parser)->location;
-				error_at(loc,"不能在类中调用构造函数%qs。",className->userName);
-				return FALSE;
-			}
-			if(class_mgr_is_interface(class_mgr_get(),className)){
-			    location_t loc = c_parser_peek_token (parser)->location;
-			    error_at(loc,"接口不能有有构造函数:%qs",className->userName);
-			    return FALSE;
-		    }
-			rearrangeConstructor(parser,className);
-			return TRUE;
-		}
-	}
-	return FALSE;
+    if(c_parser_next_token_is (parser, CPP_NAME)){
+        tree ident = c_parser_peek_token (parser)->value;
+        const char *str1=IDENTIFIER_POINTER (ident);
+        if(strcmp(str1,className->sysName)==0 && c_parser_peek_2nd_token(parser)->type==CPP_OPEN_PAREN){
+            n_info("class_ctor_parser_constructor 这是一个构函数 name:%s current_function_decl:%p", str1,current_function_decl);
+            if(current_function_decl){
+                location_t loc = c_parser_peek_token (parser)->location;
+                error_at(loc,"不能在类中调用构造函数%qs。",className->userName);
+                return FALSE;
+            }
+            if(class_mgr_is_interface(class_mgr_get(),className)){
+                location_t loc = c_parser_peek_token (parser)->location;
+                error_at(loc,"接口不能有有构造函数:%qs",className->userName);
+                return FALSE;
+            }
+            rearrangeConstructor(parser,className);
+            return TRUE;
+        }
+    }
+    return FALSE;
 }
 
 /**
@@ -320,28 +323,28 @@ static nboolean isDefualtCtorField(tree fieldDecl)
  */
 static nboolean  haveFieldOrDefine(ClassCtor *self,ClassName *className,nboolean field)
 {
-	NPtrArray *array=func_mgr_get_funcs(func_mgr_get(),className);
-	if(array==NULL)
-		return FALSE;
+    NPtrArray *array=func_mgr_get_funcs(func_mgr_get(),className);
+    if(array==NULL)
+        return FALSE;
     int i;
     for(i=0;i<array->len;i++){
-	   ClassFunc *item=(ClassFunc *)n_ptr_array_index(array,i);
-	   if(strcmp(item->orgiName,className->userName)==0 && aet_utils_valid_tree(field?item->fieldDecl:item->fromImplDefine)){
-			tree decl=field?item->fieldDecl:item->fromImplDefine;
-			if(field){
-				nboolean re=isDefualtCtorField(decl);
-				//printf("haveFieldOrDefine 00 classname:%s isDefault:%d\n",className->sysName,re);
-				if(re)
-					return TRUE;
-			}else{
-			   tree type=TREE_TYPE(decl);//函数类型的树
-			   tree argTypes= TYPE_ARG_TYPES (type);
-			   int count=getParamsNumber(argTypes);
-			   //printf("haveFieldOrDefine 11 classname:%s count:%d\n",className->sysName,count);
-			   if(count==1 || (class_func_have_generic_block(item) && count==2))
-				   return TRUE;
-			}
-	   }
+       ClassFunc *item=(ClassFunc *)n_ptr_array_index(array,i);
+       if(strcmp(item->orgiName,className->userName)==0 && aet_utils_valid_tree(field?item->fieldDecl:item->fromImplDefine)){
+            tree decl=field?item->fieldDecl:item->fromImplDefine;
+            if(field){
+                nboolean re=isDefualtCtorField(decl);
+                //printf("haveFieldOrDefine 00 classname:%s isDefault:%d\n",className->sysName,re);
+                if(re)
+                    return TRUE;
+            }else{
+               tree type=TREE_TYPE(decl);//函数类型的树
+               tree argTypes= TYPE_ARG_TYPES (type);
+               int count=getParamsNumber(argTypes);
+               //printf("haveFieldOrDefine 11 classname:%s count:%d\n",className->sysName,count);
+               if(count==1 || (class_func_have_generic_block(item) && count==2))
+                   return TRUE;
+            }
+       }
     }
     //n_warning("在方法haveFieldOrDefine中没有找到缺省的构造函数！");
     return FALSE;
@@ -349,7 +352,7 @@ static nboolean  haveFieldOrDefine(ClassCtor *self,ClassName *className,nboolean
 
 nboolean  class_ctor_have_default_field(ClassCtor *self,ClassName *className)
 {
-	return haveFieldOrDefine(self,className,TRUE);
+    return haveFieldOrDefine(self,className,TRUE);
 }
 
 /**
@@ -357,39 +360,39 @@ nboolean  class_ctor_have_default_field(ClassCtor *self,ClassName *className)
  */
 tree   class_ctor_create_default_decl(ClassCtor *self,ClassName *className,tree structType)
 {
-	c_parser *parser=self->parser;
-	struct c_declspecs *specs;
-	specs = build_null_declspecs ();
-	struct c_typespec t;
-	t.kind = ctsk_typedef;
-	tree value=aet_utils_create_ident(className->sysName);
-	t.spec = lookup_name (value);
-	t.expr = NULL_TREE;
-	t.expr_const_operands = true;
-	c_token *token = c_parser_peek_token (parser);//随便找一个位置
-	declspecs_add_type (token->location, specs, t);
-	finish_declspecs (specs);
-	tree prefix_attrs = specs->attrs;
-	tree all_prefix_attrs = prefix_attrs;
-	specs->attrs = NULL_TREE;
-	struct c_declspecs *quals_attrs = build_null_declspecs ();
-	char *funcName=className->userName;
-	value=aet_utils_create_ident(funcName);
-	struct c_declarator *funcsDeclarator= build_id_declarator (value);
-	funcsDeclarator->id_loc = c_parser_peek_token (parser)->location;
-	struct c_declarator *pointer= make_pointer_declarator (quals_attrs, funcsDeclarator);
-	struct c_arg_info *args=createParam(parser,className->sysName);
-	struct c_declarator *fundecl = build_function_declarator (args, pointer);
-	struct c_declarator *pointerLast= make_pointer_declarator (quals_attrs, fundecl);
-	nboolean change=func_mgr_change_class_func_decl(func_mgr_get(),pointerLast,className,structType);
-	tree decls = NULL_TREE;
-	tree postfix_attrs = NULL_TREE;
-	tree d = grokfield (c_parser_peek_token (parser)->location,pointerLast, specs, NULL_TREE, &all_prefix_attrs);
-	decl_attributes (&d, chainon (postfix_attrs,all_prefix_attrs), 0);
-	DECL_CHAIN (d) = decls;
-	decls = d;
-	if(change){
-	   func_mgr_set_class_func_decl(func_mgr_get(),d,className);
+    c_parser *parser=self->parser;
+    struct c_declspecs *specs;
+    specs = build_null_declspecs ();
+    struct c_typespec t;
+    t.kind = ctsk_typedef;
+    tree value=aet_utils_create_ident(className->sysName);
+    t.spec = lookup_name (value);
+    t.expr = NULL_TREE;
+    t.expr_const_operands = true;
+    c_token *token = c_parser_peek_token (parser);//随便找一个位置
+    declspecs_add_type (token->location, specs, t);
+    finish_declspecs (specs);
+    tree prefix_attrs = specs->attrs;
+    tree all_prefix_attrs = prefix_attrs;
+    specs->attrs = NULL_TREE;
+    struct c_declspecs *quals_attrs = build_null_declspecs ();
+    char *funcName=className->userName;
+    value=aet_utils_create_ident(funcName);
+    struct c_declarator *funcsDeclarator= build_id_declarator (value);
+    funcsDeclarator->id_loc = c_parser_peek_token (parser)->location;
+    struct c_declarator *pointer= make_pointer_declarator (quals_attrs, funcsDeclarator);
+    struct c_arg_info *args=createParam(parser,className->sysName);
+    struct c_declarator *fundecl = build_function_declarator (args, pointer);
+    struct c_declarator *pointerLast= make_pointer_declarator (quals_attrs, fundecl);
+    nboolean change=func_mgr_change_class_func_decl(func_mgr_get(),pointerLast,className,structType);
+    tree decls = NULL_TREE;
+    tree postfix_attrs = NULL_TREE;
+    tree d = grokfield (c_parser_peek_token (parser)->location,pointerLast, specs, NULL_TREE, &all_prefix_attrs);
+    decl_attributes (&d, chainon (postfix_attrs,all_prefix_attrs), 0);
+    DECL_CHAIN (d) = decls;
+    decls = d;
+    if(change){
+       func_mgr_set_class_func_decl(func_mgr_get(),d,className);
        char *id=IDENTIFIER_POINTER(DECL_NAME(d));
        ClassFunc *entity=func_mgr_get_entity(func_mgr_get(), className,id);
        if(entity==NULL){
@@ -397,8 +400,8 @@ tree   class_ctor_create_default_decl(ClassCtor *self,ClassName *className,tree 
            return NULL_TREE;
        }
        entity->permission=CLASS_PERMISSION_PUBLIC;
-	}
-	return decls;
+    }
+    return decls;
 }
 
 /**
@@ -406,87 +409,88 @@ tree   class_ctor_create_default_decl(ClassCtor *self,ClassName *className,tree 
  */
 void class_ctor_build_default_define(ClassCtor *self,ClassName *className)
 {
-	  c_parser *parser=self->parser;
-	  if(class_mgr_is_interface(class_mgr_get(),className)){
+      c_parser *parser=self->parser;
+      if(class_mgr_is_interface(class_mgr_get(),className)){
           return;
       }
-	  c_token *constructor = c_parser_peek_token (parser);
- 	  int tokenCount=parser->tokens_avail;
-	  if(tokenCount+5>AET_MAX_TOKEN){
-			error("token太多了");
-			return;
-	  }
-	  int i;
-	  for(i=tokenCount;i>0;i--){
-	    aet_utils_copy_token(&parser->tokens[i-1],&parser->tokens[i-1+5]);
-	  }
-	  aet_utils_create_token(&parser->tokens[4],CPP_CLOSE_BRACE,"}",1);
-	  aet_utils_create_token(&parser->tokens[3],CPP_OPEN_BRACE,"{",1);
-	  aet_utils_create_token(&parser->tokens[2],CPP_CLOSE_PAREN,")",1);
-	  aet_utils_create_token(&parser->tokens[1],CPP_OPEN_PAREN,"(",1);
-	  aet_utils_create_token(&parser->tokens[0],CPP_NAME,className->sysName,(int)strlen(className->sysName));
-	  parser->tokens[0].id_kind=C_ID_ID;//关键
-	  parser->tokens_avail=tokenCount+5;
-	  aet_print_token_in_parser("class_ctor_build_default_define className Abc(){}---- %s",className->sysName);
+      c_token *constructor = c_parser_peek_token (parser);
+      int tokenCount=parser->tokens_avail;
+      if(tokenCount+5>AET_MAX_TOKEN){
+            error("token太多了");
+            return;
+      }
+      int i;
+      for(i=tokenCount;i>0;i--){
+        aet_utils_copy_token(&parser->tokens[i-1],&parser->tokens[i-1+5]);
+      }
+      aet_utils_create_token(&parser->tokens[4],CPP_CLOSE_BRACE,"}",1);
+      aet_utils_create_token(&parser->tokens[3],CPP_OPEN_BRACE,"{",1);
+      aet_utils_create_token(&parser->tokens[2],CPP_CLOSE_PAREN,")",1);
+      aet_utils_create_token(&parser->tokens[1],CPP_OPEN_PAREN,"(",1);
+      aet_utils_create_token(&parser->tokens[0],CPP_NAME,className->sysName,(int)strlen(className->sysName));
+      parser->tokens[0].id_kind=C_ID_ID;//关键
+      parser->tokens_avail=tokenCount+5;
+      aet_print_token_in_parser("class_ctor_build_default_define className Abc(){}---- %s",className->sysName);
 }
 
 nboolean   class_ctor_have_default_define(ClassCtor *self,ClassName *className)
 {
-	return haveFieldOrDefine(self,className,FALSE);
+    return haveFieldOrDefine(self,className,FALSE);
 }
 
 
 nboolean  class_ctor_is(ClassCtor *self,struct c_declarator *declarator,ClassName *className)
 {
-	int i;
-	struct c_declarator *funcdel=NULL;
-	struct c_declarator *temp=declarator;
-	for(i=0;i<100;i++){
-		if(temp!=NULL){
-		   enum c_declarator_kind kind=temp->kind;
-		   if(kind==cdk_function){
-			   n_debug("isConstruct 在class中找到一个函数声明 第%d个 %d \n",i,kind);
-			   funcdel=temp;
+    int i;
+    struct c_declarator *funcdel=NULL;
+    struct c_declarator *temp=declarator;
+    for(i=0;i<100;i++){
+        if(temp!=NULL){
+           enum c_declarator_kind kind=temp->kind;
+           if(kind==cdk_function){
+               n_debug("isConstruct 在class中找到一个函数声明 第%d个 %d",i,kind);
+               funcdel=temp;
                break;
-		   }
-		   temp=temp->declarator;
-		}else{
-			break;
-		}
-	}
-	if(!funcdel)
-		return FALSE;
-	struct c_declarator *funid=funcdel->declarator;
-	if(funid==NULL)
-		return FALSE;
-	enum c_declarator_kind kind=funid->kind;
-	if(kind!=cdk_id)
-		return FALSE;
-  	tree funName=funid->u.id.id;
-  	char *orgiName=IDENTIFIER_POINTER(funName);
+           }
+           temp=temp->declarator;
+        }else{
+            break;
+        }
+    }
+    if(!funcdel)
+        return FALSE;
+    struct c_declarator *funid=funcdel->declarator;
+    if(funid==NULL)
+        return FALSE;
+    enum c_declarator_kind kind=funid->kind;
+    if(kind!=cdk_id)
+        return FALSE;
+    tree funName=funid->u.id.id;
+    char *orgiName=IDENTIFIER_POINTER(funName);
     return strcmp(orgiName,className->userName)==0;
 }
 
 static void rearrangeSuper(ClassCtor *self,ClassName *className)
 {
-	  c_parser *parser=self->parser;
-	  location_t  loc = c_parser_peek_token (parser)->location;
-	  c_token *openbrace = c_parser_peek_token (parser);//{
-	  int tokenCount=parser->tokens_avail;
-	  if(tokenCount+4>AET_MAX_TOKEN){
-			error("token太多了");
-			return;
-	  }
-	  int i;
-	  parser->tokens_avail=tokenCount+4;
-	  for(i=tokenCount;i>1;i--){
-			 aet_utils_copy_token(&parser->tokens[i-1],&parser->tokens[i-1+4]);
-	  }
-	  aet_utils_create_token(&parser->tokens[4],CPP_SEMICOLON,";",1);
-	  aet_utils_create_token(&parser->tokens[3],CPP_CLOSE_PAREN,")",1);
-	  aet_utils_create_token(&parser->tokens[2],CPP_OPEN_PAREN,"(",1);
-	  aet_utils_create_super_token(&parser->tokens[1],loc);
-	  aet_print_token_in_parser("class actor rearrangeSuper className ---- %s",className->sysName);
+      c_parser *parser=self->parser;
+      location_t  loc = c_parser_peek_token (parser)->location;//{
+      int tokenCount=parser->tokens_avail;
+      if(tokenCount+4>AET_MAX_TOKEN){
+            error("token太多了");
+            return;
+      }
+      int i;
+      parser->tokens_avail=tokenCount+4;
+      for(i=tokenCount;i>1;i--){
+             aet_utils_copy_token(&parser->tokens[i-1],&parser->tokens[i-1+4]);
+      }
+      aet_utils_create_super_token(&parser->tokens[1],loc);
+      aet_utils_create_token(&parser->tokens[2],CPP_OPEN_PAREN,"(",1);
+      aet_utils_create_token(&parser->tokens[3],CPP_CLOSE_PAREN,")",1);
+      aet_utils_create_token(&parser->tokens[4],CPP_SEMICOLON,";",1);
+//      for(i=1;i<=4;i++)
+//          parser->tokens[i].location=loc;
+      aet_print_token_in_parser("class actor rearrangeSuper className ---- %s",className->sysName);
 }
 
 /**
@@ -496,30 +500,30 @@ static void rearrangeSuper(ClassCtor *self,ClassName *className)
  */
 void class_ctor_add_super_keyword(ClassCtor *self,ClassName *className)
 {
-	  c_parser *parser=self->parser;
-	  if(strcmp(className->userName,AET_ROOT_OBJECT)==0)
-		  return;
+      c_parser *parser=self->parser;
+      if(strcmp(className->userName,AET_ROOT_OBJECT)==0)
+          return;
       if (!c_parser_next_token_is (parser, CPP_OPEN_BRACE)){
-    	  return;
+          return;
       }
-	  c_token *token=c_parser_peek_2nd_token(parser);
-	  nboolean isSuper=token->type == CPP_KEYWORD && token->keyword==RID_AET_SUPER;
-	  n_debug("class_ctor_add_super_keyword %s %d",className->sysName,isSuper);
-	  nboolean openParen=c_parser_peek_nth_token (parser,3)->type ==CPP_OPEN_PAREN;
-	  int index=self->superInfoCount;
-	  self->superInfos[index].sysName=n_strdup(className->sysName);
-	  if(current_function_decl){
-		  char *funcName=IDENTIFIER_POINTER(DECL_NAME(current_function_decl));
-		  self->superInfos[index].funcName=n_strdup(funcName);
-	  }
-	  if(isSuper && openParen){
-		  self->superInfos[index].sysCreate=FALSE;
-	  }else{
-	     //加super();
-		  self->superInfos[index].sysCreate=TRUE;
-	      rearrangeSuper(self,className);
-	  }
-	  self->superInfoCount++;
+      c_token *token=c_parser_peek_2nd_token(parser);
+      nboolean isSuper=token->type == CPP_KEYWORD && token->keyword==RID_AET_SUPER;
+      n_debug("class_ctor_add_super_keyword %s %d",className->sysName,isSuper);
+      nboolean openParen=c_parser_peek_nth_token (parser,3)->type ==CPP_OPEN_PAREN;
+      int index=self->superInfoCount;
+      self->superInfos[index].sysName=n_strdup(className->sysName);
+      if(current_function_decl){
+          char *funcName=IDENTIFIER_POINTER(DECL_NAME(current_function_decl));
+          self->superInfos[index].funcName=n_strdup(funcName);
+      }
+      if(isSuper && openParen){
+          self->superInfos[index].sysCreate=FALSE;
+      }else{
+         //加super();
+          self->superInfos[index].sysCreate=TRUE;
+          rearrangeSuper(self,className);
+      }
+      self->superInfoCount++;
 }
 
 /**
@@ -530,20 +534,20 @@ nboolean class_ctor_self_is_first(ClassCtor *self,ClassName *className,int *erro
    int i;
    char *nowFuncName=NULL;
    if(current_function_decl){
-	   nowFuncName=IDENTIFIER_POINTER(DECL_NAME(current_function_decl));
+       nowFuncName=IDENTIFIER_POINTER(DECL_NAME(current_function_decl));
    }
    for(i=0;i<self->superInfoCount;i++){
-	   char *sysName=self->superInfos[i].sysName;
-	   char *funcName=self->superInfos[i].funcName;
-	   //printf("class_ctor_self_is_first --- %s %s %s %s\n",sysName,funcName,nowFuncName,className->sysName);
-	   if(sysName!=NULL && !strcmp(sysName,className->sysName)){
-	      // printf("class_ctor_self_is_first -11-- %s %s %s %s\n",sysName,funcName,nowFuncName,className->sysName);
+       char *sysName=self->superInfos[i].sysName;
+       char *funcName=self->superInfos[i].funcName;
+       //printf("class_ctor_self_is_first --- %s %s %s %s\n",sysName,funcName,nowFuncName,className->sysName);
+       if(sysName!=NULL && !strcmp(sysName,className->sysName)){
+          // printf("class_ctor_self_is_first -11-- %s %s %s %s\n",sysName,funcName,nowFuncName,className->sysName);
 
-		   if(funcName!=NULL && nowFuncName!=NULL && !strcmp(funcName,nowFuncName)){
-		       // printf("class_ctor_self_is_first -22-- %s %s %s %s\n",sysName,funcName,nowFuncName,className->sysName);
-			   return self->superInfos[i].sysCreate;
-		   }
-	   }
+           if(funcName!=NULL && nowFuncName!=NULL && !strcmp(funcName,nowFuncName)){
+               // printf("class_ctor_self_is_first -22-- %s %s %s %s\n",sysName,funcName,nowFuncName,className->sysName);
+               return self->superInfos[i].sysCreate;
+           }
+       }
    }
    *error=1;
    return FALSE;
@@ -574,7 +578,6 @@ static void superToConstructor(ClassCtor *self,ClassName *className)
     }
 
       location_t  loc = c_parser_peek_token (parser)->location;
-      c_token *openParen = c_parser_peek_token (parser);//->
       int tokenCount=parser->tokens_avail;
       if(tokenCount+11>AET_MAX_TOKEN){
             error("token太多了");
@@ -598,6 +601,8 @@ static void superToConstructor(ClassCtor *self,ClassName *className)
       aet_utils_create_token(&parser->tokens[9],CPP_DEREF,"->",2);
       aet_utils_create_token(&parser->tokens[10],CPP_NAME,parent,strlen(parent));
       parser->tokens[10].id_kind=C_ID_ID;//关键
+//      for(i=0;i<=10;i++)
+//              parser->tokens[i].location=loc;
       self->superOfSelfParseing=TRUE;
       aet_print_token_in_parser("class_ctor superToConstructor className ---- %s superConstructorCount:%d",className->sysName,self->superOfSelfParseing);
 }
@@ -666,6 +671,8 @@ void  class_ctor_end_super_or_self_ctor_call(ClassCtor *self,tree expr)
      aet_utils_create_number_token(&parser->tokens[15],0);
      aet_utils_create_token(&parser->tokens[16],CPP_CLOSE_PAREN,")",1);
      aet_utils_create_token(&parser->tokens[17],CPP_SEMICOLON,";",1);
+//     for(i=0;i<=17;i++)
+//             parser->tokens[i].location=loc;
      aet_print_token_in_parser("class_ctor class_ctor_end_super_ctor_call className ----");
 }
 
@@ -679,18 +686,18 @@ void       class_ctor_parser_super(ClassCtor *self,ClassName *className)
    location_t loc = c_parser_peek_token(parser)->location;
    c_parser_consume_token (parser);
    if(!parser->isAet){
-	  error_at (loc, "super关键字只能用在类的实现中。%qs",className->sysName);
-	  return;
+      error_at (loc, "super关键字只能用在类的实现中。%qs",className->sysName);
+      return;
    }
    if (c_parser_next_token_is (parser, CPP_DEREF)){
-	 error_at(loc,"在构造函数内调用父类的构造函数形式只能是:super()或super(parm) %qs",className->sysName);
-	 return;
+     error_at(loc,"在构造函数内调用父类的构造函数形式只能是:super()或super(parm) %qs",className->sysName);
+     return;
    }else if(c_parser_next_token_is (parser, CPP_OPEN_PAREN)){
-		 //如果出现super(但不是第一条句时错的
-	  superToConstructor(self,className);
+         //如果出现super(但不是第一条句时错的
+      superToConstructor(self,className);
    }else{
-	 error_at(loc,"在构造函数内调用父类的构造函数形式只能是:super()或super(parm) %qs",className->sysName);
-	 return;
+     error_at(loc,"在构造函数内调用父类的构造函数形式只能是:super()或super(parm) %qs",className->sysName);
+     return;
    }
 }
 
@@ -708,77 +715,80 @@ static char *getLowClassName(tree field)
  * 根据参数选择最终的构造函数
  */
 tree  class_ctor_select(ClassCtor *self,tree func,vec<tree, va_gc> *exprlist,
-		vec<tree, va_gc> *origtypes,vec<location_t> arg_loc,location_t expr_loc )
+        vec<tree, va_gc> *origtypes,vec<location_t> arg_loc,location_t expr_loc )
 {
-	c_parser *parser=self->parser;
-	tree field=TREE_OPERAND(func,1);
-	tree id=DECL_NAME (field);
-	char *funName=IDENTIFIER_POINTER(id);
-	char *lowClassName=getLowClassName(field);
-	BINFO_FLAG_4(func)=0;
-	ClassName *className=class_mgr_get_class_name_by_sys(class_mgr_get(),lowClassName);
-	if(className==NULL)
-		className=class_mgr_get_class_name_by_user(class_mgr_get(),funName);
-	ClassFunc *classFunc=NULL;
-    FuncPointerError *errors=NULL;
-	CandidateFunc *candidate=select_field_get_ctor_func(select_field_get(),className,exprlist,origtypes,arg_loc,expr_loc,&errors);
-	if(candidate!=NULL){
-	    classFunc=candidate->classFunc;
-	}
-	if(classFunc==NULL){
-		n_warning("class_ctor_select 33 error %s %s %s\n",get_tree_code_name(TREE_CODE(field)),className->sysName,funName);
-		select_field_printf_func_pointer_error(errors);
-		error_at(expr_loc,"传递的参数与构造函数%qs不匹配。请检查类%qs中是否声明了构造函数。",funName,className->userName);
-		return error_mark_node;
-	}
-	GenericModel *funcGenericDefine=NULL;
-	if(class_func_is_func_generic(classFunc) || class_func_is_query_generic(classFunc)){
-		n_debug("class_ctor_select 进这里了------因为%s是一个泛型类或带问号的构造函数。\n",id);
-		generic_call_add_fpgi_parm(generic_call_get(),classFunc,className,exprlist,funcGenericDefine);
-	}
-	tree last=classFunc->fieldDecl;
-	location_t accessLoc=aet_utils_get_location(expr_loc);//如果在附加代码中,该方法返回原始的位置
-	access_controls_access_method(access_controls_get(),accessLoc,classFunc);
-	func=rebuildComponentRef(self,func,last);
-	return func;
-}
-
-/**
- * 来自在构造函数中第一条语句调用self()
- */
-tree  class_ctor_select_from_self(ClassCtor *self,tree func,vec<tree, va_gc> *exprlist,
-		vec<tree, va_gc> *origtypes,vec<location_t> arg_loc,location_t expr_loc )
-{
-	c_parser *parser=self->parser;
-	char *funName=IDENTIFIER_POINTER(DECL_NAME(func));
-	char *lowClassName=funName;
-	BINFO_FLAG_0(func)=0;
-	ClassName *className=class_mgr_get_class_name_by_sys(class_mgr_get(),lowClassName);
+    c_parser *parser=self->parser;
+    tree field=TREE_OPERAND(func,1);
+    tree id=DECL_NAME (field);
+    char *funName=IDENTIFIER_POINTER(id);
+    char *lowClassName=getLowClassName(field);
+    BINFO_FLAG_4(func)=0;
+    ClassName *className=class_mgr_get_class_name_by_sys(class_mgr_get(),lowClassName);
+    if(className==NULL)
+        className=class_mgr_get_class_name_by_user(class_mgr_get(),funName);
     ClassFunc *classFunc=NULL;
     FuncPointerError *errors=NULL;
     CandidateFunc *candidate=select_field_get_ctor_func(select_field_get(),className,exprlist,origtypes,arg_loc,expr_loc,&errors);
     if(candidate!=NULL){
         classFunc=candidate->classFunc;
     }
-	if(classFunc==NULL){
-	    select_field_printf_func_pointer_error(errors);
-		error_at(expr_loc,"构造函数未定义。%qD",func);
-		return error_mark_node;
-	}
-	GenericModel *funcGenericDefine=NULL;
-	if(class_func_is_func_generic(classFunc) || class_func_is_query_generic(classFunc)){
-		printf("class_ctor_select_from_self 进这里了------\n");
-		generic_call_add_fpgi_parm(generic_call_get(),classFunc,className,exprlist,funcGenericDefine);
-	}
-	tree last=classFunc->fieldDecl;
-	tree selfVarOrParm = (*exprlist)[0];
-	func=func_help_create_itself_deref(self->funcHelp,selfVarOrParm,last,expr_loc);
-	return func;
+    if(classFunc==NULL){
+        n_warning("class_ctor_select 33 error %s %s %s\n",get_tree_code_name(TREE_CODE(field)),className->sysName,funName);
+        select_field_printf_func_pointer_error(errors);
+        error_at(expr_loc,"传递的参数与构造函数%qs不匹配。请检查类%qs中是否声明了构造函数。",funName,className->userName);
+        return error_mark_node;
+    }
+    GenericModel *funcGenericDefine=NULL;
+    if(class_func_is_func_generic(classFunc) || class_func_is_query_generic(classFunc)){
+        n_debug("class_ctor_select 进这里了------因为%s是一个泛型类或带问号的构造函数。",id);
+        generic_call_add_fpgi_parm(generic_call_get(),classFunc,className,exprlist,funcGenericDefine);
+    }
+    tree last=classFunc->fieldDecl;
+    location_t accessLoc=aet_utils_get_location(expr_loc);//如果在附加代码中,该方法返回原始的位置
+    access_controls_access_method(access_controls_get(),accessLoc,classFunc);
+    func=rebuildComponentRef(self,func,last);
+    return func;
+}
+
+/**
+ * 来自在构造函数中第一条语句调用self()
+ */
+tree  class_ctor_select_from_self(ClassCtor *self,tree func,vec<tree, va_gc> *exprlist,
+        vec<tree, va_gc> *origtypes,vec<location_t> arg_loc,location_t expr_loc )
+{
+    c_parser *parser=self->parser;
+    char *funName=IDENTIFIER_POINTER(DECL_NAME(func));
+    char *lowClassName=funName;
+    BINFO_FLAG_0(func)=0;
+    ClassName *className=class_mgr_get_class_name_by_sys(class_mgr_get(),lowClassName);
+    ClassFunc *classFunc=NULL;
+    FuncPointerError *errors=NULL;
+    CandidateFunc *candidate=select_field_get_ctor_func(select_field_get(),className,exprlist,origtypes,arg_loc,expr_loc,&errors);
+    if(candidate!=NULL){
+        classFunc=candidate->classFunc;
+    }
+    if(classFunc==NULL){
+        select_field_printf_func_pointer_error(errors);
+        error_at(expr_loc,"构造函数未定义。%qD",func);
+        return error_mark_node;
+    }
+    GenericModel *funcGenericDefine=NULL;
+    if(class_func_is_func_generic(classFunc) || class_func_is_query_generic(classFunc)){
+        printf("class_ctor_select_from_self 进这里了------\n");
+        generic_call_add_fpgi_parm(generic_call_get(),classFunc,className,exprlist,funcGenericDefine);
+    }
+    tree last=classFunc->fieldDecl;
+    tree selfVarOrParm = (*exprlist)[0];
+    func=func_help_create_itself_deref(self->funcHelp,selfVarOrParm,last,expr_loc);
+    return func;
 }
 
 /**
  * 如果构造函数第一条语句是self();
- * 改为if(XXX(self,
+ * 改为if(self->XXX(
+ * XXX是构造函数后面接的是参数，完整的if语句是
+ * if(self->XXX()==NULL)
+ *    return NULL;
  */
 void class_ctor_process_self_call(ClassCtor *self,ClassName *className)
 {
@@ -802,6 +812,8 @@ void class_ctor_process_self_call(ClassCtor *self,ClassName *className)
      aet_utils_create_token(&parser->tokens[2],CPP_NAME,"self",4);
      aet_utils_create_token(&parser->tokens[3],CPP_DEREF,"->",2);
      aet_utils_create_token(&parser->tokens[4],CPP_NAME,constructorFuncName,strlen(constructorFuncName));
+     for(i=0;i<=4;i++)
+             parser->tokens[i].location=loc;
      aet_print_token_in_parser("class_ctor_process_self_call ----%s",className->sysName);
      self->superOfSelfParseing=TRUE;
 }
@@ -819,9 +831,9 @@ void class_ctor_set_tag_for_self_and_super_call(ClassCtor *self,tree ref)
 
 ClassCtor *class_ctor_new()
 {
-	ClassCtor *self = n_slice_alloc0 (sizeof(ClassCtor));
-	classCtorCtor(self);
-	return self;
+    ClassCtor *self = n_slice_alloc0 (sizeof(ClassCtor));
+    classCtorCtor(self);
+    return self;
 }
 
 

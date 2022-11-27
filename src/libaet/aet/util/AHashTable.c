@@ -145,14 +145,10 @@ impl$ AHashTable{
 	  priv->mask = priv->size - 1;
    }
 
-
-
    static void setupStorage(){
-	  aboolean small = FALSE;
 	  setShift (HASH_TABLE_MIN_SHIFT);
 	  priv->have_big_keys = TRUE;
 	  priv->have_big_values = TRUE;
-
 	  priv->keys   = reallocKeyOrValue (NULL, priv->size, priv->have_big_keys);
 	  priv->values = priv->keys;
 	  priv->hashes = a_new0 (auint, priv->size);

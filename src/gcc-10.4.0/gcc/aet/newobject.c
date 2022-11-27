@@ -567,14 +567,14 @@ char * new_object_parser_for_static(NewObject *self,tree decl,GenericModel *gene
       tree type=TREE_TYPE(decl);
       char *codes=NULL;
       if(check && TREE_CODE(type)==RECORD_TYPE){
-          n_debug("new_object_parser_for_static 栈内存或类中分配的 11\n");
+          n_debug("new_object_parser_for_static 栈内存或类中分配的 11。");
           //new_stack_init_object(self->newStack,decl);
       }else if(check && TREE_CODE(type)==POINTER_TYPE){
 //        if (c_parser_peek_token (parser)->type==CPP_SEMICOLON){
 //             c_parser_consume_token (parser);//consume ";" new Abc();
 //        }
           codes=new_heap_create_object_for_static(self->newHeap,decl);
-          n_debug("new_object_parser_for_static 堆内分配对象 11 %s\n",codes);
+          n_debug("new_object_parser_for_static 堆内分配对象 11 %s",codes);
       }
       return codes;
 

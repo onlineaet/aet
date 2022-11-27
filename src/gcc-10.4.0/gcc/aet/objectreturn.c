@@ -400,11 +400,11 @@ static tree finalize_remove_cleanup_r (tree *tp, int *walk_subtrees, void *data)
 
   }else if (is_nrv_p (dp->nrv, t)){
        /* And replace all uses of NRVs with the dereference of NEW_VAR.  */
-	  n_debug("遍历至的树是其中的一个返回值，需要用参数来替换\n");
+	  n_debug("遍历至的树是其中的一个返回值，需要用参数来替换。");
   }else if(isReturnExpr(dp->other,t)){
-      n_debug("遍历至的树是其中的一个返回值，需要用参数来替换0000\n");
+      n_debug("遍历至的树是其中的一个返回值，需要用参数来替换0000");
   }else if(TREE_CODE(t)==TRY_FINALLY_EXPR){
-      n_debug("遍历到TRY_FINALLY_EXPR0000\n");
+      n_debug("遍历到TRY_FINALLY_EXPR0000");
       walk_tree (&t, walkCleaup_cb, data, NULL);
   }
   if (dp->visited->add (*tp))
@@ -510,40 +510,40 @@ static void testStmt (ObjectReturn *self,tree fndecl)
 static bool return_value_ok_for_nrv_p (tree ret_obj, tree ret_val)
 {
   if (TREE_CODE (ret_val) != VAR_DECL){
-      n_debug("return_value_ok_for_nrv_p 00 不是变量:\n");
+      n_debug("return_value_ok_for_nrv_p 00 不是变量:");
     return false;
   }
 
   if (TREE_THIS_VOLATILE (ret_val)){
-      n_debug("return_value_ok_for_nrv_p 11 是一个变量，但被volatile修饰。\n");
+      n_debug("return_value_ok_for_nrv_p 11 是一个变量，但被volatile修饰。");
      return false;
   }
 
   if (DECL_CONTEXT (ret_val) != current_function_decl){
-      n_debug("return_value_ok_for_nrv_p 22 返回的变量不在当前函数内。\n");
+      n_debug("return_value_ok_for_nrv_p 22 返回的变量不在当前函数内。");
     return false;
   }
 
   if (TREE_STATIC (ret_val)){
-      n_debug("return_value_ok_for_nrv_p 33 返回的是一个静态变量。\n");
+      n_debug("return_value_ok_for_nrv_p 33 返回的是一个静态变量。");
     return false;
   }
   /* For the constrained case, test for addressability.  */
   if (ret_obj && TREE_ADDRESSABLE (ret_val)){
-     n_debug("return_value_ok_for_nrv_p 44 返回的是一个TREE_ADDRESSABLE (ret_val)。\n");
+     n_debug("return_value_ok_for_nrv_p 44 返回的是一个TREE_ADDRESSABLE (ret_val)。");
      //return false;
      return true;
 
   }
   /* For the constrained case, test for overalignment.  */
   if (ret_obj && DECL_ALIGN (ret_val) > DECL_ALIGN (ret_obj)){
-      n_debug("return_value_ok_for_nrv_p 55 返回的变量以声明返回的对象并示对齐。\n");
+      n_debug("return_value_ok_for_nrv_p 55 返回的变量以声明返回的对象并示对齐。");
          return false;
   }
 
   /* For the unconstrained case, test for bogus initialization.  */
   if (!ret_obj && DECL_INITIAL (ret_val) && TREE_CODE (DECL_INITIAL (ret_val)) == NULL_EXPR){
-      n_debug("return_value_ok_for_nrv_p 66\n");
+      n_debug("return_value_ok_for_nrv_p 66");
         return false;
   }
 
@@ -637,7 +637,7 @@ static void  build_return_expr (ObjectReturn *self,tree ret_obj, tree ret_val)
 	         ret_val = TREE_OPERAND (ret_val, 0);
 	     /* Now apply the test to the return value.  */
 	     if (return_value_ok_for_nrv_p (ret_obj, ret_val)){
-	    	 n_debug("加入的返回值是class对象变量 ，并且是一个可以优化的变量00\n");
+	    	 n_debug("加入的返回值是class对象变量 ，并且是一个可以优化的变量00");
 	         DataReturn *data=getDataReturn(self,current_function_decl);
 	         if(data==NULL){
 	        	 data=addDataReturn(self,current_function_decl);
@@ -835,7 +835,7 @@ static tree readyCleanup_cb (tree *tp, int *walk_subtrees, void *data)
 	  nboolean is1=isClass(rhs);
 	  if(is0 && is1){
 		  if (TREE_CODE (rhs)==CALL_EXPR){
-			   n_debug("变量声明是一个类对象。并且被函数调用赋值。\n");
+			   n_debug("变量声明是一个类对象。并且被函数调用赋值。");
 			   aet_print_tree(t);
 			   n_ptr_array_add(dp->dataArray,lhs);
 		  }
@@ -846,9 +846,9 @@ static tree readyCleanup_cb (tree *tp, int *walk_subtrees, void *data)
 	   if(is0){
 		   tree call=DECL_INITIAL (var);
 		   if (call && TREE_CODE (call)==CALL_EXPR){
-		       n_debug("变量声明是一个类对象。并且有初始化。\n");
+		       n_debug("变量声明是一个类对象。并且有初始化。");
 			   if(isClass(call)){
-			       n_debug("给变量加入clearup变量声明是一个类对象。并且有初始化。\n");
+			       n_debug("给变量加入clearup变量声明是一个类对象。并且有初始化。");
 				   n_ptr_array_add(dp->dataArray,var);
 			   }
 		   }else{

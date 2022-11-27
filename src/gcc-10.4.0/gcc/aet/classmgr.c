@@ -253,7 +253,7 @@ ClassInfo *class_mgr_get_class_info_by_underline_sys_name(ClassMgr *self,char *_
 			ClassInfo *info = (ClassInfo *)value;
 			char underline[256];
 			sprintf(underline,"_%s",info->className.sysName);
-			n_debug("class_mgr_get_class_info_by_underline_sys_name 00 %s",underline);
+			//n_debug("class_mgr_get_class_info_by_underline_sys_name 00 %s",underline);
 			if(strcmp(_sysClassName,underline)==0)
 				return info;
 		}
@@ -351,7 +351,7 @@ ClassRelationship   class_mgr_relationship(ClassMgr *self,char *my,char *other)
 		ship=getParentByClassName(other,my);
 		if(ship==CLASS_RELATIONSHIP_UNKNOWN){
 			if(class_info_is_interface(info) && !class_info_is_interface(otherInfo)){
-				nboolean re=class_info_is_impl(otherInfo,my);
+				nboolean re=class_info_is_impl_by_recursion(otherInfo,my);
 				if(re)
 					return CLASS_RELATIONSHIP_OTHER_IMPL;
 			}else if(!class_info_is_interface(info) && class_info_is_interface(otherInfo)){

@@ -7016,7 +7016,6 @@ static tree grokdeclarator (const struct c_declarator *declarator,
 
       if (warn_cxx_compat && declarator->u.id.id != NULL_TREE){
 	     struct c_binding *b = I_TAG_BINDING (declarator->u.id.id);
-	     n_debug("eeeeeeeeeeeeeeeeeeeeeee\n");
    	     if (b != NULL && b->decl != NULL_TREE && (B_IN_CURRENT_SCOPE (b)|| (current_scope == file_scope && B_IN_EXTERNAL_SCOPE (b)))
 	          && TYPE_MAIN_VARIANT (b->decl) != TYPE_MAIN_VARIANT (type)){
 	         auto_diagnostic_group d;
@@ -7362,7 +7361,7 @@ static tree grokdeclarator (const struct c_declarator *declarator,
 	    || TREE_CODE (TREE_TYPE (decl)) == ENUMERAL_TYPE)	&& TYPE_NAME (TREE_TYPE (decl)) == NULL_TREE)
          warning_at (DECL_SOURCE_LOCATION (decl), OPT_Wc___compat,
 		  ("non-local variable %qD with anonymous type is questionable in C++"), decl);
-	  n_debug("下半部 grokdeclarator 99 最后返回的tree decl是 code:%d %s\n",TREE_CODE(decl),get_tree_code_name(TREE_CODE(decl)));
+	  n_debug("下半部 grokdeclarator 99 最后返回的tree decl是 code:%d %s",TREE_CODE(decl),get_tree_code_name(TREE_CODE(decl)));
     return decl;
   }
 }
@@ -7540,8 +7539,6 @@ struct c_arg_info *get_parm_info (bool ellipsis, tree expr)
 	      gcc_assert (I_SYMBOL_BINDING (b->id) == b);
 	      I_SYMBOL_BINDING (b->id) = b->shadowed;
 	  }
-   	  n_debug("get_parm_info 00   ");
-
 	  /* Check for forward decls that never got their actual decl.  */
 	  if (TREE_ASM_WRITTEN (decl))
 	    error_at (b->locus,"parameter %q+D has just a forward declaration", decl);
@@ -10947,26 +10944,21 @@ struct c_declspecs *declspecs_add_type (location_t loc, struct c_declspecs *spec
 	       used a typedef.  */
 	     if (warn_cxx_compat && struct_parse_info != NULL){
 	       struct_parse_info->typedefs_seen.safe_push (type);
-		    n_debug("进入 TYPE_DECL push typedef_p=true\n");
 	     }
 	  }
   }else if (TREE_CODE (type) == IDENTIFIER_NODE){
-	    n_debug("进入 IDENTIFIER_NODE 00 \n");
-
       tree t = lookup_name (type);
       if (!t || TREE_CODE (t) != TYPE_DECL)
 	     error_at (loc, "%qE fails to be a typedef or built in type", type);
       else if (TREE_TYPE (t) == error_mark_node)
 	     ;
       else{
-  	    n_debug("进入 IDENTIFIER_NODE 11 \n");
-
 	     specs->type = TREE_TYPE (t);
 	     specs->locations[cdw_typespec] = loc;
 	  }
   }else{
       if (TREE_CODE (type) != ERROR_MARK && spec.kind == ctsk_typeof){
-  	    n_debug("进入 specs->typedef_p 00 \n");
+  	    n_debug("进入 specs->typedef_p 00 ");
 
 	      specs->typedef_p = true;
 	      specs->locations[cdw_typedef] = loc;
@@ -10975,7 +10967,7 @@ struct c_declspecs *declspecs_add_type (location_t loc, struct c_declspecs *spec
 		        specs->expr = build2 (COMPOUND_EXPR, TREE_TYPE (spec.expr),specs->expr, spec.expr);
 	          else
 		        specs->expr = spec.expr;
-	    	    n_debug("进入 specs->typedef_p 11 \n");
+	    	    n_debug("进入 specs->typedef_p 11");
 
 	        specs->expr_const_operands &= spec.expr_const_operands;
 	      }

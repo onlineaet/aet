@@ -164,7 +164,7 @@ static char * normalizeoff(const char *pathname, int len, int off)
   if (len == 0)
 	return a_strdup(pathname);
   int n;
-  char *ucs2_dst = utf8ToUtf16(pathname,&n);
+  char *ucs2_dst = utf8ToUtf16((char *)pathname,&n);
   if(ucs2_dst == NULL)
 	return ucs2_dst;
   int temp=n;
@@ -213,7 +213,7 @@ static char * normalizeoff(const char *pathname, int len, int off)
 static char *normalize(const char *pathName)
 {
 	int n = 0;
-	char *ucs2_dst = utf8ToUtf16(pathName,&n);
+	char *ucs2_dst = utf8ToUtf16((char *)pathName,&n);
 	if(ucs2_dst == NULL)
 		return ucs2_dst;
 	 char prevChar[2]={0};
@@ -327,7 +327,7 @@ impl$ AFile{
 
 	AFile(const char *pathname){
 	    self();
-		aboolean re=checkNamValid(pathname);
+		aboolean re=checkNamValid((char *)pathname);
 		if(!re)
 			return NULL;
 		self->path=normalize(pathname);
@@ -340,7 +340,7 @@ impl$ AFile{
             a_error("AFile child is NULL.");
             return NULL;
         }
-        aboolean re=checkNamValid(child);
+        aboolean re=checkNamValid((char *)child);
         if(!re)
               return NULL;
         char *lastPath;
@@ -348,10 +348,10 @@ impl$ AFile{
             const char *path0=parent;
             if(strcmp(path0,"")==0){
                 const char *parentStr=AFile.getDefaultParent();
-                lastPath=resolve0(parentStr,child);
+                lastPath=resolve0((char *)parentStr,(char *)child);
              } else {
                  char *c=normalize(child);
-                 lastPath=resolve0(path0,c);
+                 lastPath=resolve0((char *)path0,c);
                  a_free(c);
               }
          } else {
@@ -459,7 +459,7 @@ impl$ AFile{
 
 	static  int getBooleanAttributes(){
 			int rv = getBooleanAttributes0();
-			char *name = getName();
+			const char *name = getName();
 			aboolean hidden = (strlen(name) > 0) && (name[0] == '.');
 			return rv | (hidden ? BA_HIDDEN : 0);
 	}
@@ -536,10 +536,10 @@ impl$ AFile{
 		return FALSE;
 	}
 
+
 	char **list(){
 		DIR *dir = NULL;
 		struct dirent *ptr;
-		struct dirent *result;
 		dir = opendir(path);
 		if (dir == NULL)
 			return NULL;
@@ -550,11 +550,11 @@ impl$ AFile{
             return NULL;
 		}
 		AArray<char *> *rv = new$ AArray<char *>();
-		while ((readdir_r(dir, ptr, &result) == 0)  && (result != NULL)) {
-            if (!strcmp(ptr->d_name, ".") || !strcmp(ptr->d_name, "..") || !ptr->d_name)
+        while ((ptr=readdir(dir)) != NULL){
+            if(strcmp(ptr->d_name,".")==0 || strcmp(ptr->d_name,"..")==0 || !ptr->d_name)    ///current dir OR parrent dir
                 continue;
             rv->add(a_strdup(ptr->d_name));
-		}
+        }
 		closedir(dir);
 		free(ptr);
 		int size=rv->size();
@@ -573,7 +573,6 @@ impl$ AFile{
 	AFile  **listFiles(){
         DIR *dir = NULL;
         struct dirent *ptr;
-        struct dirent *result;
         dir = opendir(path);
         if (dir == NULL)
             return NULL;
@@ -584,10 +583,10 @@ impl$ AFile{
             return NULL;
         }
         AArray<AFile *> *rv = new$ AArray<AFile *>();
-        while ((readdir_r(dir, ptr, &result) == 0)  && (result != NULL)) {
-            if (!strcmp(ptr->d_name, ".") || !strcmp(ptr->d_name, "..") || !ptr->d_name)
-                continue;
-            rv->add(new$ AFile(self,ptr->d_name)->ref());//new AFile()出while范围会被释放。所以加上一次引用。
+        while ((ptr=readdir(dir)) != NULL){
+           if(strcmp(ptr->d_name,".")==0 || strcmp(ptr->d_name,"..")==0 || !ptr->d_name)    ///current dir OR parrent dir
+               continue;
+           rv->add(new$ AFile(self,ptr->d_name)->ref());//new AFile()出while范围会被释放。所以加上一次引用。
         }
         closedir(dir);
         free(ptr);
@@ -716,7 +715,7 @@ impl$ AFile{
 		int nc;
 		char **ix;
 		int i, j;
-		char *p, *q;
+		//char *p, *q;
 		nc = collapsible(names);
 		if (nc < 2) return;         /* Nothing to do */
 		ix = (char **)alloca(nc * sizeof(char *));

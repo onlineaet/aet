@@ -346,7 +346,7 @@ int  generic_call_replace_parm(GenericCall *self,location_t ploc,tree function,v
                         GenericModel *funcGen=c_aet_get_func_generics_model(function);
                         if(funcGen){
                            tree realGenericType=TREE_TYPE(val);
-                           n_debug("generic_conv_replace_param ----realGenericType \n");
+                           n_debug("generic_conv_replace_param ----realGenericType。");
                            parmval=convertGeneric(ploc,function,realGenericType,type,val,npc,excess_precision,TRUE);
                            n_debug("generic_conv_replace_param 55 是一个泛型函数，类型就用实参的类型 %s parmnum:%d ok:%d\n",str,parmnum,parmval!=error_mark_node);
                            if(parmval==error_mark_node)

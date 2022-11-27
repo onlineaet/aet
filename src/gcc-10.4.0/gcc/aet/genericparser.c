@@ -467,7 +467,7 @@ void generic_parser_parser_typeof(GenericParser *self)
 	  n_debug("generic_of_parser_typeof 22 ok:%d callObj:%s,genStr:%s\n",ok,callObj,genStr);
 	  if(ok){
 		 if(parser->isAet && parser->isTestGenericBlockState && !parser->isGenericState){
-			 n_debug("在aet不在isGenericState\n");
+			 n_debug("在aet不在isGenericState。");
 			 testGenericOf(self);
 		 }else{
 			 n_debug("在isGenericState %s %s\n",callObj,genStr);

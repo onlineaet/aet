@@ -155,7 +155,7 @@ static void copyDefineObject(BlockFunc *self,NPtrArray *dest,char *parmSysName)
 {
 	NPtrArray *childs=block_mgr_read_define_new_object(block_mgr_get(),self->sysClassName);
 	if(childs==NULL){
-	    n_debug("copyDefineObject--- 在当前类：%s中 没有define的对象,参数的类名是:%s 不加入泛型到参数中。%s\n",self->sysClassName,parmSysName,in_fnames[0]);
+	    n_debug("copyDefineObject--- 在当前类：%s中 没有define的对象,参数的类名是:%s 不加入泛型到参数中。%s",self->sysClassName,parmSysName,in_fnames[0]);
 		return;
 	}
 	int i;
@@ -169,7 +169,7 @@ static void copyDefineObject(BlockFunc *self,NPtrArray *dest,char *parmSysName)
 			//检查参数是不是继承关系
 			ClassRelationship ship=class_mgr_relationship(class_mgr_get(), parmSysName,item->sysName);
 			if(ship==CLASS_RELATIONSHIP_PARENT){
-			    n_debug("copyDefineObject--- 在当前类：%s中 有define的对象,参数的类名是:%s 定义了泛型的类是:%s 它与参数的关系是儿子。\n",
+			    n_debug("copyDefineObject--- 在当前类：%s中 有define的对象,参数的类名是:%s 定义了泛型的类是:%s 它与参数的关系是儿子。",
 						self->sysClassName,parmSysName,item->sysName);
 				if(!existsGen(dest,item->model)){
 					n_ptr_array_add(dest,item->model);
@@ -220,7 +220,7 @@ static BlockFuncParmInfo *createBlockFuncParmInfo(BlockFunc *self,char *sysName,
 	   //获取在当前文件下的所有new对象时的泛型定义
 	   copyOutGenModelArray(outGenModelArray,pinfo->defineArray,sysName);
 	   copyDefineObject(self,pinfo->defineArray,sysName);
-	   n_debug("创建泛型块函数中的参数 该参数是一个泛型类:%s 参数名：%s 收集的泛型类有几个 outGenModelArray:len:%d 该参数的泛型有几个:%d\n",
+	   n_debug("创建泛型块函数中的参数 该参数是一个泛型类:%s 参数名：%s 收集的泛型类有几个 outGenModelArray:len:%d 该参数的泛型有几个:%d",
 			   sysName,name,outGenModelArray->len,pinfo->defineArray->len);
 	   if(pinfo->defineArray->len==0){
 		   printDefines(pinfo->defineArray,sysName);
@@ -267,12 +267,12 @@ static BlockFuncParmInfo *createBlockFuncParmInfoByGenFunc00(char *sysClassName,
 
 static BlockFuncParmInfo *createBlockFuncParmInfoByGenFunc(char *sysClassName,char *belongFunc,NPtrArray *outGenModelArray)
 {
-       n_debug("createBlockFuncParmInfoByGenFunc -----00 类有泛型:%s belongFunc：%s\n",sysClassName,belongFunc);
+       n_debug("createBlockFuncParmInfoByGenFunc -----00 类有泛型:%s belongFunc：%s",sysClassName,belongFunc);
 	   if(outGenModelArray==NULL || outGenModelArray->len==0){
 		   n_warning("找不到泛型函数的调用 %s 泛型函数:%s %p",sysClassName,belongFunc,outGenModelArray);
 		   return NULL;
 	   }
-	   n_debug("createBlockFuncParmInfoByGenFunc -----11 类有泛型:%s belongFunc：%s %d\n",sysClassName,belongFunc,outGenModelArray->len);
+	   n_debug("createBlockFuncParmInfoByGenFunc -----11 类有泛型:%s belongFunc：%s %d",sysClassName,belongFunc,outGenModelArray->len);
 	   BlockFuncParmInfo *pinfo=newGenericParmInfo(AET_FUNC_GENERIC_PARM_STRUCT_NAME,AET_FUNC_GENERIC_PARM_NAME,0);
 	   pinfo->isFuncGeneric=TRUE;
 	   ClassName *className=class_mgr_get_class_name_by_sys(class_mgr_get(),sysClassName);
@@ -344,13 +344,13 @@ static void produceCondCodes(BlockFunc *self)
    int i,j,k;
    for(i=0;i<self->parmInfoCount;i++){
 	    BlockFuncParmInfo *info=(BlockFuncParmInfo *)self->parmInfos[i];
-	    n_debug("produceCondCodes i:%d sysName:%s 参数:%s 泛型函数:%d genCount:%d len:%d\n",
+	    n_debug("produceCondCodes i:%d sysName:%s 参数:%s 泛型函数:%d genCount:%d len:%d",
 	    		i,info->sysName,info->parmName,info->isFuncGeneric,info->genCount,info->defineArray->len);
 		NPtrArray *array=info->defineArray;
 		int len=array->len;
 		for(j=0;j<len;j++){
     	   GenericModel *items=n_ptr_array_index(array,j);
-    	   n_debug("produceCondCodes --- %d:%s %s %s isFuncGeneric:%d info->genCount:%d\n",
+    	   n_debug("produceCondCodes --- %d:%s %s %s isFuncGeneric:%d info->genCount:%d",
    	    		   j,info->sysName,info->parmName,generic_model_tostring(items),info->isFuncGeneric,info->genCount);
 		   NString *gx=n_string_new("");
 		   convertGenericModelToStr(info,items,gx,info->genCount);
@@ -389,7 +389,7 @@ static NPtrArray *doExchange(NPtrArray *arr,char *connectStr,nboolean whiteSpace
     	NPtrArray *a2=n_ptr_array_index(arr,1);
         int len1 = a1->len;
         int len2 = a2->len;
-        n_debug("doExchange len--- %d connectStr:%s %d %d\n",len,connectStr,len1,len2);
+        n_debug("doExchange len--- %d connectStr:%s %d %d",len,connectStr,len1,len2);
 
         NPtrArray *items=n_ptr_array_new();
         int i,j;
@@ -431,7 +431,7 @@ static char *getRealParm(BlockFunc *self)
    char *funcName=self->funcDefineName;
    tree funcId=aet_utils_create_ident(funcName);
    tree fndecl=lookup_name(funcId);
-   n_debug("getRealParm 00 %s %p\n",funcName,fndecl);
+   n_debug("getRealParm 00 %s %p",funcName,fndecl);
    if(!aet_utils_valid_tree(fndecl)){
 	   error("getRealParm 没有声明函数:%qs",funcName);
 	   n_error("在getRealParm未知错误");
@@ -524,7 +524,7 @@ static void setExcuteStmt(BlockFunc *self,char *funcTypedef,char *realParm,nbool
 static void createCodes(BlockFunc *self,NString *codes)
 {
        ClassInfo *info=class_mgr_get_class_info(class_mgr_get(),self->sysClassName);
-	   n_debug("createCodes----泛型参数有几个:%d self->condArray:len:%d\n",self->parmInfoCount,self->condArray->len);
+	   n_debug("createCodes----泛型参数有几个:%d self->condArray:len:%d",self->parmInfoCount,self->condArray->len);
 	   produceCondCodes(self);
 	   NPtrArray *result=doExchange(self->condArray,"&&",TRUE);
 	   NPtrArray *resultIndex=doExchange(self->condIndexArray,INDEX_CONNECT_STR,FALSE);
@@ -625,7 +625,7 @@ void  block_func_ready_parm(BlockFunc *self,NPtrArray *collectArray,NPtrArray *c
 			  char *id=IDENTIFIER_POINTER(DECL_NAME(decl));
 			  if(!strcmp(id,AET_FUNC_GENERIC_PARM_STRUCT_NAME) && !strcmp(name,AET_FUNC_GENERIC_PARM_NAME) && self->isFuncGeneric){
 				  BlockFuncParmInfo *pinfo=createBlockFuncParmInfoByGenFunc(self->sysClassName,self->belongFunc,collectFuncCallArray);
-				  n_debug("block_func_ready_parm 22 这是泛型函数中的块 pinfo:%p\n",pinfo);
+				  n_debug("block_func_ready_parm 22 这是泛型函数中的块 pinfo:%p",pinfo);
 				  if(pinfo!=NULL){
 					 self->parmInfos[self->parmInfoCount++]=pinfo;
 				  }

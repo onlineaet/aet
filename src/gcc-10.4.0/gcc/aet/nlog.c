@@ -654,7 +654,10 @@ static NLogWriterOutput standardStreams (NLogLevelFlags log_level,const NLogFiel
   if (!stream || fileno (stream) < 0)
     return N_LOG_WRITER_UNHANDLED;
   out = formatFields(log_level, fields, n_fields,isSupportColor (fileno (stream)));
-  _n_fprintf (stream, "%s\n", out);
+  if(out[strlen(out)-1]!='\n')
+     _n_fprintf (stream, "%s\n", out);
+  else
+      _n_fprintf (stream, "%s", out);
   fflush (stream);
   n_free (out);
   return N_LOG_WRITER_HANDLED;

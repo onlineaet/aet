@@ -394,14 +394,14 @@ NPtrArray *class_func_get_generic_parm(ClassFunc *self,char *id)
 			continue;
 		}
 	    nboolean isGeneric=generic_util_is_generic_pointer(type);
-	    n_debug("class_func_get_generic_parm 11 现有参数:%d 是不是泛型 T,E等:%d\n",count,isGeneric);
+	    n_debug("class_func_get_generic_parm 11 现有参数:%d 是不是泛型 T,E等:%d",count,isGeneric);
 		if(!isGeneric){
           GenericModel *varGen=c_aet_get_generics_model(parm);
   		  if(varGen){
-  		    n_debug("class_func_get_generic_parm 22ccc 现有参数:%d 是不是泛型 T,E等:%d\n",count,isGeneric);
+  		    n_debug("class_func_get_generic_parm 22ccc 现有参数:%d 是不是泛型 T,E等:%d",count,isGeneric);
   			 nboolean exits=generic_model_exits_ident(varGen,genStr);
   			 if(exits){
-  			   n_debug("class_func_get_generic_parm 22 参数:%d 泛型在对象中有泛型声明:%s\n",count,genStr);
+  			   n_debug("class_func_get_generic_parm 22 参数:%d 泛型在对象中有泛型声明:%s",count,genStr);
 			    ParmGenInfo *pgi=(ParmGenInfo *)n_slice_new(ParmGenInfo);
 				pgi->str=n_strdup(genStr);
 				pgi->index=count;
@@ -414,7 +414,7 @@ NPtrArray *class_func_get_generic_parm(ClassFunc *self,char *id)
 		}else{
 			char *str=generic_util_get_generic_str(type);
 			if(strcmp(str,genStr)==0){
-			    n_debug("class_func_get_generic_parm 33 参数:%d 泛型声明:%s\n",count,str);
+			    n_debug("class_func_get_generic_parm 33 参数:%d 泛型声明:%s",count,str);
 				ParmGenInfo *pgi=(ParmGenInfo *)n_slice_new(ParmGenInfo);
 				pgi->str=n_strdup(str);
 				pgi->index=count;
@@ -511,7 +511,7 @@ nboolean    class_func_is_interface_reserve(ClassFunc *self)
 {
 	  if(self==NULL)
 		  return FALSE;
-	  n_debug("class_func_is_interface_reserve %s %s %s\n",self->orgiName,IFACE_REF_FIELD_NAME,IFACE_UNREF_FIELD_NAME);
+	  n_debug("class_func_is_interface_reserve %s %s %s",self->orgiName,IFACE_REF_FIELD_NAME,IFACE_UNREF_FIELD_NAME);
 	  return (!strcmp(self->orgiName,IFACE_REF_FIELD_NAME) || !strcmp(self->orgiName,IFACE_UNREF_FIELD_NAME));
 }
 

@@ -87,7 +87,8 @@ struct c_expr class_impl_replace_func_id(ClassImpl *self,struct c_expr expr,vec<
 		            vec<tree, va_gc> *origtypes,vec<location_t> arg_loc,location_t expr_loc);
 void           class_impl_set_parser(ClassImpl *self, c_parser *parser);
 void           class_impl_end_function(ClassImpl *self,nboolean canChangeFuncName);
-nboolean       class_impl_start_function(ClassImpl *self,struct c_declspecs *specs,struct c_declarator *declarator,nboolean isFuncGeneric);
+nboolean       class_impl_start_function(ClassImpl *self,struct c_declspecs *specs,struct c_declarator *declarator,
+                    nboolean isFuncGeneric,location_t loc,nboolean havePermission,ClassPermissionType permission);
 void           class_impl_nest_op (ClassImpl *self,bool add);
 void           class_impl_parser_super(ClassImpl *self);
 nboolean       class_impl_set_class_or_enum_type(ClassImpl *self,c_token *who);

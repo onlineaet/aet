@@ -64,7 +64,7 @@ nboolean      func_mgr_static_func_exits(FuncMgr *self,ClassName *className,char
 NPtrArray    *func_mgr_get_static_funcs(FuncMgr *self,ClassName *className);
 NPtrArray    *func_mgr_get_static_funcs_by_sys_name(FuncMgr *self,char *sysName);
 nboolean      func_mgr_static_func_exits_by_recursion(FuncMgr *self,ClassName *srcName,tree component);
-ClassFunc    *func_mgr_find_static_method(FuncMgr *self,char *sysName,char *origFunName,tree argTypes);
+ClassFunc    *func_mgr_get_static_method(FuncMgr *self,char *sysName,char *mangle);
 char         *func_mgr_get_static_class_name_by_mangle(FuncMgr *self,char *mangle);
 
 char         *func_mgr_create_parm_string(FuncMgr *self,tree funcType);
@@ -74,6 +74,7 @@ nboolean      func_mgr_is_generic_func(FuncMgr *self,ClassName *className,char *
 ClassFunc    *func_mgr_get_interface_impl(FuncMgr *self,ClassName *from,ClassFunc *interfaceMethod,char **atClass);//获得接口的实现类和方法
 int           func_mgr_get_max_serial_number(FuncMgr *self,ClassName *className);
 
-
+void          func_mgr_check_permission_decl_between_define(FuncMgr *self,location_t loc,ClassName *className,
+                           char *mangle,nboolean havePermission,ClassPermissionType permission);
 
 #endif

@@ -29,17 +29,8 @@ impl$ ASList{
       return index >= 0 && index < size;
   }
 
-  static aboolean isPositionIndex(int index) {
-       return index >= 0 && index <= size;
-   }
-
   static void checkElementIndex(int index) {
       if (!isElementIndex(index))
-          a_error("索引不在范围内,index:%d 当前List的大小：%d",index,size);
-  }
-
-  static void checkPositionIndex(int index) {
-      if (!isPositionIndex(index))
           a_error("索引不在范围内,index:%d 当前List的大小：%d",index,size);
   }
 
@@ -219,7 +210,7 @@ impl$ ASList{
        }
   }
 
-  SListNode *sortMerge(SListNode *l1,SListNode *l2,AFunc compareFunc,apointer  userData){
+  SListNode *sortMerge(SListNode *l1,SListNode *l2,ACompareDataFunc compareFunc,apointer  userData){
       SListNode list, *l;
       int cmp;
       l=&list;
@@ -237,7 +228,7 @@ impl$ ASList{
       return list.next;
   }
 
-  SListNode *sortReal(SListNode *list,AFunc compareFunc,apointer  userData){
+  SListNode *sortReal(SListNode *list,ACompareDataFunc compareFunc,apointer  userData){
       SListNode *l1, *l2;
       if (!list)
         return NULL;
@@ -256,14 +247,14 @@ impl$ ASList{
   }
 
   void  sort(ACompareFunc compareFunc){
-      head=sortReal (head, (AFunc) compareFunc, NULL);
+      head=sortReal (head, (ACompareDataFunc) compareFunc, NULL);
   }
 
   void  sort(ACompareDataFunc compareFunc,apointer userData){
-      head=sortReal (head, (AFunc) compareFunc, userData);
+      head=sortReal (head, compareFunc, userData);
   }
 
-  static SListNode* insertSortedReal(SListNode *list,apointer  data,AFunc func,apointer  user_data){
+  static SListNode* insertSortedReal(SListNode *list,apointer  data,ACompareDataFunc func,apointer  user_data){
       SListNode *tmp_list = list;
       SListNode *prev_list = NULL;
       SListNode *new_list;
@@ -301,12 +292,11 @@ impl$ ASList{
   }
 
   void insertSorted(apointer data,ACompareFunc  func){
-      printf("insertSorted ----\n");
-     head=insertSortedReal(head,data,(AFunc)func,NULL);
+     head=insertSortedReal(head,data,(ACompareDataFunc)func,NULL);
   }
 
   void insertSorted(apointer data,ACompareDataFunc  func,apointer userData){
-      head=insertSortedReal(head,data,(AFunc)func,userData);
+      head=insertSortedReal(head,data,func,userData);
   }
 
   aboolean find(aconstpointer data){

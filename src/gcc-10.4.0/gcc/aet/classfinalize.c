@@ -97,17 +97,12 @@ static struct c_arg_info *createParam (c_parser *parser, char *className)
 
   c_declarator *id_declarator = pointer;
   while (id_declarator && id_declarator->kind != cdk_id){
-	 n_debug("创建c_parm 99 %s, %s, %d\n",__FILE__, __FUNCTION__, __LINE__);
      id_declarator = id_declarator->declarator;
   }
-
   location_t end_loc = parser->last_token_location;
-
   location_t caret_loc = (id_declarator->u.id.id ? id_declarator->id_loc : start_loc);
   location_t param_loc = make_location (caret_loc, start_loc, end_loc);
-  n_debug("创建c_parm 99  %s %s, %d\n",__FILE__, __FUNCTION__, __LINE__);
   tree expr;
-
   struct c_parm *parm= build_c_parm (specs, NULL_TREE,pointer, param_loc);
   push_parm_decl (parm, &expr);
   struct c_arg_info * args= get_parm_info (false, expr);

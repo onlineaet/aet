@@ -1937,7 +1937,9 @@ static void c_parser_declaration_or_fndef (c_parser *parser, bool fndef_ok,
   GenericModel *genericDefineModel=NULL;//zclei
   GenericModel *funcGenericModel=NULL;//zclei 泛型函数
   nboolean genericBlockFuncDefine=FALSE;//是不是泛型块的函数
-
+  nboolean haveAccessControl=FALSE;//有没有public$ protected$ private$等修饰。
+  ClassPermissionType permission=CLASS_PERMISSION_DEFAULT;
+  location_t permissionLoc=0;
   if (static_assert_ok && c_parser_next_token_is_keyword (parser, RID_STATIC_ASSERT)){
 	  n_warning("注意：这是异常---");
       c_parser_static_assert_declaration (parser);
@@ -1945,6 +1947,19 @@ static void c_parser_declaration_or_fndef (c_parser *parser, bool fndef_ok,
   }
   n_debug("分析声明说明符 00:创建一个空的声明说明符 ：have_attrs:%d nested:%d", have_attrs,nested);
   aet_print_token(c_parser_peek_token (parser));
+  c_token *tok=c_parser_peek_token (parser);
+  if(tok->type==CPP_KEYWORD && (tok->keyword==RID_AET_PUBLIC || tok->keyword==RID_AET_PROTECTED || tok->keyword==RID_AET_PRIVATE)){
+      haveAccessControl=TRUE;
+      if(tok->keyword==RID_AET_PUBLIC)
+         permission=CLASS_PERMISSION_PUBLIC;
+      else if(tok->keyword==RID_AET_PROTECTED)
+         permission=CLASS_PERMISSION_PROTECTED;
+      else if(tok->keyword==RID_AET_PRIVATE)
+         permission=CLASS_PERMISSION_PRIVATE;
+      permissionLoc=tok->location;
+      c_parser_consume_token (parser);//consume public$、protected$、private$
+  }
+
   //zclei 在这里把Abc( 变成 Abc* Abc(
   if(parser->isAet){
 	 if(c_parser_next_token_is (parser, CPP_LESS)){
@@ -1975,7 +1990,6 @@ static void c_parser_declaration_or_fndef (c_parser *parser, bool fndef_ok,
  	  if(!genericBlockFuncDefine)
  	    return;
    }
-
 
   if(parser->isGenericState){
 		if(c_parser_next_token_is (parser, CPP_NAME)){
@@ -2321,7 +2335,7 @@ static void c_parser_declaration_or_fndef (c_parser *parser, bool fndef_ok,
 			      //zclei
 			     nboolean genblock=FALSE;
 			     if(c_parser_peek_token (parser)->type==CPP_KEYWORD && c_parser_peek_token (parser)->keyword==RID_AET_GENERIC_BLOCK){
-			         n_debug("分析声明说明符 初始化变量时  发现genericblock\n");
+			         n_debug("分析声明说明符 初始化变量时  发现genericblock");
 			    	  genblock=TRUE;
 			    	  block_mgr_set_lhs(block_mgr_get(),d);
 			     }
@@ -2465,7 +2479,7 @@ static void c_parser_declaration_or_fndef (c_parser *parser, bool fndef_ok,
 				all_prefix_attrs = prefix_attrs;
 			 continue;
 	     } else if (c_parser_next_token_is (parser, CPP_SEMICOLON)){
-			 n_debug("分析声明说明符 123： count:%d", testcount);
+			 n_debug("分析声明说明符 123 这是一个分号 count:%d", testcount);
 			 c_parser_consume_token (parser);
 			 return;
 	     } else if (c_parser_next_token_is_keyword (parser, RID_IN)){
@@ -2497,15 +2511,11 @@ static void c_parser_declaration_or_fndef (c_parser *parser, bool fndef_ok,
   	  n_debug("分析声明说明符 124： 分析函数定义 count:%d declarator:%p", testcount,declarator);
   	  nboolean changeNameOk=FALSE;
   	  if(parser->isAet && !genericBlockFuncDefine && nested==0){
-  		 changeNameOk=class_impl_start_function(classImpl,specs,declarator,funcGenericModel!=NULL);
+  		 changeNameOk=class_impl_start_function(classImpl,specs,declarator,funcGenericModel!=NULL,permissionLoc,haveAccessControl,permission);
   	  }
 
       if (!start_function (specs, declarator, all_prefix_attrs)){
         	  n_warning("分析声明说明符 125：函数定义出错了 count:%d declarator:%p", testcount,declarator);
-
-
-
-
 	       /* At this point we've consumed:
 	          declaration-specifiers declarator
 	         and the next token isn't CPP_EQ, CPP_COMMA, CPP_SEMICOLON,
@@ -2543,27 +2553,6 @@ static void c_parser_declaration_or_fndef (c_parser *parser, bool fndef_ok,
       else
         tv = TV_PARSE_FUNC;
       auto_timevar at (g_timer, tv);
-
-//	  tree resultDecl=DECL_RESULT (current_function_decl);
-//	  if(TREE_CODE (resultDecl) == RESULT_DECL){
-//	    	  int rx=DECL_BY_REFERENCE (resultDecl);
-//	    	  const_tree typeXX = (TYPE_P (resultDecl)) ? resultDecl : TREE_TYPE (resultDecl);
-//	    	  if(TREE_CODE(typeXX)==RECORD_TYPE){
-//	    	    tree typeName=TYPE_NAME(typeXX);
-//	    	    if(typeName){
-//	    	    	char *typeDecl=IDENTIFIER_POINTER(DECL_NAME(typeName));
-//	    	    	if(typeDecl && !strcmp(typeDecl,"MyFuncs")){
-//	    	    	    printf("c-parser------tree-nrv execute aggregate_value_p--- RESULT_DECL %d %d\n",rx,TREE_ADDRESSABLE (resultDecl));
-//	    	    	     DECL_BY_REFERENCE (resultDecl)=1;
-//	    	    	     printNode(result);
-//	    	    	     printNode(current_function_decl);
-//
-//	    	    	}
-//	    	    }
-//	    	  }
-//	     }
-
-
 
       /* Parse old-style parameter declarations.  ??? Attributes are
 	 not allowed to start declaration specifiers here because of a
@@ -2978,7 +2967,7 @@ void c_parser_declspecs (c_parser *parser, struct c_declspecs *specs,
 					 t.spec = error_mark_node;
 	    		 }
 	    	 }else{
-	    		 n_debug("特别的:是不是在AObject声明中，并且是方法 “AClass *getClass()“,如果是返回void *\n");
+	    		 n_debug("特别的:是不是在AObject声明中，并且是方法 “AClass *getClass()“,如果是返回void *");
 	    		 if(class_parser_exception(classParser,ident))
 	    			 continue;
 	             error_at (loc, "unknown type name %qE", value);
@@ -3875,7 +3864,7 @@ static tree c_parser_struct_declaration (c_parser *parser)
 	  c_parser_error (parser,
 			  "expected %<:%>, %<,%>, %<;%>, %<}%> or "
 			  "%<__attribute__%>");
-      n_debug("c_parser_struct_declaration--- 103\n");
+      n_debug("c_parser_struct_declaration--- 103");
 	  break;
 	}
   }//end while
@@ -4540,7 +4529,7 @@ static struct c_parm *c_parser_parameter_declaration (c_parser *parser, tree att
 	 }
   }
   if (c_parser_next_token_is_keyword (parser, RID_AET_GOTO)){
-      n_debug("c-parsr.c 解析参数时遇到RID_AET_GOTO\n");
+      n_debug("c-parsr.c 解析参数时遇到RID_AET_GOTO");
 	  //zclei
  	  nboolean re=class_parser_goto(class_parser_get(),FALSE,NULL);
   }
@@ -6541,7 +6530,6 @@ static void c_parser_statement_after_labels (c_parser *parser, bool *if_p, vec<t
 	      }
           break;
        case CPP_SEMICOLON:
-    	   n_debug("这是一个冒号-------\n");
           c_parser_consume_token (parser);
           break;
        case CPP_CLOSE_PAREN:
@@ -8365,7 +8353,7 @@ static struct c_expr c_parser_cast_expression (c_parser *parser, struct c_expr *
        return c_parser_postfix_expression_after_primary (parser,cast_loc, *after);
     //zclei 把泛型声明 E 转成aet_generic_E类型 或替换成实际类型
      if (c_parser_next_token_is (parser, CPP_OPEN_PAREN) && generic_impl_is_cast_token(generic_impl_get(),c_parser_peek_2nd_token (parser))){
-    	 n_debug("c_parser_cast_expression 00 泛型强转aet_generic_E类型或在泛型块实现中转真实类型\n");
+    	 n_debug("c_parser_cast_expression 00 泛型强转aet_generic_E类型或在泛型块实现中转真实类型。");
     	 generic_impl_cast_by_token(generic_impl_get(),c_parser_peek_2nd_token (parser));
      }
 
@@ -8584,10 +8572,9 @@ static struct c_expr c_parser_unary_expression (c_parser *parser)
    	    new_object_parser_new$(new_object_get());//zclei
         return c_parser_postfix_expression (parser);
 	case RID_AET_GENERIC_INFO:
-	    n_debug("RID_AET_GENERIC_INFO ---\n");
 	    return generic_impl_generic_info_expression (generic_impl_get());
 	case RID_AET_GENERIC_BLOCK:
-	    n_debug("c_parser_unary_expression 00nn 分析genericblock$ \n");
+	    n_debug("c_parser_unary_expression 00nn 分析genericblock$ 。");
 	    return block_mgr_parser(block_mgr_get());
 	case RID_AET_GOTO:
 		{
@@ -8662,7 +8649,6 @@ c_parser_sizeof_expression (c_parser *parser)
       c_inhibit_evaluation_warnings--;
       in_sizeof--;
       result = c_expr_sizeof_type (expr_loc, type_name);
-      n_debug("c_expr_sizeof_type 11\n");
     }
   else
     {

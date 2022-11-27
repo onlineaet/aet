@@ -459,15 +459,15 @@ static void createCode(char *fromSysName,char **parents,SuperCallInfo *info,int 
 	int i;
 	for(i=0;i<len;i++){
 	   if(i==0){
-          n_string_append_printf(codes,"if(%s((%s *)self,\"%s\",%d,%d,%d,\"%s\",\"%s\")>0){\n",
+          n_string_append_printf(codes,"   if(%s((%s *)self,\"%s\",%d,%d,%d,\"%s\",\"%s\")>0){\n",
         		  SUPER_FILL_ADDRESS_FUNC,aObjectClassName->sysName,fromSysName,info->distance,superCallCount,info->index, parents[i],funcName);
 	   }else{
-	      n_string_append_printf(codes,"}else if(%s((%s *)self,\"%s\",%d,%d,%d,\"%s\",\"%s\")>0){\n",
+	      n_string_append_printf(codes,"   }else if(%s((%s *)self,\"%s\",%d,%d,%d,\"%s\",\"%s\")>0){\n",
 	        		  SUPER_FILL_ADDRESS_FUNC,aObjectClassName->sysName,fromSysName,info->distance,superCallCount,info->index, parents[i],funcName);
 	   }
-       n_string_append(codes,"    ;\n");
+       n_string_append(codes,"      ;\n");
        if(i==len-1){
-    		n_string_append(codes,"}\n");
+    		n_string_append(codes,"   }\n");
        }
     }
 }

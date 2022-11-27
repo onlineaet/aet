@@ -240,7 +240,7 @@ static void msort_r (void *b, size_t n, size_t s, ACompareDataFunc cmp, void *ar
 
 impl$ AQSort{
    static void sort(aconstpointer pbase,aint totalElems,asize elementSize,
-		   ACompareDataFunc compareFunc,apointer userData){
+           ACompareDataFunc compareFunc,apointer userData){
      msort_r ((apointer)pbase, totalElems, elementSize, compareFunc, userData);
    }
 };

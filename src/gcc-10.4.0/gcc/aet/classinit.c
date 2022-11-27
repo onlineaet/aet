@@ -619,11 +619,11 @@ void class_init_create_init_define(ClassInit *self,ClassName *className,NPtrArra
 
 	 if(info->parentName.sysName){
 		 char *parentInitMethod=aet_utils_create_init_method(info->parentName.sysName);
-		 n_string_append_printf(buf,"%s((%s *)self);\n",parentInitMethod,info->parentName.sysName);
+		 n_string_append_printf(buf,"   %s((%s *)self);\n",parentInitMethod,info->parentName.sysName);
 		 n_free(parentInitMethod);
 	 }else{
 		 printf("说明是AObject 只能是aobject才有此功能。_init_super_data_123\n");
-		 n_string_append_printf(buf,"%s((%s *)self);\n",SUPER_INIT_DATA_FUNC,className->sysName);
+		 n_string_append_printf(buf,"   %s((%s *)self);\n",SUPER_INIT_DATA_FUNC,className->sysName);
 	 }
 	 char *modify=func_mgr_create_field_modify_token(func_mgr_get(),className);
 	 if(modify){
@@ -647,7 +647,7 @@ void class_init_create_init_define(ClassInit *self,ClassName *className,NPtrArra
 	 if(superCodes!=NULL){
 	    n_string_append(buf,superCodes);
 	 }
-	 n_string_append(buf,"return (void*)self;\n}\n");
+	 n_string_append(buf,"   return (void*)self;\n}\n");
 }
 
 void class_init_create_init_define_for_interface(ClassInit *self,char *sysName,NString *buf)

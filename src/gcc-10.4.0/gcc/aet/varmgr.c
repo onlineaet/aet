@@ -111,14 +111,14 @@ static nboolean addVar(VarMgr *self,ClassName *className,tree decl,char *orgiNam
 		item->serialNumber=getSerialNumber(self,className);
 		NPtrArray *array=n_ptr_array_sized_new(2);
 		n_ptr_array_add(array,item);
-		n_debug("var_mgr_add 00 第一次加 类名:%s 变量原名:%s mangleName:%s\n",className->sysName,orgiName,mangleVarName);
+		n_debug("var_mgr_add 00 第一次加 类名:%s 变量原名:%s mangleName:%s",className->sysName,orgiName,mangleVarName);
 		n_hash_table_insert (self->mgrHash, n_strdup(className->sysName),array);
 	 }else{
 		NPtrArray *array=(NPtrArray *)n_hash_table_lookup(self->mgrHash,className->sysName);
 		VarEntity *item=createEntity(decl,orgiName,mangleVarName,isStatic,className->sysName);
         item->serialNumber=getSerialNumber(self,className);
 		n_ptr_array_add(array,item);
-		n_debug("var_mgr_add 11 类：%s的条目已建立，现在加新的变量进来:%s %s\n",className->sysName,orgiName,mangleVarName);
+		n_debug("var_mgr_add 11 类：%s的条目已建立，现在加新的变量进来:%s %s",className->sysName,orgiName,mangleVarName);
 	 }
 	 return TRUE;
 }
@@ -219,7 +219,7 @@ static void defineGlobalVar(VarEntity *item)
 //	      finish_decl (decl, init_loc, NULL_TREE,NULL_TREE, NULL_TREE);
 //	  else
 //          finish_decl (decl, init_loc, init,initOrginalTypes, NULL_TREE);
-      n_debug("类中静态变量全局定义: %s %s context:%p extern:%d static:%d pub:%d\n",
+      n_debug("类中静态变量全局定义: %s %s context:%p extern:%d static:%d pub:%d",
     		  item->mangleVarName,item->orgiName,DECL_CONTEXT(decl),DECL_EXTERNAL(decl),TREE_STATIC(decl),TREE_PUBLIC(decl));
 }
 
@@ -237,7 +237,7 @@ static void eachDefine(VarMgr *self,NPtrArray *array,char *sysName,NString *code
 	for(i=0;i<array->len;i++){
 		VarEntity *entity=n_ptr_array_index(array,i);
 		if(entity->isStatic){
-			n_debug("类%s中的静态变量%s定义。i:%d\n",sysName,entity->orgiName,i);
+			n_debug("类%s中的静态变量%s定义。i:%d",sysName,entity->orgiName,i);
 			if(aet_utils_valid_tree(entity->init) && TREE_CODE(entity->init)==IDENTIFIER_NODE){
 				//printf("静态变量的创建代码\n");
 				n_string_append(codes,IDENTIFIER_POINTER(entity->init));
@@ -314,7 +314,7 @@ nboolean   var_mgr_change_static_decl(VarMgr *self,ClassName *className,struct c
     if(result){
       tree value = aet_utils_create_ident (newVarName);
       vardel->u.id.id=value;
-      n_debug("var_mgr_change_static_decl 变量名变成了:%s %s\n",varName,newVarName);
+      n_debug("var_mgr_change_static_decl 变量名变成了:%s %s",varName,newVarName);
     }
 	n_free(newVarName);
 	n_free(varName);
@@ -364,7 +364,7 @@ nboolean   var_mgr_set_static_decl(VarMgr *self,ClassName *className,tree decl,
 	tree type=TREE_TYPE(decl);
 	const unsigned int quals = TYPE_QUALS (type);
 	if(quals & TYPE_QUAL_CONST){
-	    n_debug("这是一个静态 const----- %s\n",item->orgiName);
+	    n_debug("这是一个静态 const----- %s",item->orgiName);
 		item->isConst=TRUE;
 	}
 	if(initExpr && aet_utils_valid_tree(initExpr->value)){

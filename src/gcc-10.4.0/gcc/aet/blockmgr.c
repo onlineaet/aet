@@ -322,10 +322,10 @@ static char *getBlockFromSourceCodes(location_t start,location_t end)
 	}
 
 	//roew is :115 28 117 5 2314 2316
-	n_debug("roew is :%d %d %d %d %d %d\n",startRows,startPos,endRows,endPos,startLoc,endLoc);
+	n_debug("roew is :%d %d %d %d %d %d",startRows,startPos,endRows,endPos,startLoc,endLoc);
 	NString *blockCodes=n_string_substring_from(codes,startLoc,endLoc);
 	n_string_free(codes,TRUE);
-	n_debug("blockcodes is :%s\n",blockCodes->str);
+	n_debug("blockcodes is :%s",blockCodes->str);
 	char *result=n_strdup(blockCodes->str);
 	n_string_free(blockCodes,TRUE);
 	return result;
@@ -590,18 +590,18 @@ static void createFuncGenParmInfoActual(BlockMgr *self,int add)
 	tree funcGenParmInfo=lookup_name(id);
 	char *funcName=IDENTIFIER_POINTER(DECL_NAME(current_function_decl));
 	if(aet_utils_valid_tree(funcGenParmInfo)){
-		n_debug("blockmgr 调用泛型块数据的地方（1）所在函数有参数 tempFgpi1234 belongFunc:%s %s\n",funcName,in_fnames[0]);
+		n_debug("blockmgr 调用泛型块数据的地方（1）所在函数有参数 tempFgpi1234 belongFunc:%s %s",funcName,in_fnames[0]);
 		addFuncGenParmInfoFromtempFgpi1234 (self,add);
 	}else{
 		tree id=aet_utils_create_ident(FuncGenParmInfo_NAME);
 		tree fggb=lookup_name(id);
 		if(aet_utils_valid_tree(fggb)){
-		    n_debug("blockmgr 调用泛型块数据的地方（2）所在的.c文件有变量 _inFileGlobalFuncGenParmInfo 转成地址参数 &_inFileGlobalFuncGenParmInfo belongFunc:%s %s\n",
+		    n_debug("blockmgr 调用泛型块数据的地方（2）所在的.c文件有变量 _inFileGlobalFuncGenParmInfo 转成地址参数 &_inFileGlobalFuncGenParmInfo belongFunc:%s %s",
 					funcName,in_fnames[0]);
 			addFuncGenParmInfoHaveBlockInfo(self,add);
 
 		}else{
-		    n_debug("blockmgr 调用泛型块数据的地方（3）没有 tempFgpi1234和_inFileGlobalFuncGenParmInfo 创建一个空的 belongFunc:%s %s\n",funcName,in_fnames[0]);
+		    n_debug("blockmgr 调用泛型块数据的地方（3）没有 tempFgpi1234和_inFileGlobalFuncGenParmInfo 创建一个空的 belongFunc:%s %s",funcName,in_fnames[0]);
 		   addFuncGenParmInfoNULL(self,add);
 		}
 	}
@@ -658,7 +658,7 @@ struct c_expr  block_mgr_parser(BlockMgr *self)
     //c_parser_skip_until_found (parser, CPP_SEMICOLON, "expected %<;%>");//加这句话 int gen=genericblock(){};出问题，但genericblock(){};不会
     aet_print_token(c_parser_peek_token (parser));
     char *body1=getBlockFromSourceCodes(startLoc,endLoc);
-    n_debug("block body 两种不同的源代码:%s\n 第二种： %s\n",body->str,body1);
+    n_debug("block body 两种不同的源代码:%s\n 第二种： %s",body->str,body1);
     NString  *bodys=n_string_substring(body,1);//去除{
     n_string_free(body,TRUE);
     body=bodys;
@@ -756,7 +756,7 @@ void block_mgr_add_define_new_object(BlockMgr *self,ClassName *className,Generic
     GenericNewClass  *item=generic_new_class_new(className->sysName,defines);
     int i;
     nboolean find=generic_new_class_exists(self->collectNewObject,item);
-    n_debug("new$新泛型全定义的对象在文件中，不在类实现中 %s 是否已存在:%d\n",item->id,find);
+    n_debug("new$新泛型全定义的对象在文件中，不在类实现中 %s 是否已存在:%d",item->id,find);
     if(!find){
 	    n_ptr_array_add(self->collectNewObject,item);
     }else{

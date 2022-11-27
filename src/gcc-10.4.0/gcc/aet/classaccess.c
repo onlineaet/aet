@@ -120,7 +120,7 @@ static tree setNopExpr(tree nopexpr,int *nest)
 {
 	   enum tree_code  nopexprTypeCode=TREE_CODE(TREE_TYPE(nopexpr));
 	   tree op=TREE_OPERAND (nopexpr, 0);
-	   n_debug("class_ref setNopExpr 00 %s op:%s\n",get_tree_code_name(nopexprTypeCode),get_tree_code_name(TREE_CODE(op)));
+	   n_debug("class_ref setNopExpr 00 %s op:%s",get_tree_code_name(nopexprTypeCode),get_tree_code_name(TREE_CODE(op)));
 	   if(nopexprTypeCode==POINTER_TYPE && TREE_CODE(op)==CALL_EXPR){
 	   }else  if(nopexprTypeCode==POINTER_TYPE && TREE_CODE(op)==TARGET_EXPR){
 
@@ -129,7 +129,7 @@ static tree setNopExpr(tree nopexpr,int *nest)
 	   }else  if(nopexprTypeCode==POINTER_TYPE && TREE_CODE(op)==PARM_DECL){
 		   //如果参数是 void  *返回NULL;
 		   if(class_util_is_void_pointer(TREE_TYPE(op))){
-			   n_debug("参数是void *,原来是直接返回，引起段错误。为什么原来是这样设计呢？？\n");
+			   n_debug("参数是void *,原来是直接返回，引起段错误。为什么原来是这样设计呢？？");
 			   return NULL_TREE;
 		   }
 		   return getLastVar(op,nest);
@@ -243,7 +243,7 @@ static tree getLastVar(tree decl,int *nest)
 		//printf("class_ref getLastVar 22 TREE_CODE(decl)==PARM_DECL nest:%d\n",*nest);
 		return decl;
 	}else if(TREE_CODE(decl)==NOP_EXPR){
-		n_debug("class_ref getLastVar 33 TREE_CODE(decl)==NOP_EXPR nest:%d\n",*nest);
+		n_debug("class_ref getLastVar 33 TREE_CODE(decl)==NOP_EXPR nest:%d",*nest);
 		*nest=*nest+1;
     	tree ret= setNopExpr(decl,nest);
     	if(ret==NULL_TREE){
@@ -252,15 +252,15 @@ static tree getLastVar(tree decl,int *nest)
     		return ret;
     	}
 	}else if(TREE_CODE(decl)==NON_LVALUE_EXPR){
-		n_debug("class_ref getLastVar 44 TREE_CODE(decl)==NON_LVALUE_EXPR nest:%d\n",*nest);
+		n_debug("class_ref getLastVar 44 TREE_CODE(decl)==NON_LVALUE_EXPR nest:%d",*nest);
 		*nest=*nest+1;
     	return setNopExpr(decl,nest);
 	}else if(TREE_CODE(decl)==ADDR_EXPR){
-		n_debug("class_ref getLastVar 55 TREE_CODE(decl)==ADDR_EXPR nest:%d\n",*nest);
+		n_debug("class_ref getLastVar 55 TREE_CODE(decl)==ADDR_EXPR nest:%d",*nest);
 		*nest=*nest+1;
     	return setAddrExpr(decl,nest);
 	}else if(TREE_CODE(decl)==COMPONENT_REF){
-		n_debug("class_ref getLastVar 66 TREE_CODE(decl)==COMPONENT_REF nest:%d\n",*nest);
+		n_debug("class_ref getLastVar 66 TREE_CODE(decl)==COMPONENT_REF nest:%d",*nest);
 		*nest=*nest+1;
 		return setComponentRef(decl,nest);
 	}else if(TREE_CODE(decl)==CALL_EXPR){
@@ -407,7 +407,7 @@ int class_access_get_last_class_and_var(ClassAccess *self,location_t loc,tree co
 	 char *lows[2];
 	 getLastClassAndVar(self,exprValue,lows);
 	 if(lows[1]==NULL){
-	     n_debug("lows[1]是空的 sysName:%s lows[0]:%s\n",className,lows[0]);
+	     n_debug("lows[1]是空的 sysName:%s lows[0]:%s",className,lows[0]);
 	 }
 	 if(lows[0]==NULL){
         aet_print_tree_skip_debug(exprValue);

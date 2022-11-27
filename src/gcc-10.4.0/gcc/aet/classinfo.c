@@ -252,14 +252,17 @@ nboolean class_info_is_generic_class(ClassInfo *self)
   return self->genericModel!=NULL;
 }
 
-nboolean   class_info_is_impl(ClassInfo *self,char *className)
+nboolean   class_info_is_impl_by_recursion(ClassInfo *self,char *ifaceSysName)
 {
+    if(self==NULL)
+        return FALSE;
 	int i;
 	for(i=0;i<self->ifaceCount;i++){
-		if(strcmp(self->ifaces[i].sysName,className)==0)
+		if(strcmp(self->ifaces[i].sysName,ifaceSysName)==0)
 			return TRUE;
 	}
-	return FALSE;
+    ClassInfo *parentInfo=class_mgr_get_class_info(class_mgr_get(),self->parentName.sysName);
+	return class_info_is_impl_by_recursion(parentInfo,ifaceSysName);
 }
 
 
@@ -394,6 +397,50 @@ char  *class_info_get_file(ClassInfo *self)
     if(self==NULL)
         return NULL;
     return self->file;
+}
+
+/**
+ * 比较class$ Abx和impl$ Abx后继承的父类接口是否一样
+ */
+nboolean class_info_decl_equal_impl(ClassInfo *self,NPtrArray *implParent,NPtrArray *implIface)
+{
+    if(strcmp(self->className.userName,AET_ROOT_OBJECT)==0){//如果AObject
+        if(implParent!=NULL && implParent->len>0)
+            return FALSE;
+        if(implIface!=NULL && implIface->len>0)
+            return FALSE;
+        return TRUE;
+    }
+    nboolean equalParent=FALSE;
+    nboolean equalIface=FALSE;
+
+   //比较父类
+    if(implParent!=NULL && implParent->len==1){
+        char *parent=n_ptr_array_index(implParent,0);
+        if(!strcmp(parent,self->parentName.userName) || !strcmp(parent,self->parentName.sysName)){
+            equalParent=TRUE;
+        }
+    }else if(implParent==NULL || implParent->len==0){
+        equalParent=TRUE;
+    }
+    if(!equalParent)
+        return FALSE;
+
+    int implIfaceCount=implIface==NULL?0:implIface->len;
+    if(implIfaceCount==0)
+        return TRUE;
+    if(implIfaceCount!=self->ifaceCount)
+        return FALSE;
+    int i;
+    printf("ffdd %d %d\n",implIface->len,self->ifaceCount);
+    for(i=0;i<self->ifaceCount;i++){
+        char *iface=n_ptr_array_index(implIface,i);
+        if(strcmp(iface,self->ifaces[i].userName) || strcmp(iface,self->ifaces[i].sysName)){
+            return FALSE;
+        }
+    }
+    return TRUE;
+
 }
 
 

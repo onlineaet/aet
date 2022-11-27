@@ -99,7 +99,7 @@ void         class_info_set_parent(ClassInfo *self,ClassName *parent);
 void         class_info_set_ifaces(ClassInfo *self,ClassName **ifaces,int count);
 void         class_name_free(ClassName *className);
 nboolean     class_info_is_belong(ClassInfo *self,char *className);
-nboolean     class_info_is_impl(ClassInfo *self,char *className);
+nboolean     class_info_is_impl_by_recursion(ClassInfo *self,char *ifaceSysName);
 nboolean     class_info_is_generic_decl(ClassInfo *self,tree id);
 int          class_info_get_undefine_generic_count(ClassInfo *self);
 int          class_info_get_generic_index(ClassInfo *self,char *genericName);
@@ -125,5 +125,6 @@ char         *class_info_create_class_code(ClassInfo *self);//生成AClass变量
 nboolean      class_info_is_root(ClassInfo *self);//是不是AObject;
 void          class_info_set_file(ClassInfo *self,char *file);//声明所在的文件
 char         *class_info_get_file(ClassInfo *self);//声明所在的文件
+nboolean      class_info_decl_equal_impl(ClassInfo *self,NPtrArray *implParent,NPtrArray *implIface);
 
 #endif

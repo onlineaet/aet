@@ -288,7 +288,7 @@ static tree getActualParmType(ClassFunc *func,NPtrArray *array,vec<tree, va_gc> 
         n_debug("getActualParmType 00 检查实参:i:%d 参数个数:%d index:%d independ:%d str:%s\n",i,array->len,index,item->independ,item->str);
         tree actual=(*exprlist)[index];
         if(item->independ==0){
-            n_debug("是一个泛型类，取出泛型类中的泛型\n");
+            n_debug("是一个泛型类，取出泛型类中的泛型。");
         	if(TREE_CODE(actual)==ADDR_EXPR) //setData(&abc)此种情况需要取出变量
         		actual=TREE_OPERAND(actual,0);
         	else if(TREE_CODE(actual)==COMPONENT_REF)

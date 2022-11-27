@@ -68,10 +68,7 @@ impl$ FileUtil{
       asize totalBytes = 0;
       asize totalAllocated = 0;
       char *tmp;
-      char *display_filename;
-
       a_assert (f!= NULL);
-
       while (!feof (f)){
           int saveErrno;
           bytes = fread (buf, 1, sizeof (buf), f);

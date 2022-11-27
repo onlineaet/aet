@@ -408,9 +408,9 @@ NPtrArray *class_interface_add_define(ClassInterface *self,ClassName *className)
 	   ClassName iface=info->ifaces[i];
 	   ClassInfo *faceInfo=class_mgr_get_class_info_by_class_name(class_mgr_get(),&iface);
 	   if(faceInfo==NULL){
-		   error("在类%qs中实现接口%qs,但没有找到接口的声明。检查是否包含对应的头文件",className->userName,iface.userName);
 		   n_ptr_array_set_free_func(array,freeFaceData_cb);
 		   n_ptr_array_unref(array);
+	       error("在类%qs中实现接口%qs,但没有找到接口的声明。检查是否包含对应的头文件",className->userName,iface.userName);
 		   return NULL;
 	   }
 	   eachInterface(self,array,className,&iface);

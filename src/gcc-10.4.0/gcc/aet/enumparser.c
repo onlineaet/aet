@@ -649,7 +649,7 @@ tree  enum_parser_parser_dot(EnumParser *self,struct c_typespec *specs)
      	c_parser_consume_token (parser); //consume cpp_name(enum 名字)
     	return item->typeDecl;
     }else{
-        n_warning("找不到类%s的枚举类型%s！检查类型是否有错。",sysName,origName);
+        error_at(t->location,"找不到类%qs的枚举类型%qs！检查类型是否有错。",sysName,origName);
     }
 	return NULL_TREE;
 }

@@ -236,7 +236,6 @@ impl$ ArrayStorage{
         apointer key=NULL;
         apointer value=NULL;
         ASList list=new$ ASList();
-        int count=0;
         while(sourcesHash->iterNext(&iter,&key,&value)){
              EventSource *source=(EventSource *)value;
             // printf("removeall --00-- :%d %s ref:%u source:%p %d\n",source->id,source->name,source->refCount,source,count++);

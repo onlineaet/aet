@@ -198,26 +198,26 @@ void middle_file_create_global_var(MiddleFile *self)
     NString *codes=n_string_new("");
     n_debug("middle_file_create_global_var 00 %s\n",fileName);
     if(generic){
-        n_debug("middle_file_create_global_var 11\n");
+        n_debug("middle_file_create_global_var 11。");
        n_string_append(codes,generic);
        n_string_append(codes,"\n");
        n_free(generic);
     }
     if(funcCheck){
-        n_debug("middle_file_create_global_var 22\n");
+        n_debug("middle_file_create_global_var 22。");
        n_string_append(codes,funcCheck);
        n_string_append(codes,"\n");
        n_free(funcCheck);
     }
     if(ifaceImpl && strlen(ifaceImpl)<0){
-        n_debug("middle_file_create_global_var 33\n");
+        n_debug("middle_file_create_global_var 33。");
        n_string_append(codes,ifaceImpl);
        n_string_append(codes,"\n");
        n_free(ifaceImpl);
     }
     if(codes->len<=0)
         return;
-    n_debug("middle_file_create_global_var 44\n");
+    n_debug("middle_file_create_global_var 44。");
     int newDataLen=0;
     char *newData=compressData(codes->str,&newDataLen);
     char varName[255];

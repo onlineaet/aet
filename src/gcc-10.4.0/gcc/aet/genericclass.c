@@ -445,7 +445,7 @@ static NPtrArray *getDefineForChildFuncGen(GenericClass *self,GenericCallFunc *i
        n_debug("未定泛型的调用泛型函数，所在的类是%s，所在的函数是:%s,并且是一个泛型函数。\n",classInfo->className.userName,item->atFunc);
 	   GenericModel *genModel=class_func_get_func_generic(func);
 	   if(generic_model_include_decl(genModel,item->model)){
-	       n_debug("所在的泛型函数的泛型单元包含了调用的泛型函数中的未定。所以由泛型函数处理.\n");
+	       n_debug("所在的泛型函数的泛型单元包含了调用的泛型函数中的未定。所以由泛型函数处理。");
 		   return NULL;
 	   }else{
 		   GenericModel  *classModel=class_info_get_generic_model(classInfo);

@@ -2544,7 +2544,7 @@ static int convert_arguments (location_t loc, vec<location_t> arg_loc, tree type
 	      //function 被改过的原函数 fundecl未改过的函数声明 type 函数参数类型  origtype 实参的类型 val具体的实参 valtype具体实参的类型 npc实参是否是空指针
 	      //rname =function parmnum当前第几个参数 argnum 总的参数个数+1 excess_precision 超精度 0 是否警告
 	      nboolean isGenericType=generic_util_is_generic_pointer(type);
-	      n_debug("convert_arguments 88 进入循环 调convert_argument origtype code:%s  parmnum:%d error_args:%d 是不是泛型:%d function:%p isFuncGeneric:%d isQueryGenFunc:%d\n",
+	      n_debug("convert_arguments 88 进入循环 调convert_argument origtype code:%s  parmnum:%d error_args:%d 是不是泛型:%d function:%p isFuncGeneric:%d isQueryGenFunc:%d",
 		         			  origtype?get_tree_code_name(TREE_CODE(origtype)):"NULL", parmnum,error_args,isGenericType,function,isFuncGeneric,isQueryGenFunc);
 		  if(isGenericType){
 		      if(userData!=NULL){
@@ -2638,7 +2638,7 @@ static int convert_arguments (location_t loc, vec<location_t> arg_loc, tree type
 	      typetail = TREE_CHAIN (typetail);
 	      if((isFuncGeneric || isQueryGenFunc)&& parmnum==0){
 		      typetail = TREE_CHAIN (typetail);
-		      n_debug("convert_arguments 105 跳过泛型函数的第二参数\n");
+		      n_debug("convert_arguments 105 跳过泛型函数的第二参数。");
 	      }
        }
        if (builtin_typetail){
@@ -5105,7 +5105,7 @@ static tree convert_for_assignment (location_t location, location_t expr_loc, tr
 	            ttl = strip_array_types (ttl);
 	      /* Assignments between atomic and non-atomic objects are OK.  */
 	         if (TYPE_QUALS_NO_ADDR_SPACE_NO_ATOMIC (ttr) & ~TYPE_QUALS_NO_ADDR_SPACE_NO_ATOMIC (ttl)){
-	             n_debug("convert_for_assignment wwfdsss0000\n");
+	             n_debug("convert_for_assignment wwfdsss0000。");
 
 		        PEDWARN_FOR_QUALIFIERS (location, expr_loc,
 				          OPT_Wdiscarded_qualifiers,

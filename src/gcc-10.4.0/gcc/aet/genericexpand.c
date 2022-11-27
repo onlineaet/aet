@@ -324,7 +324,7 @@ void generic_expand_produce_set_block_func_decl(GenericExpand *self,nboolean sta
 	  tree prefix_attrs;
 	  tree all_prefix_attrs;
 	  location_t here = c_parser_peek_token (parser)->location;
-	  n_debug("generic_expand_produce_set_block_func_decl 00:创建一个空的声明说明符 ：\n");
+	  n_debug("generic_expand_produce_set_block_func_decl 00:创建一个空的声明说明符 ：");
 	  c_parser_consume_token (parser);//consume   RID_AET_GOTO
 	  c_parser_consume_token (parser);//consume   GOTO_GENERIC_BLOCK_FUNC_DECL
 	  specs = build_null_declspecs ();
@@ -334,7 +334,7 @@ void generic_expand_produce_set_block_func_decl(GenericExpand *self,nboolean sta
 	  all_prefix_attrs = prefix_attrs;
 	  specs->attrs = NULL_TREE;
 	  while (true){
-		  n_debug("generic_expand_produce_set_block_func_decl 11:\n");
+		  n_debug("generic_expand_produce_set_block_func_decl 11。");
 	      struct c_declarator *declarator;
 	      bool dummy = false;
 	      declarator = c_parser_declarator (parser, specs->typespec_kind != ctsk_none,C_DTR_NORMAL, &dummy);
@@ -370,7 +370,7 @@ void generic_expand_produce_set_block_func_decl(GenericExpand *self,nboolean sta
 					 }
 					/* If it exists and is cdk_function, use its parameters.  */
 				   if (last_non_id_attrs   && last_non_id_attrs->kind == cdk_function){
-					  n_debug("generic_expand_produce_set_block_func_decl 22:设参数  DECL_ARGUMENTS (d) ：\n");
+					  n_debug("generic_expand_produce_set_block_func_decl 22:设参数  DECL_ARGUMENTS (d) ：");
 					  DECL_ARGUMENTS (d) = last_non_id_attrs->u.arg_info->parms;
 				   }
 			   }
@@ -388,7 +388,7 @@ void generic_expand_produce_set_block_func_decl(GenericExpand *self,nboolean sta
 					finish_decl (d, UNKNOWN_LOCATION, NULL_TREE,NULL_TREE, asm_name);
 			   }
 		       if (c_parser_next_token_is (parser, CPP_SEMICOLON)){
-				  n_debug("generic_expand_produce_set_block_func_decl 33:结束了：\n");
+				  n_debug("generic_expand_produce_set_block_func_decl 33:结束了：");
 				  c_parser_consume_token (parser);
 				  return;
 		       }else {

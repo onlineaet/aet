@@ -207,10 +207,8 @@ typedef enum
   } NNumberParserError;
 
 
-#define N_NUMBER_PARSER_ERROR 2// (n_number_parser_error_quark ())
+#define N_NUMBER_PARSER_ERROR 2
 
-
-//NQuark                n_number_parser_error_quark  (void);
 
 
 nboolean              n_ascii_string_to_signed     (const nchar  *str,

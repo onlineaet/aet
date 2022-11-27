@@ -277,7 +277,7 @@ void class_build_replace_getclass_rtn(ClassBuild *self,ClassName *className)
 //				char newFuncName[256];
 //				aet_utils_create_super_field_name(parent->className.userName,mangleFuncName,newFuncName);
 //				if(strcmp(IDENTIFIER_POINTER(name),newFuncName)==0){
-//					n_debug("找到getClass的父方法:%s\n",IDENTIFIER_POINTER(name));
+//					n_debug("找到getClass的父方法:%s",IDENTIFIER_POINTER(name));
 //					relaceGetClassFieldRtn(field,aclassInfo);
 //					break;
 //				}

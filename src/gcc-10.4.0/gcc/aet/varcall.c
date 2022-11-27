@@ -91,10 +91,10 @@ static int findValAtClass(VarCall *self,ClassName *className,tree id)
 	 if(classDecl){
 		if (TREE_CODE (classDecl) == TYPE_DECL){
 			tree type = TREE_TYPE (classDecl);
-			n_debug("findValAtClass 00 field type is:%s %s\n",get_tree_code_name(TREE_CODE(type)),className->sysName);
+			n_debug("findValAtClass 00 field type is:%s %s",get_tree_code_name(TREE_CODE(type)),className->sysName);
 			nboolean ret=class_util_have_field (type, id);
 			if(ret){
-				n_debug("findValAtClass 11 找到了 className:%s id:%s\n",className->sysName,IDENTIFIER_POINTER(id));
+				n_debug("findValAtClass 11 找到了 className:%s id:%s",className->sysName,IDENTIFIER_POINTER(id));
 				return ISAET_FIND_VAL;
 			}else{
 				return findValAtClass(self,&info->parentName,id);
@@ -102,10 +102,10 @@ static int findValAtClass(VarCall *self,ClassName *className,tree id)
 		}else{
 			if(TREE_CODE (classDecl) ==FUNCTION_DECL){
 				char *funcName=IDENTIFIER_POINTER(DECL_NAME(current_function_decl));
-				printf("在当前函数中调用了self(),lookup_name返回的是构造函数，不是类类型。%s 当前函数:%s\n",className->sysName,funcName);
+				printf("在当前函数中调用了self(),lookup_name返回的是构造函数，不是类类型。%s 当前函数:%s",className->sysName,funcName);
 				nboolean ret=class_util_have_field (info->record, id);
 				if(ret){
-				   n_debug("findValAtClass 33 找到了 className:%s id:%s\n",className->sysName,IDENTIFIER_POINTER(id));
+				   n_debug("findValAtClass 33 找到了 className:%s id:%s",className->sysName,IDENTIFIER_POINTER(id));
 				   return ISAET_FIND_VAL;
 				}else{
 				   return findValAtClass(self,&info->parentName,id);

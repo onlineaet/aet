@@ -154,12 +154,12 @@ static tree createPointerPlusExpr(ClassName *className,char *ifaceVarInClass,loc
  */
 static void castClassToInterface(char *rightName,char *leftName,tree nopexpr,tree op)
 {
-	   n_debug("class_cast_parser_decl castClassToInterface 00 %s %s \n",leftName,rightName);
+	   n_debug("class_cast_parser_decl castClassToInterface 00 %s %s",leftName,rightName);
 	   if(rightName==NULL || leftName==NULL)
 		   return;
 	   ClassInfo *rightInfo=class_mgr_get_class_info(class_mgr_get(),rightName);
 	   ClassInfo *leftInfo=class_mgr_get_class_info(class_mgr_get(),leftName);
-	   n_debug("class_cast_parser_decl castClassToInterface 11 %s %s info:%p\n",leftName,rightName);
+	   n_debug("class_cast_parser_decl castClassToInterface 11 %s %s info:%p",leftName,rightName);
 	   if(rightInfo==NULL || leftInfo==NULL)
 		   return;
 	   if(!strcmp(rightName,leftName))
@@ -168,24 +168,24 @@ static void castClassToInterface(char *rightName,char *leftName,tree nopexpr,tre
 	   nboolean rhs=class_mgr_is_interface(class_mgr_get(),&rightInfo->className);
 	   if(lhs && !rhs){
 		   ClassName *belongClass=class_mgr_find_interface(class_mgr_get(),&rightInfo->className,&leftInfo->className);
-		   n_debug("class_cast_parser_decl castClassToInterface 22 左边是接口，右边是类 类转接口 %s %s belongClass:%s\n",
+		   n_debug("class_cast_parser_decl castClassToInterface 22 左边是接口，右边是类 类转接口 %s %s belongClass:%s",
 				   leftName,rightName,belongClass?belongClass->sysName:"null");
 		   if(belongClass!=NULL){
 			   char ifaceVarInClass[255];
 			   aet_utils_create_in_class_iface_var(leftInfo->className.userName,ifaceVarInClass);
 			   tree value= createPointerPlusExpr(belongClass,ifaceVarInClass,EXPR_LOCATION (nopexpr),op,FALSE);
-			   n_debug("class_cast_parser_decl castClassToInterface ---22 左边是接口，右边是类 类转接口 %s %s belongClass:%s\n",
+			   n_debug("class_cast_parser_decl castClassToInterface ---22 左边是接口，右边是类 类转接口 %s %s belongClass:%s",
 					   leftName,rightName,belongClass->sysName);
 			   TREE_OPERAND (nopexpr, 0)=value;
 		   }
 	   }else if(!lhs && rhs){
 		   ClassName *belongClass=class_mgr_find_interface(class_mgr_get(),&leftInfo->className,&rightInfo->className);
-		   n_debug("class_cast_parser_decl castClassToInterface 33 左边是类:%s，右边是接口:%s 接口转类 接口实现类是:%s\n",leftName,rightName,belongClass?belongClass->sysName:"null");
+		   n_debug("class_cast_parser_decl castClassToInterface 33 左边是类:%s，右边是接口:%s 接口转类 接口实现类是:%s",leftName,rightName,belongClass?belongClass->sysName:"null");
 		   if(belongClass!=NULL){
 			   //char ifaceVarInClass[255];
 			  // aet_utils_create_in_class_iface_var(rightInfo->className.userName,ifaceVarInClass);
 			   //tree value= createPointerPlusExpr(belongClass,ifaceVarInClass,EXPR_LOCATION (nopexpr),op,TRUE);
-			  // n_debug("class_cast_parser_decl castClassToInterface 44 左边是类:%s，右边是接口:%s 接口转类 %s\n",leftName,rightName,belongClass?belongClass->sysName:"null");
+			  // n_debug("class_cast_parser_decl castClassToInterface 44 左边是类:%s，右边是接口:%s 接口转类 %s",leftName,rightName,belongClass?belongClass->sysName:"null");
                error_at(EXPR_LOCATION(nopexpr),"不能转化接口%qs到类qs。",rightName,leftName);
 			   //TREE_OPERAND (nopexpr, 0)=value;
 		   }
@@ -254,30 +254,30 @@ static void setNopExpr(ClassCast *self ,tree decl,tree nopexpr,char *declClassNa
 {
 	   enum tree_code  nopexprTypeCode=TREE_CODE(TREE_TYPE(nopexpr));
 	   tree op=TREE_OPERAND (nopexpr, 0);
-	   n_debug("class_cast_parser_decl setNopExpr ----sxx00 %s %s\n",get_tree_code_name(nopexprTypeCode),get_tree_code_name(TREE_CODE(op)));
+	   n_debug("class_cast_parser_decl setNopExpr ----sxx00 %s %s",get_tree_code_name(nopexprTypeCode),get_tree_code_name(TREE_CODE(op)));
 	   if(nopexprTypeCode==POINTER_TYPE && TREE_CODE(op)==CALL_EXPR){
 		   char *className=class_util_get_class_name(TREE_TYPE(op));
-		   n_debug("从设setNopExpr 再设castClassToInterface----- %s\n",className);
+		   n_debug("从设setNopExpr 再设castClassToInterface----- %s",className);
 		    castClassToInterface(className,declClassName,nopexpr,op);
 	   }else  if(nopexprTypeCode==POINTER_TYPE && TREE_CODE(op)==TARGET_EXPR){
-		   n_debug("从设setNopExpr 再设setTargetExpr-----\n");
+		   n_debug("从设setNopExpr 再设setTargetExpr-----。");
 		   char *className= getClassNameFromTargetExpr(op);
 		   castClassToInterface(className,declClassName,nopexpr,op);
 	   }else  if(nopexprTypeCode==POINTER_TYPE && TREE_CODE(op)==VAR_DECL){
-		   n_debug("从设setNopExpr 再设setVarDecl---eee--\n");
+		   n_debug("从设setNopExpr 再设setVarDecl---eee--。");
 		    char *className=getClassNameFromVarDecl(op);
 			castClassToInterface(className,declClassName,nopexpr,op);
 	   }else  if(nopexprTypeCode==POINTER_TYPE && TREE_CODE(op)==PARM_DECL){
 		    char *className=class_util_get_class_name(TREE_TYPE(op));
-		    n_debug("从设setNopExpr 再设setParmDecl----- %s %s\n",className,declClassName);
+		    n_debug("从设setNopExpr 再设setParmDecl----- %s %s。",className,declClassName);
 			castClassToInterface(className,declClassName,nopexpr,op);
        }else if(nopexprTypeCode==POINTER_TYPE && TREE_CODE(op)==COMPONENT_REF){
             char *className=class_util_get_class_name(TREE_TYPE(op));
-            n_debug("从设setNopExpr COMPONENT_REF-----不处理 右边:%s declClassName:%s\n",className,declClassName);
+            n_debug("从设setNopExpr COMPONENT_REF-----不处理 右边:%s declClassName:%s",className,declClassName);
             castClassToInterface(className,declClassName,nopexpr,op);
             aet_print_tree(nopexpr);
 	   }else if(nopexprTypeCode==POINTER_TYPE && TREE_CODE(op)==POINTER_PLUS_EXPR){
-		   n_debug("从设setNopExpr POINTER_PLUS_EXPR-----不处理 \n");
+		   n_debug("从设setNopExpr POINTER_PLUS_EXPR-----不处理。");
 		    aet_print_tree(nopexpr);
 	   }
 }
@@ -292,7 +292,7 @@ static void setTargetExpr(ClassCast *self,tree decl,tree targetexpr,char *declCl
 	   char *className=class_util_get_class_name_by_pointer(va);
 	   if(className==NULL)
 		   return;
-	   n_debug("class_cast_add_ref_in_finish_decl setTargetExpr 00 %s %s %s\n",
+	   n_debug("class_cast_add_ref_in_finish_decl setTargetExpr 00 %s %s %s",
 			   get_tree_code_name(TREE_CODE(va)),get_tree_code_name(TREE_CODE(init)),className);
 	   tree vars=TREE_OPERAND (init, 0);
 	   tree body=TREE_OPERAND (init, 1);
@@ -304,19 +304,19 @@ static void setTargetExpr(ClassCast *self,tree decl,tree targetexpr,char *declCl
 	   tree retn=TREE_OPERAND (last, 1);
 	   if(TREE_CODE(retn)==VAR_DECL){
 		   char *id=IDENTIFIER_POINTER(DECL_NAME(retn));
-		   n_debug("class_cast_add_ref_in_finish_decl setTargetExpr 11 %s %s\n",get_tree_code_name(TREE_CODE(retn)),id);
+		   n_debug("class_cast_add_ref_in_finish_decl setTargetExpr 11 %s %s",get_tree_code_name(TREE_CODE(retn)),id);
 		   ClassInfo *leftValueInfo=class_mgr_get_class_info(class_mgr_get(),className);
 		   if(class_info_is_generic_class(leftValueInfo)){
 			   GenericModel *rgenerics=c_aet_get_generics_model(retn);
 			   if(rgenerics){
-			       n_debug("把右边的对象定义的泛型赋值给左边的变量。----\n");
+			       n_debug("把右边的对象定义的泛型赋值给左边的变量。----");
 				   GenericModel *lgenerics=c_aet_get_generics_model(decl);
 				   if(!lgenerics){
 					   c_aet_set_generics_model(decl,rgenerics);
 				   }else{
                        //比较两个generics如果不相等是错的
 					   nboolean result=generic_model_equal(rgenerics,lgenerics);
-					   n_debug("把右边的对象定义的泛型赋值给左边的变量。---222 - %d\n",result);
+					   n_debug("把右边的对象定义的泛型赋值给左边的变量。---222 - %d",result);
 					   if(!result){
 						   error_at(DECL_SOURCE_LOCATION(decl),"变量%qD的泛型不能转换到另外一个定义的泛型。",decl);
 					   }
@@ -354,7 +354,7 @@ void   class_cast_in_finish_decl(ClassCast *self ,tree decl)
 			return;
 		//检查返回的是不是NClass
 	    tree init=DECL_INITIAL(decl);
-		n_debug("class_cast_add_ref_in_finish_decl 先声明再有初始值 00 declClassName:%s init tree:%p declClassName:%s init code:%s\n",
+		n_debug("class_cast_add_ref_in_finish_decl 先声明再有初始值 00 declClassName:%s init tree:%p declClassName:%s init code:%s",
 				declClassName,init,declClassName,aet_utils_valid_tree(init)?get_tree_code_name(TREE_CODE(init)):"null");
 		if(!aet_utils_valid_tree(init))
 			return;
@@ -411,13 +411,13 @@ void  class_cast_in_finish_stmt(ClassCast *self ,tree stmt)
     declClassName=getClassNameInVarDeclOrModifyOrComponentRefExpr(self,stmt);
     if(declClassName==NULL)
 		return;
-	//n_debug("class_cast_add_ref_in_finish_stmt 语句 00 stmt:%p %s\n",stmt,declClassName);
+	//n_debug("class_cast_add_ref_in_finish_stmt 语句 00 stmt:%p %s",stmt,declClassName);
 	lt=TREE_OPERAND(stmt,0);
 	rt=TREE_OPERAND(stmt,1);
     varClassName=getClassNameInVarDeclOrModifyOrComponentRefExpr(self,lt);
     if(varClassName==NULL)
     	return;
-  //  n_debug("class_cast_add_ref_in_finish_stmt 语句 11 stmt:%p varClassName:%s  declClassName:%s rt:%s\n",
+  //  n_debug("class_cast_add_ref_in_finish_stmt 语句 11 stmt:%p varClassName:%s  declClassName:%s rt:%s",
 		//	stmt,varClassName,declClassName,get_tree_code_name(TREE_CODE(rt)));
     //aet_print_tree(lt);
     //printf("=======================rt==================\n");
@@ -425,10 +425,10 @@ void  class_cast_in_finish_stmt(ClassCast *self ,tree stmt)
     if((TREE_CODE(lt)==VAR_DECL || TREE_CODE(lt)==COMPONENT_REF) && TREE_CODE(rt)==NOP_EXPR){
     	setNopExpr(self,lt,rt,declClassName);
     }else if(TREE_CODE(lt)==COMPONENT_REF && TREE_CODE(rt)==TARGET_EXPR){
-    	n_debug("class_cast_add_ref_in_finish_stmt 语句 22 stmt:%p %s\n",stmt,varClassName);
+    	n_debug("class_cast_add_ref_in_finish_stmt 语句 22 stmt:%p %s",stmt,varClassName);
 		tree field=TREE_OPERAND(lt,1);
 		if(TREE_CODE(field)==FIELD_DECL){
-			//n_debug("class_cast_add_ref_in_finish_stmt 语句 2xxx2 stmt:%p %s\n",stmt,varClassName);
+			//n_debug("class_cast_add_ref_in_finish_stmt 语句 2xxx2 stmt:%p %s",stmt,varClassName);
 			setTargetExpr(self,field,rt,declClassName);
 		}
     }else  if(TREE_CODE(lt)==VAR_DECL && TREE_CODE(rt)==VAR_DECL){
@@ -439,7 +439,7 @@ void  class_cast_in_finish_stmt(ClassCast *self ,tree stmt)
 			c_aet_set_generics_model(lt,generics);
         }
 	}else if(TREE_CODE(rt)==NOP_EXPR){
-		n_debug("class_cast_add_ref_in_finish_stmt 语句 33 stmt:%p %s\n",stmt,varClassName);
+		n_debug("class_cast_add_ref_in_finish_stmt 语句 33 stmt:%p %s",stmt,varClassName);
 		aet_print_tree_skip_debug(lt);
 		n_error("还未处理此种类型。");
 	}else if(TREE_CODE(rt)==VAR_DECL){
@@ -479,7 +479,7 @@ static tree buildClassToIface(tree op,tree castToType)
 	 }
 
     char *beConvertedIntoSysName=belongClass->sysName;//class_util_get_class_name(TREE_TYPE(op));//被转化的类名
-    n_debug("buildClassToIface --- %s beConvertedIntoSysName:%s\n",interface,beConvertedIntoSysName);
+    n_debug("buildClassToIface --- %s beConvertedIntoSysName:%s",interface,beConvertedIntoSysName);
 	ClassName *ifaceName=class_mgr_get_class_name_by_sys(class_mgr_get(),interface);
 	ClassName *className=class_mgr_get_class_name_by_sys(class_mgr_get(),beConvertedIntoSysName);
 	char ifaceVarInClass[255];
@@ -499,7 +499,7 @@ static nboolean isClassToIface(tree castToType,tree op)
 {
     char *interface=class_util_get_class_name(castToType);//这是一个aet 类吗？
     char *sysName=class_util_get_class_name(TREE_TYPE(op));
-    n_debug("isClassToIface --- %s %s\n",interface,sysName);
+    n_debug("isClassToIface --- %s %s",interface,sysName);
     if(sysName==NULL || interface==NULL)
 	   return FALSE;
     //如果castToType 与op类型相同返回FALSE;
@@ -515,7 +515,7 @@ static nboolean isClassToIface(tree castToType,tree op)
 		error_at(input_location,"%qs没有实现接口%qs，不能强转。",rightInfo->className.userName,leftInfo->className.userName);
 		return FALSE;
 	}
-	n_debug("isClassToIface --- 11 %s %s %s\n",interface,sysName,belongClass->sysName);
+	n_debug("isClassToIface --- 11 %s %s %s",interface,sysName,belongClass->sysName);
 	return TRUE;
 }
 
@@ -844,7 +844,7 @@ static tree convertToIface(tree type,tree actualParm,nboolean isRefOrUnref)
 		nboolean isActualFace=isIface(actualType);
 		char *formulaSysName=class_util_get_class_name(type);
 		char *actualSysName=class_util_get_class_name(actualType);
-		n_debug("接口调用接口的方法:00 实参:%s 形参:%s\n",actualSysName,formulaSysName);
+		n_debug("接口调用接口的方法:00 实参:%s 形参:%s",actualSysName,formulaSysName);
 		if(isface && isActualFace){
 			nboolean equal=c_tree_equal(type,actualType);
 			if(!equal){
@@ -858,7 +858,7 @@ static tree convertToIface(tree type,tree actualParm,nboolean isRefOrUnref)
                 	tree aobjectType=lookup_name(id);
                     aobjectType=TREE_TYPE(aobjectType);
                     tree pointerType=build_pointer_type(aobjectType);
-                    n_debug("接口调用接口的方法:11 实参:%s 形参:%s\n",actualSysName,formulaSysName);
+                    n_debug("接口调用接口的方法:11 实参:%s 形参:%s",actualSysName,formulaSysName);
                 	return ifaceToClass(actualParm,pointerType);
                 }
 			}
@@ -879,7 +879,7 @@ void class_cast_parm_convert_from_deref(ClassCast *self,tree func,vec<tree, va_g
 		nboolean iface=isIFaceCall(op0);
 		if(iface && isIFaceField(op0,fieldDecl)){
 			char *fieldName=IDENTIFIER_POINTER(DECL_NAME(fieldDecl));
-			n_debug("是一个接口调用的方法。第一个参数是接口，通过接口变量 _iface_common_var.atClass123把iface转为AObject:%s\n",fieldName);
+			n_debug("是一个接口调用的方法。第一个参数是接口，通过接口变量 _iface_common_var.atClass123把iface转为AObject:%s",fieldName);
 			//转第一个参数
 			tree  funcType = getFunctionType(TREE_TYPE (fieldDecl));
 			int count=0;
@@ -889,16 +889,16 @@ void class_cast_parm_convert_from_deref(ClassCast *self,tree func,vec<tree, va_g
 					break;
 				}
 				tree actualParm = (*exprlist)[count];
-				n_debug("class_cast_parm_convert_from_deref 实参是:%d\n",count);
+				n_debug("class_cast_parm_convert_from_deref 实参是:%d",count);
 				if(count==0){
 					nboolean isRefUnref=isIFaceRefOrUnref(op0,fieldDecl);
 					tree cc=convertToIface(type,actualParm,isRefUnref);
-					n_debug("class_cast_parm_convert_from_deref 11 实参是:%d cc:%p\n",count,cc);
+					n_debug("class_cast_parm_convert_from_deref 11 实参是:%d cc:%p",count,cc);
 					if(cc!=NULL_TREE)
 					  (*exprlist)[count]=cc;
 				}else{
 				   tree cc=convertActualParm(type,actualParm,count);
-				   n_debug("class_cast_parm_convert_from_deref 22 实参是:%d cc:%p\n",count,cc);
+				   n_debug("class_cast_parm_convert_from_deref 22 实参是:%d cc:%p",count,cc);
 
 				   if(cc!=NULL_TREE)
 					  (*exprlist)[count]=cc;

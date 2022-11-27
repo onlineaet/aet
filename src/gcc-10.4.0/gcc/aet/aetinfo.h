@@ -22,6 +22,7 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 #ifndef GCC_AET_INFO_H
 #define GCC_AET_INFO_H
 
+int    aet_demangle_text(const char *start,int length,char *newStr);
 
 
 #endif /* ! GCC_C_AET_H */

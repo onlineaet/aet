@@ -523,7 +523,7 @@ void iface_file_compile(IfaceFile *self,char *tokenString)
             class_name_free(ifaceName);
     }
     if(codes->len>0){
-        printf("IfaceFile.c 实现接口的初始化方法 ---实现的文件:%s\n源代码:\n%s\n",in_fnames[0],codes->str);
+        n_debug("IfaceFile.c 实现接口的初始化方法 ---实现的文件:%s\n源代码:\n%s\n",in_fnames[0],codes->str);
         aet_utils_add_token(parse_in,codes->str,codes->len);
     }
 }
@@ -555,7 +555,7 @@ static NPtrArray *getSysNameFromOFile(char *fileName)
             int index=n_string_indexof(str,AET_INIT_GLOBAL_METHOD_STRING);
             NString *sub=n_string_substring(str,index+strlen(AET_INIT_GLOBAL_METHOD_STRING));
             n_string_free(str,TRUE);
-            NString *sub1=n_string_substring(sub,1);//跳动下划线_
+            NString *sub1=n_string_substring(sub,1);//跳过下划线_
             char *sysName=NULL;
             if(n_string_ends_with(sub1,"\n")){
                 sysName=n_strndup(sub1->str,sub1->len-1);

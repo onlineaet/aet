@@ -78,8 +78,17 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 
 int enter_aet=0;
 
+static  void initAddressDiagnosticCallback()
+{
+     unsigned long add=aet_demangle_text;
+     char *value=xmalloc(100);
+     sprintf(value,"%lu",add);
+     setenv("initAddressDiagnosticCallback",value,0);
+}
+
 static void classParserInit(ClassParser *self)
 {
+    initAddressDiagnosticCallback();
 	self->classCtor=class_ctor_new();
 	self->classInterface=class_interface_new();
 	self->classInit=class_init_new();
@@ -304,7 +313,7 @@ static tree  c_parser_class_declaration (ClassParser *self,ClassInfo *classInfo,
 	//格式如下：public$ <T> void getName(); <T>在函数返回值之前。
     if(c_parser_next_token_is (parser, CPP_LESS)){
 	    funcGenericModel=generic_model_new(TRUE,GEN_FROM_CLASS_DECL);
-	    n_debug("新----struct内的声明 可以是一个泛型函数\n");
+	    n_debug("新----struct内的声明 可以是一个泛型函数。");
 		if(c_parser_next_token_is (parser, CPP_NAME)){
 		    needCheckConstructors=!(class_ctor_parser_constructor(self->classCtor,className));
 		    c_token *token=c_parser_peek_token (parser);
@@ -355,19 +364,19 @@ static tree  c_parser_class_declaration (ClassParser *self,ClassInfo *classInfo,
     */
     if(c_parser_next_token_is (parser, CPP_MULT) && c_parser_peek_2nd_token(parser)->type==CPP_NAME
 		  && !c_token_starts_typename(c_parser_peek_2nd_token(parser)) && c_parser_peek_nth_token(parser,3)->type==CPP_OPEN_PAREN){
-    	n_debug("新----struct内的声明 --11--把函数声明'int * getName('重整为'int *(*getName)('  此种格式 ");
+    	//n_debug("新----struct内的声明 --11--把函数声明'int * getName('重整为'int *(*getName)('  此种格式 ");
 	  /*匹配 * getName(*/
 	  checkConstructor(parser,c_parser_peek_2nd_token(parser),className,needCheckConstructors);
 	  rearrangeMode(parser,className,3,funcGenericModel!=NULL);
     }else  if(c_parser_next_token_is (parser, CPP_NAME) && c_parser_peek_2nd_token(parser)->type==CPP_OPEN_PAREN){
-    	n_debug("新----struct内的声明 -22-- 把函数声明'int  getName('重整为'int (*getName)('  此种格式  ");
+    	//n_debug("新----struct内的声明 -22-- 把函数声明'int  getName('重整为'int (*getName)('  此种格式  ");
 	  /*匹配 getName(*/
 	  checkConstructor(parser,c_parser_peek_token(parser),className,needCheckConstructors);
 	  rearrangeMode(parser,className,2,funcGenericModel!=NULL);
     }else if(c_parser_next_token_is (parser, CPP_MULT) && c_parser_peek_2nd_token(parser)->type==CPP_MULT &&
 		  c_parser_peek_nth_token(parser,3)->type==CPP_NAME
 		  && !c_token_starts_typename(c_parser_peek_nth_token(parser,3)) && c_parser_peek_nth_token(parser,4)->type==CPP_OPEN_PAREN){
-    	n_debug("新----struct内的声明 --33--把函数声明'int ** getName('重整为'int *(*getName)('  此种格式  ");
+    	//n_debug("新----struct内的声明 --33--把函数声明'int ** getName('重整为'int *(*getName)('  此种格式  ");
 	  checkConstructor(parser,c_parser_peek_nth_token(parser,3),className,needCheckConstructors);
 	  /*匹配 ** getName(*/
 	  rearrangeMode(parser,className,4,funcGenericModel!=NULL);
@@ -375,14 +384,14 @@ static tree  c_parser_class_declaration (ClassParser *self,ClassInfo *classInfo,
 		  && c_parser_peek_nth_token(parser,3)->type==CPP_MULT
 		  && c_parser_peek_nth_token(parser,4)->type==CPP_NAME
 		  && !c_token_starts_typename(c_parser_peek_nth_token(parser,4)) && c_parser_peek_nth_token(parser,5)->type==CPP_OPEN_PAREN){
-    	n_debug("新----struct内的声明 --33--把函数声明'int ** getName('重整为'int *(*getName)('  此种格式 ");
+    	//n_debug("新----struct内的声明 --33--把函数声明'int ** getName('重整为'int *(*getName)('  此种格式 ");
 	  checkConstructor(parser,c_parser_peek_nth_token(parser,3),className,needCheckConstructors);
 	  /*匹配 ** getName(*/
 	  rearrangeMode(parser,className,5,funcGenericModel!=NULL);
     }
 
    if (c_parser_next_token_is (parser, CPP_SEMICOLON) || c_parser_next_token_is (parser, CPP_CLOSE_BRACE)){
-	   n_debug("新----struct内的声明 22 如果是CPP_SEMICOLON或CPP_CLOSE_BRACE 返回 ");
+	   //n_debug("新----struct内的声明 22 如果是CPP_SEMICOLON或CPP_CLOSE_BRACE 返回 ");
       tree ret;
       if (specs->typespec_kind == ctsk_none){
 	     pedwarn (decl_loc, OPT_Wpedantic,"ISO C forbids member declarations with no members");
@@ -549,7 +558,7 @@ static void parserExentdsAndImplements(ClassParser *self,ClassInfo *classInfo,ch
     	     }
     	         return;
     	     default:
-    	    	 error_at(start_loc,"Class Xxx Extends Yyy格式");
+    	    	 error_at(start_loc,"class$ Xxx extends$ Yyy格式");
     	    	 return;
           }
       }

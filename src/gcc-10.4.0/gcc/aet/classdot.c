@@ -135,7 +135,7 @@ tree  class_dot_build_ref(ClassDot *self,location_t loc,location_t component_loc
 		 char *idStr=IDENTIFIER_POINTER(component);
 	     ClassName *className=class_mgr_get_class_name_by_user(class_mgr_get(),idStr);
 		 ClassInfo *info=class_mgr_get_class_info_by_class_name(class_mgr_get(),className);
-		 n_debug("class_dot_build_deref 00 %s component:%s 当前所在函数：%s\n",
+		 n_debug("class_dot_build_deref 00 %s component:%s 当前所在函数：%s",
 				 className==NULL?"null":className->sysName,idStr,IDENTIFIER_POINTER(DECL_NAME(current_function_decl)));
 		 if(info!=NULL){
 			 error_at(loc,"不能调用构造函数 %qs",className->userName);
@@ -147,7 +147,7 @@ tree  class_dot_build_ref(ClassDot *self,location_t loc,location_t component_loc
 			 return ref;
 		 }
 	 }else{
-	     n_debug("class_dot_build_deref 变量处理 还要重新处理，先这样 component:%s \n",IDENTIFIER_POINTER(component));
+	     n_debug("class_dot_build_deref 变量处理 还要重新处理，先这样 component:%s",IDENTIFIER_POINTER(component));
 		 //从引用的类名开始查找引用的变量，取最近的，原来还要判断右边赋值情况，想多了。重新设计
 		 VarRefRelation *item=class_access_create_relation_ship((ClassAccess *)self,loc,component,exprValue);
 		 if(item==NULL)
@@ -169,7 +169,7 @@ nboolean class_dot_is_class_ref(ClassDot *self,tree exprValue)
 {
 	char *className=class_access_get_class_name((ClassAccess*)self,exprValue);
 	if(className==NULL){
-		 n_debug("class_dot_is_class_ref 点访问不是一个Class %s\n",get_tree_code_name(TREE_CODE(exprValue)));
+		 n_debug("class_dot_is_class_ref 点访问不是一个Class %s",get_tree_code_name(TREE_CODE(exprValue)));
 	     //aet_print_tree(exprValue);
 	}
 	return className!=NULL;

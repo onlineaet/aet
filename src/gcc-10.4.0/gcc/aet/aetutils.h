@@ -45,9 +45,10 @@ tree           aet_utils_create_temp_func_name(char *className,char *orgiName);
 int            aet_utils_get_orgi_func_and_class_name(char *newName,char *className,char *funcName);
 c_token       *aet_utils_create_super_token(c_token *token,location_t start_loc);
 void           aet_utils_create_string_token(c_token *token,uchar *str,int len);
-char*          aet_utils_create_init_method(char *className);
-c_token       *aet_utils_create_aet_goto_token(c_token *token,location_t start_loc);
+char*          aet_utils_create_init_method(char *sysName);
+char          *aet_utils_get_sys_name_from_init_method(char *funcName);
 
+c_token       *aet_utils_create_aet_goto_token(c_token *token,location_t start_loc);
 
 int            aet_utils_add_token(cpp_reader *pfile, const char *str,size_t len);
 int            aet_utils_add_token_with_location(cpp_reader *pfile, const char *str,size_t len,location_t loc);
@@ -111,6 +112,8 @@ int      aet_utils_in_micro();
 nboolean aet_utils_compile_additional_code_status();
 
 char   *aet_utils_get_keyword_string(c_token *token);//获取keyword类型的keyword的字符串
+
+location_t  aet_utils_create_location(nuint lines,nuint cols);
 
 
 #endif /* ! GCC_C_AET_H */

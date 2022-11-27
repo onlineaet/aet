@@ -32,6 +32,7 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
  */
 
 int func_pointer_check(tree lhs,tree rhs,int *paramNum);
+int func_pointer_check_two(tree lhs,tree rhs,int *paramNum);
 
 #endif
 

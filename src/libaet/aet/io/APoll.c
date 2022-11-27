@@ -96,7 +96,6 @@ impl$ APoll{
 
 
     int modify (int fd, int events){
-         int res=0;
          struct epoll_event ev;
          memset(&ev, 0, sizeof(ev));
          unsigned char oldmask=0;

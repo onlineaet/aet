@@ -48,6 +48,7 @@ int                  class_util_get_pointers(tree type);
 nboolean             class_util_is_void_pointer(tree type);
 nboolean             class_util_is_function(struct c_declarator *declarator);
 struct c_declarator *class_util_get_function_declarator(struct c_declarator *declarator);
+struct c_declarator *class_util_get_function_id(struct c_declarator *funcdel);
 tree                 class_util_create_null_tree();
 nint                 class_util_get_random_number();
 char                *class_util_get_o_file();

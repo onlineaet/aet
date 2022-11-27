@@ -1,6 +1,7 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <string.h>
+#define __USE_GNU
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>

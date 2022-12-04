@@ -43,12 +43,14 @@ public$ class$ AClass{
     private$ char *packageName;
     private$ AClass *parent;
     private$ AClass *interfaces[10];
+    private$ unsigned long interfacesOffset[10];
     private$ int interfaceCount;
     private$ AClass();
     public$ char    *getName();
     public$ char    *getPackage();
     public$ AClass  *getParent();
     public$ AClass **getInterfaces(int *count);
+    public$ unsigned long getInterfaceOffset(int index);
 };
 
 ///////////////---------------以下都是编译器调用的，用户程序不能调用---------------
@@ -94,8 +96,6 @@ static inline  void _iface_reserve_unref_func_define_123(IfaceCommonData123 *ifa
 {
     ((AObject*)iface->_atClass123)->unref();
 }
-
-
 
 static inline int is_aet_class(AClass *class,char *name)
 {
@@ -147,6 +147,44 @@ static inline int  varof_object_or_interface (void *object,char *name)
         return 0;
     return object_varof(dest->getClass(),name);
 }
+
+/**
+ * 动态的类转接口
+ */
+static inline int class_to_iface(AClass *class,char *ifaceSysName,unsigned long *offset)
+{
+    if(class==NULL)
+          return 0;
+    int ifaceCount=0;
+    AClass **interfaceClasses=class->getInterfaces(&ifaceCount);
+    int i;
+    for(i=0;i<ifaceCount;i++){
+      if(is_aet_class(interfaceClasses[i],ifaceSysName)){
+           *offset=class->getInterfaceOffset(i);
+           return 1;
+      }
+    }
+    AClass *parentClass=class->getParent();
+    return class_to_iface(parentClass,ifaceSysName,offset);
+}
+
+static inline void* dynamic_cast_iface(void *data,char *ifaceSysName,char *compileFile,int line,int column)
+{
+     AObject *obj=(AObject*)data;
+     AClass *class=obj->getClass();
+     unsigned long offset=0;
+     int find= class_to_iface(class,ifaceSysName,&offset);
+     if(!find){
+         //动态转化是错的，给用户报位置
+         char msg[1024];
+         sprintf(msg,"类 %s不能被转化为接口 %s 。\n在文件 %s 第%d行 第%d列。\n",class->getName(),ifaceSysName,compileFile,line,column);
+         printf(msg);
+         exit(1);
+     }else{
+         return (void *)(((unsigned long)data)+offset);
+     }
+}
+
 
 
 /**
@@ -202,7 +240,7 @@ static inline void add_super_method(AObject *self,char *sysName,char *rawMangleN
      }else{
           int count=0;
           while(self->superCallData[count++]!=NULL);
-         // printf("add_super_method 第二次 count:%d self:%p sysName:%s rawMangleName:%s add:%lu\n",count,self,sysName,rawMangleName,address);
+          //printf("add_super_method 第二次 count:%d self:%p sysName:%s rawMangleName:%s add:%lu\n",count,self,sysName,rawMangleName,address);
           self->superCallData=realloc(self->superCallData,sizeof(SuperCallData*)*(count+1));
           self->superCallData[count-1]=a_malloc0(sizeof(SuperCallData));
           self->superCallData[count-1]->sysName=a_strdup(sysName);

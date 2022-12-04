@@ -287,9 +287,10 @@ typedef enum{
 #define AET_NEED_SECOND_FILE_NAME           "aet_need_second_compile.tmp" //存放需要第二次编译的文件名
 
 #define AET_MAGIC_NAME                       "_aet_magic$_123"  //存放魔数的变量名
-#define AET_MAGIC_NAME_VALUE                 1725348960 //存放魔数的变量名 int max=2147483647 接口加1
-#define AET_IFACE_MAGIC_NAME_VALUE           (AET_MAGIC_NAME_VALUE+1)//存放魔数的变量名 int max=2147483647 接口加1
-#define AET_VAR_OF_FUNC_NAME                 "varof_object_or_interface"  //varof具体实现。
+#define AET_MAGIC_NAME_VALUE                 1725348960 //类魔数
+#define AET_IFACE_MAGIC_NAME_VALUE           (AET_MAGIC_NAME_VALUE+1)//接口魔数
+#define AET_VAR_OF_FUNC_NAME                 "varof_object_or_interface"  //varof具体实现。定义在AObject.h。
+#define AET_DYNAMIC_CAST_IFACE_FUNC_NAME     "dynamic_cast_iface"  //类转接口的动态实现函数，定义在AObject.h。
 
 typedef enum _FuncAndVarMsg
 {

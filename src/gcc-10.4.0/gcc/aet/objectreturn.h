@@ -53,7 +53,7 @@ void             object_return_add_return(ObjectReturn *self,tree retExpr);
 /**
  * 只有对象指针才能根据函数返回值声明转化
  */
-tree             object_return_convert(ObjectReturn *self,tree retExpr);
+tree             object_return_convert(ObjectReturn *self,location_t loc,tree retExpr);
 
 
 

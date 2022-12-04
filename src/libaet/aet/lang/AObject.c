@@ -5,6 +5,7 @@
  * objectSize=0;由编译器来设大小
  */
 impl$ AObject{
+
   AObject(){
      refCount=1;
   }

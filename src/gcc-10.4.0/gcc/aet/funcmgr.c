@@ -1145,7 +1145,7 @@ void func_mgr_check_permission_decl_between_define(FuncMgr *self,location_t loc,
     if((func->permission==CLASS_PERMISSION_DEFAULT || func->permission==CLASS_PERMISSION_PROTECTED) &&
             (permission==CLASS_PERMISSION_DEFAULT || permission==CLASS_PERMISSION_PROTECTED))
         return;
-    if(func->permission!=permission){
+    if(func->permission!=permission && aet_utils_valid_tree(func->fieldDecl)){
         warning_at(loc,0,"在类实现中函数%qs的访问控制方法与类声明中的不一致。",func->orgiName);
     }
 }

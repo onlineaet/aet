@@ -6456,7 +6456,7 @@ static void c_parser_statement_after_labels (c_parser *parser, bool *if_p, vec<t
 	               struct c_expr expr = c_parser_expression_conv (parser);
 	               mark_exp_read (expr.value);
 		           n_debug("语句标签后 44 分析return ");
-		           expr.value=class_impl_add_return(classImpl,expr.value);
+		           expr.value=class_impl_add_return(classImpl,expr.get_location(),expr.value);
 	               stmt = c_finish_return (EXPR_LOC_OR_LOC (expr.value, xloc),expr.value, expr.original_type);
 	               goto expect_semicolon;
 	            }

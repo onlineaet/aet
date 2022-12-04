@@ -177,6 +177,8 @@ static void castClassToInterface(char *rightName,char *leftName,tree nopexpr,tre
 			   n_debug("class_cast_parser_decl castClassToInterface ---22 左边是接口，右边是类 类转接口 %s %s belongClass:%s",
 					   leftName,rightName,belongClass->sysName);
 			   TREE_OPERAND (nopexpr, 0)=value;
+		   }else{
+               error_at(EXPR_LOCATION(nopexpr),"类%qs不能转化到接口%qs。",rightName,leftName);
 		   }
 	   }else if(!lhs && rhs){
 		   ClassName *belongClass=class_mgr_find_interface(class_mgr_get(),&leftInfo->className,&rightInfo->className);
@@ -362,9 +364,7 @@ void   class_cast_in_finish_decl(ClassCast *self ,tree decl)
 	    	setNopExpr(self,decl,init,declClassName);
 	    }else if(TREE_CODE(init)==TARGET_EXPR){
 	    	setTargetExpr(self,decl,init,declClassName);
-			//aet_print_tree(init);
 	    }else if(TREE_CODE(init)==VAR_DECL){
-	    	  //setVarDecl(self,decl,init,declClassName);
 	    	  GenericModel *generics=c_aet_get_generics_model(init);
 	    	  if(generics)
 	    		c_aet_set_generics_model(decl,generics);
@@ -417,11 +417,6 @@ void  class_cast_in_finish_stmt(ClassCast *self ,tree stmt)
     varClassName=getClassNameInVarDeclOrModifyOrComponentRefExpr(self,lt);
     if(varClassName==NULL)
     	return;
-  //  n_debug("class_cast_add_ref_in_finish_stmt 语句 11 stmt:%p varClassName:%s  declClassName:%s rt:%s",
-		//	stmt,varClassName,declClassName,get_tree_code_name(TREE_CODE(rt)));
-    //aet_print_tree(lt);
-    //printf("=======================rt==================\n");
-   // aet_print_tree(rt);
     if((TREE_CODE(lt)==VAR_DECL || TREE_CODE(lt)==COMPONENT_REF) && TREE_CODE(rt)==NOP_EXPR){
     	setNopExpr(self,lt,rt,declClassName);
     }else if(TREE_CODE(lt)==COMPONENT_REF && TREE_CODE(rt)==TARGET_EXPR){
@@ -492,31 +487,39 @@ static tree buildClassToIface(tree op,tree castToType)
 	return addrExpr;
 }
 
+#define CLASS_TO_IFACE_NO_CAST  0
+#define CLASS_TO_IFACE_DYNAMIC  1
+#define CLASS_TO_IFACE_STATIC   2
+
 /**
  * 是不是从类转接口
+ * 返回 0 说明类型相同
+ * 返回 1 说明被转的变量并没有实现接口
+ * 返回 2 说明被转的变量实现接口
  */
-static nboolean isClassToIface(tree castToType,tree op)
+static int isClassToIface(tree castToType,tree op)
 {
     char *interface=class_util_get_class_name(castToType);//这是一个aet 类吗？
     char *sysName=class_util_get_class_name(TREE_TYPE(op));
-    n_debug("isClassToIface --- %s %s",interface,sysName);
+    printf("ddddxxxxddd isClassToIface :%s %s\n",interface,sysName);
     if(sysName==NULL || interface==NULL)
-	   return FALSE;
+	   return CLASS_TO_IFACE_NO_CAST;
     //如果castToType 与op类型相同返回FALSE;
     if(c_tree_equal(castToType,TREE_TYPE(op))){
-    	 printf("类型相同---- \n");
-    	return FALSE;
+    	 return CLASS_TO_IFACE_NO_CAST;
     }
-
     ClassInfo *rightInfo=class_mgr_get_class_info(class_mgr_get(),sysName);
     ClassInfo *leftInfo=class_mgr_get_class_info(class_mgr_get(),interface);
+    if(!class_info_is_interface(leftInfo)) //不是接口
+        return CLASS_TO_IFACE_NO_CAST;
+    if(class_info_is_interface(rightInfo))    //不是类
+        return CLASS_TO_IFACE_NO_CAST;
     ClassName *belongClass=class_mgr_find_interface(class_mgr_get(),&rightInfo->className,&leftInfo->className);
 	if(belongClass==NULL){
-		error_at(input_location,"%qs没有实现接口%qs，不能强转。",rightInfo->className.userName,leftInfo->className.userName);
-		return FALSE;
+	    n_debug("isClassToIface --- 00 需要动态转化 %s %s",interface,sysName);
+		return CLASS_TO_IFACE_DYNAMIC;
 	}
-	n_debug("isClassToIface --- 11 %s %s %s",interface,sysName,belongClass->sysName);
-	return TRUE;
+	return CLASS_TO_IFACE_STATIC;
 }
 
 static nboolean isIfaceToClass(tree castToType,tree op)
@@ -542,6 +545,48 @@ static nboolean isIfaceToClass(tree castToType,tree op)
 
 }
 
+////--------------------------类转接口------------------
+
+
+static  vec<tree, va_gc> *createDynamicCastIfaceParms(location_t loc,tree one,char *ifaceSysName)
+{
+       tree two=class_util_create_string_actual_param(loc,ifaceSysName);
+       expanded_location xloc;
+       xloc = expand_location(loc);
+       printf("位置是:%d %d %s\n",xloc.line, xloc.column,xloc.file);
+       tree three=class_util_create_string_actual_param(loc,xloc.file);//当不能动态转化时报错在那个文件。
+       tree four=class_util_create_integer_actual_param(loc,xloc.line);
+       tree five=class_util_create_integer_actual_param(loc,xloc.column);
+
+       vec<tree, va_gc> *parmVec;
+       parmVec = make_tree_vector ();
+       vec_safe_push(parmVec,one);
+       vec_safe_push(parmVec,two);
+       vec_safe_push(parmVec,three);
+       vec_safe_push(parmVec,four);
+       vec_safe_push(parmVec,five);
+       return parmVec;
+}
+
+
+static tree buildDynamicClassToIfaceExpr(location_t loc,tree op,char *ifaceSysName)
+{
+    tree valueType=TREE_TYPE(op);
+    tree type=build_pointer_type(void_type_node);
+    tree firstParm;
+    if(TREE_CODE(valueType)!=POINTER_TYPE){
+         tree pointer = build_unary_op (loc, ADDR_EXPR, op, FALSE);//转指针
+         firstParm = build1 (NOP_EXPR, type, pointer);//转成(void*)value
+    }else{
+         firstParm = build1 (NOP_EXPR, type, op);//转成(void*)value
+    }
+    tree funcName=aet_utils_create_ident(AET_DYNAMIC_CAST_IFACE_FUNC_NAME);
+    tree decl=lookup_name(funcName);
+    vec<tree, va_gc> *parms=createDynamicCastIfaceParms(loc,firstParm,ifaceSysName);
+    tree newCallExpr = c_build_function_call_vec (loc, vNULL, decl,parms, NULL);
+    return newCallExpr;
+}
+
 /**
  * 从类转接口
  * Abc *abc=new$ Abc();
@@ -549,31 +594,45 @@ static nboolean isIfaceToClass(tree castToType,tree op)
  * 接口:
  * Interface *face=(Interface *)temp;
  * 这时，从temp应该找到最下层的类abc。由abc再来找到接口。否则出错。
+ * 如果temp中没有接口，这时进入动态转
  */
-static tree convertClassToInterface(tree castToType,tree expr)
+static tree convertClassToInterface(location_t loc,tree castToType,tree expr)
 {
    tree type=getTypeFromPointer(castToType);
    char *interface=class_util_get_class_name(castToType);//这是一个aet 类吗？
-   if(TREE_CODE(expr)==NOP_EXPR){
-   	      tree op=TREE_OPERAND (expr, 0);
-   	      if(!isClassToIface(castToType,op)){
-   	    	  return expr;
-   	      }
-   	      if(TREE_CODE(op)==VAR_DECL || TREE_CODE(op)==ADDR_EXPR || TREE_CODE(op)==PARM_DECL){
-   	    	    //printf("convertClassToInterface --- %s\n",get_tree_code_name(TREE_CODE(op)));
-   	    	    op=buildClassToIface(op,castToType);
-		        TREE_OPERAND (expr, 0)=op;
-   		        return expr;
-   	      }else if(TREE_CODE(op)==CALL_EXPR){
-   	       //printf("convertClassToInterface ssscalll--- %s\n",get_tree_code_name(TREE_CODE(op)));
-   	                     op=buildClassToIface(op,castToType);
-   	                     TREE_OPERAND (expr, 0)=op;
-   	                     return expr;
-   	      }else{
-   	           aet_print_tree_skip_debug(expr);
-   	      	   n_error("expr是 NOP_EXPR 它的类型与要转化的类型不一样。%s，还未处理!!!\n",interface);
-   	      }
-    	  return expr;
+   printf("convertClassToInterface---- %s\n",interface);
+   if(TREE_CODE(expr)==NOP_EXPR || TREE_CODE(expr)==NON_LVALUE_EXPR){
+      tree op=TREE_OPERAND (expr, 0);
+      if(TREE_CODE(op)==VAR_DECL || TREE_CODE(op)==ADDR_EXPR || TREE_CODE(op)==PARM_DECL ||
+              TREE_CODE(op)==CALL_EXPR || TREE_CODE(op)==COMPONENT_REF || TREE_CODE(op)==TARGET_EXPR){
+           printf("convertClassToInterface CCCC--- %s\n",get_tree_code_name(TREE_CODE(op)));
+           int castMethod=isClassToIface(castToType,op);
+           printf("转接口的方法是:%d interface:%s\n",castMethod,interface);
+           if(castMethod==CLASS_TO_IFACE_STATIC){
+               op=buildClassToIface(op,castToType);
+           }else if(castMethod==CLASS_TO_IFACE_DYNAMIC){
+               op=buildDynamicClassToIfaceExpr(loc,op,interface);
+           }
+           TREE_OPERAND (expr, 0)=op;
+           return expr;
+      }else{
+           aet_print_tree_skip_debug(expr);
+           n_error("类转接口%s 表达式 NOP_EXPR TREE_OPERAND(expr,0)，还未处理!!!\n",interface,get_tree_code_name(TREE_CODE(op)));
+      }
+   }else if(TREE_CODE(expr)==VAR_DECL || TREE_CODE(expr)==ADDR_EXPR || TREE_CODE(expr)==PARM_DECL || TREE_CODE(expr)==CALL_EXPR
+           || TREE_CODE(expr)==COMPONENT_REF || TREE_CODE(expr)==TARGET_EXPR){
+       int castMethod=isClassToIface(castToType,expr);
+       printf("转接口的方法是:%d interface:%s\n",castMethod,interface);
+       if(castMethod==CLASS_TO_IFACE_STATIC){
+           expr=buildClassToIface(expr,castToType);
+       }else if(castMethod==CLASS_TO_IFACE_DYNAMIC){
+           char *sysName=class_util_get_class_name(TREE_TYPE(expr));
+           error_at(loc,"类%qs不能转化为接口%qs。",sysName,interface);
+       }
+   }else{
+       aet_print_tree_skip_debug(expr);
+       aet_print_location(loc);
+       n_error("类转接口%s 表达式是%s，还未处理!!!\n",interface,get_tree_code_name(TREE_CODE(expr)));
    }
    return expr;
 }
@@ -586,44 +645,44 @@ static tree convertClassToInterface(tree castToType,tree expr)
  */
 tree class_cast_cast(ClassCast *self,struct c_type_name *type_name,tree expr)
 {
-      if (!type_name)
-          return expr;
-      tree type = groktypename (type_name, NULL, NULL);
-      char *sysName=class_util_get_class_name(type);//这是一个aet 类吗？
-      if(!sysName)
-          return expr;
-      if(TREE_CODE(type)!=POINTER_TYPE){
-          n_warning("强制转化成类%s,但类型不是指针。不处理。",sysName);
-          return expr;
-      }
-        ClassInfo *leftInfo=class_mgr_get_class_info(class_mgr_get(),sysName);
-        if(leftInfo==NULL){
-            n_error("从表达式转化到类%s时出错。原因：找不到类:%s\n",sysName,sysName);
-            return expr;
-        }
-        if(class_info_is_class(leftInfo) || class_info_is_abstract_class(leftInfo)){
-           if(TREE_CODE(expr)==NOP_EXPR){
-              tree op=TREE_OPERAND (expr, 0);
-              if(isIfaceToClass(type,op)){
-                  char *rightSysName=class_util_get_class_name(TREE_TYPE(op));
-                  ClassInfo *rightInfo=class_mgr_get_class_info(class_mgr_get(),rightSysName);
-                  ClassName *belongClass=class_mgr_find_interface(class_mgr_get(),&leftInfo->className,&rightInfo->className);
-                  if(belongClass==NULL){
-                      location_t loc= type_name->declarator->id_loc;
-                      error_at(loc,"类%qs并未实接口%qs。",leftInfo->className.sysName,rightInfo->className.sysName);
-                      return expr;
-                  }
-                  n_debug("接口转类-----接口：%s 转化的类:%s\n",rightSysName,leftInfo->className.sysName);
-                  tree pointerType=type;//等同 ARandom *;
-                  tree value= ifaceToClass(op,pointerType);
-                  TREE_OPERAND (expr,0)=value;
-              }
-           }
-        }else{
-            //printf("转接口 %s\n",destSysName);
-            return convertClassToInterface(type,expr);
-        }
+    if (!type_name)
+      return expr;
+    tree type = groktypename (type_name, NULL, NULL);
+    char *sysName=class_util_get_class_name(type);//这是一个aet 类吗？
+    if(!sysName)
+      return expr;
+    if(TREE_CODE(type)!=POINTER_TYPE){
+      n_warning("强制转化成类%s,但类型不是指针。不处理。",sysName);
+      return expr;
+    }
+    location_t loc= EXPR_LOCATION (expr);//type_name->declarator->id_loc;
+    ClassInfo *leftInfo=class_mgr_get_class_info(class_mgr_get(),sysName);
+    if(leftInfo==NULL){
+        n_error("从表达式转化到类%s时出错。原因：找不到类:%s\n",sysName,sysName);
         return expr;
+    }
+    if(class_info_is_class(leftInfo) || class_info_is_abstract_class(leftInfo)){
+       if(TREE_CODE(expr)==NOP_EXPR){
+          tree op=TREE_OPERAND (expr, 0);
+          if(isIfaceToClass(type,op)){
+              char *rightSysName=class_util_get_class_name(TREE_TYPE(op));
+              ClassInfo *rightInfo=class_mgr_get_class_info(class_mgr_get(),rightSysName);
+              ClassName *belongClass=class_mgr_find_interface(class_mgr_get(),&leftInfo->className,&rightInfo->className);
+              if(belongClass==NULL){
+                  error_at(loc,"类%qs并未实接口%qs。",leftInfo->className.sysName,rightInfo->className.sysName);
+                  return expr;
+              }
+              n_debug("接口转类-----接口：%s 转化的类:%s\n",rightSysName,leftInfo->className.sysName);
+              tree pointerType=type;//等同 ARandom *;
+              tree value= ifaceToClass(op,pointerType);
+              TREE_OPERAND (expr,0)=value;
+          }
+       }
+    }else{
+        n_debug("转接口 %s\n",sysName);
+        return convertClassToInterface(loc,type,expr);
+    }
+    return expr;
 }
 
 ////////////////////-----------------------
@@ -917,7 +976,6 @@ void class_cast_parm_convert_from_deref(ClassCast *self,tree func,vec<tree, va_g
 				}
 				tree actualParm = (*exprlist)[count];
 				//printf("实际参数是\n");
-				//aet_print_tree(actualParm);
 				tree cc=convertActualParm(type,actualParm,count);
 				if(cc!=NULL_TREE)
 					(*exprlist)[count]=cc;
@@ -930,12 +988,12 @@ void class_cast_parm_convert_from_deref(ClassCast *self,tree func,vec<tree, va_g
 /**
  * 返回值是对象转成接口
  */
-tree  class_cast_cast_for_return(ClassCast *self,tree interfaceType,tree expr)
+tree  class_cast_cast_for_return(ClassCast *self,location_t loc,tree interfaceType,tree expr)
 {
-	nboolean isObjectToIface=isClassToIface(interfaceType,expr);
-	printf("class_cast_cast_for_return --- %d\n",isObjectToIface);
-	if(isObjectToIface){
-   	    expr=buildClassToIface(expr,interfaceType);
+	int castMethod=isClassToIface(interfaceType,expr);
+	n_debug("class_cast_cast_for_return ---castMethod:%d\n",castMethod);
+	if(castMethod==CLASS_TO_IFACE_STATIC || castMethod==CLASS_TO_IFACE_DYNAMIC){
+   	    expr=convertClassToInterface(loc,interfaceType,expr);
 	}
 	return expr;
 

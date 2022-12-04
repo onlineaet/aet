@@ -765,6 +765,7 @@ void func_check_check_all_define(FuncCheck *self)
 	    n_debug("func_check_check_all_define 22 过滤后没有需要检查的方法了。");
 		return;
 	}
+	printf("func_check_check_all_define ----00\n");
 	checkStepThree(self,filter);
 }
 

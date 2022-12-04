@@ -1240,10 +1240,10 @@ void   class_impl_finish_function(ClassImpl *self,tree fndecl)
 /**
  * 如果是对象变量加入到objectreturn中处理，如果是转化由objectreturn处理并返回
  */
-tree   class_impl_add_return(ClassImpl *self,tree retExpr)
+tree   class_impl_add_return(ClassImpl *self,location_t loc,tree retExpr)
 {
     object_return_add_return(object_return_get(),retExpr);
-    tree expr=object_return_convert(object_return_get(),retExpr);
+    tree expr=object_return_convert(object_return_get(),loc,retExpr);
     return expr;
 }
 

@@ -961,7 +961,6 @@ static void
 pp_wrap_text (pretty_printer *pp, const char *start, const char *end)
 {
   bool wrapping_line = pp_is_wrapping_line (pp);
-  printf("pp_wrap_text --- %s %s\n",start,end);
   while (start != end)
     {
       /* Dump anything bordered by whitespaces.  */

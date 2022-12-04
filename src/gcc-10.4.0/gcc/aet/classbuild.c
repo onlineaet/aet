@@ -137,7 +137,6 @@ void class_build_create_codes(ClassBuild *self,ClassName *className,NString *cod
    ClassInfo *classInfo=class_mgr_get_class_info_by_class_name(class_mgr_get(),className);
    char *varInitCodes=class_info_create_class_code(classInfo);
    char *initMethod=aet_utils_create_init_method(cName->sysName);
-   //n_string_append_printf(codes,"static  AClass *%s(%s *self)\n",funcName,className->sysName);
    n_string_append_printf(codes,"static  AClass *%s(AObject *self)\n",funcName);
    n_string_append(codes,       "{\n");
    n_string_append_printf(codes,"    static AClass *%s=NULL;\n",varName);

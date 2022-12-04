@@ -1,7 +1,7 @@
 
 
-#ifndef _A_LIB_H_
-#define _A_LIB_H_
+#ifndef __A_LIB_H__
+#define __A_LIB_H__
 
 #include "abase.h"
 #include "alog.h"

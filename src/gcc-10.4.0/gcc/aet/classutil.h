@@ -84,7 +84,11 @@ struct _CheckParamCallback{
     GenericModel *generics;//GenericModel *generics
 };
 
-
+/**
+ * 创建字符串的实参
+ */
+tree class_util_create_string_actual_param(location_t loc,char *string);
+tree class_util_create_integer_actual_param(location_t loc,int value);
 
 
 #endif /* ! GCC_C_AET_H */

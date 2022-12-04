@@ -962,10 +962,9 @@ void object_return_add_return(ObjectReturn *self,tree retExpr)
  * 只有对象指针才能根据函数返回值声明转化
  * 并且只能转为接口
  */
-tree   object_return_convert(ObjectReturn *self,tree retExpr)
+tree   object_return_convert(ObjectReturn *self,location_t loc,tree retExpr)
 {
 	 tree  decl = DECL_RESULT (current_function_decl);
-	 //printf("object_return_convert 00\n");
      tree type=TREE_TYPE(decl);
      if(TREE_CODE(type)==POINTER_TYPE){
          type=TREE_TYPE(type);
@@ -973,8 +972,7 @@ tree   object_return_convert(ObjectReturn *self,tree retExpr)
          if(sysName!=NULL){
         	 ClassInfo *info=class_mgr_get_class_info(class_mgr_get(),sysName);
         	 if(info!=NULL && class_info_is_interface(info)){
-        		 //printf("object_return_convertv 返回值是接口:%s\n",sysName);
-        		 return class_cast_cast_for_return(self->classCast,TREE_TYPE(decl),retExpr);
+        		 return class_cast_cast_for_return(self->classCast,loc,TREE_TYPE(decl),retExpr);
         	 }
          }
      }

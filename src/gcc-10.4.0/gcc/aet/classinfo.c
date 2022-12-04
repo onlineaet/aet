@@ -364,6 +364,9 @@ char *class_info_create_class_code(ClassInfo *self)
         int i;
         for(i=0;i<self->ifaceCount;i++){
             n_string_append_printf(codes,"obj->interfaces[%d]=%s.class;\n",i,self->ifaces[i].userName);
+            char ifaceVarName[255];
+            aet_utils_create_in_class_iface_var(self->ifaces[i].userName,ifaceVarName);
+            n_string_append_printf(codes,"obj->interfacesOffset[%d]=offsetof(%s,%s);\n",i,className->sysName,ifaceVarName);
         }
         if(self->ifaceCount>0){
             n_string_append_printf(codes,"obj->interfaceCount=%d;\n",i,self->ifaceCount);

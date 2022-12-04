@@ -447,7 +447,7 @@ impl$ AThreadPool{
       t1=Time.monotonic();
       /* 运行的线程已达到设定的最大值 */
       if (maxThreads != -1 && numThreads >= (auint)maxThreads){
-          printf(" 运行的线程已达到设定的最大值:maxThreads:%d numThreads:%d\n",maxThreads,numThreads);
+         // printf(" 运行的线程已达到设定的最大值:maxThreads:%d numThreads:%d\n",maxThreads,numThreads);
           return TRUE;
       }
       success=unusedThread->addPool(self);

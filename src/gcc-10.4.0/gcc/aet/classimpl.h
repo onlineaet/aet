@@ -102,7 +102,7 @@ void           class_impl_build_enum_dot (ClassImpl *self, location_t loc,struct
 nboolean       class_impl_is_aet_class_component_ref_call(ClassImpl *self,struct c_expr expr);
 GenericModel * class_impl_get_func_generic_model(ClassImpl *self,tree id);
 void           class_impl_finish_function(ClassImpl *self,tree fndecl);
-tree           class_impl_add_return(ClassImpl *self,tree retExpr);//如果是对象变量加入到objectreturn中处理，如果是转化由objectreturn处理并返回
+tree           class_impl_add_return(ClassImpl *self,location_t loc,tree retExpr);//如果是对象变量加入到objectreturn中处理，如果是转化由objectreturn处理并返回
 
 void           class_impl_in_finish_decl(ClassImpl *self ,tree decl);
 void           class_impl_in_finish_stmt(ClassImpl *self ,tree stmt);

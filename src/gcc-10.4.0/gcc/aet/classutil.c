@@ -995,7 +995,33 @@ static tree lookupField(tree type, tree component)
    return field;
 }
 
-
+/**
+ * 创建字符串的实参
+ */
+tree class_util_create_string_actual_param(location_t loc,char *string)
+{
+    size_t length=string!=NULL?strlen(string):0;
+    tree strCst = build_string (length, (const char *) string!=NULL?string:"");
+    tree type = build_array_type (char_type_node,build_index_type (size_int (length)));
+    TREE_TYPE(strCst)=type;
+     struct c_expr expr;
+     set_c_expr_source_range (&expr, loc, loc);
+     expr.value=strCst;
+     expr = convert_lvalue_to_rvalue (expr.get_location (), expr, true, true);
+     return expr.value;
+}
+/**
+ * 创建整形的实参
+ */
+tree class_util_create_integer_actual_param(location_t loc,int value)
+{
+     tree ret=build_int_cst (integer_type_node,value);
+     struct c_expr expr;
+     set_c_expr_source_range (&expr, loc, loc);
+     expr.value=ret;
+     expr = convert_lvalue_to_rvalue (expr.get_location (), expr, true, true);
+     return expr.value;
+}
 /**
  * 在结构体或UNION中查找component
  */

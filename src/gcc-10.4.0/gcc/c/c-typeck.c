@@ -3066,7 +3066,7 @@ build_function_call_vec (location_t loc, vec<location_t> arg_loc,
   /* Convert anything with function type to a pointer-to-function.  */
   if (TREE_CODE (function) == FUNCTION_DECL){
       name = DECL_NAME (function);
-      n_debug("build_function_call_vec 00 %s",IDENTIFIER_POINTER(name));
+      //n_debug("build_function_call_vec 00 %s",IDENTIFIER_POINTER(name));
       if (flag_tm)
 	     tm_malloc_replacement (function);
       fundecl = function;
@@ -3079,28 +3079,28 @@ build_function_call_vec (location_t loc, vec<location_t> arg_loc,
   }
   char *funName=name?IDENTIFIER_POINTER(name):"unknown";
   if (TREE_CODE (TREE_TYPE (function)) == FUNCTION_TYPE){
-	  n_debug("build_function_call_vec 11 %s",funName,get_tree_code_name(TREE_CODE (function)));
+	  //n_debug("build_function_call_vec 11 %s",funName,get_tree_code_name(TREE_CODE (function)));
       function = function_to_pointer_conversion (loc, function);
   }
 
   /* For Objective-C, convert any calls via a cast to OBJC_TYPE_REF
      expressions, like those used for ObjC messenger dispatches.  */
   if (params && !params->is_empty ()){
-	  n_debug("build_function_call_vec 22 %s",funName);
+	  //n_debug("build_function_call_vec 22 %s",funName);
      function = objc_rewrite_function_call (function, (*params)[0]);
   }
 
   function = c_fully_fold (function, false, NULL);
 
   fntype = TREE_TYPE (function);
-  n_debug("build_function_call_vec 33 %s fntype code:%s function:%s",funName,get_tree_code_name(TREE_CODE (fntype)),
-		  get_tree_code_name(TREE_CODE (function)));
+ // n_debug("build_function_call_vec 33 %s fntype code:%s function:%s",funName,get_tree_code_name(TREE_CODE (fntype)),
+		//  get_tree_code_name(TREE_CODE (function)));
 
   if (TREE_CODE (fntype) == ERROR_MARK)
     return error_mark_node;
 
   if (!(TREE_CODE (fntype) == POINTER_TYPE	&& TREE_CODE (TREE_TYPE (fntype)) == FUNCTION_TYPE)){
-	  n_debug("build_function_call_vec 44 %s",funName);
+	  //n_debug("build_function_call_vec 44 %s",funName);
 
       if (!flag_diagnostics_show_caret)
 	     error_at (loc,"called object %qE is not a function or function pointer",function);

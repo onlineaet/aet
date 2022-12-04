@@ -39,7 +39,7 @@ void       class_cast_in_finish_stmt(ClassCast *self ,tree stmt);
 tree       class_cast_cast(ClassCast *self,struct c_type_name *type_name,tree expr);
 void       class_cast_parm_convert_from_ctor(ClassCast *self,tree func,vec<tree, va_gc> *exprlist);
 void       class_cast_parm_convert_from_deref(ClassCast *self,tree func,vec<tree, va_gc> *exprlist);
-tree       class_cast_cast_for_return(ClassCast *self,tree interfaceType,tree expr);//转化返回值 并且是对象转接口
+tree       class_cast_cast_for_return(ClassCast *self,location_t loc,tree interfaceType,tree expr);//转化返回值 并且是对象转接口
 
 #endif
 

@@ -1,0 +1,217 @@
+# Top level configure fragment for GNU Objective-C
+
+
+language="aet"
+
+compilers="cc1\$(exeext)"
+
+target_libs=target-libaet
+
+# Most of the object files for cc1obj actually come from C.
+lang_requires="c"
+
+# Order is important.  If you change this list, make sure you test
+# building without C++ as well; that is, remove the gcc/cp directory,
+# and build with --enable-languages=c,aet.
+
+gtfiles="\
+\$(srcdir)/aet/accesscontrols.h \
+\$(srcdir)/aet/aet-c-parser-header.h \
+\$(srcdir)/aet/aetexpr.h \
+\$(srcdir)/aet/aetinfo.h \
+\$(srcdir)/aet/aetmangle.h \
+\$(srcdir)/aet/aetmicro.h \
+\$(srcdir)/aet/aetparser.h \
+\$(srcdir)/aet/aetpragma.h \
+\$(srcdir)/aet/aetprinttree.h \
+\$(srcdir)/aet/aetutils.h \
+\$(srcdir)/aet/blockfunc.h \
+\$(srcdir)/aet/blockmgr.h \
+\$(srcdir)/aet/c-aet.h \
+\$(srcdir)/aet/classaccess.h \
+\$(srcdir)/aet/classbuild.h \
+\$(srcdir)/aet/classcast.h \
+\$(srcdir)/aet/classctor.h \
+\$(srcdir)/aet/classdot.h \
+\$(srcdir)/aet/classfinal.h \
+\$(srcdir)/aet/classfinalize.h \
+\$(srcdir)/aet/classfunc.h \
+\$(srcdir)/aet/classimpl.h \
+\$(srcdir)/aet/classinfo.h \
+\$(srcdir)/aet/classinit.h \
+\$(srcdir)/aet/classinterface.h \
+\$(srcdir)/aet/classlib.h \
+\$(srcdir)/aet/classmgr.h \
+\$(srcdir)/aet/classparser.h \
+\$(srcdir)/aet/classpackage.h \
+\$(srcdir)/aet/classpermission.h \
+\$(srcdir)/aet/classref.h \
+\$(srcdir)/aet/cmprefopt.h \
+\$(srcdir)/aet/classutil.h \
+\$(srcdir)/aet/clearwarning.h \
+\$(srcdir)/aet/enumparser.h \
+\$(srcdir)/aet/funccheck.h \
+\$(srcdir)/aet/funchelp.h \
+\$(srcdir)/aet/funcmgr.h \
+\$(srcdir)/aet/funcpointer.h \
+\$(srcdir)/aet/genericblock.h \
+\$(srcdir)/aet/genericcall.h \
+\$(srcdir)/aet/genericcheck.h \
+\$(srcdir)/aet/genericclass.h \
+\$(srcdir)/aet/genericcommon.h\
+\$(srcdir)/aet/genericdefine.h \
+\$(srcdir)/aet/genericmethod.h \
+\$(srcdir)/aet/genericexpand.h \
+\$(srcdir)/aet/genericfile.h\
+\$(srcdir)/aet/genericfunc.h \
+\$(srcdir)/aet/genericmodel.h \
+\$(srcdir)/aet/genericimpl.h \
+\$(srcdir)/aet/genericinfo.h \
+\$(srcdir)/aet/genericparser.h \
+\$(srcdir)/aet/genericutil.h \
+\$(srcdir)/aet/genericquery.h \
+\$(srcdir)/aet/ifacefile.h \
+\$(srcdir)/aet/implicitlycall.h \
+\$(srcdir)/aet/libfile.h \
+\$(srcdir)/aet/linkfile.h \
+\$(srcdir)/aet/localcharset.h \
+\$(srcdir)/aet/makefileparm.h \
+\$(srcdir)/aet/middlefile.h \
+\$(srcdir)/aet/mtcsparser.h \
+\$(srcdir)/aet/namelesscall.h \
+\$(srcdir)/aet/natomic.h \
+\$(srcdir)/aet/nbase.h \
+\$(srcdir)/aet/ncharset.h \
+\$(srcdir)/aet/nconvert.h \
+\$(srcdir)/aet/nerror.h \
+\$(srcdir)/aet/newfield.h \
+\$(srcdir)/aet/newheap.h \
+\$(srcdir)/aet/newstack.h \
+\$(srcdir)/aet/newstrategy.h \
+\$(srcdir)/aet/nfile.h \
+\$(srcdir)/aet/nfileutils.h \
+\$(srcdir)/aet/nhash.h \
+\$(srcdir)/aet/nlib.h \
+\$(srcdir)/aet/nlist.h \
+\$(srcdir)/aet/nlog.h \
+\$(srcdir)/aet/nmem.h \
+\$(srcdir)/aet/nmirroringtable.h \
+\$(srcdir)/aet/nprintf.h \
+\$(srcdir)/aet/nptrarray.h \
+\$(srcdir)/aet/nqsort.h \
+\$(srcdir)/aet/nscripttable.h \
+\$(srcdir)/aet/nslice.h \
+\$(srcdir)/aet/nstrfuncs.h \
+\$(srcdir)/aet/nstring.h \
+\$(srcdir)/aet/ntranslit-data.h \
+\$(srcdir)/aet/nunichartables.h \
+\$(srcdir)/aet/nunicode.h \
+\$(srcdir)/aet/nunicomp.h\
+\$(srcdir)/aet/nunidecomp.h \
+\$(srcdir)/aet/objectreturn.h \
+\$(srcdir)/aet/parserhelp.h \
+\$(srcdir)/aet/parserstatic.h \
+\$(srcdir)/aet/selectfield.h \
+\$(srcdir)/aet/supercall.h \
+\$(srcdir)/aet/superdefine.h \
+\$(srcdir)/aet/varcall.h \
+\$(srcdir)/aet/varmgr.h \
+\$(srcdir)/aet/xmlfile.h \
+\$(srcdir)/aet/accesscontrols.c \
+\$(srcdir)/aet/aetcompile.c \
+\$(srcdir)/aet/aetdiagnosticiface.c \
+\$(srcdir)/aet/aet-dump.c \
+\$(srcdir)/aet/aetexpr.c \
+\$(srcdir)/aet/aetmangle.c \
+\$(srcdir)/aet/aetpragma.c \
+\$(srcdir)/aet/aetprinttree.c \
+\$(srcdir)/aet/aetutils.c \
+\$(srcdir)/aet/blockfunc.c \
+\$(srcdir)/aet/blockmgr.c \
+\$(srcdir)/aet/c-aet.c \
+\$(srcdir)/aet/classaccess.c \
+\$(srcdir)/aet/classbuild.c \
+\$(srcdir)/aet/classcast.c \
+\$(srcdir)/aet/classctor.c \
+\$(srcdir)/aet/classdot.c \
+\$(srcdir)/aet/classfinal.c \
+\$(srcdir)/aet/classfinalize.c \
+\$(srcdir)/aet/classfunc.c \
+\$(srcdir)/aet/classimpl.c \
+\$(srcdir)/aet/classinfo.c \
+\$(srcdir)/aet/classinit.c \
+\$(srcdir)/aet/classinterface.c \
+\$(srcdir)/aet/classlib.c \
+\$(srcdir)/aet/classmgr.c \
+\$(srcdir)/aet/classpackage.c \
+\$(srcdir)/aet/classparser.c \
+\$(srcdir)/aet/classpermission.c \
+\$(srcdir)/aet/classref.c \
+\$(srcdir)/aet/classutil.c \
+\$(srcdir)/aet/clearwarning.c \
+\$(srcdir)/aet/cmprefopt.c \
+\$(srcdir)/aet/enumparser.c \
+\$(srcdir)/aet/funccheck.c \
+\$(srcdir)/aet/funchelp.c \
+\$(srcdir)/aet/funcmgr.c \
+\$(srcdir)/aet/funcpointer.c \
+\$(srcdir)/aet/genericblock.c \
+\$(srcdir)/aet/genericcall.c \
+\$(srcdir)/aet/genericcheck.c \
+\$(srcdir)/aet/genericclass.c \
+\$(srcdir)/aet/genericcommon.c \
+\$(srcdir)/aet/genericdefine.c \
+\$(srcdir)/aet/genericexpand.c \
+\$(srcdir)/aet/genericfile.c \
+\$(srcdir)/aet/genericfunc.c \
+\$(srcdir)/aet/genericimpl.c \
+\$(srcdir)/aet/genericinfo.c \
+\$(srcdir)/aet/genericmethod.c \
+\$(srcdir)/aet/genericmodel.c \
+\$(srcdir)/aet/genericparser.c \
+\$(srcdir)/aet/genericquery.c \
+\$(srcdir)/aet/generic-typeck.c \
+\$(srcdir)/aet/genericutil.c \
+\$(srcdir)/aet/ifacefile.c \
+\$(srcdir)/aet/implicitlycall.c \
+\$(srcdir)/aet/libfile.c \
+\$(srcdir)/aet/linkfile.c \
+\$(srcdir)/aet/localcharset.c \
+\$(srcdir)/aet/makefileparm.c \
+\$(srcdir)/aet/middlefile.c \
+\$(srcdir)/aet/mtcsparser.c \
+\$(srcdir)/aet/namelesscall.c \
+\$(srcdir)/aet/natomic.c \
+\$(srcdir)/aet/ncharset.c \
+\$(srcdir)/aet/nconvert.c \
+\$(srcdir)/aet/nerror.c \
+\$(srcdir)/aet/newfield.c \
+\$(srcdir)/aet/newheap.c \
+\$(srcdir)/aet/newstack.c \
+\$(srcdir)/aet/newstrategy.c \
+\$(srcdir)/aet/nfile.c \
+\$(srcdir)/aet/nfileutils.c \
+\$(srcdir)/aet/nhash.c \
+\$(srcdir)/aet/nlist.c \
+\$(srcdir)/aet/nlog.c \
+\$(srcdir)/aet/nmem.c \
+\$(srcdir)/aet/nprintf.c \
+\$(srcdir)/aet/nptrarray.c \
+\$(srcdir)/aet/nqsort.c \
+\$(srcdir)/aet/nslice.c \
+\$(srcdir)/aet/nstrfuncs.c \
+\$(srcdir)/aet/nstring.c \
+\$(srcdir)/aet/nunicode.c \
+\$(srcdir)/aet/nunidecomp.c \
+\$(srcdir)/aet/nuniprop.c \
+\$(srcdir)/aet/objectreturn.c \
+\$(srcdir)/aet/parserhelp.c \
+\$(srcdir)/aet/parserstatic.c \
+\$(srcdir)/aet/restorelocation.c \
+\$(srcdir)/aet/selectfield.c \
+\$(srcdir)/aet/supercall.c \
+\$(srcdir)/aet/superdefine.c \
+\$(srcdir)/aet/varcall.c \
+\$(srcdir)/aet/varmgr.c \
+\$(srcdir)/aet/xmlfile.c \
+"

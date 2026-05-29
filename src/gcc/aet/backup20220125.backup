@@ -1,0 +1,600 @@
+/*
+严重问题:在RowEchelon.c中的方法
+gaussReduction(IMatrix<E> *A,auint pivotalRow) 生成的tree如下:
+@16     pointer_type     size: @14      algn: 64       ptd : @22     
+                         addr: 7fb497bd9888 
+@17     tree_list        valu: @23      chan: @24      addr: 7fb497e9dbb8 
+.
+.
+.
+@23     integer_type     name: @34      unql: @35      size: @36    
+
+会在genericblock.c的方法void generic_block_create_call00(GenericBlock *self,int index,tree lhs,vec<tree, va_gc> *exprlist)中当调用完
+vec_safe_insert(exprlist,0,target)语句后，被改为
+@17     block        
+
+target是用代码( ({ FuncGenParmInfo info;
+info.count=0;
+info.excute=0;
+info.globalBlockInfo=&_inFileGlobalFuncGenParmInfo;
+info;
+})))生成的实参
+改用程序生成的参数也不行
+static tree createFuncGenParmInfoParm(tree inFileGlobalFuncGenParmInfo)
+最后在blockmgr.c中成加token解决问题。相关文件备分到backup20220125.backup
+*/
+
+/**
+ * 解析 genericblock$(a1){
+ * }
+ * 替换成以下调用表达式
+ * ((Abc *)self->_generic_blocks_1234)->func_1(self,a1)
+ */
+struct c_expr  block_mgr_parser00(BlockMgr *self)
+{
+    struct c_expr ret;
+	c_parser *parser=self->parser;
+    if(!parser->isAet){
+	  c_parser_error (parser, "关键字genericblock$只能用在类实现中。%<;%>");
+	  c_parser_consume_token (parser);
+	  block_mgr_set_lhs(self,NULL_TREE);
+	  return ret;
+    }
+	func_mgr_print_test(func_mgr_get(),"block_mgr_parser");
+
+	ClassImpl  *classImpl=class_impl_get();
+    ClassName *className=classImpl->className;
+    ClassInfo *classInfo=class_mgr_get_class_info_by_class_name(class_mgr_get(),className);
+    tree currentFunc=current_function_decl;
+	char *funcName=IDENTIFIER_POINTER(DECL_NAME(currentFunc));
+	nboolean isFuncGen=func_mgr_is_generic_func(func_mgr_get(),className,funcName);
+    if(!class_info_is_generic_class(classInfo) && !isFuncGen){
+    	   //是不是泛型函数
+		error_at(input_location,"%qs泛型块只能用在泛型类或泛型函数中。",className->userName);
+		c_parser_consume_token (parser);
+		return ret;
+    }
+	c_parser_consume_token (parser);
+	func_mgr_print_test(func_mgr_get(),"block_mgr_parser 00");
+
+    //作为参数解析
+	location_t loc=	c_parser_peek_token (parser)->location;
+    if (!c_parser_next_token_is (parser, CPP_OPEN_PAREN)){
+	   error_at(loc,"语法出错了：格式：genericblock$(){};。");
+	   block_mgr_set_lhs(self,NULL_TREE);
+	   return ret;
+    }
+	func_mgr_print_test(func_mgr_get(),"block_mgr_parser 11");
+
+    vec<tree, va_gc> *exprlist;
+    vec<tree, va_gc> *origtypes = NULL;
+	c_parser_consume_token(parser);
+    if (c_parser_next_token_is (parser, CPP_CLOSE_PAREN))
+	   exprlist = NULL;
+	else
+	   exprlist = c_parser_expr_list (parser, true, false, &origtypes,NULL,NULL,NULL,NULL);
+	func_mgr_print_test(func_mgr_get(),"block_mgr_parser --22");
+
+    c_parser_skip_until_found (parser, CPP_CLOSE_PAREN, "expected %<)%>");
+    location_t startLoc=c_parser_peek_token (parser)->location;
+    NString *body=n_string_new("");
+    aet_print_token(c_parser_peek_token (parser));
+    c_parser_skip_to_end_of_block_or_statement(parser,body);
+    n_string_append(body,"\n");
+    location_t endLoc=c_parser_peek_token (parser)->location;
+    aet_print_token(c_parser_peek_token (parser));
+	func_mgr_print_test(func_mgr_get(),"block_mgr_parser 22");
+
+    //c_parser_skip_until_found (parser, CPP_SEMICOLON, "expected %<;%>");//加这句话 int gen=genericblock(){};出问题，但genericblock(){};不会
+    aet_print_token(c_parser_peek_token (parser));
+    char *body1=getBlockFromSourceCodes(startLoc,endLoc);
+    n_debug("block body 两种不同的源代码:%s\n 第二种： %s\n",body->str,body1);
+    NString  *bodys=n_string_substring(body,1);//去除{
+    n_string_free(body,TRUE);
+    body=bodys;
+    //生成名字和参数
+	func_mgr_print_test(func_mgr_get(),"block_mgr_parser 33");
+
+     GenericInfo *ginfo=getInfoAndCreate(self,className);
+     GenericBlock *block=generic_info_add_block(ginfo,self->lhs,exprlist,body->str,funcName,isFuncGen);
+     generic_block_set_loc(block,startLoc,endLoc);
+     generic_block_print(block);
+     //testBlock(self,block); //在同一个函数内有块又调用泛型函数，testBlock会出错
+     tree value=  generic_block_get_call(block);//生成如下表达式:(* (setData_1_typedecl)self->_gen_blocks_array_897[0])(self,tempFgpi1234,5);
+
+     n_string_free(body,TRUE);
+     n_free(body1);
+	 block_mgr_set_lhs(self,NULL_TREE);
+     ret.value= value;
+  	 set_c_expr_source_range (&ret, startLoc,endLoc);
+     ret.original_code = ERROR_MARK;
+     ret.original_type = NULL;
+     if (exprlist){
+  	    release_tree_vector (exprlist);
+  	 }
+     if (origtypes){
+    	    release_tree_vector (origtypes);
+    	 }
+     return ret;
+}
+
+
+/**
+ * 生成 typedef void (*func_1_typedecl)(MatrixOps *self,int abcts);
+ */
+void generic_block_create_type_decl00(GenericBlock *self,int index,tree lhs,vec<tree, va_gc> *exprlist)
+{
+    char *fname=generic_util_create_block_func_type_decl_name(self->className->sysName,index);
+	tree param_type_list = NULL;
+	tree selfclass=lookup_name(aet_utils_create_ident("self"));
+	tree selftype=build_pointer_type(TREE_TYPE(selfclass));
+    param_type_list = tree_cons (NULL_TREE, selftype, param_type_list);
+    //加入第二个参数FuncGenParmInfo
+	tree funcGenParmInfoType=createQueryParmType();
+	param_type_list = tree_cons (NULL_TREE, funcGenParmInfoType, param_type_list);
+
+	if(exprlist==NULL || exprlist->length()==0){
+		;
+	}else{
+	  int ix;
+	  tree arg;
+	  for (ix = 0; exprlist->iterate (ix, &arg); ++ix){
+//		printf("replaceField 11 有参数 %d\n",ix);
+//		printf("replaceField 22 有参数 %d\n",ix);
+//		aet_print_tree(arg);
+		tree param_type=TREE_TYPE(arg);
+	    param_type_list = tree_cons (NULL_TREE, param_type, param_type_list);
+	  }
+	}
+	param_type_list = tree_cons (NULL_TREE, void_type_node, param_type_list);
+	  /* The 3 lists have been created in reverse order.  */
+	param_type_list = nreverse (param_type_list);
+	  /* Build the function type.  */
+	tree rtntype=void_type_node;
+	if(aet_utils_valid_tree(lhs)){
+		rtntype=TREE_TYPE(lhs);
+	}
+	func_mgr_print_test(func_mgr_get(),"create type decl00");
+
+	tree fntype = build_function_type (rtntype, param_type_list);
+	tree pointer=build_pointer_type(fntype);
+    tree typeNameId=aet_utils_create_ident(fname);
+	tree decl = build_decl (input_location, TYPE_DECL, typeNameId, pointer);
+    //TYPE_NAME(pointer2)=decl;
+    DECL_ARTIFICIAL (decl) = 1;
+    DECL_CONTEXT(decl)=NULL_TREE;
+    DECL_EXTERNAL(decl)=0;
+    TREE_STATIC(decl)=0;
+    TREE_PUBLIC(decl)=0;
+    set_underlying_type (decl);
+    record_locally_defined_typedef (decl);
+	c_c_decl_bind_file_scope(decl);//放在file_scope，c_c_decl_bind_file_scope是增加的,原本没有
+	finish_decl (decl, input_location, NULL_TREE,NULL_TREE, NULL_TREE);
+	func_mgr_print_test(func_mgr_get(),"create type decl11");
+
+    self->funcTypeDecl=decl;
+}
+
+
+static char *createCodes(nboolean add)
+{
+	  NString *codes=n_string_new("");
+	  n_string_append_printf(codes,"({ %s info;\n",AET_FUNC_GENERIC_PARM_STRUCT_NAME);
+	  n_string_append(codes,"info.count=0;\n");
+	  if(add)
+	     n_string_append_printf(codes,"info.globalBlockInfo=&%s;\n",FuncGenParmInfo_NAME);
+	  else
+		 n_string_append(codes,"info.globalBlockInfo=NULL;\n");
+	  n_string_append(codes,"info;\n");
+	  n_string_append(codes,"}))\n");
+	  char *result=n_strdup(codes->str);
+	  n_string_free(codes,TRUE);
+	  return result;
+}
+
+static tree createFuncGenParmInfoParm(tree inFileGlobalFuncGenParmInfo)
+{
+    location_t loc=input_location;
+	tree type=createQueryParmType();
+    printf("createFuncGenParmInfo vvv eeeexxxeeexxxcccccccc\n");
+	tree varDecl=build_decl(loc, VAR_DECL, NULL_TREE, type);
+	DECL_ARTIFICIAL (varDecl)=1;
+	TREE_USED (varDecl)=1;
+    tree bindVarDecl = build_decl (0,VAR_DECL,aet_utils_create_ident("info"), type);
+	TREE_USED (bindVarDecl)=1;
+	//bindVarDecl = pushdecl (bindVarDecl);
+	//finish_decl (bindVarDecl, loc, NULL_TREE,type, NULL_TREE);
+	DECL_EXTERNAL(bindVarDecl)=0;
+	TREE_STATIC(bindVarDecl)=0;
+	TREE_PUBLIC(bindVarDecl)=0;
+	DECL_CONTEXT(bindVarDecl)=current_function_decl;
+
+	tree stmtList=alloc_stmt_list();
+	tree stmt0 = build_stmt (loc, DECL_EXPR, void_type_node);
+	append_to_statement_list_force (stmt0, &stmtList);
+	{
+		   tree ident=aet_utils_create_ident("count");
+		   tree componentRef = build_component_ref (loc,bindVarDecl,ident, loc);
+		   unsigned HOST_WIDE_INT value;
+		   value=0;
+		   tree rvalue=build_int_cst (integer_type_node, value);
+		   tree stmt2 = build_modify_expr (loc, componentRef, TREE_TYPE(rvalue),NOP_EXPR,loc,rvalue,TREE_TYPE(rvalue));
+		   append_to_statement_list_force (stmt2, &stmtList);
+	}
+
+	{
+		   tree ident=aet_utils_create_ident("globalBlockInfo");
+		   tree componentRef = build_component_ref (loc,bindVarDecl,ident, loc);
+		   tree stmt2;
+		   if(aet_utils_valid_tree(inFileGlobalFuncGenParmInfo)){
+		       tree blockInfoType=createBlockInfoType();
+		       tree pointType=build_pointer_type(blockInfoType);
+		       tree rvalue = build1 (ADDR_EXPR, pointType, inFileGlobalFuncGenParmInfo);
+			   stmt2 = build_modify_expr (loc, componentRef, TREE_TYPE(rvalue),NOP_EXPR,loc,rvalue,TREE_TYPE(rvalue));
+		   }else{
+			   tree rvalue=class_util_create_null_tree();
+			   stmt2 = build_modify_expr (loc, componentRef, TREE_TYPE(rvalue),NOP_EXPR,loc,rvalue,TREE_TYPE(rvalue));
+		   }
+		   append_to_statement_list_force (stmt2, &stmtList);
+	}
+	tree stmt3 = build_modify_expr (loc, varDecl, void_type_node,NOP_EXPR,0,bindVarDecl,TREE_TYPE(bindVarDecl));
+	append_to_statement_list_force (stmt3, &stmtList);
+    tree bind = build3 (BIND_EXPR, void_type_node, bindVarDecl, stmtList, NULL_TREE);
+    tree target = build4 (TARGET_EXPR, type, varDecl, bind, NULL_TREE, NULL_TREE);
+    aet_print_tree(target);
+    return target;
+}
+
+
+/**
+ * 创建(* (setData_1_typedecl)self->_gen_blocks_array_897[0])(self,tempFgpi1234,5);
+ *找当前所在函数中参数中是否有tempFgpi1234，如果没有，找全局变量
+ */
+void generic_block_create_call00(GenericBlock *self,int index,tree lhs,vec<tree, va_gc> *exprlist)
+{
+    tree arrayRefType=build_pointer_type(void_type_node);
+	location_t loc=input_location;
+	tree selfid=lookup_name(aet_utils_create_ident("self"));
+	tree selfref=build_indirect_ref (loc,selfid,RO_ARROW);
+	tree component1=aet_utils_create_ident(AET_GENERIC_BLOCK_ARRAY_VAR_NAME);
+    tree componetRef = build_component_ref (loc,selfref,component1, loc);//
+    tree arrayIndex=build_int_cst(integer_type_node,index-1);
+	tree arrayRef = build4 (ARRAY_REF, arrayRefType, componetRef, arrayIndex, NULL_TREE,NULL_TREE);
+	tree type=TREE_TYPE(self->funcTypeDecl);//typedef void (*setData_1_typedecl)(MatrixOps *self,int abcts)中的functype
+	tree nopExpr= build1 (NOP_EXPR, type, arrayRef);
+	tree id=aet_utils_create_ident(AET_FUNC_GENERIC_PARM_NAME);
+	tree funcGenParmInfo=lookup_name(id);
+	if(aet_utils_valid_tree(funcGenParmInfo)){
+		printf("调用泛型块数据的地方（1）所在函数有参数 tempFgpi1234 belongFunc:%s %s\n",self->belongFunc,in_fnames[0]);
+	   vec_safe_insert (exprlist,0,funcGenParmInfo);
+	}else{
+		tree id=aet_utils_create_ident(FuncGenParmInfo_NAME);
+		tree fggb=lookup_name(id);
+		if(aet_utils_valid_tree(fggb)){
+			printf("调用泛型块数据的地方（2）所在的.c文件有变量 _inFileGlobalFuncGenParmInfo 转成地址参数 &_inFileGlobalFuncGenParmInfo belongFunc:%s %s\n",
+					self->belongFunc,in_fnames[0]);
+			char *funcName=IDENTIFIER_POINTER(DECL_NAME(current_function_decl));
+            char temp[512];
+            sprintf(temp,"块内所在的函数:%s",funcName);
+			func_mgr_print_test(func_mgr_get(),temp);
+			char *codes=createCodes(TRUE);
+			tree target=generic_util_create_target(codes);
+			vec_safe_insert(exprlist,0,target);
+			n_free(codes);
+			func_mgr_print_test(func_mgr_get(),temp);
+
+		}else{
+		   printf("调用泛型块数据的地方（3）没有 tempFgpi1234和_inFileGlobalFuncGenParmInfo 创建一个空的 belongFunc:%s %s\n",self->belongFunc,in_fnames[0]);
+	       char *codes=createCodes(FALSE);
+		   tree target=generic_util_create_target(codes);
+		   vec_safe_insert(exprlist,0,target);
+		   n_free(codes);
+		}
+	}
+	vec_safe_insert (exprlist, 0, selfid);
+	tree rtn=void_type_node;
+	if(aet_utils_valid_tree(lhs))
+		rtn=TREE_TYPE(lhs);
+    tree result = build_call_vec (rtn,nopExpr, exprlist);
+	func_mgr_print_test(func_mgr_get(),"over block");
+    self->callTree=result;
+}
+/**
+ * 类型是FuncGenParmInfo
+ */
+static tree createBlockInfoType()
+{
+	 tree id=aet_utils_create_ident(AET_FUNC_GENERIC_GLOBAL_BLOCK_STRUCT_NAME);
+	 tree record=lookup_name(id);
+	 if(!record || record==error_mark_node){
+		 return NULL_TREE;
+	 }
+	 tree recordType=TREE_TYPE(record);
+     return recordType;
+}
+void generic_block_create_call11(GenericBlock *self,int index,tree lhs,vec<tree, va_gc> *exprlist)
+{
+    tree arrayRefType=build_pointer_type(void_type_node);
+	location_t loc=input_location;
+	tree selfid=lookup_name(aet_utils_create_ident("self"));
+	tree selfref=build_indirect_ref (loc,selfid,RO_ARROW);
+	tree component1=aet_utils_create_ident(AET_GENERIC_BLOCK_ARRAY_VAR_NAME);
+    tree componetRef = build_component_ref (loc,selfref,component1, loc);//
+    tree arrayIndex=build_int_cst(integer_type_node,index-1);
+	tree arrayRef = build4 (ARRAY_REF, arrayRefType, componetRef, arrayIndex, NULL_TREE,NULL_TREE);
+	tree type=TREE_TYPE(self->funcTypeDecl);//typedef void (*setData_1_typedecl)(MatrixOps *self,int abcts)中的functype
+	tree nopExpr= build1 (NOP_EXPR, type, arrayRef);
+	tree id=aet_utils_create_ident(AET_FUNC_GENERIC_PARM_NAME);
+	tree funcGenParmInfo=lookup_name(id);
+	if(aet_utils_valid_tree(funcGenParmInfo)){
+		printf("调用泛型块数据的地方（1）所在函数有参数 tempFgpi1234 belongFunc:%s %s\n",self->belongFunc,in_fnames[0]);
+	   vec_safe_insert (exprlist,0,funcGenParmInfo);
+	}else{
+		tree id=aet_utils_create_ident(FuncGenParmInfo_NAME);
+		tree fggb=lookup_name(id);
+		if(aet_utils_valid_tree(fggb)){
+			printf("调用泛型块数据的地方（2）所在的.c文件有变量 _inFileGlobalFuncGenParmInfo 转成地址参数 &_inFileGlobalFuncGenParmInfo belongFunc:%s %s\n",
+					self->belongFunc,in_fnames[0]);
+			char *funcName=IDENTIFIER_POINTER(DECL_NAME(current_function_decl));
+            char temp[512];
+            sprintf(temp,"块内所在的函数 create_call 00:%s",funcName);
+			func_mgr_print_test(func_mgr_get(),temp);
+			tree target=createFuncGenParmInfoParm(fggb);
+			func_mgr_print_test(func_mgr_get(),"create call 11");
+			aet_print_tree_skip_debug(target);
+
+			vec_safe_insert(exprlist,0,target);
+			func_mgr_print_test(func_mgr_get(),"create all 22");
+
+		}else{
+		   printf("调用泛型块数据的地方（3）没有 tempFgpi1234和_inFileGlobalFuncGenParmInfo 创建一个空的 belongFunc:%s %s\n",self->belongFunc,in_fnames[0]);
+		   tree target=createFuncGenParmInfoParm(NULL_TREE);
+		   vec_safe_insert(exprlist,0,target);
+     	}
+	}
+	vec_safe_insert (exprlist, 0, selfid);
+	tree rtn=void_type_node;
+	if(aet_utils_valid_tree(lhs))
+		rtn=TREE_TYPE(lhs);
+    tree result = build_call_vec (rtn,nopExpr, exprlist);
+	func_mgr_print_test(func_mgr_get(),"over block");
+    self->callTree=result;
+}
+
+static char *createGenericStr(GenericModel *generices)
+{
+    tree t;
+    int count=0;
+    NString *genericStr=n_string_new("");
+    int i;
+    for(i=0;i<generices->unitCount;i++){
+    	GenericUnit *unit=generices->genUnits[i];
+    	if(!unit->isDefine){
+ 		   n_string_append_printf(genericStr,"%s|0,",unit->name);
+    	}else{
+  		   n_string_append_printf(genericStr,"%s|%d,",unit->name,unit->pointerCount);
+    	}
+    }
+	char *result=n_strdup(genericStr->str);
+	n_string_free(genericStr,TRUE);
+	return result;
+}
+
+static char *createParmGenStr(tree arg,tree parmType)
+{
+	char *sysName=class_util_get_class_name_by_record(parmType);
+	ClassInfo *info=class_mgr_get_class_info(class_mgr_get(),sysName);
+	if(info==NULL)
+		return NULL;
+	nboolean haveGen=class_info_is_generic_class(info);
+	if(!haveGen)
+		return NULL;
+	char *genstr=NULL;
+    int undefine=class_info_get_undefine_generic_count(info);
+    GenericModel *genericDefine=c_aet_get_generics_model(arg);
+    GenericModel *genericDecl=info->genericModel;
+    char *from="泛型来自参数 classInfo";
+    if(undefine>0){
+	  if(genericDefine){
+		 genstr=createGenericStr(genericDefine);
+		 from="泛型来自参数";
+	  }else{
+		 genstr=createGenericStr(genericDecl);
+	  }
+    }else{
+		genstr=createGenericStr(genericDecl);
+    }
+	printf("createParmGenSttr 00 %s %s\n",from,genstr);
+    return genstr;
+}
+
+void          func_mgr_print_test(FuncMgr *self,char *explain);
+
+//test-----debug
+static void printgaussReduction(FuncMgr *self,char *funcing)
+{
+	char *mangle="_Z10RowEchelon14gaussReductionEPN10RowEchelonEPN7IMatrixEDi";
+	ClassFunc    *func=func_mgr_get_entity_by_mangle(self,mangle);
+	if(func==NULL)
+		return;
+	if(func->fromImplDefine==NULL)
+		return;
+	 tree  funcType = TREE_TYPE (func->fromImplDefine);
+			   int count=0;
+			   int varargs_p = 1;
+			   printf("printgaussReduction 00-----正在生成的是:%s funcType:%p\n",funcing,funcType);
+			   aet_print_tree_skip_debug(funcType);
+
+			   for (tree al = TYPE_ARG_TYPES (funcType); al; al = TREE_CHAIN (al)){
+					printf("printgaussReduction 11------ %p count:%d\n",al,count);
+					tree type=TREE_VALUE(al);
+					printf("printgaussReduction 22------ %p %d\n",type,count);
+					if(type == void_type_node){
+						printf("printgaussReduction 33------ %d\n",count);
+						varargs_p=0;
+						break;
+					}
+					count++;
+			   }
+
+}
+
+void func_mgr_print_test(FuncMgr *self,char *explain)
+{
+	printgaussReduction(self,explain);
+}
+
+
+nboolean class_func_set_decl(ClassFunc *self,tree decl,enum func_from_code code)
+{
+	if(code==STRUCT_DECL){
+		self->fieldDecl=decl;
+	}else if(code==CLASS_IMPL_DECL){
+		self->fromImplDecl=decl;
+	}else if(code==CLASS_IMPL_DEFINE){
+		self->fromImplDefine=decl;
+		char *compare="_Z10RowEchelon14gaussReductionEPN10RowEchelonEPN7IMatrixEDi";
+		char *funcName=IDENTIFIER_POINTER(DECL_NAME(decl));
+	    if(strcmp(compare,funcName)==0){
+		   tree  funcType = TREE_TYPE (decl);
+		   int count=0;
+		   int varargs_p = 1;
+		   printf("class_func_set_decl 00----- %s %p funcType:%p\n",self->orgiName,decl,funcType);
+		   aet_print_tree_skip_debug(funcType);
+		   for (tree al = TYPE_ARG_TYPES (funcType); al; al = TREE_CHAIN (al)){
+				printf("class_func_set_decl 11------ %p count:%d\n",al,count);
+				tree type=TREE_VALUE(al);
+				printf("class_func_set_decl 22------ %p %d\n",type,count);
+				if(type == void_type_node){
+					printf("class_func_set_decl 33------ %d %s\n",count,IDENTIFIER_POINTER(DECL_NAME(decl)));
+
+					varargs_p=0;
+					break;
+				}
+				count++;
+		   }
+	    }
+
+	}
+	return checkRtn(self);
+}
+
+
+
+static void fillNullFun(BlockFunc *self,NString *codes)
+{
+	  n_string_append_printf(codes,"static %s %s %s\n",self->returnStr,self->funcDefineName,self->parmStr);
+	  n_string_append(codes,"{\n");
+	  n_string_append_printf(codes,"printf(\"程序不应该执行到这里，请报告。类:%s 块函数所在的函数:%s,第几块:%d\\n\");\n",self->sysClassName,self->belongFunc,self->index);
+	  n_string_append(codes," exit(-1);\n");
+	  n_string_append(codes,self->body);
+	  n_string_append(codes,"}\n");
+}
+
+static void fillNullFunReturn(BlockFunc *self,NString *codes)
+{
+	  n_string_append_printf(codes,"static %s %s %s\n",self->returnStr,self->funcDefineName,self->parmStr);
+	  n_string_append(codes,"{\n");
+	  NString *ff=n_string_new(self->returnStr);
+	  int index1=n_string_indexof(ff,"*");
+	  int index2=n_string_indexof(ff,"void");
+	  n_string_append_printf(codes,"printf(\"程序不应该执行到这里，请报告。类:%s 块函数所在的函数:%s,第几块:%d\\n\");\n",self->sysClassName,self->belongFunc,self->index);
+	  n_string_append(codes," exit(-1);\n");
+	  if(index1>=0){
+		  n_string_append(codes," return NULL;\n");
+	  }else if(index1<0 && index2>=0){
+		  ;
+	  }else{
+		  n_string_append(codes," return 0;\n");
+	  }
+	  n_string_free(ff,TRUE);
+	  n_string_append(codes," }\n");
+}
+
+
+/**
+ * 创建泛型块函数的源代码。
+ * 关键是各种泛型定义的组合
+ *   printf("在test4.c count: %d\n",tempFgpi1234.countOfBlockClass);
+        if(tempFgpi1234.countOfBlockClass==0){
+     	   printf("FuncGenParmInfo 不能处理未知的泛型。\n");
+        }else{
+           int index=0;
+     	   int i;
+     	   char *className="test";
+     	   for(i=0;i<tempFgpi1234.countOfBlockClass;i++){
+     		   if(!memcmp(className,tempFgpi1234.blockFuncs[i].sysName,strlen(className))){
+     	    	   printf("eexx xxxxx%d\n",5);
+     	    	   return (* (_test_MatrixOps__inner_generic_func_1_typedecl)tempFgpi1234.blockFuncs[i].blockFuncsPointer[index])(self,tempFgpi1234,b);
+     		   }
+     	   }
+        }
+ *
+ */
+static void createCodes00(BlockFunc *self,NString *codes)
+{
+   ClassInfo *info=class_mgr_get_class_info(class_mgr_get(),self->sysClassName);
+//   if(self->parmInfoCount==0){
+//	   printf("泛型块函数并没有被调用:%s 第几个:%d 属于的函数是:%s,创建一个空的函数。\n",self->sysClassName,self->index,self->belongFunc);
+//	   if(self->isFuncGeneric || class_info_is_generic_class(info)){
+//		   fillNullFunReturn(self,codes);
+//	   }else{
+//		   fillNullFun(self,codes);
+//	   }
+//   }else{
+	   printf("createCodes----泛型参数有几个:%d self->condArray:len:%d\n",self->parmInfoCount,self->condArray->len);
+	   produceCondCodes(self);
+	   NPtrArray *result=doExchange(self->condArray,"&&",TRUE);
+	   NPtrArray *resultIndex=doExchange(self->condIndexArray,INDEX_CONNECT_STR,FALSE);
+	   printf("dddd---- %d %d\n",result->len,resultIndex->len);
+	   NPtrArray *condArray=result->len>0?n_ptr_array_index(result,0):NULL;
+	   NPtrArray *itemsIndex=resultIndex->len>0?n_ptr_array_index(resultIndex,0):NULL;
+	   int i;
+	   n_string_append_printf(codes,"static %s %s %s\n",self->returnStr,self->funcDefineName,self->parmStr);
+	   n_string_append(codes,"{\n");
+	   if(condArray && condArray->len>0){
+		   for(i=0;i<condArray->len;i++){
+			 char  *cond=n_ptr_array_index(condArray,i);
+			 char  *genStr=n_ptr_array_index(itemsIndex,i);
+			 if(i==0){
+				 n_string_append_printf(codes,"if(%s){\n",cond);
+			 }else{
+				 n_string_append_printf(codes,"else if(%s){\n",cond);
+			 }
+			 n_string_append_printf(codes,"%s %d \"%s\"\n",RID_AET_GOTO_STR,GOTO_GENERIC_BLOCK_FUNC_DEFINE_COND,genStr);
+			 n_string_append_printf(codes,"   %s.excute=1;\n",AET_FUNC_GENERIC_PARM_NAME);
+			 n_string_append(codes,self->body);
+			 n_string_append(codes," }\n");
+		  }
+      }else{
+		 n_string_append(codes,"if(5<3){\n");
+		 n_string_append(codes,"   printf(\"没有条件\\n\");\n");
+		 n_string_append(codes," }\n");
+      }
+	  n_string_append(codes,      "else{\n");
+	  n_string_append_printf(codes,"   if(%s.gbCount==0){\n",AET_FUNC_GENERIC_PARM_NAME);
+	  n_string_append_printf(codes,"      printf(\"泛型函数 条件不匹配 %s belong:%s %s\\n\");\n",self->funcDefineName,self->belongFunc,in_fnames[0]);
+      n_string_append(codes,       "   }else{\n");
+	  n_string_append_printf(codes,"      printf(\"通过在参数tempFgpi1234中的函数指针执行 00 %s %s\\n\");\n",self->funcDefineName,in_fnames[0]);
+	  n_string_append(codes,"             printf(\"通过在参数tempFgpi1234中的函数指针执行 11 gbCount: %d self:%s\\n\",tempFgpi1234.gbCount,self->_generic_1234_array[0].typeName);\n");
+	  n_string_append_printf(codes,"      int index=%d;\n",self->index);
+	  n_string_append(codes,       "      int i;\n");
+	  n_string_append_printf(codes,"      static const char *sysName=\"%s\";\n",self->sysClassName);
+	  n_string_append_printf(codes,"      for(i=0;i<%s.gbCount;i++){\n",AET_FUNC_GENERIC_PARM_NAME);
+	  n_string_append_printf(codes,"         FuncGenBlockInfo *blockInfo=%s.globalBlockInfos[i];\n",AET_FUNC_GENERIC_PARM_NAME);
+	  n_string_append(codes,"                printf(\"FuncGenBlockInfo来自的文件是:%s\\n\",blockInfo->from);\n");
+	  n_string_append_printf(codes,"         int blockIndex=get_block_func_pointer_from_info(blockInfo,index,sysName,%s);\n",self->funcDefineName);
+	  nboolean noRtn=isNoReturnValue(self);
+	  char *funcTypedef=generic_util_create_block_func_type_decl_name(self->sysClassName,self->index);
+	  char *realParm=getRealParm(self);
+	  setExcuteStmt(self,funcTypedef,realParm,codes);
+	  n_free(funcTypedef);
+	  n_free(realParm);
+      n_string_append(codes,       "      }\n");//over for
+	  n_string_append(codes,       "   }\n");
+	  n_string_append(codes,       "}\n");
+	  if(!noRtn)
+		  defaultReturn(self,codes);
+	  n_string_append(codes,"}\n");
+   //}
+}

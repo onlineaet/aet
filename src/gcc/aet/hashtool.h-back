@@ -1,0 +1,31 @@
+
+
+#ifndef __HASH_TOOL_H__
+#define __HASH_TOOL_H__
+
+#include <stdarg.h>
+
+#include "nbase.h"
+
+
+/* Hash Functions
+ */
+nboolean n_str_equal    (nconstpointer  v1,nconstpointer  v2);
+nuint    n_str_hash     (nconstpointer  v);
+
+
+nboolean n_int_equal    (nconstpointer  v1,nconstpointer  v2);
+nuint    n_int_hash     (nconstpointer  v);
+
+nboolean n_int64_equal  (nconstpointer  v1,nconstpointer  v2);
+nuint    n_int64_hash   (nconstpointer  v);
+
+nboolean n_double_equal (nconstpointer  v1,nconstpointer  v2);
+nuint    n_double_hash  (nconstpointer  v);
+
+nuint    n_direct_hash  (nconstpointer  v) ;
+nboolean n_direct_equal (nconstpointer  v1,nconstpointer  v2) ;
+
+
+
+#endif /* __N_UTILS_H__ */

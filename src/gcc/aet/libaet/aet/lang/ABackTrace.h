@@ -1,0 +1,50 @@
+/*
+ * Copyright (C) 2026  zclei
+ * This file is part of AET.
+
+ * AET is free software; you can redistribute it and/or modify it under
+ * the terms of the GNU General Public License as published by the Free
+ * Software Foundation; either version 3, or (at your option) any later
+ * version.
+
+ * AET is distributed in the hope that it will be useful, but WITHOUT ANY
+ * WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * for more details.
+
+ * You should have received a copy of the GNU General Public License
+ * along with GCC Exception along with this program; see the file COPYING3.
+ * If not see <http://www.gnu.org/licenses/>.
+ * AET was originally developed  by the zclei@sina.com
+ */
+
+#ifndef __AET_LANG_A_BACK_TRACE_H__
+#define __AET_LANG_A_BACK_TRACE_H__
+
+#include "../../aet.h"
+
+package$ aet.lang;
+
+/**
+ * 打印栈中函数调用序列。
+ * 当调用a_error时，会触发调用a_log_print_stack
+ * 然后调到类ABackTrace中的backtrace方法。
+ * 在类中注册了监听信号SIGSEGV(著名的段错误)，当发生segament fault时也会调用backtrace().
+ * 如果用户调用a_log_print_stack也是可以的。
+ * 要打印出栈中的行数和文件名。与编译参数有关。
+ * 不能有 -O1 O2 O3 只能时O0 不能调用压缩命令strip。
+ * 必须加入 -g --rdynamic
+ */
+
+public$ class$ ABackTrace{
+      auint64 *mapsAddress;
+      auint len;
+      void backtrace();
+      private$ ABackTrace();
+};
+
+
+
+
+#endif /* __N_MEM_H__ */
+

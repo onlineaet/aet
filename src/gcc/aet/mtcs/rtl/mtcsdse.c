@@ -1,0 +1,3261 @@
+/*
+ * Copyright (C) 2026  zclei
+ * This file is part of AET.
+
+ * AET is free software; you can redistribute it and/or modify it under
+ * the terms of the GNU General Public License as published by the Free
+ * Software Foundation; either version 3, or (at your option) any later
+ * version.
+
+ * AET is distributed in the hope that it will be useful, but WITHOUT ANY
+ * WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * for more details.
+
+ * You should have received a copy of the GNU General Public License
+ * along with GCC Exception along with this program; see the file COPYING3.
+ * If not see <http://www.gnu.org/licenses/>.
+ * AET was originally developed  by the onlineaet@163.com
+ * base on dse.cc
+ */
+
+#undef BASELINE
+
+#include "config.h"
+#include "system.h"
+#include "coretypes.h"
+#include "backend.h"
+#include "target.h"
+#include "rtl.h"
+#include "tree.h"
+#include "gimple.h"
+#include "predict.h"
+#include "df.h"
+#include "memmodel.h"
+#include "tm_p.h"
+#include "gimple-ssa.h"
+#include "expmed.h"
+#include "optabs.h"
+#include "emit-rtl.h"
+#include "recog.h"
+#include "alias.h"
+#include "stor-layout.h"
+#include "cfgrtl.h"
+#include "cselib.h"
+#include "tree-pass.h"
+#include "explow.h"
+#include "expr.h"
+#include "dbgcnt.h"
+#include "rtl-iter.h"
+#include "cfgcleanup.h"
+#include "calls.h"
+
+
+#include "mtcsdse.h"
+#include "../mtcstarget.h"
+#include "../mtcscompile.h"
+#include "../mtcsmicro.h"
+#include "../mtcsdfcore.h"
+#include "../mtcsdfproblems.h"
+#include "../mtcsprintrtl.h"
+
+//用在回调函数中
+typedef struct _LookForHardRegsData
+{
+   bitmap regs_set;
+   MtcsDse *mtcsDse;
+}LookForHardRegsData;
+
+static rtx get_stored_val (MtcsDse *self,store_info *, machine_mode, poly_int64,poly_int64, basic_block, bool);
+
+/* This file contains three techniques for performing Dead Store
+   Elimination (dse).
+
+   * The first technique performs dse locally on any base address.  It
+   is based on the cselib which is a local value numbering technique.
+   This technique is local to a basic block but deals with a fairly
+   general addresses.
+
+   * The second technique performs dse globally but is restricted to
+   base addresses that are either constant or are relative to the
+   frame_pointer.
+
+   * The third technique, (which is only done after register allocation)
+   processes the spill slots.  This differs from the second
+   technique because it takes advantage of the fact that spilling is
+   completely free from the effects of aliasing.
+
+   Logically, dse is a backwards dataflow problem.  A store can be
+   deleted if it if cannot be reached in the backward direction by any
+   use of the value being stored.  However, the local technique uses a
+   forwards scan of the basic block because cselib requires that the
+   block be processed in that order.
+
+   The pass is logically broken into 7 steps:
+
+   0) Initialization.
+
+   1) The local algorithm, as well as scanning the insns for the two
+   global algorithms.
+
+   2) Analysis to see if the global algs are necessary.  In the case
+   of stores base on a constant address, there must be at least two
+   stores to that address, to make it possible to delete some of the
+   stores.  In the case of stores off of the frame or spill related
+   stores, only one store to an address is necessary because those
+   stores die at the end of the function.
+
+   3) Set up the global dataflow equations based on processing the
+   info parsed in the first step.
+
+   4) Solve the dataflow equations.
+
+   5) Delete the insns that the global analysis has indicated are
+   unnecessary.
+
+   6) Delete insns that store the same value as preceding store
+   where the earlier store couldn't be eliminated.
+
+   7) Cleanup.
+
+   This step uses cselib and canon_rtx to build the largest expression
+   possible for each address.  This pass is a forwards pass through
+   each basic block.  From the point of view of the global technique,
+   the first pass could examine a block in either direction.  The
+   forwards ordering is to accommodate cselib.
+
+   We make a simplifying assumption: addresses fall into four broad
+   categories:
+
+   1) base has rtx_varies_p == false, offset is constant.
+   2) base has rtx_varies_p == false, offset variable.
+   3) base has rtx_varies_p == true, offset constant.
+   4) base has rtx_varies_p == true, offset variable.
+
+   The local passes are able to process all 4 kinds of addresses.  The
+   global pass only handles 1).
+
+   The global problem is formulated as follows:
+
+     A store, S1, to address A, where A is not relative to the stack
+     frame, can be eliminated if all paths from S1 to the end of the
+     function contain another store to A before a read to A.
+
+     If the address A is relative to the stack frame, a store S2 to A
+     can be eliminated if there are no paths from S2 that reach the
+     end of the function that read A before another store to A.  In
+     this case S2 can be deleted if there are paths from S2 to the
+     end of the function that have no reads or writes to A.  This
+     second case allows stores to the stack frame to be deleted that
+     would otherwise die when the function returns.  This cannot be
+     done if self->stores_off_frame_dead_at_return is not true.  See the doc
+     for that variable for when this variable is false.
+
+     The global problem is formulated as a backwards set union
+     dataflow problem where the stores are the gens and reads are the
+     kills.  Set union problems are rare and require some special
+     handling given our representation of bitmaps.  A straightforward
+     implementation requires a lot of bitmaps filled with 1s.
+     These are expensive and cumbersome in our bitmap formulation so
+     care has been taken to avoid large vectors filled with 1s.  See
+     the comments in bb_info and in the dataflow confluence functions
+     for details.
+
+   There are two places for further enhancements to this algorithm:
+
+   1) The original dse which was embedded in a pass called flow also
+   did local address forwarding.  For example in
+
+   A <- r100
+   ... <- A
+
+   flow would replace the right hand side of the second insn with a
+   reference to r100.  Most of the information is available to add this
+   to this pass.  It has not done it because it is a lot of work in
+   the case that either r100 is assigned to between the first and
+   second insn and/or the second insn is a load of part of the value
+   stored by the first insn.
+
+   insn 5 in gcc.c-torture/compile/990203-1.c simple case.
+   insn 15 in gcc.c-torture/execute/20001017-2.c simple case.
+   insn 25 in gcc.c-torture/execute/20001026-1.c simple case.
+   insn 44 in gcc.c-torture/execute/20010910-1.c simple case.
+
+   2) The cleaning up of spill code is quite profitable.  It currently
+   depends on reading tea leaves and chicken entrails left by reload.
+   This pass depends on reload creating a singleton alias set for each
+   spill slot and telling the next dse pass which of these alias sets
+   are the singletons.  Rather than analyze the addresses of the
+   spills, dse's spill processing just does analysis of the loads and
+   stores that use those alias sets.  There are three cases where this
+   falls short:
+
+     a) Reload sometimes creates the slot for one mode of access, and
+     then inserts loads and/or stores for a smaller mode.  In this
+     case, the current code just punts on the slot.  The proper thing
+     to do is to back out and use one bit vector position for each
+     byte of the entity associated with the slot.  This depends on
+     KNOWING that reload always generates the accesses for each of the
+     bytes in some canonical (read that easy to understand several
+     passes after reload happens) way.
+
+     b) Reload sometimes decides that spill slot it allocated was not
+     large enough for the mode and goes back and allocates more slots
+     with the same mode and alias set.  The backout in this case is a
+     little more graceful than (a).  In this case the slot is unmarked
+     as being a spill slot and if final address comes out to be based
+     off the frame pointer, the global algorithm handles this slot.
+
+     c) For any pass that may prespill, there is currently no
+     mechanism to tell the dse pass that the slot being used has the
+     special properties that reload uses.  It may be that all that is
+     required is to have those passes make the same calls that reload
+     does, assuming that the alias sets can be manipulated in the same
+     way.  */
+
+/* There are limits to the size of constant offsets we model for the
+   global problem.  There are certainly test cases, that exceed this
+   limit, however, it is unlikely that there are important programs
+   that really have constant offsets this size.  */
+#define MAX_OFFSET (64 * 1024)
+
+/* Return a bitmask with the first N low bits set.  */
+static unsigned HOST_WIDE_INT lowpart_bitmask (int n)
+{
+   unsigned HOST_WIDE_INT mask = HOST_WIDE_INT_M1U;
+   return mask >> (HOST_BITS_PER_WIDE_INT - n);
+}
+
+/* Print offset range [OFFSET, OFFSET + WIDTH) to FILE.  */
+static void print_range (FILE *file, poly_int64 offset, poly_int64 width)
+{
+   fprintf (file, "[");
+   print_dec (offset, file, SIGNED);
+   fprintf (file, "..");
+   print_dec (offset + width, file, SIGNED);
+   fprintf (file, ")");
+}
+
+/*----------------------------------------------------------------------------
+   Zeroth step.
+
+   Initialization.
+----------------------------------------------------------------------------*/
+/* Hashtable callbacks for maintaining the "bases" field of
+   store_group_info, given that the addresses are function invariants.  */
+struct mtcs_invariant_group_base_hasher : nofree_ptr_hash <group_info>
+{
+   static inline hashval_t hash (const group_info *);
+   static inline bool equal (const group_info *, const group_info *);
+};
+
+inline bool mtcs_invariant_group_base_hasher::equal (const group_info *gi1,const group_info *gi2)
+{
+   return rtx_equal_p (gi1->rtx_base, gi2->rtx_base);
+}
+
+inline hashval_t mtcs_invariant_group_base_hasher::hash (const group_info *gi)
+{
+   MtcsTarget *mtcsTarget=mtcs_compile_get_current_target(mtcs_compile_get());
+   MtcsMode *mtcsMode=mtcsTarget->mtcsMode;
+   MtcsCse *mtcsCse =mtcs_target_get_cse(mtcsTarget);
+
+   int do_not_record;
+   return mtcs_cse_hash_rtx/*!hash_rtx*/(mtcsCse,gi->rtx_base, mtcs_mode_get_Pmode(mtcsMode), &do_not_record, NULL, false);
+}
+
+/* Get the GROUP for BASE.  Add a new group if it is not there.  */
+static struct group_info * get_group_info (MtcsDse *self,rtx base)
+{
+   MtcsMode *mtcsMode=MTCS_GET_MODE_OBJECT(self);
+   MtcsTarget *mtcsTarget=(MtcsTarget *)mtcsMode->target;
+   MtcsRTL  *mtcsRTL=mtcs_target_get_rtl(mtcsTarget);
+   MtcsAlias *mtcsAlias=mtcs_target_get_alias(mtcsTarget);
+   MtcsReg *mtcsReg=mtcs_target_get_reg(mtcsTarget);
+
+   struct group_info tmp_gi;
+   struct group_info *gi;
+   struct group_info **slot;
+
+   gcc_assert (base != NULL_RTX);
+
+   /* Find the store_base_info structure for BASE, creating a new one
+   if necessary.  */
+   tmp_gi.rtx_base = base;
+   slot = self->rtx_group_table->find_slot (&tmp_gi, INSERT);
+   gi = *slot;
+
+   if (gi == NULL){
+      *slot = gi = self->group_info_pool.allocate ();
+      gi->rtx_base = base;
+      gi->id = self->rtx_group_next_id++;
+      gi->base_mem = gen_rtx_MEM (mtcsMode->modes.M_BLKmode, base);
+      gi->canon_base_addr = mtcs_alias_canon_rtx/*!canon_rtx*/(mtcsAlias,base);
+      gi->store1_n = BITMAP_ALLOC (&self->dse_bitmap_obstack);
+      gi->store1_p = BITMAP_ALLOC (&self->dse_bitmap_obstack);
+      gi->store2_n = BITMAP_ALLOC (&self->dse_bitmap_obstack);
+      gi->store2_p = BITMAP_ALLOC (&self->dse_bitmap_obstack);
+      gi->escaped_p = BITMAP_ALLOC (&self->dse_bitmap_obstack);
+      gi->escaped_n = BITMAP_ALLOC (&self->dse_bitmap_obstack);
+      gi->group_kill = BITMAP_ALLOC (&self->dse_bitmap_obstack);
+      gi->process_globally = false;
+      gi->frame_related = (base == mtcs_rtl_get_frame_pointer_rtx/*!frame_pointer_rtx*/(mtcsRTL))
+            || (base == mtcs_rtl_get_hard_frame_pointer_rtx/*!hard_frame_pointer_rtx*/(mtcsRTL))
+      || (base == mtcs_rtl_get_arg_pointer_rtx/*!arg_pointer_rtx*/(mtcsRTL)
+      && mtcsReg->hardRegs.x_fixed_regs/*!fixed_regs*/[mtcs_reg_get_arg_pointer_regnum/*!ARG_POINTER_REGNUM*/(mtcsReg)]);
+      gi->offset_map_size_n = 0;
+      gi->offset_map_size_p = 0;
+      gi->offset_map_n = NULL;
+      gi->offset_map_p = NULL;
+      self->rtx_group_vec.safe_push (gi);
+   }
+   return gi;
+}
+
+/* Initialization of data structures.  */
+static void dse_step0 (MtcsDse *self)
+{
+   MtcsMode *mtcsMode=MTCS_GET_MODE_OBJECT(self);
+   MtcsTarget *mtcsTarget=(MtcsTarget *)mtcsMode->target;
+   MtcsAlias *mtcsAlias=mtcs_target_get_alias(mtcsTarget);
+
+   self->locally_deleted = 0;
+   self->globally_deleted = 0;
+
+   bitmap_obstack_initialize (&self->dse_bitmap_obstack);
+   gcc_obstack_init (&self->dse_obstack);
+
+   self->scratch = BITMAP_ALLOC (&reg_obstack);
+   self->kill_on_calls = BITMAP_ALLOC (&self->dse_bitmap_obstack);
+
+
+   self->rtx_group_table = new hash_table<mtcs_invariant_group_base_hasher> (11);
+
+   self->bb_table = XNEWVEC (struct dse_bb_info_type *, last_basic_block_for_fn (cfun));
+   self->rtx_group_next_id = 0;
+
+   self->stores_off_frame_dead_at_return = !cfun->stdarg;
+
+   mtcs_alias_init_alias_analysis/*!init_alias_analysis*/(mtcsAlias);
+}
+
+
+/*----------------------------------------------------------------------------
+   First step.
+
+   Scan all of the insns.  Any random ordering of the blocks is fine.
+   Each block is scanned in forward order to accommodate cselib which
+   is used to remove stores with non-constant bases.
+----------------------------------------------------------------------------*/
+
+/* Delete all of the store_info recs from INSN_INFO.  */
+static void free_store_info (MtcsDse *self,struct insn_info_type * insn_info)
+{
+   store_info *cur = insn_info->store_rec;
+   while (cur){
+      store_info *next = cur->next;
+      if (cur->is_large)
+         BITMAP_FREE (cur->positions_needed.large.bmap);
+      if (cur->cse_base)
+         self->cse_store_info_pool.remove (cur);
+      else
+         self->rtx_store_info_pool.remove (cur);
+      cur = next;
+   }
+
+   insn_info->cannot_delete = true;
+   insn_info->contains_cselib_groups = false;
+   insn_info->store_rec = NULL;
+}
+
+struct note_add_store_info
+{
+  rtx_insn *first, *current;
+  regset fixed_regs_live;
+  bool failure;
+  MtcsDse *mtcsDse;
+};
+
+/* Callback for emit_inc_dec_insn_before via note_stores.
+   Check if a register is clobbered which is live afterwards.  */
+static void noteAddStore_cb (rtx loc, const_rtx expr ATTRIBUTE_UNUSED, void *data)
+{
+   rtx_insn *insn;
+   note_add_store_info *info = (note_add_store_info *) data;
+   MtcsDse *self=info->mtcsDse;
+   MtcsMode *mtcsMode=MTCS_GET_MODE_OBJECT(self);
+   MtcsTarget *mtcsTarget=(MtcsTarget *)mtcsMode->target;
+   MtcsRtlanal *mtcsRtlanal=mtcs_target_get_rtlanal(mtcsTarget);
+
+
+   if (!REG_P (loc))
+      return;
+
+   /* If this register is referenced by the current or an earlier insn,
+   that's OK.  E.g. this applies to the register that is being incremented
+   with this addition.  */
+   for (insn = info->first; insn != NEXT_INSN (info->current); insn = NEXT_INSN (insn))
+      if (mtcs_rtlanal_reg_referenced_p/*!reg_referenced_p*/(mtcsRtlanal,loc, PATTERN (insn)))
+         return;
+
+   /* If we come here, we have a clobber of a register that's only OK
+   if that register is not live.  If we don't have liveness information
+   available, fail now.  */
+   if (!info->fixed_regs_live){
+      info->failure = true;
+      return;
+   }
+   /* Now check if this is a live fixed register.  */
+   unsigned int end_regno = END_REGNO (loc);
+   for (unsigned int regno = REGNO (loc); regno < end_regno; ++regno)
+      if (REGNO_REG_SET_P (info->fixed_regs_live, regno))
+         info->failure = true;
+}
+
+/* Callback for for_each_inc_dec that emits an INSN that sets DEST to
+   SRC + SRCOFF before insn ARG.  */
+static int emitIncDecInsnBefore_cb (rtx mem ATTRIBUTE_UNUSED,
+           rtx op ATTRIBUTE_UNUSED,rtx dest, rtx src, rtx srcoff, void *arg)
+{
+   struct insn_info_type * insn_info = (struct insn_info_type *) arg;
+
+   MtcsDse *self = insn_info->mtcsDse;
+   MtcsMode *mtcsMode=MTCS_GET_MODE_OBJECT(self);
+   MtcsTarget *mtcsTarget=(MtcsTarget *)mtcsMode->target;
+   MtcsFunc *mtcsFunc=mtcs_target_get_func(mtcsTarget);
+   MtcsRtlData *mtcsRtlData=mtcs_func_get_rtl_data(mtcsFunc);
+   MtcsRtlanal *mtcsRtlanal=mtcs_target_get_rtlanal(mtcsTarget);
+   MtcsEmit *mtcsEmit=mtcs_target_get_emit(mtcsTarget);
+   MtcsOptabs *mtcsOptabs =mtcs_target_get_optabs(mtcsTarget);
+   MtcsExpr *mtcsExpr =mtcs_target_get_expr(mtcsTarget);
+
+   rtx_insn *insn = insn_info->insn, *new_insn, *cur;
+   note_add_store_info info;
+
+   /* We can reuse all operands without copying, because we are about
+   to delete the insn that contained it.  */
+   if (srcoff){
+      mtcs_emit_start_sequence/*!start_sequence*/(mtcsEmit);
+      mtcs_emit_emit_insn/*!emit_insn*/(mtcsEmit,mtcs_optabs_gen_add3_insn/*!gen_add3_insn*/(mtcsOptabs,dest, src, srcoff));
+      new_insn =  mtcs_rtl_data_get_insns/*!get_insns*/(mtcsRtlData);
+      mtcs_emit_end_sequence/*!end_sequence*/(mtcsEmit);
+   }else
+      new_insn = mtcs_expr_gen_move_insn/*!gen_move_insn*/(mtcsExpr,dest, src);
+   info.first = new_insn;
+   info.fixed_regs_live = insn_info->fixed_regs_live;
+   info.failure = false;
+   info.mtcsDse = self;
+   for (cur = new_insn; cur; cur = NEXT_INSN (cur)){
+      info.current = cur;
+      mtcs_rtlanal_note_stores/*!note_stores*/(mtcsRtlanal,cur, noteAddStore_cb, &info);
+   }
+
+   /* If a failure was flagged above, return 1 so that for_each_inc_dec will
+   return it immediately, communicating the failure to its caller.  */
+   if (info.failure)
+      return 1;
+
+   mtcs_emit_emit_insn_before/*!emit_insn_before*/(mtcsEmit,new_insn, insn);
+
+   return 0;
+}
+
+/* Before we delete INSN_INFO->INSN, make sure that the auto inc/dec, if it
+   is there, is split into a separate insn.
+   Return true on success (or if there was nothing to do), false on failure.  */
+static bool check_for_inc_dec_1 (MtcsDse *self,struct insn_info_type * insn_info)
+{
+   MtcsMode *mtcsMode=MTCS_GET_MODE_OBJECT(self);
+   MtcsTarget *mtcsTarget=(MtcsTarget *)mtcsMode->target;
+   MtcsRtlanal *mtcsRtlanal=mtcs_target_get_rtlanal(mtcsTarget);
+
+   insn_info->mtcsDse =self;
+
+   rtx_insn *insn = insn_info->insn;
+   rtx note = find_reg_note (insn, REG_INC, NULL_RTX);
+   if (note)
+      return mtcs_rtlanal_for_each_inc_dec/*!for_each_inc_dec*/(mtcsRtlanal,PATTERN (insn), emitIncDecInsnBefore_cb, insn_info) == 0;
+
+   /* Punt on stack pushes, those don't have REG_INC notes and we are
+   unprepared to deal with distribution of REG_ARGS_SIZE notes etc.  */
+   subrtx_iterator::array_type array;
+   FOR_EACH_SUBRTX (iter, array, PATTERN (insn), NONCONST){
+      const_rtx x = *iter;
+      if (GET_RTX_CLASS (GET_CODE (x)) == RTX_AUTOINC)
+         return false;
+   }
+
+   return true;
+}
+
+
+/* Entry point for postreload.  If you work on reload_cse, or you need this
+   anywhere else, consider if you can provide register liveness information
+   and add a parameter to this function so that it can be passed down in
+   insn_info.fixed_regs_live.  */
+//原型 check_for_inc_dec rtl.h dse.cc postreload.cc调用
+bool mtcs_dse_check_for_inc_dec (MtcsDse *self,rtx_insn *insn)
+{
+   MtcsMode *mtcsMode=MTCS_GET_MODE_OBJECT(self);
+   MtcsTarget *mtcsTarget=(MtcsTarget *)mtcsMode->target;
+   MtcsRtlanal *mtcsRtlanal=mtcs_target_get_rtlanal(mtcsTarget);
+
+   insn_info_type insn_info;
+   rtx note;
+
+   insn_info.insn = insn;
+   insn_info.fixed_regs_live = NULL;
+   insn_info.mtcsDse =self;
+   note = find_reg_note (insn, REG_INC, NULL_RTX);
+   if (note)
+      return mtcs_rtlanal_for_each_inc_dec/*!for_each_inc_dec*/(mtcsRtlanal,PATTERN (insn), emitIncDecInsnBefore_cb, &insn_info) == 0;
+
+   /* Punt on stack pushes, those don't have REG_INC notes and we are
+   unprepared to deal with distribution of REG_ARGS_SIZE notes etc.  */
+   subrtx_iterator::array_type array;
+   FOR_EACH_SUBRTX (iter, array, PATTERN (insn), NONCONST){
+      const_rtx x = *iter;
+      if (GET_RTX_CLASS (GET_CODE (x)) == RTX_AUTOINC)
+         return false;
+   }
+
+   return true;
+}
+
+/* Delete the insn and free all of the fields inside INSN_INFO.  */
+static void delete_dead_store_insn (MtcsDse *self,struct insn_info_type * insn_info)
+{
+   MtcsMode *mtcsMode=MTCS_GET_MODE_OBJECT(self);
+   MtcsTarget *mtcsTarget=(MtcsTarget *)mtcsMode->target;
+   MtcsCfgRtl *mtcsCfgRtl=mtcs_target_get_cfg_rtl(mtcsTarget);
+
+   read_info_type * read_info;
+
+   if (!dbg_cnt (dse))
+      return;
+
+   if (!check_for_inc_dec_1(self,insn_info))
+      return;
+   if (dump_file && (dump_flags & TDF_DETAILS))
+      fprintf (dump_file, "Locally deleting insn %d\n",INSN_UID (insn_info->insn));
+
+   free_store_info(self,insn_info);
+   read_info = insn_info->read_rec;
+
+   while (read_info){
+      read_info_type * next = read_info->next;
+      self->read_info_type_pool.remove (read_info);
+      read_info = next;
+   }
+   insn_info->read_rec = NULL;
+
+   mtcs_cfg_rtl_delete_insn/*!delete_insn*/(mtcsCfgRtl,insn_info->insn);
+   self->locally_deleted++;
+   insn_info->insn = NULL;
+
+   insn_info->wild_read = false;
+}
+
+/* Return whether DECL, a local variable, can possibly escape the current
+   function scope.  */
+static bool local_variable_can_escape (tree decl)
+{
+   if (TREE_ADDRESSABLE (decl))
+      return true;
+   /* If this is a partitioned variable, we need to consider all the variables
+   in the partition.  This is necessary because a store into one of them can
+   be replaced with a store into another and this may not change the outcome
+   of the escape analysis.  */
+   if (cfun->gimple_df->decls_to_pointers != NULL){
+      tree *namep = cfun->gimple_df->decls_to_pointers->get (decl);
+      if (namep)
+         return TREE_ADDRESSABLE (*namep);
+   }
+   return false;
+}
+
+/* Return whether EXPR can possibly escape the current function scope.  */
+static bool can_escape (tree expr)
+{
+   tree base;
+   if (!expr)
+      return true;
+   base = get_base_address (expr);
+   if (DECL_P (base)
+   && !may_be_aliased (base)
+   && !(VAR_P (base)
+   && !DECL_EXTERNAL (base)
+   && !TREE_STATIC (base)
+   && local_variable_can_escape (base)))
+      return false;
+   return true;
+}
+
+/* Set the store* bitmaps offset_map_size* fields in GROUP based on
+   OFFSET and WIDTH.  */
+static void set_usage_bits (group_info *group, poly_int64 offset, poly_int64 width,
+                tree expr)
+{
+   /* Non-constant offsets and widths act as global kills, so there's no point
+   trying to use them to derive global DSE candidates.  */
+   HOST_WIDE_INT i, const_offset, const_width;
+   bool expr_escapes = can_escape (expr);
+   if (offset.is_constant (&const_offset)
+   && width.is_constant (&const_width)
+   && const_offset > -MAX_OFFSET
+   && const_offset + const_width < MAX_OFFSET)
+   for (i = const_offset; i < const_offset + const_width; ++i){
+      bitmap store1;
+      bitmap store2;
+      bitmap escaped;
+      int ai;
+      if (i < 0){
+         store1 = group->store1_n;
+         store2 = group->store2_n;
+         escaped = group->escaped_n;
+         ai = -i;
+      }else{
+         store1 = group->store1_p;
+         store2 = group->store2_p;
+         escaped = group->escaped_p;
+         ai = i;
+      }
+
+      if (!bitmap_set_bit (store1, ai))
+         bitmap_set_bit (store2, ai);
+      else{
+         if (i < 0){
+            if (group->offset_map_size_n < ai)
+               group->offset_map_size_n = ai;
+         }else{
+            if (group->offset_map_size_p < ai)
+            group->offset_map_size_p = ai;
+         }
+      }
+      if (expr_escapes)
+         bitmap_set_bit (escaped, ai);
+   }
+}
+
+static void reset_active_stores (MtcsDse *self)
+{
+  self->active_local_stores = NULL;
+  self->active_local_stores_len = 0;
+}
+
+/* Free all READ_REC of the LAST_INSN of BB_INFO.  */
+static void free_read_records (MtcsDse *self,struct dse_bb_info_type * bb_info)
+{
+   struct insn_info_type * insn_info = bb_info->last_insn;
+   read_info_type * *ptr = &insn_info->read_rec;
+   while (*ptr){
+      read_info_type * next = (*ptr)->next;
+      self->read_info_type_pool.remove (*ptr);
+      *ptr = next;
+   }
+}
+
+/* Set the BB_INFO so that the last insn is marked as a wild read.  */
+static void add_wild_read (MtcsDse *self,struct dse_bb_info_type * bb_info)
+{
+  struct insn_info_type * insn_info = bb_info->last_insn;
+  insn_info->wild_read = true;
+  free_read_records(self,bb_info);
+  reset_active_stores(self);
+}
+
+/* Set the BB_INFO so that the last insn is marked as a wild read of
+   non-frame locations.  */
+static void add_non_frame_wild_read (MtcsDse *self,struct dse_bb_info_type * bb_info)
+{
+  struct insn_info_type * insn_info = bb_info->last_insn;
+  insn_info->non_frame_wild_read = true;
+  free_read_records(self,bb_info);
+  reset_active_stores(self);
+}
+
+/* Return true if X is a constant or one of the registers that behave
+   as a constant over the life of a function.  This is equivalent to
+   !rtx_varies_p for memory addresses.  */
+static bool const_or_frame_p (MtcsDse *self,rtx x)
+{
+   MtcsMode *mtcsMode=MTCS_GET_MODE_OBJECT(self);
+   MtcsTarget *mtcsTarget=(MtcsTarget *)mtcsMode->target;
+   MtcsRTL  *mtcsRTL=mtcs_target_get_rtl(mtcsTarget);
+   MtcsReg *mtcsReg=mtcs_target_get_reg(mtcsTarget);
+
+   if (CONSTANT_P (x))
+      return true;
+
+   if (GET_CODE (x) == REG){
+      /* Note that we have to test for the actual rtx used for the frame
+      and arg pointers and not just the register number in case we have
+      eliminated the frame and/or arg pointer and are using it
+      for pseudos.  */
+      if (x == mtcs_rtl_get_frame_pointer_rtx/*!frame_pointer_rtx*/(mtcsRTL)
+      || x ==mtcs_rtl_get_hard_frame_pointer_rtx/*!hard_frame_pointer_rtx*/(mtcsRTL)
+      /* The arg pointer varies if it is not a fixed register.  */
+      || (x == mtcs_rtl_get_arg_pointer_rtx/*!arg_pointer_rtx*/(mtcsRTL)
+      && mtcsReg->hardRegs.x_fixed_regs/*!fixed_regs*/[mtcs_reg_get_arg_pointer_regnum/*!ARG_POINTER_REGNUM*/(mtcsReg)])
+      || x == mtcs_rtl_get_pic_offset_table_rtx/*!pic_offset_table_rtx*/(mtcsRTL))
+         return true;
+      return false;
+   }
+
+   return false;
+}
+
+/* Take all reasonable action to put the address of MEM into the form
+   that we can do analysis on.
+
+   The gold standard is to get the address into the form: address +
+   OFFSET where address is something that rtx_varies_p considers a
+   constant.  When we can get the address in this form, we can do
+   global analysis on it.  Note that for constant bases, address is
+   not actually returned, only the group_id.  The address can be
+   obtained from that.
+
+   If that fails, we try cselib to get a value we can at least use
+   locally.  If that fails we return false.
+
+   The GROUP_ID is set to -1 for cselib bases and the index of the
+   group for non_varying bases.
+
+   FOR_READ is true if this is a mem read and false if not.  */
+static bool canon_address (MtcsDse *self,rtx mem,  int *group_id,  poly_int64 *offset,  cselib_val **base)
+{
+   MtcsMode *mtcsMode=MTCS_GET_MODE_OBJECT(self);
+   MtcsTarget *mtcsTarget=(MtcsTarget *)mtcsMode->target;
+   MtcsRTL  *mtcsRTL=mtcs_target_get_rtl(mtcsTarget);
+   MtcsAlias *mtcsAlias=mtcs_target_get_alias(mtcsTarget);
+   MtcsReg *mtcsReg=mtcs_target_get_reg(mtcsTarget);
+   MtcsCseLib *mtcsCseLib=mtcs_target_get_cse_lib(mtcsTarget);
+
+   machine_mode address_mode = mtcs_rtl_get_address_mode/*!get_address_mode*/(mtcsRTL,mem);
+   rtx mem_address = XEXP (mem, 0);
+   rtx expanded_address, address;
+   int expanded;
+
+   mtcs_cse_lib_cselib_lookup/*!cselib_lookup*/(mtcsCseLib,mem_address, address_mode, 1, GET_MODE (mem));
+
+   if (dump_file && (dump_flags & TDF_DETAILS)){
+      fprintf (dump_file, "  mem: ");
+      mtcs_print_inline_rtx/*!print_inline_rtx*/(dump_file, mem_address, 0);
+      fprintf (dump_file, "\n");
+   }
+
+   /* First see if just canon_rtx (mem_address) is const or frame,
+   if not, try cselib_expand_value_rtx and call canon_rtx on that.  */
+   address = NULL_RTX;
+   for (expanded = 0; expanded < 2; expanded++){
+      if (expanded){
+         /* Use cselib to replace all of the reg references with the full
+         expression.  This will take care of the case where we have
+
+         r_x = base + offset;
+         val = *r_x;
+
+         by making it into
+
+         val = *(base + offset);  */
+
+         expanded_address = mtcs_cse_lib_cselib_expand_value_rtx/*!cselib_expand_value_rtx*/(mtcsCseLib,
+               mem_address,self->scratch, 5);
+
+         /* If this fails, just go with the address from first
+         iteration.  */
+         if (!expanded_address)
+            break;
+      }else
+         expanded_address = mem_address;
+
+      /* Split the address into canonical BASE + OFFSET terms.  */
+      address = mtcs_alias_canon_rtx/*!canon_rtx*/(mtcsAlias,expanded_address);
+
+      *offset = 0;
+
+      if (dump_file && (dump_flags & TDF_DETAILS)){
+         if (expanded){
+            fprintf (dump_file, "\n   after cselib_expand address: ");
+            mtcs_print_inline_rtx/*!print_inline_rtx*/(dump_file, expanded_address, 0);
+            fprintf (dump_file, "\n");
+         }
+
+         fprintf (dump_file, "\n   after canon_rtx address: ");
+         mtcs_print_inline_rtx/*!print_inline_rtx*/(dump_file, address, 0);
+         fprintf (dump_file, "\n");
+      }
+
+      if (GET_CODE (address) == CONST)
+         address = XEXP (address, 0);
+
+      address = strip_offset_and_add (address, offset);
+
+      if (ADDR_SPACE_GENERIC_P (mtcs_rtl_get_mem_addr_space/*!MEM_ADDR_SPACE*/(mtcsRTL,mem))
+      && const_or_frame_p(self,address)){
+         group_info *group = get_group_info(self,address);
+
+         if (dump_file && (dump_flags & TDF_DETAILS)){
+            fprintf (dump_file, "  gid=%d offset=", group->id);
+            print_dec (*offset, dump_file);
+            fprintf (dump_file, "\n");
+         }
+         *base = NULL;
+         *group_id = group->id;
+         return true;
+      }
+   }
+
+   *base = mtcs_cse_lib_cselib_lookup/*!cselib_lookup*/(mtcsCseLib,address, address_mode, true, GET_MODE (mem));
+   *group_id = -1;
+
+   if (*base == NULL){
+      if (dump_file && (dump_flags & TDF_DETAILS))
+         fprintf (dump_file, " no cselib val - should be a wild read.\n");
+      return false;
+   }
+   if (dump_file && (dump_flags & TDF_DETAILS)){
+      fprintf (dump_file, "  varying cselib base=%u:%u offset = ", (*base)->uid, (*base)->hash);
+      print_dec (*offset, dump_file);
+      fprintf (dump_file, "\n");
+   }
+   return true;
+}
+
+/* Clear the rhs field from the active_local_stores array.  */
+static void clear_rhs_from_active_local_stores (MtcsDse *self)
+{
+   struct insn_info_type * ptr = self->active_local_stores;
+   while (ptr){
+      store_info *store_info = ptr->store_rec;
+      /* Skip the clobbers.  */
+      while (!store_info->is_set)
+         store_info = store_info->next;
+
+      store_info->rhs = NULL;
+      store_info->const_rhs = NULL;
+
+      ptr = ptr->next_local_store;
+   }
+}
+
+/* Mark byte POS bytes from the beginning of store S_INFO as unneeded.  */
+static inline void set_position_unneeded (store_info *s_info, int pos)
+{
+   if (UNLIKELY (s_info->is_large)){
+      if (bitmap_set_bit (s_info->positions_needed.large.bmap, pos))
+         s_info->positions_needed.large.count++;
+   }else
+      s_info->positions_needed.small_bitmask   &= ~(HOST_WIDE_INT_1U << pos);
+}
+
+/* Mark the whole store S_INFO as unneeded.  */
+static inline void set_all_positions_unneeded (store_info *s_info)
+{
+   if (UNLIKELY (s_info->is_large)){
+      HOST_WIDE_INT width;
+      if (s_info->width.is_constant (&width)){
+         bitmap_set_range (s_info->positions_needed.large.bmap, 0, width);
+         s_info->positions_needed.large.count = width;
+      }else{
+         gcc_checking_assert (!s_info->positions_needed.large.bmap);
+         s_info->positions_needed.large.count = 1;
+      }
+   }else
+      s_info->positions_needed.small_bitmask = HOST_WIDE_INT_0U;
+}
+
+/* Return TRUE if any bytes from S_INFO store are needed.  */
+static inline bool any_positions_needed_p (store_info *s_info)
+{
+   if (UNLIKELY (s_info->is_large)){
+      HOST_WIDE_INT width;
+      if (s_info->width.is_constant (&width)){
+         gcc_checking_assert (s_info->positions_needed.large.bmap);
+         return s_info->positions_needed.large.count < width;
+      }else{
+         gcc_checking_assert (!s_info->positions_needed.large.bmap);
+         return s_info->positions_needed.large.count == 0;
+      }
+   }else
+      return (s_info->positions_needed.small_bitmask != HOST_WIDE_INT_0U);
+}
+
+/* Return TRUE if all bytes START through START+WIDTH-1 from S_INFO
+   store are known to be needed.  */
+static inline bool all_positions_needed_p (store_info *s_info, poly_int64 start, poly_int64 width)
+{
+   gcc_assert (s_info->rhs);
+   if (!s_info->width.is_constant ()){
+      gcc_assert (s_info->is_large  && !s_info->positions_needed.large.bmap);
+      return s_info->positions_needed.large.count == 0;
+   }
+
+   /* Otherwise, if START and WIDTH are non-constant, we're asking about
+   a non-constant region of a constant-sized store.  We can't say for
+   sure that all positions are needed.  */
+   HOST_WIDE_INT const_start, const_width;
+   if (!start.is_constant (&const_start) || !width.is_constant (&const_width))
+      return false;
+
+   if (UNLIKELY (s_info->is_large)){
+      for (HOST_WIDE_INT i = const_start; i < const_start + const_width; ++i)
+         if (bitmap_bit_p (s_info->positions_needed.large.bmap, i))
+            return false;
+      return true;
+   }else{
+      unsigned HOST_WIDE_INT mask = lowpart_bitmask (const_width) << const_start;
+      return (s_info->positions_needed.small_bitmask & mask) == mask;
+   }
+}
+
+/* BODY is an instruction pattern that belongs to INSN.  Return 1 if
+   there is a candidate store, after adding it to the appropriate
+   local store group if so.  */
+static int record_store (MtcsDse *self,rtx body, struct dse_bb_info_type * bb_info)
+{
+   MtcsMode *mtcsMode=MTCS_GET_MODE_OBJECT(self);
+   MtcsTarget *mtcsTarget=(MtcsTarget *)mtcsMode->target;
+   MtcsRTL  *mtcsRTL=mtcs_target_get_rtl(mtcsTarget);
+   MtcsAlias *mtcsAlias=mtcs_target_get_alias(mtcsTarget);
+   MtcsReg *mtcsReg=mtcs_target_get_reg(mtcsTarget);
+   MtcsFunc *mtcsFunc=mtcs_target_get_func(mtcsTarget);
+   MtcsRtlData *mtcsRtlData=mtcs_func_get_rtl_data(mtcsFunc);
+   MtcsRtlanal *mtcsRtlanal=mtcs_target_get_rtlanal(mtcsTarget);
+   MtcsEmit *mtcsEmit=mtcs_target_get_emit(mtcsTarget);
+   MtcsCseLib *mtcsCseLib=mtcs_target_get_cse_lib(mtcsTarget);
+   MtcsDfcore *mtcsDfcore=mtcs_target_get_dfcore(mtcsTarget);
+
+   rtx mem, rhs, const_rhs, mem_addr;
+   poly_int64 offset = 0;
+   poly_int64 width = 0;
+   struct insn_info_type * insn_info = bb_info->last_insn;
+   store_info *store_info = NULL;
+   int group_id;
+   cselib_val *base = NULL;
+   struct insn_info_type * ptr, *last, *redundant_reason;
+   bool store_is_unused;
+
+   if (GET_CODE (body) != SET && GET_CODE (body) != CLOBBER)
+      return 0;
+
+   mem = SET_DEST (body);
+
+   /* If this is not used, then this cannot be used to keep the insn
+   from being deleted.  On the other hand, it does provide something
+   that can be used to prove that another store is dead.  */
+   store_is_unused  = (find_reg_note (insn_info->insn, REG_UNUSED, mem) != NULL);
+
+   /* Check whether that value is a suitable memory location.  */
+   if (!MEM_P (mem)){
+      /* If the set or clobber is unused, then it does not effect our
+      ability to get rid of the entire insn.  */
+      if (!store_is_unused)
+         insn_info->cannot_delete = true;
+      return 0;
+   }
+
+   /* At this point we know mem is a mem. */
+   if (GET_MODE (mem) == mtcsMode->modes.M_BLKmode){
+      HOST_WIDE_INT const_size;
+      if (GET_CODE (XEXP (mem, 0)) == SCRATCH){
+         if (dump_file && (dump_flags & TDF_DETAILS))
+            fprintf (dump_file, " adding wild read for (clobber (mem:BLK (scratch))\n");
+         add_wild_read(self,bb_info);
+         insn_info->cannot_delete = true;
+         return 0;
+      }
+      /* Handle (set (mem:BLK (addr) [... S36 ...]) (const_int 0))
+      as memset (addr, 0, 36);  */
+      else if (!mtcs_rtl_is_mem_size_known_p/*!MEM_SIZE_KNOWN_P*/(mtcsRTL,mem)
+      || maybe_le (mtcs_rtl_get_mem_size/*!MEM_SIZE*/(mtcsRTL,mem), 0)
+      /* This is a limit on the bitmap size, which is only relevant
+      for constant-sized MEMs.  */
+      || (mtcs_rtl_get_mem_size/*!MEM_SIZE*/(mtcsRTL,mem).is_constant (&const_size)
+      && const_size > MAX_OFFSET)
+      || GET_CODE (body) != SET
+      || !CONST_INT_P (SET_SRC (body))){
+         if (!store_is_unused){
+            /* If the set or clobber is unused, then it does not effect our
+            ability to get rid of the entire insn.  */
+            insn_info->cannot_delete = true;
+            clear_rhs_from_active_local_stores(self);
+         }
+         return 0;
+      }
+   }
+
+   /* We can still process a volatile mem, we just cannot delete it.  */
+   if (MEM_VOLATILE_P (mem))
+      insn_info->cannot_delete = true;
+
+   if (!canon_address(self,mem, &group_id, &offset, &base)){
+      clear_rhs_from_active_local_stores(self);
+      return 0;
+   }
+
+   if (GET_MODE (mem) == mtcsMode->modes.M_BLKmode)
+      width = mtcs_rtl_get_mem_size/*!MEM_SIZE*/(mtcsRTL,mem);
+   else
+      width = mtcs_mode_get_size/*!GET_MODE_SIZE*/(mtcsMode,GET_MODE (mem));
+
+   if (!endpoint_representable_p (offset, width)){
+      clear_rhs_from_active_local_stores(self);
+      return 0;
+   }
+
+   if (known_eq (width, 0))
+      return 0;
+
+   if (group_id >= 0){
+      /* In the restrictive case where the base is a constant or the
+      frame pointer we can do global analysis.  */
+
+      group_info *group = self->rtx_group_vec[group_id];
+      tree expr =mtcs_rtl_get_mem_expr/*!MEM_EXPR*/(mtcsRTL,mem);
+
+      store_info = self->rtx_store_info_pool.allocate ();
+      set_usage_bits (group, offset, width, expr);
+
+      if (dump_file && (dump_flags & TDF_DETAILS)){
+         fprintf (dump_file, " processing const base store gid=%d",group_id);
+         print_range (dump_file, offset, width);
+         fprintf (dump_file, "\n");
+      }
+   }else{
+      if (may_be_sp_based_p (XEXP (mem, 0)))
+         insn_info->stack_pointer_based = true;
+      insn_info->contains_cselib_groups = true;
+
+      store_info = self->cse_store_info_pool.allocate ();
+      group_id = -1;
+
+      if (dump_file && (dump_flags & TDF_DETAILS)){
+         fprintf (dump_file, " processing cselib store ");
+         print_range (dump_file, offset, width);
+         fprintf (dump_file, "\n");
+      }
+   }
+
+   const_rhs = rhs = NULL_RTX;
+   if (GET_CODE (body) == SET
+   /* No place to keep the value after ra.  */
+   && !reload_completed
+   && (REG_P (SET_SRC (body))
+   || GET_CODE (SET_SRC (body)) == SUBREG
+   || CONSTANT_P (SET_SRC (body)))
+   && !MEM_VOLATILE_P (mem)
+   /* Sometimes the store and reload is used for truncation and
+   rounding.  */
+   && !(mtcs_mode_is_float_p/*!FLOAT_MODE_P*/(mtcsMode,GET_MODE (mem)) && (flag_float_store))){
+      rhs = SET_SRC (body);
+      if (CONSTANT_P (rhs))
+         const_rhs = rhs;
+      else if (body == PATTERN (insn_info->insn)){
+         rtx tem = find_reg_note (insn_info->insn, REG_EQUAL, NULL_RTX);
+         if (tem && CONSTANT_P (XEXP (tem, 0)))
+            const_rhs = XEXP (tem, 0);
+      }
+      if (const_rhs == NULL_RTX && REG_P (rhs)){
+         rtx tem = mtcs_cse_lib_cselib_expand_value_rtx/*!cselib_expand_value_rtx*/(mtcsCseLib,rhs, self->scratch, 5);
+
+         if (tem && CONSTANT_P (tem))
+            const_rhs = tem;
+         else{
+            /* If RHS is set only once to a constant, set CONST_RHS
+            to the constant.  */
+            rtx def_src = mtcs_dfcore_df_find_single_def_src/*!df_find_single_def_src*/(mtcsDfcore,rhs);
+            if (def_src != nullptr && CONSTANT_P (def_src))
+               const_rhs = def_src;
+         }
+      }
+   }
+
+   /* Check to see if this stores causes some other stores to be
+   dead.  */
+   ptr = self->active_local_stores;
+   last = NULL;
+   redundant_reason = NULL;
+   unsigned char addrspace = mtcs_rtl_get_mem_addr_space/*!MEM_ADDR_SPACE*/(mtcsRTL,mem);
+   mem = mtcs_alias_canon_rtx/*!canon_rtx*/(mtcsAlias,mem);
+
+   if (group_id < 0)
+      mem_addr = base->val_rtx;
+   else{
+      group_info *group = self->rtx_group_vec[group_id];
+      mem_addr = group->canon_base_addr;
+   }
+   if (maybe_ne (offset, 0))
+      mem_addr = mtcs_rtl_plus_constant/*!plus_constant*/(mtcsRTL,
+            mtcs_rtl_get_address_mode/*!get_address_mode*/(mtcsRTL,mem), mem_addr, offset);
+
+   while (ptr){
+      struct insn_info_type * next = ptr->next_local_store;
+      class store_info *s_info = ptr->store_rec;
+      bool del = true;
+
+      /* Skip the clobbers. We delete the active insn if this insn
+      shadows the set.  To have been put on the active list, it
+      has exactly on set. */
+      while (!s_info->is_set)
+         s_info = s_info->next;
+
+      if (s_info->group_id == group_id
+      && s_info->cse_base == base
+      && s_info->addrspace == addrspace){
+         HOST_WIDE_INT i;
+         if (dump_file && (dump_flags & TDF_DETAILS)){
+            fprintf (dump_file, "    trying store in insn=%d gid=%d",INSN_UID (ptr->insn), s_info->group_id);
+            print_range (dump_file, s_info->offset, s_info->width);
+            fprintf (dump_file, "\n");
+         }
+
+         /* Even if PTR won't be eliminated as unneeded, if both
+         PTR and this insn store the same constant value, we might
+         eliminate this insn instead.  */
+         if (s_info->const_rhs
+         && const_rhs
+         && known_subrange_p (offset, width,s_info->offset, s_info->width)
+         && all_positions_needed_p (s_info, offset - s_info->offset, width)
+         /* We can only remove the later store if the earlier aliases
+         at least all accesses the later one.  */
+         && mtcs_alias_mems_same_for_tbaa_p/*!mems_same_for_tbaa_p*/(mtcsAlias,s_info->mem, mem)){
+            if (GET_MODE (mem) ==mtcsMode->modes.M_BLKmode){
+               if (GET_MODE (s_info->mem) == mtcsMode->modes.M_BLKmode && s_info->const_rhs == const_rhs)
+                  redundant_reason = ptr;
+            }else if (s_info->const_rhs == const0_rtx && const_rhs == const0_rtx)
+               redundant_reason = ptr;
+            else{
+               rtx val;
+               mtcs_emit_start_sequence/*!start_sequence*/(mtcsEmit);
+               val = get_stored_val(self,s_info, GET_MODE (mem), offset, width, BLOCK_FOR_INSN (insn_info->insn),true);
+               if (mtcs_rtl_data_get_insns/*!get_insns*/(mtcsRtlData) != NULL)
+                  val = NULL_RTX;
+               mtcs_emit_end_sequence/*!end_sequence*/(mtcsEmit);
+               if (val && rtx_equal_p (val, const_rhs))
+                  redundant_reason = ptr;
+            }
+         }
+
+         HOST_WIDE_INT begin_unneeded, const_s_width, const_width;
+         if (known_subrange_p (s_info->offset, s_info->width, offset, width))
+            /* The new store touches every byte that S_INFO does.  */
+            set_all_positions_unneeded (s_info);
+         else if ((offset - s_info->offset).is_constant (&begin_unneeded)
+         && s_info->width.is_constant (&const_s_width)
+         && width.is_constant (&const_width)){
+            HOST_WIDE_INT end_unneeded = begin_unneeded + const_width;
+            begin_unneeded = MAX (begin_unneeded, 0);
+            end_unneeded = MIN (end_unneeded, const_s_width);
+            for (i = begin_unneeded; i < end_unneeded; ++i)
+               set_position_unneeded (s_info, i);
+         }else{
+            /* We don't know which parts of S_INFO are needed and
+            which aren't, so invalidate the RHS.  */
+            s_info->rhs = NULL;
+            s_info->const_rhs = NULL;
+         }
+      }else if (s_info->rhs)
+      /* Need to see if it is possible for this store to overwrite
+      the value of store_info.  If it is, set the rhs to NULL to
+      keep it from being used to remove a load.  */
+      {
+         if (mtcs_alias_canon_output_dependence/*!canon_output_dependence*/(mtcsAlias,s_info->mem, true,
+         mem, GET_MODE (mem), mem_addr)){
+            s_info->rhs = NULL;
+            s_info->const_rhs = NULL;
+         }
+      }
+
+      /* An insn can be deleted if every position of every one of
+      its s_infos is zero.  */
+      if (any_positions_needed_p (s_info))
+      del = false;
+
+      if (del){
+         struct insn_info_type * insn_to_delete = ptr;
+
+         self->active_local_stores_len--;
+         if (last)
+            last->next_local_store = ptr->next_local_store;
+         else
+            self->active_local_stores = ptr->next_local_store;
+
+         if (!insn_to_delete->cannot_delete)
+         delete_dead_store_insn(self,insn_to_delete);
+      }else
+         last = ptr;
+
+      ptr = next;
+   } //end  while (ptr){
+
+   /* Finish filling in the store_info.  */
+   store_info->next = insn_info->store_rec;
+   insn_info->store_rec = store_info;
+   store_info->mem = mem;
+   store_info->mem_addr = mem_addr;
+   store_info->cse_base = base;
+   HOST_WIDE_INT const_width;
+   if (!width.is_constant (&const_width)){
+      store_info->is_large = true;
+      store_info->positions_needed.large.count = 0;
+      store_info->positions_needed.large.bmap = NULL;
+   }else if (const_width > HOST_BITS_PER_WIDE_INT){
+      store_info->is_large = true;
+      store_info->positions_needed.large.count = 0;
+      store_info->positions_needed.large.bmap = BITMAP_ALLOC (&self->dse_bitmap_obstack);
+   }else{
+      store_info->is_large = false;
+      store_info->positions_needed.small_bitmask = lowpart_bitmask (const_width);
+   }
+   store_info->group_id = group_id;
+   store_info->offset = offset;
+   store_info->width = width;
+   store_info->is_set = GET_CODE (body) == SET;
+   store_info->rhs = rhs;
+   store_info->const_rhs = const_rhs;
+   store_info->redundant_reason = redundant_reason;
+   store_info->addrspace = addrspace;
+
+   /* If this is a clobber, we return 0.  We will only be able to
+   delete this insn if there is only one store USED store, but we
+   can use the clobber to delete other stores earlier.  */
+   return store_info->is_set ? 1 : 0;
+}
+
+static void dump_insn_info (const char * start, struct insn_info_type * insn_info)
+{
+   fprintf (dump_file, "%s insn=%d %s\n", start, INSN_UID (insn_info->insn),
+      insn_info->store_rec ? "has store" : "naked");
+}
+
+/* If the modes are different and the value's source and target do not
+   line up, we need to extract the value from lower part of the rhs of
+   the store, shift it, and then put it into a form that can be shoved
+   into the read_insn.  This function generates a right SHIFT of a
+   value that is at least ACCESS_SIZE bytes wide of READ_MODE.  The
+   shift sequence is returned or NULL if we failed to find a
+   shift.  */
+static rtx find_shift_sequence (MtcsDse *self,poly_int64 access_size,
+           store_info *store_info,
+           machine_mode read_mode,
+           poly_int64 shift, bool speed, bool require_cst)
+{
+   MtcsMode *mtcsMode=MTCS_GET_MODE_OBJECT(self);
+   MtcsTarget *mtcsTarget=(MtcsTarget *)mtcsMode->target;
+   MtcsRTL  *mtcsRTL=mtcs_target_get_rtl(mtcsTarget);
+   MtcsFunc *mtcsFunc=mtcs_target_get_func(mtcsTarget);
+   MtcsRtlData *mtcsRtlData=mtcs_func_get_rtl_data(mtcsFunc);
+   MtcsRtlanal *mtcsRtlanal=mtcs_target_get_rtlanal(mtcsTarget);
+   MtcsEmit *mtcsEmit=mtcs_target_get_emit(mtcsTarget);
+   MtcsSimplifyRtx *mtcsSimplifyRtx=mtcs_target_get_simplify_rtx(mtcsTarget);
+   MtcsExpmed *mtcsExpmed = mtcs_target_get_expmed(mtcsTarget);
+   MtcsExpr *mtcsExpr = mtcs_target_get_expr(mtcsTarget);
+   MtcsOptabs *mtcsOptabs = mtcs_target_get_optabs(mtcsTarget);
+
+   machine_mode store_mode = GET_MODE (store_info->mem);
+   scalar_int_mode new_mode;
+   rtx read_reg = NULL;
+
+   /* If a constant was stored into memory, try to simplify it here,
+   otherwise the cost of the shift might preclude this optimization
+   e.g. at -Os, even when no actual shift will be needed.  */
+   if (store_info->const_rhs
+   && known_le (access_size, mtcs_mode_get_size/*!GET_MODE_SIZE*/(mtcsMode,MAX_MODE_INT))){
+      auto new_mode = mtcs_mode_smallest_int_mode_for_size/*!smallest_int_mode_for_size*/(mtcsMode,access_size * BITS_PER_UNIT);
+      auto byte = mtcs_mode_subreg_lowpart_offset/*!subreg_lowpart_offset*/(mtcsMode,new_mode, store_mode);
+      rtx ret =mtcs_simplify_rtx_subreg/*!simplify_subreg*/(mtcsSimplifyRtx,new_mode, store_info->const_rhs, store_mode, byte);
+      if (ret && CONSTANT_P (ret)){
+         rtx shift_rtx =mtcs_rtl_gen_int_shift_amount/*!gen_int_shift_amount*/(mtcsRTL,new_mode, shift);
+         ret = mtcs_simplify_rtx_const_binary_operation/*!simplify_const_binary_operation*/(mtcsSimplifyRtx,
+               LSHIFTRT, new_mode, ret,shift_rtx);
+         if (ret && CONSTANT_P (ret)){
+            byte = mtcs_mode_subreg_lowpart_offset/*!subreg_lowpart_offset*/(mtcsMode,read_mode, new_mode);
+            ret = mtcs_simplify_rtx_subreg/*!simplify_subreg*/(mtcsSimplifyRtx,read_mode, ret, new_mode, byte);
+            if (ret && CONSTANT_P (ret)
+            && (mtcs_rtlanal_set_src_cost/*!set_src_cost*/(mtcsRtlanal,ret, read_mode, speed) <= COSTS_N_INSNS (1)))
+               return ret;
+         }
+      }
+   }
+
+   if (require_cst)
+      return NULL_RTX;
+
+   /* Some machines like the x86 have shift insns for each size of
+   operand.  Other machines like the ppc or the ia-64 may only have
+   shift insns that shift values within 32 or 64 bit registers.
+   This loop tries to find the smallest shift insn that will right
+   justify the value we want to read but is available in one insn on
+   the machine.  */
+
+   opt_scalar_int_mode new_mode_iter;
+   MTCS_FOR_EACH_MODE_IN_CLASS (mtcsMode,new_mode_iter, MODE_INT){
+      rtx target, new_reg, new_lhs;
+      rtx_insn *shift_seq, *insn;
+      int cost;
+
+      new_mode = new_mode_iter.require ();
+      if (mtcs_mode_get_bitsize/*!GET_MODE_BITSIZE*/(mtcsMode,new_mode) > BITS_PER_WORD)
+         break;
+      if (maybe_lt (mtcs_mode_get_size/*!GET_MODE_SIZE*/(mtcsMode,new_mode),
+            mtcs_mode_get_size/*!GET_MODE_SIZE*/(mtcsMode,read_mode)))
+         continue;
+
+      /* Try a wider mode if truncating the store mode to NEW_MODE
+      requires a real instruction.  */
+      if (maybe_lt (mtcs_mode_get_size/*!GET_MODE_SIZE*/(mtcsMode,new_mode), mtcs_mode_get_size/*!GET_MODE_SIZE*/(mtcsMode,store_mode))
+      && !mtcs_mode_truly_noop_truncation_p/*!TRULY_NOOP_TRUNCATION_MODES_P*/(mtcsMode,new_mode, store_mode))
+         continue;
+
+      /* Also try a wider mode if the necessary punning is either not
+      desirable or not possible.  */
+      if (!CONSTANT_P (store_info->rhs)
+      && !mtcsTarget/*!targetm.modes_tieable_p*/->modes_tieable_p(mtcsTarget,new_mode, store_mode))
+         continue;
+
+      if (multiple_p (shift, mtcs_mode_get_bitsize/*!GET_MODE_BITSIZE*/(mtcsMode,new_mode))
+      && known_le (mtcs_mode_get_size/*!GET_MODE_SIZE*/(mtcsMode,new_mode),
+            mtcs_mode_get_size/*!GET_MODE_SIZE*/(mtcsMode,store_mode))){
+         /* Try to implement the shift using a subreg.  */
+         poly_int64 offset= mtcs_mode_subreg_offset_from_lsb/*!subreg_offset_from_lsb*/(mtcsMode,new_mode, store_mode, shift);
+         rtx rhs_subreg = mtcs_simplify_rtx_gen_subreg/*!simplify_gen_subreg*/(mtcsSimplifyRtx,
+               new_mode, store_info->rhs, store_mode, offset);
+         if (rhs_subreg){
+            read_reg =mtcs_expmed_extract_low_bits/*!extract_low_bits*/(mtcsExpmed,read_mode, new_mode, copy_rtx (rhs_subreg));
+            break;
+         }
+      }
+
+      if (maybe_lt (mtcs_mode_get_size/*!GET_MODE_SIZE*/(mtcsMode,new_mode), access_size))
+         continue;
+
+      new_reg = mtcs_emit_gen_reg_rtx/*!gen_reg_rtx*/(mtcsEmit,new_mode);
+
+      mtcs_emit_start_sequence/*!start_sequence*/(mtcsEmit);
+
+      /* In theory we could also check for an ashr.  Ian Taylor knows
+      of one dsp where the cost of these two was not the same.  But
+      this really is a rare case anyway.  */
+      target = mtcs_optabs_expand_binop/*!expand_binop*/(mtcsOptabs,new_mode, lshr_optab, new_reg,
+            mtcs_rtl_gen_int_shift_amount/*!gen_int_shift_amount*/(mtcsRTL,new_mode, shift),new_reg, 1, OPTAB_DIRECT);
+
+      shift_seq = mtcs_rtl_data_get_insns/*!get_insns*/(mtcsRtlData);
+      mtcs_emit_end_sequence/*!end_sequence*/(mtcsEmit);
+
+      if (target != new_reg || shift_seq == NULL)
+         continue;
+
+      cost = 0;
+      for (insn = shift_seq; insn != NULL_RTX; insn = NEXT_INSN (insn))
+         if (INSN_P (insn))
+            cost += mtcs_rtlanal_insn_cost/*!insn_cost*/(mtcsRtlanal,insn, speed);
+
+      /* The computation up to here is essentially independent
+      of the arguments and could be precomputed.  It may
+      not be worth doing so.  We could precompute if
+      worthwhile or at least cache the results.  The result
+      technically depends on both SHIFT and ACCESS_SIZE,
+      but in practice the answer will depend only on ACCESS_SIZE.  */
+
+      if (cost > COSTS_N_INSNS (1))
+         continue;
+
+      new_lhs = mtcs_expmed_extract_low_bits/*!extract_low_bits*/(mtcsExpmed,new_mode, store_mode,
+      copy_rtx (store_info->rhs));
+      if (new_lhs == NULL_RTX)
+         continue;
+
+      /* We found an acceptable shift.  Generate a move to
+      take the value from the store and put it into the
+      shift pseudo, then shift it, then generate another
+      move to put in into the target of the read.  */
+      mtcs_expr_emit_move_insn/*!emit_move_insn*/(mtcsExpr,new_reg, new_lhs);
+      mtcs_emit_emit_insn/*!emit_insn*/(mtcsEmit,shift_seq);
+      read_reg = mtcs_expmed_extract_low_bits/*!extract_low_bits*/(mtcsExpmed,read_mode, new_mode, new_reg);
+      break;
+   }
+
+   return read_reg;
+}
+
+
+/* Call back for note_stores to find the hard regs set or clobbered by
+   insn.  Data is a bitmap of the hardregs set so far.  */
+static void lookForHardRegs_cb (rtx x, const_rtx pat ATTRIBUTE_UNUSED, void *userData)
+{
+   LookForHardRegsData *info=(LookForHardRegsData *)userData;
+
+   MtcsDse *self=info->mtcsDse;
+   MtcsMode *mtcsMode=MTCS_GET_MODE_OBJECT(self);
+   MtcsTarget *mtcsTarget=(MtcsTarget *)mtcsMode->target;
+   MtcsReg *mtcsReg=mtcs_target_get_reg(mtcsTarget);
+
+   bitmap regs_set = (bitmap) info->regs_set;
+
+   if (REG_P (x) && mtcs_reg_is_hard_rtx/*!HARD_REGISTER_P*/(mtcsReg,x))
+      bitmap_set_range (regs_set, REGNO (x), REG_NREGS (x));
+}
+
+/* Helper function for replace_read and record_store.
+   Attempt to return a value of mode READ_MODE stored in STORE_INFO,
+   consisting of READ_WIDTH bytes starting from READ_OFFSET.  Return NULL
+   if not successful.  If REQUIRE_CST is true, return always constant.  */
+static rtx get_stored_val (MtcsDse *self,store_info *store_info, machine_mode read_mode,
+      poly_int64 read_offset, poly_int64 read_width, basic_block bb, bool require_cst)
+{
+   MtcsMode *mtcsMode=MTCS_GET_MODE_OBJECT(self);
+   MtcsTarget *mtcsTarget=(MtcsTarget *)mtcsMode->target;
+   MtcsRTL  *mtcsRTL=mtcs_target_get_rtl(mtcsTarget);
+   MtcsExpmed *mtcsExpmed = mtcs_target_get_expmed(mtcsTarget);
+
+   machine_mode store_mode = GET_MODE (store_info->mem);
+   poly_int64 gap;
+   rtx read_reg;
+
+   /* To get here the read is within the boundaries of the write so
+   shift will never be negative.  Start out with the shift being in
+   bytes.  */
+   if (store_mode == mtcsMode->modes.M_BLKmode)
+      gap = 0;
+   else if (BYTES_BIG_ENDIAN)
+      gap = ((store_info->offset + store_info->width) - (read_offset + read_width));
+   else
+      gap = read_offset - store_info->offset;
+
+   if (maybe_ne (gap, 0)){
+      if (!gap.is_constant ())
+         return NULL_RTX;
+
+      poly_int64 shift = gap * BITS_PER_UNIT;
+      poly_int64 access_size = mtcs_mode_get_size_poly/*!GET_MODE_SIZE*/(mtcsMode,read_mode) + gap;
+      read_reg = find_shift_sequence(self,access_size, store_info, read_mode,
+            shift, optimize_bb_for_speed_p (bb),require_cst);
+   }else if (store_mode == mtcsMode->modes.M_BLKmode){
+      /* The store is a memset (addr, const_val, const_size).  */
+      gcc_assert (CONST_INT_P (store_info->rhs));
+      scalar_int_mode int_store_mode;
+      if (!mtcs_mode_int_mode_for_mode/*!int_mode_for_mode*/(mtcsMode,read_mode).exists (&int_store_mode))
+         read_reg = NULL_RTX;
+      else if (store_info->rhs == const0_rtx)
+         read_reg = mtcs_expmed_extract_low_bits/*!extract_low_bits*/(mtcsExpmed,read_mode, int_store_mode, const0_rtx);
+      else if (mtcs_mode_get_bitsize/*!GET_MODE_BITSIZE*/(mtcsMode,int_store_mode) > HOST_BITS_PER_WIDE_INT
+      || BITS_PER_UNIT >= HOST_BITS_PER_WIDE_INT)
+         read_reg = NULL_RTX;
+      else{
+         unsigned HOST_WIDE_INT c = INTVAL (store_info->rhs)  & ((HOST_WIDE_INT_1 << BITS_PER_UNIT) - 1);
+         int shift = BITS_PER_UNIT;
+         while (shift < HOST_BITS_PER_WIDE_INT){
+            c |= (c << shift);
+            shift <<= 1;
+         }
+         read_reg = mtcs_rtl_gen_int_mode/*!gen_int_mode*/(mtcsRTL,c, int_store_mode);
+         read_reg = mtcs_expmed_extract_low_bits/*!extract_low_bits*/(mtcsExpmed,read_mode, int_store_mode, read_reg);
+      }
+   }else if (store_info->const_rhs  && (require_cst
+   || mtcs_mode_get_class/*!GET_MODE_CLASS*/(mtcsMode,read_mode) != mtcs_mode_get_class/*!GET_MODE_CLASS*/(mtcsMode,store_mode)))
+      read_reg = mtcs_expmed_extract_low_bits/*!extract_low_bits*/(mtcsExpmed,
+            read_mode, store_mode,copy_rtx (store_info->const_rhs));
+   else if (mtcs_mode_is_vector_p/*!VECTOR_MODE_P*/(mtcsMode,read_mode)
+         && mtcs_mode_is_vector_p/*!VECTOR_MODE_P*/(mtcsMode,store_mode)
+   && known_le (mtcs_mode_get_bitsize/*!GET_MODE_BITSIZE*/(mtcsMode,read_mode),
+         mtcs_mode_get_bitsize/*!GET_MODE_BITSIZE*/(mtcsMode,store_mode))
+   && mtcsTarget/*!targetm.modes_tieable_p*/->modes_tieable_p(mtcsTarget,read_mode, store_mode))
+      read_reg = gen_lowpart (read_mode, copy_rtx (store_info->rhs));
+   else
+      read_reg = mtcs_expmed_extract_low_bits/*!extract_low_bits*/(mtcsExpmed,read_mode, store_mode,
+   copy_rtx (store_info->rhs));
+   if (require_cst && read_reg && !CONSTANT_P (read_reg))
+      read_reg = NULL_RTX;
+   return read_reg;
+}
+
+/* Take a sequence of:
+     A <- r1
+     ...
+     ... <- A
+
+   and change it into
+   r2 <- r1
+   A <- r1
+   ...
+   ... <- r2
+
+   or
+
+   r3 <- extract (r1)
+   r3 <- r3 >> shift
+   r2 <- extract (r3)
+   ... <- r2
+
+   or
+
+   r2 <- extract (r1)
+   ... <- r2
+
+   Depending on the alignment and the mode of the store and
+   subsequent load.
+
+
+   The STORE_INFO and STORE_INSN are for the store and READ_INFO
+   and READ_INSN are for the read.  Return true if the replacement
+   went ok.  */
+static bool replace_read (MtcsDse *self,store_info *store_info, struct insn_info_type * store_insn,
+         read_info_type * read_info, struct insn_info_type * read_insn, rtx *loc)
+{
+   MtcsMode *mtcsMode=MTCS_GET_MODE_OBJECT(self);
+   MtcsTarget *mtcsTarget=(MtcsTarget *)mtcsMode->target;
+   MtcsFunc *mtcsFunc=mtcs_target_get_func(mtcsTarget);
+   MtcsRtlData *mtcsRtlData=mtcs_func_get_rtl_data(mtcsFunc);
+   MtcsRtlanal *mtcsRtlanal=mtcs_target_get_rtlanal(mtcsTarget);
+   MtcsEmit *mtcsEmit=mtcs_target_get_emit(mtcsTarget);
+   MtcsOptabs *mtcsOptabs =mtcs_target_get_optabs(mtcsTarget);
+   MtcsExpr *mtcsExpr =mtcs_target_get_expr(mtcsTarget);
+   MtcsRecog *mtcsRecog =mtcs_target_get_recog(mtcsTarget);
+   MtcsDfcore *mtcsDfcore =mtcs_target_get_dfcore (mtcsTarget);
+   MtcsReg *mtcsReg=mtcs_target_get_reg(mtcsTarget);
+   MtcsExplow *mtcsExplow =mtcs_target_get_explow(mtcsTarget);
+
+   machine_mode store_mode = GET_MODE (store_info->mem);
+   machine_mode read_mode = GET_MODE (read_info->mem);
+   rtx_insn *insns, *this_insn;
+   rtx read_reg;
+   basic_block bb;
+
+   if (!dbg_cnt (dse))
+      return false;
+
+   /* Create a sequence of instructions to set up the read register.
+   This sequence goes immediately before the store and its result
+   is read by the load.
+
+   We need to keep this in perspective.  We are replacing a read
+   with a sequence of insns, but the read will almost certainly be
+   in cache, so it is not going to be an expensive one.  Thus, we
+   are not willing to do a multi insn shift or worse a subroutine
+   call to get rid of the read.  */
+   if (dump_file && (dump_flags & TDF_DETAILS))
+      fprintf (dump_file, "trying to replace %smode load in insn %d from %smode store in insn %d\n",
+            mtcs_mode_get_name/*!GET_MODE_NAME*/(mtcsMode,read_mode), INSN_UID (read_insn->insn),
+            mtcs_mode_get_name/*!GET_MODE_NAME*/(mtcsMode,store_mode), INSN_UID (store_insn->insn));
+   mtcs_emit_start_sequence/*!start_sequence*/(mtcsEmit);
+   bb = BLOCK_FOR_INSN (read_insn->insn);
+   read_reg = get_stored_val(self,store_info, read_mode, read_info->offset, read_info->width, bb, false);
+   if (read_reg == NULL_RTX){
+      mtcs_emit_end_sequence/*!end_sequence*/(mtcsEmit);
+      if (dump_file && (dump_flags & TDF_DETAILS))
+         fprintf (dump_file, " -- could not extract bits of stored value\n");
+      return false;
+   }
+   /* Force the value into a new register so that it won't be clobbered
+   between the store and the load.  */
+   if (mtcs_reg_get_word_register_operations/*!WORD_REGISTER_OPERATIONS*/(mtcsReg)  && GET_CODE (read_reg) == SUBREG
+   && REG_P (SUBREG_REG (read_reg))  && GET_MODE (SUBREG_REG (read_reg)) == word_mode){
+      /* For WORD_REGISTER_OPERATIONS with subreg of word_mode register
+      force SUBREG_REG into a new register rather than the SUBREG.  */
+      rtx r = mtcs_explow_copy_to_mode_reg/*!copy_to_mode_reg*/(mtcsExplow,word_mode, SUBREG_REG (read_reg));
+      read_reg = shallow_copy_rtx (read_reg);
+      SUBREG_REG (read_reg) = r;
+   }else
+      read_reg = mtcs_explow_copy_to_mode_reg/*!copy_to_mode_reg*/(mtcsExplow, read_mode, read_reg);
+   insns = mtcs_rtl_data_get_insns/*!get_insns*/(mtcsRtlData);
+   mtcs_emit_end_sequence/*!end_sequence*/(mtcsEmit);
+
+   if (insns != NULL_RTX){
+      /* Now we have to scan the set of new instructions to see if the
+      sequence contains and sets of hardregs that happened to be
+      live at this point.  For instance, this can happen if one of
+      the insns sets the CC and the CC happened to be live at that
+      point.  This does occasionally happen, see PR 37922.  */
+      bitmap regs_set = BITMAP_ALLOC (&reg_obstack);
+      LookForHardRegsData userData={regs_set,self};
+      for (this_insn = insns;  this_insn != NULL_RTX; this_insn = NEXT_INSN (this_insn)){
+         if (mtcs_recog_insn_invalid_p/*!insn_invalid_p*/(mtcsRecog,this_insn, false)){
+            if (dump_file && (dump_flags & TDF_DETAILS)){
+               fprintf (dump_file, " -- replacing the loaded MEM with ");
+               mtcs_print_simple_rtl/*!print_simple_rtl*/(dump_file, read_reg);
+               fprintf (dump_file, " led to an invalid instruction\n");
+            }
+            BITMAP_FREE (regs_set);
+            return false;
+         }
+         mtcs_rtlanal_note_stores/*!note_stores*/(mtcsRtlanal,this_insn, lookForHardRegs_cb, (void *)&userData/*!regs_set*/);
+      }
+
+      if (store_insn->fixed_regs_live)
+         bitmap_and_into (regs_set, store_insn->fixed_regs_live);
+      if (!bitmap_empty_p (regs_set)){
+         if (dump_file && (dump_flags & TDF_DETAILS)){
+            fprintf (dump_file, "abandoning replacement because sequence clobbers live hardregs:");
+            mtcs_dfcore_df_print_regset/*!df_print_regset*/(mtcsDfcore,dump_file, regs_set);
+         }
+
+         BITMAP_FREE (regs_set);
+         return false;
+      }
+      BITMAP_FREE (regs_set);
+   }
+
+   subrtx_iterator::array_type array;
+   FOR_EACH_SUBRTX (iter, array, *loc, NONCONST){
+      const_rtx x = *iter;
+      if (GET_RTX_CLASS (GET_CODE (x)) == RTX_AUTOINC){
+         if (dump_file && (dump_flags & TDF_DETAILS))
+            fprintf (dump_file, " -- replacing the MEM failed due to address side-effects\n");
+         return false;
+      }
+   }
+
+   if (mtcs_recog_validate_change/*!validate_change*/(mtcsRecog,read_insn->insn, loc, read_reg, 0)){
+      deferred_change *change = self->deferred_change_pool.allocate ();
+
+      /* Insert this right before the store insn where it will be safe
+      from later insns that might change it before the read.  */
+      mtcs_emit_emit_insn_before/*!emit_insn_before*/(mtcsEmit,insns, store_insn->insn);
+
+      /* And now for the kludge part: cselib croaks if you just
+      return at this point.  There are two reasons for this:
+
+      1) Cselib has an idea of how many pseudos there are and
+      that does not include the new ones we just added.
+
+      2) Cselib does not know about the move insn we added
+      above the store_info, and there is no way to tell it
+      about it, because it has "moved on".
+
+      Problem (1) is fixable with a certain amount of engineering.
+      Problem (2) is requires starting the bb from scratch.  This
+      could be expensive.
+
+      So we are just going to have to lie.  The move/extraction
+      insns are not really an issue, cselib did not see them.  But
+      the use of the new pseudo read_insn is a real problem because
+      cselib has not scanned this insn.  The way that we solve this
+      problem is that we are just going to put the mem back for now
+      and when we are finished with the block, we undo this.  We
+      keep a table of mems to get rid of.  At the end of the basic
+      block we can put them back.  */
+
+      *loc = read_info->mem;
+      change->next = self->deferred_change_list;
+      self->deferred_change_list = change;
+      change->loc = loc;
+      change->reg = read_reg;
+
+      /* Get rid of the read_info, from the point of view of the
+      rest of dse, play like this read never happened.  */
+      read_insn->read_rec = read_info->next;
+      self->read_info_type_pool.remove (read_info);
+      if (dump_file && (dump_flags & TDF_DETAILS)){
+         fprintf (dump_file, " -- replaced the loaded MEM with ");
+         mtcs_print_simple_rtl/*!print_simple_rtl*/(dump_file, read_reg);
+         fprintf (dump_file, "\n");
+      }
+      return true;
+   }else{
+      if (dump_file && (dump_flags & TDF_DETAILS)){
+         fprintf (dump_file, " -- replacing the loaded MEM with ");
+         mtcs_print_simple_rtl/*!print_simple_rtl*/(dump_file, read_reg);
+         fprintf (dump_file, " led to an invalid instruction\n");
+      }
+      return false;
+   }
+}
+
+/* Check the address of MEM *LOC and kill any appropriate stores that may
+   be active.  */
+static void check_mem_read_rtx (MtcsDse *self,rtx *loc, struct dse_bb_info_type * bb_info, bool used_in_call = false)
+{
+   MtcsMode *mtcsMode=MTCS_GET_MODE_OBJECT(self);
+   MtcsTarget *mtcsTarget=(MtcsTarget *)mtcsMode->target;
+   MtcsFunc *mtcsFunc=mtcs_target_get_func(mtcsTarget);
+   MtcsRtlData *mtcsRtlData=mtcs_func_get_rtl_data(mtcsFunc);
+   MtcsAlias *mtcsAlias=mtcs_target_get_alias(mtcsTarget);
+   MtcsRTL  *mtcsRTL=mtcs_target_get_rtl(mtcsTarget);
+
+   rtx mem = *loc, mem_addr;
+   struct insn_info_type * insn_info;
+   poly_int64 offset = 0;
+   poly_int64 width = 0;
+   cselib_val *base = NULL;
+   int group_id;
+   read_info_type * read_info;
+
+   insn_info = bb_info->last_insn;
+
+   if ((mtcs_rtl_get_mem_alias/*!MEM_ALIAS_SET*/(mtcsRTL,mem) == ALIAS_SET_MEMORY_BARRIER)  || MEM_VOLATILE_P (mem)){
+      if (mtcsRtlData/*!crtl*/->stack_protect_guard
+      && (mtcs_rtl_get_mem_expr/*!MEM_EXPR*/(mtcsRTL,mem) == mtcsRtlData/*!crtl*/->stack_protect_guard
+      || (mtcsRtlData/*!crtl*/->stack_protect_guard_decl
+      && mtcs_rtl_get_mem_expr/*!MEM_EXPR*/(mtcsRTL,mem) == mtcsRtlData/*!crtl*/->stack_protect_guard_decl))
+      && MEM_VOLATILE_P (mem)){
+         /* This is either the stack protector canary on the stack,
+         which ought to be written by a MEM_VOLATILE_P store and
+         thus shouldn't be deleted and is read at the very end of
+         function, but shouldn't conflict with any other store.
+         Or it is __stack_chk_guard variable or TLS or whatever else
+         MEM holding the canary value, which really shouldn't be
+         ever modified in -fstack-protector* protected functions,
+         otherwise the prologue store wouldn't match the epilogue
+         check.  */
+         if (dump_file && (dump_flags & TDF_DETAILS))
+            fprintf (dump_file, " stack protector canary read ignored.\n");
+         insn_info->cannot_delete = true;
+         return;
+      }
+
+      if (dump_file && (dump_flags & TDF_DETAILS))
+         fprintf (dump_file, " adding wild read, volatile or barrier.\n");
+      add_wild_read(self,bb_info);
+      insn_info->cannot_delete = true;
+      return;
+   }
+
+   /* If it is reading readonly mem, then there can be no conflict with
+   another write. */
+   if (MEM_READONLY_P (mem))
+      return;
+
+   if (!canon_address(self,mem, &group_id, &offset, &base)){
+      if (dump_file && (dump_flags & TDF_DETAILS))
+         fprintf (dump_file, " adding wild read, canon_address failure.\n");
+      add_wild_read(self,bb_info);
+      return;
+   }
+
+   if (GET_MODE (mem) == mtcsMode->modes.M_BLKmode)
+      width = -1;
+   else
+      width = mtcs_mode_get_size/*!GET_MODE_SIZE*/(mtcsMode,GET_MODE (mem));
+
+   if (!endpoint_representable_p (offset, known_eq (width, -1) ? 1 : width)){
+      if (dump_file && (dump_flags & TDF_DETAILS))
+         fprintf (dump_file, " adding wild read, due to overflow.\n");
+      add_wild_read(self,bb_info);
+      return;
+   }
+
+   read_info = self->read_info_type_pool.allocate ();
+   read_info->group_id = group_id;
+   read_info->mem = mem;
+   read_info->offset = offset;
+   read_info->width = width;
+   read_info->next = insn_info->read_rec;
+   insn_info->read_rec = read_info;
+   if (group_id < 0)
+      mem_addr = base->val_rtx;
+   else{
+      group_info *group = self->rtx_group_vec[group_id];
+      mem_addr = group->canon_base_addr;
+   }
+   if (maybe_ne (offset, 0))
+      mem_addr = mtcs_rtl_plus_constant/*!plus_constant*/(mtcsRTL,
+            mtcs_rtl_get_address_mode/*!get_address_mode*/(mtcsRTL,mem), mem_addr, offset);
+   /* Avoid passing VALUE RTXen as mem_addr to canon_true_dependence
+   which will over and over re-create proper RTL and re-apply the
+   offset above.  See PR80960 where we almost allocate 1.6GB of PLUS
+   RTXen that way.  */
+   mem_addr = mtcs_alias_get_addr/*!get_addr*/(mtcsAlias,mem_addr);
+
+   if (group_id >= 0){
+      /* This is the restricted case where the base is a constant or
+      the frame pointer and offset is a constant.  */
+      struct insn_info_type * i_ptr = self->active_local_stores;
+      struct insn_info_type * last = NULL;
+
+      if (dump_file && (dump_flags & TDF_DETAILS)){
+         if (!known_size_p (width))
+            fprintf (dump_file, " processing const load gid=%d[BLK]\n", group_id);
+         else{
+            fprintf (dump_file, " processing const load gid=%d", group_id);
+            print_range (dump_file, offset, width);
+            fprintf (dump_file, "\n");
+         }
+      }
+
+      while (i_ptr){
+         bool remove = false;
+         store_info *store_info = i_ptr->store_rec;
+
+         /* Skip the clobbers.  */
+         while (!store_info->is_set)
+            store_info = store_info->next;
+
+         /* There are three cases here.  */
+         if (store_info->group_id < 0)
+            /* We have a cselib store followed by a read from a
+            const base. */
+            remove  = mtcs_alias_canon_true_dependence/*!canon_true_dependence*/(mtcsAlias,
+                  store_info->mem,GET_MODE (store_info->mem),store_info->mem_addr, mem, mem_addr);
+
+         else if (group_id == store_info->group_id){
+            /* This is a block mode load.  We may get lucky and
+            canon_true_dependence may save the day.  */
+            if (!known_size_p (width))
+               remove = mtcs_alias_canon_true_dependence/*!canon_true_dependence*/(mtcsAlias,
+                     store_info->mem,GET_MODE (store_info->mem),store_info->mem_addr, mem, mem_addr);
+
+            /* If this read is just reading back something that we just
+            stored, rewrite the read.  */
+            else{
+               if (!used_in_call
+               && store_info->rhs
+               && known_subrange_p (offset, width, store_info->offset, store_info->width)
+               && all_positions_needed_p (store_info, offset - store_info->offset, width)
+               && replace_read(self,store_info, i_ptr, read_info, insn_info, loc))
+                  return;
+
+               /* The bases are the same, just see if the offsets
+               could overlap.  */
+               if (ranges_maybe_overlap_p (offset, width,store_info->offset, store_info->width))
+                  remove = true;
+            }
+         }
+
+         /* else
+         The else case that is missing here is that the
+         bases are constant but different.  There is nothing
+         to do here because there is no overlap.  */
+
+         if (remove){
+            if (dump_file && (dump_flags & TDF_DETAILS))
+               dump_insn_info ("removing from active", i_ptr);
+
+            self->active_local_stores_len--;
+            if (last)
+               last->next_local_store = i_ptr->next_local_store;
+            else
+               self->active_local_stores = i_ptr->next_local_store;
+         }else
+            last = i_ptr;
+         i_ptr = i_ptr->next_local_store;
+      }
+   }else{
+      struct insn_info_type * i_ptr = self->active_local_stores;
+      struct insn_info_type * last = NULL;
+      if (dump_file && (dump_flags & TDF_DETAILS)){
+         fprintf (dump_file, " processing cselib load mem:");
+         mtcs_print_inline_rtx/*!print_inline_rtx*/(dump_file, mem, 0);
+         fprintf (dump_file, "\n");
+      }
+
+      while (i_ptr){
+         bool remove = false;
+         store_info *store_info = i_ptr->store_rec;
+
+         if (dump_file && (dump_flags & TDF_DETAILS))
+            fprintf (dump_file, " processing cselib load against insn %d\n",INSN_UID (i_ptr->insn));
+
+         /* Skip the clobbers.  */
+         while (!store_info->is_set)
+            store_info = store_info->next;
+
+         /* If this read is just reading back something that we just
+         stored, rewrite the read.  */
+         if (!used_in_call
+         && store_info->rhs
+         && store_info->group_id == -1
+         && store_info->cse_base == base
+         && known_subrange_p (offset, width, store_info->offset,
+         store_info->width)
+         && all_positions_needed_p (store_info,
+         offset - store_info->offset, width)
+         && replace_read(self,store_info, i_ptr,  read_info, insn_info, loc))
+            return;
+
+         remove = mtcs_alias_canon_true_dependence/*!canon_true_dependence*/(mtcsAlias,store_info->mem,
+         GET_MODE (store_info->mem), store_info->mem_addr, mem, mem_addr);
+
+         if (remove){
+            if (dump_file && (dump_flags & TDF_DETAILS))
+               dump_insn_info ("removing from active", i_ptr);
+
+            self->active_local_stores_len--;
+            if (last)
+               last->next_local_store = i_ptr->next_local_store;
+            else
+               self->active_local_stores = i_ptr->next_local_store;
+         }else
+            last = i_ptr;
+         i_ptr = i_ptr->next_local_store;
+      }
+   }
+}
+
+/* A note_uses callback in which DATA points the INSN_INFO for
+   as check_mem_read_rtx.  Nullify the pointer if i_m_r_m_r returns
+   true for any part of *LOC.  */
+static void checkMemReadUse_cb (rtx *loc, void *data)
+{
+   MtcsDse *self = ((struct dse_bb_info_type *) data)->mtcsDse;
+   subrtx_ptr_iterator::array_type array;
+   FOR_EACH_SUBRTX_PTR (iter, array, loc, NONCONST){
+      rtx *loc = *iter;
+      if (MEM_P (*loc))
+         check_mem_read_rtx(self,loc, (struct dse_bb_info_type *) data);
+   }
+}
+
+
+/* Get arguments passed to CALL_INSN.  Return TRUE if successful.
+   So far it only handles arguments passed in registers.  */
+static bool get_call_args (MtcsDse *self,rtx call_insn, tree fn, rtx *args, int nargs)
+{
+   MtcsMode *mtcsMode=MTCS_GET_MODE_OBJECT(self);
+   MtcsTarget *mtcsTarget=(MtcsTarget *)mtcsMode->target;
+   MtcsFunc *mtcsFunc=mtcs_target_get_func(mtcsTarget);
+   MtcsRtlData *mtcsRtlData=mtcs_func_get_rtl_data(mtcsFunc);
+   MtcsAlias *mtcsAlias=mtcs_target_get_alias(mtcsTarget);
+   MtcsRTL  *mtcsRTL=mtcs_target_get_rtl(mtcsTarget);
+   MtcsTree  *mtcsTree=mtcs_target_get_tree(mtcsTarget);
+   MtcsArgs  *mtcsArgs=mtcs_target_get_args(mtcsTarget);
+   MtcsCseLib *mtcsCseLib=mtcs_target_get_cse_lib(mtcsTarget);
+   MtcsMachine *mtcsMachine=mtcs_target_get_machine(mtcsTarget);
+
+   MtcsCumulativeArgs/*!CUMULATIVE_ARGS*/ args_so_far_v;
+   cumulative_args_t args_so_far;
+   tree arg;
+   int idx;
+
+   mtcs_args_init_cumulative_args/*!INIT_CUMULATIVE_ARGS*/(mtcsArgs,&args_so_far_v, TREE_TYPE (fn), NULL_RTX, 0, 3);
+   args_so_far = pack_cumulative_args ((CUMULATIVE_ARGS *)&args_so_far_v);
+
+   arg = TYPE_ARG_TYPES (TREE_TYPE (fn));
+   for (idx = 0; arg != mtcs_void_list_node/*!void_list_node*/ && idx < nargs; arg = TREE_CHAIN (arg), idx++){
+      scalar_int_mode mode;
+      rtx reg, link, tmp;
+
+      if (!mtcs_mode_is_int_mode/*!is_int_mode*/(mtcsMode,TYPE_MODE (TREE_VALUE (arg)), &mode))
+         return false;
+
+      mtcs_function_arg_info arg (mtcsMode,mode, /*named=*/true);
+      reg =target_calls_function_arg/*targetm.calls.function_arg*/(mtcsMachine->calls,args_so_far, arg);
+      if (!reg || !REG_P (reg) || GET_MODE (reg) != mode)
+         return false;
+
+      for (link = CALL_INSN_FUNCTION_USAGE (call_insn); link; link = XEXP (link, 1))
+         if (GET_CODE (XEXP (link, 0)) == USE){
+            scalar_int_mode arg_mode;
+            args[idx] = XEXP (XEXP (link, 0), 0);
+            if (REG_P (args[idx])
+            && REGNO (args[idx]) == REGNO (reg)
+            && (GET_MODE (args[idx]) == mode
+            || (mtcs_mode_is_int_mode/*!is_int_mode*/(mtcsMode,GET_MODE (args[idx]), &arg_mode)
+            && (mtcs_mode_get_size/*!GET_MODE_SIZE*/(mtcsMode,arg_mode) <= UNITS_PER_WORD)
+            && (mtcs_mode_get_size/*!GET_MODE_SIZE*/(mtcsMode,arg_mode) > mtcs_mode_get_size/*!GET_MODE_SIZE*/(mtcsMode,mode)))))
+               break;
+         }
+      if (!link)
+         return false;
+
+      tmp = mtcs_cse_lib_cselib_expand_value_rtx/*!cselib_expand_value_rtx*/(mtcsCseLib,args[idx], self->scratch, 5);
+      if (GET_MODE (args[idx]) != mode){
+         if (!tmp || !CONST_INT_P (tmp))
+            return false;
+         tmp = mtcs_rtl_gen_int_mode/*!gen_int_mode*/(mtcsRTL,INTVAL (tmp), mode);
+      }
+      if (tmp)
+         args[idx] = tmp;
+
+      target_calls_function_arg_advance/*!targetm.calls.function_arg_advance*/(mtcsMachine->calls,args_so_far, arg);
+   }
+   if (arg != mtcs_void_list_node/*!void_list_node*/ || idx != nargs)
+      return false;
+   return true;
+}
+
+/* Return a bitmap of the fixed registers contained in IN.  */
+static bitmap copy_fixed_regs (MtcsDse *self,const_bitmap in)
+{
+   MtcsMode *mtcsMode=MTCS_GET_MODE_OBJECT(self);
+   MtcsTarget *mtcsTarget=(MtcsTarget *)mtcsMode->target;
+   MtcsReg *mtcsReg=mtcs_target_get_reg(mtcsTarget);
+
+   bitmap ret;
+   ret = ALLOC_REG_SET (NULL);
+   bitmap_and (ret, in, mtcs_bitmap_view<HardRegSet/*!HARD_REG_SET*/> (mtcsReg->hardRegs.x_fixed_reg_set/*!fixed_reg_set*/));
+   return ret;
+}
+
+/* Apply record_store to all candidate stores in INSN.  Mark INSN
+   if some part of it is not a candidate store and assigns to a
+   non-register target.  */
+
+static void scan_insn (MtcsDse *self,struct dse_bb_info_type * bb_info, rtx_insn *insn, int max_active_local_stores)
+{
+   MtcsMode *mtcsMode=MTCS_GET_MODE_OBJECT(self);
+   MtcsTarget *mtcsTarget=(MtcsTarget *)mtcsMode->target;
+   MtcsReg *mtcsReg=mtcs_target_get_reg(mtcsTarget);
+   MtcsRTL  *mtcsRTL=mtcs_target_get_rtl(mtcsTarget);
+
+   rtx body;
+   insn_info_type *insn_info = self->insn_info_type_pool.allocate ();
+   int mems_found = 0;
+   memset (insn_info, 0, sizeof (struct insn_info_type));
+
+   if (dump_file && (dump_flags & TDF_DETAILS))
+      fprintf (dump_file, "\n**scanning insn=%d\n",INSN_UID (insn));
+
+   insn_info->prev_insn = bb_info->last_insn;
+   insn_info->insn = insn;
+   bb_info->last_insn = insn_info;
+   bb_info->mtcsDse= self ;
+   if (DEBUG_INSN_P (insn)){
+      insn_info->cannot_delete = true;
+      return;
+   }
+
+   /* Look at all of the uses in the insn.  */
+   note_uses (&PATTERN (insn), checkMemReadUse_cb, bb_info);
+
+   if (CALL_P (insn)){
+      bool const_call;
+      rtx call, sym;
+      tree memset_call = NULL_TREE;
+
+      insn_info->cannot_delete = true;
+
+      /* Const functions cannot do anything bad i.e. read memory,
+      however, they can read their parameters which may have
+      been pushed onto the stack.
+      memset and bzero don't read memory either.  */
+      const_call = RTL_CONST_CALL_P (insn);
+      if (!const_call
+      && (call = get_call_rtx_from (insn))
+      && (sym = XEXP (XEXP (call, 0), 0))
+      && GET_CODE (sym) == SYMBOL_REF
+      && SYMBOL_REF_DECL (sym)
+      && TREE_CODE (SYMBOL_REF_DECL (sym)) == FUNCTION_DECL
+      && fndecl_built_in_p (SYMBOL_REF_DECL (sym), BUILT_IN_MEMSET))
+         memset_call = SYMBOL_REF_DECL (sym);
+
+      if (const_call || memset_call){
+         struct insn_info_type * i_ptr = self->active_local_stores;
+         struct insn_info_type * last = NULL;
+
+         if (dump_file && (dump_flags & TDF_DETAILS))
+            fprintf (dump_file, "%s call %d\n", const_call ? "const" : "memset", INSN_UID (insn));
+
+         /* See the head comment of the frame_read field.  */
+         if (reload_completed
+         /* Tail calls are storing their arguments using
+         arg pointer.  If it is a frame pointer on the target,
+         even before reload we need to kill frame pointer based
+         stores.  */
+         || (SIBLING_CALL_P (insn)  && mtcs_reg_hard_frame_pointer_is_arg_pointer/*!HARD_FRAME_POINTER_IS_ARG_POINTER*/(mtcsReg)))
+            insn_info->frame_read = true;
+
+         /* Loop over the active stores and remove those which are
+         killed by the const function call.  */
+         while (i_ptr){
+            bool remove_store = false;
+            /* The stack pointer based stores are always killed.  */
+            if (i_ptr->stack_pointer_based)
+               remove_store = true;
+            /* If the frame is read, the frame related stores are killed.  */
+            else if (insn_info->frame_read){
+               store_info *store_info = i_ptr->store_rec;
+               /* Skip the clobbers.  */
+               while (!store_info->is_set)
+                  store_info = store_info->next;
+               if (store_info->group_id >= 0 && self->rtx_group_vec[store_info->group_id]->frame_related)
+                  remove_store = true;
+            }
+
+            if (remove_store){
+               if (dump_file && (dump_flags & TDF_DETAILS))
+                  dump_insn_info ("removing from active", i_ptr);
+
+               self->active_local_stores_len--;
+               if (last)
+                  last->next_local_store = i_ptr->next_local_store;
+               else
+                  self->active_local_stores = i_ptr->next_local_store;
+            }else
+               last = i_ptr;
+
+            i_ptr = i_ptr->next_local_store;
+         }
+
+         if (memset_call){
+            rtx args[3];
+            if (get_call_args(self,insn, memset_call, args, 3)
+            && CONST_INT_P (args[1])  && CONST_INT_P (args[2])  && INTVAL (args[2]) > 0){
+               rtx mem = gen_rtx_MEM (mtcsMode->modes.M_BLKmode, args[0]);
+               mtcs_rtl_set_mem_size/*!set_mem_size*/(mtcsRTL,mem, INTVAL (args[2]));
+               body = gen_rtx_SET (mem, args[1]);
+               mems_found += record_store(self,body, bb_info);
+               if (dump_file && (dump_flags & TDF_DETAILS))
+                  fprintf (dump_file, "handling memset as BLKmode store\n");
+               if (mems_found == 1){
+                  if (self->active_local_stores_len++ >= max_active_local_stores){
+                     self->active_local_stores_len = 1;
+                     self->active_local_stores = NULL;
+                  }
+                  insn_info->fixed_regs_live = copy_fixed_regs(self,bb_info->regs_live);
+                  insn_info->next_local_store = self->active_local_stores;
+                  self->active_local_stores = insn_info;
+               }
+            }else
+               clear_rhs_from_active_local_stores(self);
+         }
+      }else if (SIBLING_CALL_P (insn)  && (reload_completed
+      || mtcs_reg_hard_frame_pointer_is_arg_pointer/*!HARD_FRAME_POINTER_IS_ARG_POINTER*/(mtcsReg)))
+         /* Arguments for a sibling call that are pushed to memory are passed
+         using the incoming argument pointer of the current function.  After
+         reload that might be (and likely is) frame pointer based.  And, if
+         it is a frame pointer on the target, even before reload we need to
+         kill frame pointer based stores.  */
+         add_wild_read(self,bb_info);
+      else
+         /* Every other call, including pure functions, may read any memory
+         that is not relative to the frame.  */
+         add_non_frame_wild_read(self,bb_info);
+
+      for (rtx link = CALL_INSN_FUNCTION_USAGE (insn);link != NULL_RTX; link = XEXP (link, 1))
+         if (GET_CODE (XEXP (link, 0)) == USE && MEM_P (XEXP (XEXP (link, 0),0)))
+            check_mem_read_rtx(self,&XEXP (XEXP (link, 0),0), bb_info, true);
+
+      return;
+   }
+
+   /* Assuming that there are sets in these insns, we cannot delete
+   them.  */
+   if ((GET_CODE (PATTERN (insn)) == CLOBBER)
+   || volatile_refs_p (PATTERN (insn))
+   || (!cfun->can_delete_dead_exceptions && !insn_nothrow_p (insn))
+   || (RTX_FRAME_RELATED_P (insn))
+   || find_reg_note (insn, REG_FRAME_RELATED_EXPR, NULL_RTX))
+      insn_info->cannot_delete = true;
+
+   body = PATTERN (insn);
+   if (GET_CODE (body) == PARALLEL){
+      int i;
+      for (i = 0; i < XVECLEN (body, 0); i++)
+         mems_found += record_store(self,XVECEXP (body, 0, i), bb_info);
+   }else
+      mems_found += record_store(self,body, bb_info);
+
+   if (dump_file && (dump_flags & TDF_DETAILS))
+      fprintf (dump_file, "mems_found = %d, cannot_delete = %s\n", mems_found, insn_info->cannot_delete ? "true" : "false");
+
+   /* If we found some sets of mems, add it into the active_local_stores so
+   that it can be locally deleted if found dead or used for
+   replace_read and redundant constant store elimination.  Otherwise mark
+   it as cannot delete.  This simplifies the processing later.  */
+   if (mems_found == 1){
+      if (self->active_local_stores_len++ >= max_active_local_stores){
+         self->active_local_stores_len = 1;
+         self->active_local_stores = NULL;
+      }
+      insn_info->fixed_regs_live = copy_fixed_regs(self,bb_info->regs_live);
+      insn_info->next_local_store = self->active_local_stores;
+      self->active_local_stores = insn_info;
+   }else
+      insn_info->cannot_delete = true;
+}
+
+
+/* Remove BASE from the set of active_local_stores.  This is a
+   callback from cselib that is used to get rid of the stores in
+   active_local_stores.  */
+static void remove_useless_values (cselib_val *base)
+{
+   MtcsTarget *mtcsTarget = mtcs_compile_get_current_target(mtcs_compile_get());
+   MtcsRtlPassMgr *mtcsRtlPassMgr=mtcs_target_get_rtl_pass_mgr(mtcsTarget);
+   MtcsDse *self=mtcs_rtl_pass_mgr_get_dse(mtcsRtlPassMgr);
+
+   struct insn_info_type * insn_info = self->active_local_stores;
+   struct insn_info_type * last = NULL;
+
+   while (insn_info){
+      store_info *store_info = insn_info->store_rec;
+      bool del = false;
+
+      /* If ANY of the store_infos match the cselib group that is
+      being deleted, then the insn cannot be deleted.  */
+      while (store_info){
+         if ((store_info->group_id == -1)  && (store_info->cse_base == base)){
+            del = true;
+            break;
+         }
+         store_info = store_info->next;
+      }
+
+      if (del){
+         self->active_local_stores_len--;
+         if (last)
+            last->next_local_store = insn_info->next_local_store;
+         else
+            self->active_local_stores = insn_info->next_local_store;
+         free_store_info(self,insn_info);
+      }else
+         last = insn_info;
+
+      insn_info = insn_info->next_local_store;
+   }
+}
+
+
+/* Do all of step 1.  */
+
+static void dse_step1 (MtcsDse *self)
+{
+   MtcsMode *mtcsMode=MTCS_GET_MODE_OBJECT(self);
+   MtcsTarget *mtcsTarget=(MtcsTarget *)mtcsMode->target;
+   MtcsDfproblems *mtcsDfproblems =mtcs_target_get_dfproblems(mtcsTarget);
+   MtcsCseLib *mtcsCseLib=mtcs_target_get_cse_lib(mtcsTarget);
+   MtcsFunc *mtcsFunc=mtcs_target_get_func(mtcsTarget);
+   MtcsRtlData *mtcsRtlData=mtcs_func_get_rtl_data(mtcsFunc);
+   MtcsOptions *mtcsOptions=mtcs_target_get_options(mtcsTarget);
+   MtcsOptionsItem *mtcsOptionsItem=mtcsOptions->global_options;
+
+   basic_block bb;
+   bitmap regs_live = BITMAP_ALLOC (&reg_obstack);
+
+   mtcs_cse_lib_cselib_init/*!cselib_init*/(mtcsCseLib,0);
+   self->all_blocks = BITMAP_ALLOC (NULL);
+   bitmap_set_bit (self->all_blocks, ENTRY_BLOCK);
+   bitmap_set_bit (self->all_blocks, EXIT_BLOCK);
+
+   /* For -O1 reduce the maximum number of active local stores for RTL DSE
+   since this can consume huge amounts of memory (PR89115).  */
+   int max_active_local_stores = mtcsOptionsItem->x_param_max_dse_active_local_stores;
+   if (mtcsOptionsItem->x_optimize < 2)
+      max_active_local_stores /= 10;
+
+   FOR_ALL_BB_FN (bb, cfun){
+      struct insn_info_type * ptr;
+      struct dse_bb_info_type * bb_info = self->dse_bb_info_type_pool.allocate ();
+
+      memset (bb_info, 0, sizeof (dse_bb_info_type));
+      bitmap_set_bit (self->all_blocks, bb->index);
+      bb_info->regs_live = regs_live;
+
+      bitmap_copy (regs_live, DF_LR_IN (bb));
+      mtcs_dfproblems_df_simulate_initialize_forwards/*!df_simulate_initialize_forwards*/(mtcsDfproblems,bb, regs_live);
+
+      self->bb_table[bb->index] = bb_info;
+      mtcsCseLib->cselib_discard_hook = remove_useless_values;
+
+      if (bb->index >= NUM_FIXED_BLOCKS){
+         rtx_insn *insn;
+
+         self->active_local_stores = NULL;
+         self->active_local_stores_len = 0;
+         mtcs_cse_lib_cselib_clear_table/*!cselib_clear_table*/(mtcsCseLib);
+
+         /* Scan the insns.  */
+         FOR_BB_INSNS (bb, insn){
+            if (INSN_P (insn))
+               scan_insn(self,bb_info, insn, max_active_local_stores);
+            mtcs_cse_lib_cselib_process_insn/*!cselib_process_insn*/(mtcsCseLib,insn);
+            if (INSN_P (insn))
+               mtcs_dfproblems_df_simulate_one_insn_forwards/*!df_simulate_one_insn_forwards*/(mtcsDfproblems,bb, insn, regs_live);
+         }
+
+         /* This is something of a hack, because the global algorithm
+         is supposed to take care of the case where stores go dead
+         at the end of the function.  However, the global
+         algorithm must take a more conservative view of block
+         mode reads than the local alg does.  So to get the case
+         where you have a store to the frame followed by a non
+         overlapping block more read, we look at the active local
+         stores at the end of the function and delete all of the
+         frame and spill based ones.  */
+         if (self->stores_off_frame_dead_at_return
+         && (EDGE_COUNT (bb->succs) == 0
+         || (single_succ_p (bb)
+         && single_succ (bb) == EXIT_BLOCK_PTR_FOR_FN (cfun)
+         && ! mtcsRtlData/*!crtl*/->calls_eh_return))){
+            struct insn_info_type * i_ptr = self->active_local_stores;
+            while (i_ptr){
+               store_info *store_info = i_ptr->store_rec;
+
+               /* Skip the clobbers.  */
+               while (!store_info->is_set)
+                  store_info = store_info->next;
+               if (store_info->group_id >= 0){
+                  group_info *group = self->rtx_group_vec[store_info->group_id];
+                  if (group->frame_related && !i_ptr->cannot_delete)
+                     delete_dead_store_insn(self,i_ptr);
+               }
+
+               i_ptr = i_ptr->next_local_store;
+            }
+         }
+
+         /* Get rid of the loads that were discovered in
+         replace_read.  Cselib is finished with this block.  */
+         while (self->deferred_change_list){
+            deferred_change *next = self->deferred_change_list->next;
+
+            /* There is no reason to validate this change.  That was
+            done earlier.  */
+            *self->deferred_change_list->loc = self->deferred_change_list->reg;
+            self->deferred_change_pool.remove (self->deferred_change_list);
+            self->deferred_change_list = next;
+         }
+
+         /* Get rid of all of the cselib based store_infos in this
+         block and mark the containing insns as not being
+         deletable.  */
+         ptr = bb_info->last_insn;
+         while (ptr){
+            if (ptr->contains_cselib_groups){
+               store_info *s_info = ptr->store_rec;
+               while (s_info && !s_info->is_set)
+                  s_info = s_info->next;
+               if (s_info
+               && s_info->redundant_reason
+               && s_info->redundant_reason->insn
+               && !ptr->cannot_delete){
+                  if (dump_file && (dump_flags & TDF_DETAILS))
+                     fprintf (dump_file, "Locally deleting insn %d "
+                     "because insn %d stores the "
+                     "same value and couldn't be "
+                     "eliminated\n",
+                     INSN_UID (ptr->insn),
+                     INSN_UID (s_info->redundant_reason->insn));
+                  delete_dead_store_insn(self,ptr);
+               }
+               free_store_info(self,ptr);
+            }else{
+               store_info *s_info;
+
+               /* Free at least positions_needed bitmaps.  */
+               for (s_info = ptr->store_rec; s_info; s_info = s_info->next)
+                  if (s_info->is_large){
+                     BITMAP_FREE (s_info->positions_needed.large.bmap);
+                     s_info->is_large = false;
+                  }
+            }
+            ptr = ptr->prev_insn;
+         }
+
+         self->cse_store_info_pool.release ();
+      }
+      bb_info->regs_live = NULL;
+   }
+
+   BITMAP_FREE (regs_live);
+   mtcs_cse_lib_cselib_finish/*!cselib_finish*/(mtcsCseLib);
+   self->rtx_group_table->empty ();
+}
+
+
+/*----------------------------------------------------------------------------
+   Second step.
+
+   Assign each byte position in the stores that we are going to
+   analyze globally to a position in the bitmaps.  Returns true if
+   there are any bit positions assigned.
+----------------------------------------------------------------------------*/
+static void dse_step2_init (MtcsDse *self)
+{
+   unsigned int i;
+   group_info *group;
+
+   FOR_EACH_VEC_ELT (self->rtx_group_vec, i, group){
+      /* For all non stack related bases, we only consider a store to
+      be deletable if there are two or more stores for that
+      position.  This is because it takes one store to make the
+      other store redundant.  However, for the stores that are
+      stack related, we consider them if there is only one store
+      for the position.  We do this because the stack related
+      stores can be deleted if their is no read between them and
+      the end of the function.
+
+      To make this work in the current framework, we take the stack
+      related bases add all of the bits from store1 into store2.
+      This has the effect of making the eligible even if there is
+      only one store.   */
+
+      if (self->stores_off_frame_dead_at_return && group->frame_related){
+         bitmap_ior_into (group->store2_n, group->store1_n);
+         bitmap_ior_into (group->store2_p, group->store1_p);
+         if (dump_file && (dump_flags & TDF_DETAILS))
+            fprintf (dump_file, "group %d is frame related ", i);
+      }
+
+      group->offset_map_size_n++;
+      group->offset_map_n = XOBNEWVEC (&self->dse_obstack, int, group->offset_map_size_n);
+      group->offset_map_size_p++;
+      group->offset_map_p = XOBNEWVEC (&self->dse_obstack, int, group->offset_map_size_p);
+      group->process_globally = false;
+      if (dump_file && (dump_flags & TDF_DETAILS)){
+         fprintf (dump_file, "group %d(%d+%d): ", i,
+         (int)bitmap_count_bits (group->store2_n),
+         (int)bitmap_count_bits (group->store2_p));
+         bitmap_print (dump_file, group->store2_n, "n ", " ");
+         bitmap_print (dump_file, group->store2_p, "p ", "\n");
+      }
+   }
+}
+
+
+/* Init the offset tables.  */
+static bool dse_step2 (MtcsDse *self)
+{
+   unsigned int i;
+   group_info *group;
+   /* Position 0 is unused because 0 is used in the maps to mean
+   unused.  */
+   self->current_position = 1;
+   FOR_EACH_VEC_ELT (self->rtx_group_vec, i, group){
+      bitmap_iterator bi;
+      unsigned int j;
+
+      memset (group->offset_map_n, 0, sizeof (int) * group->offset_map_size_n);
+      memset (group->offset_map_p, 0, sizeof (int) * group->offset_map_size_p);
+      bitmap_clear (group->group_kill);
+
+      EXECUTE_IF_SET_IN_BITMAP (group->store2_n, 0, j, bi){
+         bitmap_set_bit (group->group_kill, self->current_position);
+         if (bitmap_bit_p (group->escaped_n, j))
+            bitmap_set_bit (self->kill_on_calls, self->current_position);
+         group->offset_map_n[j] = self->current_position++;
+         group->process_globally = true;
+      }
+      EXECUTE_IF_SET_IN_BITMAP (group->store2_p, 0, j, bi){
+         bitmap_set_bit (group->group_kill, self->current_position);
+         if (bitmap_bit_p (group->escaped_p, j))
+            bitmap_set_bit (self->kill_on_calls, self->current_position);
+         group->offset_map_p[j] = self->current_position++;
+         group->process_globally = true;
+      }
+   }
+   return self->current_position != 1;
+}
+
+
+/*----------------------------------------------------------------------------
+  Third step.
+
+  Build the bit vectors for the transfer functions.
+----------------------------------------------------------------------------*/
+
+/* Look up the bitmap index for OFFSET in GROUP_INFO.  If it is not
+   there, return 0.  */
+static int get_bitmap_index (group_info *group_info, HOST_WIDE_INT offset)
+{
+   if (offset < 0){
+      HOST_WIDE_INT offset_p = -offset;
+      if (offset_p >= group_info->offset_map_size_n)
+         return 0;
+      return group_info->offset_map_n[offset_p];
+   }else{
+      if (offset >= group_info->offset_map_size_p)
+         return 0;
+      return group_info->offset_map_p[offset];
+   }
+}
+
+/* Process the STORE_INFOs into the bitmaps into GEN and KILL.  KILL
+   may be NULL. */
+static void scan_stores (MtcsDse *self,store_info *store_info, bitmap gen, bitmap kill)
+{
+   while (store_info){
+      HOST_WIDE_INT i, offset, width;
+      group_info *group_info = self->rtx_group_vec[store_info->group_id];
+      /* We can (conservatively) ignore stores whose bounds aren't known;
+      they simply don't generate new global dse opportunities.  */
+      if (group_info->process_globally  && store_info->offset.is_constant (&offset)
+      && store_info->width.is_constant (&width)){
+         HOST_WIDE_INT end = offset + width;
+         for (i = offset; i < end; i++){
+            int index = get_bitmap_index (group_info, i);
+            if (index != 0){
+               bitmap_set_bit (gen, index);
+               if (kill)
+                  bitmap_clear_bit (kill, index);
+            }
+         }
+      }
+      store_info = store_info->next;
+   }
+}
+
+
+/* Process the READ_INFOs into the bitmaps into GEN and KILL.  KILL
+   may be NULL.  */
+static void scan_reads (MtcsDse *self,struct insn_info_type * insn_info, bitmap gen, bitmap kill)
+{
+   MtcsMode *mtcsMode=MTCS_GET_MODE_OBJECT(self);
+   MtcsTarget *mtcsTarget=(MtcsTarget *)mtcsMode->target;
+   MtcsAlias *mtcsAlias=mtcs_target_get_alias(mtcsTarget);
+
+   read_info_type * read_info = insn_info->read_rec;
+   int i;
+   group_info *group;
+
+   /* If this insn reads the frame, kill all the frame related stores.  */
+   if (insn_info->frame_read){
+      FOR_EACH_VEC_ELT (self->rtx_group_vec, i, group)
+         if (group->process_globally && group->frame_related){
+            if (kill)
+               bitmap_ior_into (kill, group->group_kill);
+            bitmap_and_compl_into (gen, group->group_kill);
+         }
+   }
+   if (insn_info->non_frame_wild_read){
+      /* Kill all non-frame related stores.  Kill all stores of variables that
+      escape.  */
+      if (kill)
+         bitmap_ior_into (kill, self->kill_on_calls);
+      bitmap_and_compl_into (gen, self->kill_on_calls);
+      FOR_EACH_VEC_ELT (self->rtx_group_vec, i, group)
+         if (group->process_globally && !group->frame_related){
+            if (kill)
+               bitmap_ior_into (kill, group->group_kill);
+            bitmap_and_compl_into (gen, group->group_kill);
+         }
+   }
+   while (read_info){
+      FOR_EACH_VEC_ELT (self->rtx_group_vec, i, group){
+         if (group->process_globally){
+            if (i == read_info->group_id){
+                  HOST_WIDE_INT offset, width;
+                  /* Reads with non-constant size kill all DSE opportunities
+                  in the group.  */
+                  if (!read_info->offset.is_constant (&offset)
+                  || !read_info->width.is_constant (&width)
+                  || !known_size_p (width)){
+                     /* Handle block mode reads.  */
+                     if (kill)
+                        bitmap_ior_into (kill, group->group_kill);
+                     bitmap_and_compl_into (gen, group->group_kill);
+                  }else{
+                     /* The groups are the same, just process the
+                     offsets.  */
+                     HOST_WIDE_INT j;
+                     HOST_WIDE_INT end = offset + width;
+                     for (j = offset; j < end; j++){
+                        int index = get_bitmap_index (group, j);
+                        if (index != 0){
+                           if (kill)
+                              bitmap_set_bit (kill, index);
+                           bitmap_clear_bit (gen, index);
+                        }
+                     }
+                  }
+            }else{
+               /* The groups are different, if the alias sets
+               conflict, clear the entire group.  We only need
+               to apply this test if the read_info is a cselib
+               read.  Anything with a constant base cannot alias
+               something else with a different constant
+               base.  */
+               if ((read_info->group_id < 0)
+               && mtcs_alias_canon_true_dependence/*!canon_true_dependence*/(mtcsAlias,group->base_mem,
+               GET_MODE (group->base_mem), group->canon_base_addr, read_info->mem, NULL_RTX)){
+                  if (kill)
+                     bitmap_ior_into (kill, group->group_kill);
+                  bitmap_and_compl_into (gen, group->group_kill);
+               }
+            }
+         }
+      }
+
+      read_info = read_info->next;
+   }
+}
+
+
+/* Return the insn in BB_INFO before the first wild read or if there
+   are no wild reads in the block, return the last insn.  */
+
+static struct insn_info_type * find_insn_before_first_wild_read (struct dse_bb_info_type * bb_info)
+{
+   struct insn_info_type * insn_info = bb_info->last_insn;
+   struct insn_info_type * last_wild_read = NULL;
+
+   while (insn_info){
+      if (insn_info->wild_read){
+         last_wild_read = insn_info->prev_insn;
+         /* Block starts with wild read.  */
+         if (!last_wild_read)
+            return NULL;
+      }
+      insn_info = insn_info->prev_insn;
+   }
+
+   if (last_wild_read)
+      return last_wild_read;
+   else
+      return bb_info->last_insn;
+}
+
+
+/* Scan the insns in BB_INFO starting at PTR and going to the top of
+   the block in order to build the gen and kill sets for the block.
+   We start at ptr which may be the last insn in the block or may be
+   the first insn with a wild read.  In the latter case we are able to
+   skip the rest of the block because it just does not matter:
+   anything that happens is hidden by the wild read.  */
+static void dse_step3_scan (MtcsDse *self,basic_block bb)
+{
+   struct dse_bb_info_type * bb_info = self->bb_table[bb->index];
+   struct insn_info_type * insn_info;
+   insn_info = find_insn_before_first_wild_read (bb_info);
+   /* In the spill case or in the no_spill case if there is no wild
+   read in the block, we will need a kill set.  */
+   if (insn_info == bb_info->last_insn) {
+      if (bb_info->kill)
+         bitmap_clear (bb_info->kill);
+      else
+         bb_info->kill = BITMAP_ALLOC (&self->dse_bitmap_obstack);
+   }else
+      if (bb_info->kill)
+         BITMAP_FREE (bb_info->kill);
+
+   while (insn_info){
+      /* There may have been code deleted by the dce pass run before
+      this phase.  */
+      if (insn_info->insn && INSN_P (insn_info->insn)){
+         scan_stores(self,insn_info->store_rec, bb_info->gen, bb_info->kill);
+         scan_reads(self,insn_info, bb_info->gen, bb_info->kill);
+      }
+      insn_info = insn_info->prev_insn;
+   }
+}
+
+
+/* Set the gen set of the exit block, and also any block with no
+   successors that does not have a wild read.  */
+static void dse_step3_exit_block_scan (MtcsDse *self,struct dse_bb_info_type * bb_info)
+{
+   /* The gen set is all 0's for the exit block except for the
+   frame_pointer_group.  */
+   if (self->stores_off_frame_dead_at_return){
+      unsigned int i;
+      group_info *group;
+
+      FOR_EACH_VEC_ELT (self->rtx_group_vec, i, group){
+         if (group->process_globally && group->frame_related)
+            bitmap_ior_into (bb_info->gen, group->group_kill);
+      }
+   }
+}
+
+/* Find all of the blocks that are not backwards reachable from the
+   exit block or any block with no successors (BB).  These are the
+   infinite loops or infinite self loops.  These blocks will still
+   have their bits set in UNREACHABLE_BLOCKS.  */
+static void mark_reachable_blocks (sbitmap unreachable_blocks, basic_block bb)
+{
+   edge e;
+   edge_iterator ei;
+
+   if (bitmap_bit_p (unreachable_blocks, bb->index)){
+      bitmap_clear_bit (unreachable_blocks, bb->index);
+      FOR_EACH_EDGE (e, ei, bb->preds){
+         mark_reachable_blocks (unreachable_blocks, e->src);
+      }
+   }
+}
+
+/* Build the transfer functions for the function.  */
+static void dse_step3 (MtcsDse *self)
+{
+   basic_block bb;
+   sbitmap_iterator sbi;
+   bitmap all_ones = NULL;
+   unsigned int i;
+
+   auto_sbitmap unreachable_blocks (last_basic_block_for_fn (cfun));
+   bitmap_ones (unreachable_blocks);
+
+   FOR_ALL_BB_FN (bb, cfun){
+      struct dse_bb_info_type * bb_info = self->bb_table[bb->index];
+      if (bb_info->gen)
+         bitmap_clear (bb_info->gen);
+      else
+         bb_info->gen = BITMAP_ALLOC (&self->dse_bitmap_obstack);
+
+      if (bb->index == ENTRY_BLOCK)
+         ;
+      else if (bb->index == EXIT_BLOCK)
+         dse_step3_exit_block_scan(self,bb_info);
+      else
+         dse_step3_scan(self,bb);
+      if (EDGE_COUNT (bb->succs) == 0)
+         mark_reachable_blocks (unreachable_blocks, bb);
+
+      /* If this is the second time dataflow is run, delete the old
+      sets.  */
+      if (bb_info->in)
+         BITMAP_FREE (bb_info->in);
+      if (bb_info->out)
+         BITMAP_FREE (bb_info->out);
+   }
+
+   /* For any block in an infinite loop, we must initialize the out set
+   to all ones.  This could be expensive, but almost never occurs in
+   practice. However, it is common in regression tests.  */
+   EXECUTE_IF_SET_IN_BITMAP (unreachable_blocks, 0, i, sbi){
+      if (bitmap_bit_p (self->all_blocks, i)){
+         struct dse_bb_info_type * bb_info = self->bb_table[i];
+         if (!all_ones){
+            unsigned int j;
+            group_info *group;
+
+            all_ones = BITMAP_ALLOC (&self->dse_bitmap_obstack);
+            FOR_EACH_VEC_ELT (self->rtx_group_vec, j, group)
+               bitmap_ior_into (all_ones, group->group_kill);
+         }
+         if (!bb_info->out){
+            bb_info->out = BITMAP_ALLOC (&self->dse_bitmap_obstack);
+            bitmap_copy (bb_info->out, all_ones);
+         }
+      }
+   }
+
+   if (all_ones)
+      BITMAP_FREE (all_ones);
+}
+
+/*----------------------------------------------------------------------------
+   Fourth step.
+
+   Solve the bitvector equations.
+----------------------------------------------------------------------------*/
+
+/* Confluence function for blocks with no successors.  Create an out
+   set from the gen set of the exit block.  This block logically has
+   the exit block as a successor.  */
+static void dse_confluence_0 (basic_block bb)
+{
+   MtcsTarget *mtcsTarget = mtcs_compile_get_current_target(mtcs_compile_get());
+   MtcsRtlPassMgr *mtcsRtlPassMgr=mtcs_target_get_rtl_pass_mgr(mtcsTarget);
+   MtcsDse *self=mtcs_rtl_pass_mgr_get_dse(mtcsRtlPassMgr);
+
+   struct dse_bb_info_type * bb_info = self->bb_table[bb->index];
+   if (bb->index == EXIT_BLOCK)
+      return;
+   if (!bb_info->out){
+      bb_info->out = BITMAP_ALLOC (&self->dse_bitmap_obstack);
+      bitmap_copy (bb_info->out, self->bb_table[EXIT_BLOCK]->gen);
+   }
+}
+
+/* Propagate the information from the in set of the dest of E to the
+   out set of the src of E.  If the various in or out sets are not
+   there, that means they are all ones.  */
+static bool dse_confluence_n (edge e)
+{
+   MtcsTarget *mtcsTarget = mtcs_compile_get_current_target(mtcs_compile_get());
+   MtcsRtlPassMgr *mtcsRtlPassMgr=mtcs_target_get_rtl_pass_mgr(mtcsTarget);
+   MtcsDse *self=mtcs_rtl_pass_mgr_get_dse(mtcsRtlPassMgr);
+
+   struct dse_bb_info_type * src_info = self->bb_table[e->src->index];
+   struct dse_bb_info_type * dest_info = self->bb_table[e->dest->index];
+   if (dest_info->in){
+      if (src_info->out)
+         bitmap_and_into (src_info->out, dest_info->in);
+      else{
+         src_info->out = BITMAP_ALLOC (&self->dse_bitmap_obstack);
+         bitmap_copy (src_info->out, dest_info->in);
+      }
+   }
+   return true;
+}
+
+
+/* Propagate the info from the out to the in set of BB_INDEX's basic
+   block.  There are three cases:
+
+   1) The block has no kill set.  In this case the kill set is all
+   ones.  It does not matter what the out set of the block is, none of
+   the info can reach the top.  The only thing that reaches the top is
+   the gen set and we just copy the set.
+
+   2) There is a kill set but no out set and bb has successors.  In
+   this case we just return. Eventually an out set will be created and
+   it is better to wait than to create a set of ones.
+
+   3) There is both a kill and out set.  We apply the obvious transfer
+   function.
+*/
+static bool dse_transfer_function (int bb_index)
+{
+   MtcsTarget *mtcsTarget = mtcs_compile_get_current_target(mtcs_compile_get());
+   MtcsRtlPassMgr *mtcsRtlPassMgr=mtcs_target_get_rtl_pass_mgr(mtcsTarget);
+   MtcsDse *self=mtcs_rtl_pass_mgr_get_dse(mtcsRtlPassMgr);
+
+   struct dse_bb_info_type * bb_info = self->bb_table[bb_index];
+
+   if (bb_info->kill){
+      if (bb_info->out){
+         /* Case 3 above.  */
+         if (bb_info->in)
+            return bitmap_ior_and_compl (bb_info->in, bb_info->gen, bb_info->out, bb_info->kill);
+         else{
+            bb_info->in = BITMAP_ALLOC (&self->dse_bitmap_obstack);
+            bitmap_ior_and_compl (bb_info->in, bb_info->gen, bb_info->out, bb_info->kill);
+            return true;
+         }
+      }else
+         /* Case 2 above.  */
+         return false;
+   }else{
+      /* Case 1 above.  If there is already an in set, nothing
+      happens.  */
+      if (bb_info->in)
+         return false;
+      else{
+         bb_info->in = BITMAP_ALLOC (&self->dse_bitmap_obstack);
+         bitmap_copy (bb_info->in, bb_info->gen);
+         return true;
+      }
+   }
+}
+
+/* Solve the dataflow equations.  */
+static void dse_step4 (MtcsDse *self)
+{
+   MtcsMode *mtcsMode=MTCS_GET_MODE_OBJECT(self);
+   MtcsTarget *mtcsTarget=(MtcsTarget *)mtcsMode->target;
+   MtcsDfcore *mtcsDfcore =mtcs_target_get_dfcore (mtcsTarget);
+
+   mtcs_dfcore_df_simple_dataflow/*!df_simple_dataflow*/(mtcsDfcore,DF_BACKWARD, NULL, dse_confluence_0,
+         dse_confluence_n, dse_transfer_function, self->all_blocks,
+         mtcs_dfcore_df_get_postorder/*!df_get_postorder*/(mtcsDfcore,DF_BACKWARD),
+   mtcs_dfcore_df_get_n_blocks/*!df_get_n_blocks*/(mtcsDfcore,DF_BACKWARD));
+   if (dump_file && (dump_flags & TDF_DETAILS)){
+      basic_block bb;
+
+      fprintf (dump_file, "\n\n*** Global dataflow info after analysis.\n");
+      FOR_ALL_BB_FN (bb, cfun){
+         struct dse_bb_info_type * bb_info = self->bb_table[bb->index];
+
+         df_print_bb_index (bb, dump_file);
+         if (bb_info->in)
+            bitmap_print (dump_file, bb_info->in, "  in:   ", "\n");
+         else
+            fprintf (dump_file, "  in:   *MISSING*\n");
+         if (bb_info->gen)
+            bitmap_print (dump_file, bb_info->gen, "  gen:  ", "\n");
+         else
+            fprintf (dump_file, "  gen:  *MISSING*\n");
+         if (bb_info->kill)
+            bitmap_print (dump_file, bb_info->kill, "  kill: ", "\n");
+         else
+            fprintf (dump_file, "  kill: *MISSING*\n");
+         if (bb_info->out)
+            bitmap_print (dump_file, bb_info->out, "  out:  ", "\n");
+         else
+            fprintf (dump_file, "  out:  *MISSING*\n\n");
+      }
+   }
+}
+
+/*----------------------------------------------------------------------------
+   Fifth step.
+
+   Delete the stores that can only be deleted using the global information.
+----------------------------------------------------------------------------*/
+static void dse_step5 (MtcsDse *self)
+{
+   basic_block bb;
+   FOR_EACH_BB_FN (bb, cfun){
+   struct dse_bb_info_type * bb_info = self->bb_table[bb->index];
+   struct insn_info_type * insn_info = bb_info->last_insn;
+   bitmap v = bb_info->out;
+
+   while (insn_info){
+      bool deleted = false;
+      if (dump_file && insn_info->insn){
+         fprintf (dump_file, "starting to process insn %d\n", INSN_UID (insn_info->insn));
+         bitmap_print (dump_file, v, "  v:  ", "\n");
+      }
+
+      /* There may have been code deleted by the dce pass run before
+      this phase.  */
+      if (insn_info->insn  && INSN_P (insn_info->insn)  && (!insn_info->cannot_delete) && (!bitmap_empty_p (v))){
+         store_info *store_info = insn_info->store_rec;
+
+         /* Try to delete the current insn.  */
+         deleted = true;
+
+         /* Skip the clobbers.  */
+         while (!store_info->is_set)
+            store_info = store_info->next;
+
+         HOST_WIDE_INT i, offset, width;
+         group_info *group_info = self->rtx_group_vec[store_info->group_id];
+
+         if (!store_info->offset.is_constant (&offset)  || !store_info->width.is_constant (&width))
+            deleted = false;
+         else{
+            HOST_WIDE_INT end = offset + width;
+            for (i = offset; i < end; i++){
+               int index = get_bitmap_index (group_info, i);
+
+               if (dump_file && (dump_flags & TDF_DETAILS))
+                  fprintf (dump_file, "i = %d, index = %d\n",(int) i, index);
+                  if (index == 0 || !bitmap_bit_p (v, index)){
+                     if (dump_file && (dump_flags & TDF_DETAILS))
+                        fprintf (dump_file, "failing at i = %d\n",(int) i);
+                     deleted = false;
+                     break;
+                  }
+               }
+            }
+            if (deleted){
+               if (dbg_cnt (dse)  && check_for_inc_dec_1(self,insn_info)){
+                  delete_insn (insn_info->insn);
+                  insn_info->insn = NULL;
+                  self->globally_deleted++;
+               }
+            }
+         }
+         /* We do want to process the local info if the insn was
+         deleted.  For instance, if the insn did a wild read, we
+         no longer need to trash the info.  */
+         if (insn_info->insn  && INSN_P (insn_info->insn)  && (!deleted)){
+            scan_stores(self,insn_info->store_rec, v, NULL);
+            if (insn_info->wild_read){
+               if (dump_file && (dump_flags & TDF_DETAILS))
+                  fprintf (dump_file, "wild read\n");
+               bitmap_clear (v);
+            }else if (insn_info->read_rec || insn_info->non_frame_wild_read || insn_info->frame_read){
+               if (dump_file && (dump_flags & TDF_DETAILS)){
+                  if (!insn_info->non_frame_wild_read && !insn_info->frame_read)
+                     fprintf (dump_file, "regular read\n");
+                  if (insn_info->non_frame_wild_read)
+                     fprintf (dump_file, "non-frame wild read\n");
+                  if (insn_info->frame_read)
+                     fprintf (dump_file, "frame read\n");
+               }
+               scan_reads(self,insn_info, v, NULL);
+            }
+         }
+
+         insn_info = insn_info->prev_insn;
+      }
+   }
+}
+
+/*----------------------------------------------------------------------------
+   Sixth step.
+
+   Delete stores made redundant by earlier stores (which store the same
+   value) that couldn't be eliminated.
+----------------------------------------------------------------------------*/
+static void dse_step6 (MtcsDse *self)
+{
+   basic_block bb;
+
+   FOR_ALL_BB_FN (bb, cfun)    {
+      struct dse_bb_info_type * bb_info = self->bb_table[bb->index];
+      struct insn_info_type * insn_info = bb_info->last_insn;
+
+      while (insn_info){
+         /* There may have been code deleted by the dce pass run before
+         this phase.  */
+         if (insn_info->insn   && INSN_P (insn_info->insn)  && !insn_info->cannot_delete){
+            store_info *s_info = insn_info->store_rec;
+
+            while (s_info && !s_info->is_set)
+               s_info = s_info->next;
+            if (s_info  && s_info->redundant_reason  && s_info->redundant_reason->insn
+            && INSN_P (s_info->redundant_reason->insn)){
+               rtx_insn *rinsn = s_info->redundant_reason->insn;
+               if (dump_file && (dump_flags & TDF_DETAILS))
+                  fprintf (dump_file, "Locally deleting insn %d "
+                                       "because insn %d stores the "
+                                       "same value and couldn't be "
+                                       "eliminated\n",
+                                       INSN_UID (insn_info->insn),
+                                       INSN_UID (rinsn));
+               delete_dead_store_insn(self,insn_info);
+            }
+         }
+         insn_info = insn_info->prev_insn;
+      }
+   }
+}
+
+/*----------------------------------------------------------------------------
+   Seventh step.
+
+   Destroy everything left standing.
+----------------------------------------------------------------------------*/
+static void dse_step7 (MtcsDse *self)
+{
+   MtcsMode *mtcsMode=MTCS_GET_MODE_OBJECT(self);
+   MtcsTarget *mtcsTarget=(MtcsTarget *)mtcsMode->target;
+   MtcsAlias *mtcsAlias=mtcs_target_get_alias(mtcsTarget);
+
+   bitmap_obstack_release (&self->dse_bitmap_obstack);
+   obstack_free (&self->dse_obstack, NULL);
+
+   mtcs_alias_end_alias_analysis/*!end_alias_analysis*/(mtcsAlias);
+   free (self->bb_table);
+   delete self->rtx_group_table;
+   self->rtx_group_table = NULL;
+   self->rtx_group_vec.release ();
+   BITMAP_FREE (self->all_blocks);
+   BITMAP_FREE (self->scratch);
+
+   self->rtx_store_info_pool.release ();
+   self->read_info_type_pool.release ();
+   self->insn_info_type_pool.release ();
+   self->dse_bb_info_type_pool.release ();
+   self->group_info_pool.release ();
+   self->deferred_change_pool.release ();
+}
+
+/* -------------------------------------------------------------------------
+   DSE
+   ------------------------------------------------------------------------- */
+/* Callback for running pass_rtl_dse.  */
+static unsigned int rest_of_handle_dse (MtcsDse *self)
+{
+   MtcsMode *mtcsMode=MTCS_GET_MODE_OBJECT(self);
+   MtcsTarget *mtcsTarget=(MtcsTarget *)mtcsMode->target;
+   MtcsCfgRtl *mtcsCfgRtl=mtcs_target_get_cfg_rtl(mtcsTarget);
+   MtcsDfcore *mtcsDfcore =mtcs_target_get_dfcore (mtcsTarget);
+   MtcsDfproblems *mtcsDfproblems =mtcs_target_get_dfproblems(mtcsTarget);
+   MtcsCfgCleanup *mtcsCfgCleanup=mtcs_target_get_cfg_cleanup(mtcsTarget);
+
+   mtcs_dfcore_df_set_flags/*!df_set_flags*/(mtcsDfcore,DF_DEFER_INSN_RESCAN);
+
+   /* Need the notes since we must track live hardregs in the forwards
+   direction.  */
+   mtcs_dfproblems_df_note_add_problem/*!df_note_add_problem*/(mtcsDfproblems);
+   mtcs_dfcore_df_analyze/*!df_analyze*/(mtcsDfcore);
+
+   dse_step0(self);
+   dse_step1(self);
+   /* DSE can eliminate potentially-trapping MEMs.
+   Remove any EH edges associated with them, since otherwise
+   DF_LR_RUN_DCE will complain later.  */
+   if ((self->locally_deleted || self->globally_deleted)
+   && cfun->can_throw_non_call_exceptions
+   && mtcs_cfg_rtl_purge_all_dead_edges/*!purge_all_dead_edges*/(mtcsCfgRtl)){
+      free_dominance_info (CDI_DOMINATORS);
+      mtcs_cfg_cleanup_delete_unreachable_blocks/*!delete_unreachable_blocks*/(mtcsCfgCleanup);
+   }
+   dse_step2_init(self);
+   if (dse_step2(self)){
+      mtcs_dfcore_df_set_flags/*!df_set_flags*/(mtcsDfcore,DF_LR_RUN_DCE);
+      mtcs_dfcore_df_analyze/*!df_analyze*/(mtcsDfcore);
+      if (dump_file && (dump_flags & TDF_DETAILS))
+         fprintf (dump_file, "doing global processing\n");
+      dse_step3(self);
+      dse_step4(self);
+      dse_step5(self);
+   }
+
+   dse_step6(self);
+   dse_step7(self);
+
+   if (dump_file)
+      fprintf (dump_file, "dse: local deletions = %d, global deletions = %d\n",
+            self->locally_deleted, self->globally_deleted);
+
+   /* DSE can eliminate potentially-trapping MEMs.
+   Remove any EH edges associated with them.  */
+   if ((self->locally_deleted || self->globally_deleted)
+   && cfun->can_throw_non_call_exceptions
+   &&mtcs_cfg_rtl_purge_all_dead_edges/*!purge_all_dead_edges*/(mtcsCfgRtl)){
+      free_dominance_info (CDI_DOMINATORS);
+      mtcs_cfg_cleanup_cleanup_cfg/*!cleanup_cfg*/(mtcsCfgCleanup,0);
+   }
+
+   return 0;
+}
+
+////namespace {
+////
+////const pass_data pass_data_rtl_dse1 =
+////{
+////  RTL_PASS, /* type */
+////  "dse1", /* name */
+////  OPTGROUP_NONE, /* optinfo_flags */
+////  TV_DSE1, /* tv_id */
+////  0, /* properties_required */
+////  0, /* properties_provided */
+////  0, /* properties_destroyed */
+////  0, /* todo_flags_start */
+////  TODO_df_finish, /* todo_flags_finish */
+////};
+////
+////class pass_rtl_dse1 : public rtl_opt_pass
+////{
+////public:
+////  pass_rtl_dse1 (gcc::context *ctxt)
+////    : rtl_opt_pass (pass_data_rtl_dse1, ctxt)
+////  {}
+////
+////  /* opt_pass methods: */
+////  bool gate (function *) final override
+////    {
+////      return optimize > 0 && flag_dse && dbg_cnt (dse1);
+////    }
+////
+////  unsigned int execute (function *) final override
+////  {
+////    return rest_of_handle_dse ();
+////  }
+////
+////}; // class pass_rtl_dse1
+////
+////} // anon namespace
+////
+////rtl_opt_pass *
+////make_pass_rtl_dse1 (gcc::context *ctxt)
+////{
+////  return new pass_rtl_dse1 (ctxt);
+////}
+////
+////namespace {
+////
+////const pass_data pass_data_rtl_dse2 =
+////{
+////  RTL_PASS, /* type */
+////  "dse2", /* name */
+////  OPTGROUP_NONE, /* optinfo_flags */
+////  TV_DSE2, /* tv_id */
+////  0, /* properties_required */
+////  0, /* properties_provided */
+////  0, /* properties_destroyed */
+////  0, /* todo_flags_start */
+////  TODO_df_finish, /* todo_flags_finish */
+////};
+////
+////class pass_rtl_dse2 : public rtl_opt_pass
+////{
+////public:
+////  pass_rtl_dse2 (gcc::context *ctxt)
+////    : rtl_opt_pass (pass_data_rtl_dse2, ctxt)
+////  {}
+////
+////  /* opt_pass methods: */
+////  bool gate (function *) final override
+////    {
+////      return optimize > 0 && flag_dse && dbg_cnt (dse2);
+////    }
+////
+////  unsigned int execute (function *) final override
+////  {
+////    return rest_of_handle_dse ();
+////  }
+////
+////}; // class pass_rtl_dse2
+////
+////} // anon namespace
+////
+////rtl_opt_pass *
+////make_pass_rtl_dse2 (gcc::context *ctxt)
+////{
+////  return new pass_rtl_dse2 (ctxt);
+////}
+
+static void mtcsDseInit(MtcsDse *self)
+{
+   self->cse_store_info_pool=object_allocator<store_info> ("cse_store_info_pool");
+   self->rtx_store_info_pool= object_allocator<store_info>  ("rtx_store_info_pool");
+   self->read_info_type_pool=  object_allocator<read_info_type>  ("read_info_pool");
+   self->insn_info_type_pool =  object_allocator<insn_info_type>  ("insn_info_pool");
+   self->dse_bb_info_type_pool= object_allocator<dse_bb_info_type>  ("bb_info_pool");
+   self->group_info_pool = object_allocator<group_info>  ("rtx_group_info_pool");
+   self->deferred_change_pool = object_allocator<deferred_change> ("deferred_change_pool");
+   self->deferred_change_list = NULL;
+   self->scratch = NULL;
+}
+
+MtcsDse *mtcs_dse_new(MtcsMode *mtcsMode)
+{
+   MtcsDse *self = n_slice_alloc0 (sizeof(MtcsDse));
+   mtcs_component_set_mode((MtcsComponent*)self,mtcsMode);
+   mtcsDseInit(self);
+   return self;
+}
+
+//原型 NEXT_PASS (pass_rtl_dse1, 1); RTL_PASS dse.cc dse1 y 有条件执行 optimize > 0 && flag_dse && dbg_cnt (dse1);  rest_of_handle_dse;
+static nboolean dse1_gate_cb(MtcsPass *mtcsPass,function *fun)
+{
+   MtcsMode *mtcsMode=MTCS_GET_MODE_OBJECT(mtcsPass);
+   MtcsTarget *mtcsTarget=(MtcsTarget *)mtcsMode->target;
+   MtcsOptions *mtcsOptions=mtcs_target_get_options(mtcsTarget);
+   MtcsOptionsItem *mtcsOptionsItem=mtcsOptions->global_options;
+   n_debug("mtcsdse.c dse1_gate_cb 00 %d %d %d\n",mtcsOptionsItem->x_optimize,mtcsOptionsItem->x_flag_dse,dbg_cnt (dse1));
+   return mtcsOptionsItem->x_optimize>0 && mtcsOptionsItem->x_flag_dse && dbg_cnt (dse1);
+}
+
+static nuint dse1_execute_cb (MtcsPass *mtcsPass,function *func)
+{
+   MtcsMode *mtcsMode=MTCS_GET_MODE_OBJECT(mtcsPass);
+   MtcsTarget *mtcsTarget=(MtcsTarget *)mtcsMode->target;
+   MtcsRtlPassMgr *mtcsRtlPassMgr=mtcs_target_get_rtl_pass_mgr(mtcsTarget);
+   MtcsDse *mtcsDse=mtcs_rtl_pass_mgr_get_dse(mtcsRtlPassMgr);
+   return rest_of_handle_dse (mtcsDse);
+}
+
+static void mtcsPassDse1Init(MtcsPassDse1 *self)
+{
+   MtcsPass *mtcsPass= (MtcsPass *)self;
+   mtcsPass->execute =dse1_execute_cb;
+   mtcsPass->gate =dse1_gate_cb;
+   mtcs_pass_set_properties(mtcsPass,
+      0,/* properties_required */
+      0, /* properties_provided */
+      0 /* properties_destroyed */);
+   mtcs_pass_set_todo_flags(mtcsPass,
+      0, /* todo_flags_start */
+      TODO_df_finish /*todo_flags_finish */);
+}
+
+MtcsPassDse1 *mtcs_pass_dse1_new(MtcsMode *mtcsMode)
+{
+   MtcsPassDse1 *self = n_slice_alloc0 (sizeof(MtcsPassDse1));
+   mtcs_component_set_mode((MtcsComponent*)self,mtcsMode);
+   mtcs_pass_init((MtcsPass *)self,RTL_PASS,"dse1");
+   mtcsPassDse1Init(self);
+   return self;
+}
+
+//原型 NEXT_PASS (pass_rtl_dse2, 1); RTL_PASS dse.cc dse2 y 有条件执行 optimize > 0 && flag_dse && dbg_cnt (dse2);  rest_of_handle_dse;
+static nboolean dse2_gate_cb (MtcsPass *mtcsPass,function *fun)
+{
+   MtcsMode *mtcsMode=MTCS_GET_MODE_OBJECT(mtcsPass);
+   MtcsTarget *mtcsTarget=(MtcsTarget *)mtcsMode->target;
+   MtcsOptions *mtcsOptions=mtcs_target_get_options(mtcsTarget);
+   MtcsOptionsItem *mtcsOptionsItem=mtcsOptions->global_options;
+   return mtcsOptionsItem->x_optimize>0 && mtcsOptionsItem->x_flag_dse && dbg_cnt (dse2);
+}
+
+static nuint dse2_execute_cb(MtcsPass *mtcsPass,function *func)
+{
+   MtcsMode *mtcsMode=MTCS_GET_MODE_OBJECT(mtcsPass);
+   MtcsTarget *mtcsTarget=(MtcsTarget *)mtcsMode->target;
+   MtcsRtlPassMgr *mtcsRtlPassMgr=mtcs_target_get_rtl_pass_mgr(mtcsTarget);
+   MtcsDse *mtcsDse=mtcs_rtl_pass_mgr_get_dse(mtcsRtlPassMgr);
+   return rest_of_handle_dse (mtcsDse);
+}
+
+static void mtcsPassDse2Init(MtcsPassDse2 *self)
+{
+   MtcsPass *mtcsPass= (MtcsPass *)self;
+   mtcsPass->execute =dse2_execute_cb;
+   mtcsPass->gate =dse2_gate_cb;
+   mtcs_pass_set_properties(mtcsPass,
+      0,/* properties_required */
+      0, /* properties_provided */
+      0 /* properties_destroyed */);
+   mtcs_pass_set_todo_flags(mtcsPass,
+      0, /* todo_flags_start */
+      TODO_df_finish /*todo_flags_finish */);
+}
+
+MtcsPassDse2 *mtcs_pass_dse2_new(MtcsMode *mtcsMode)
+{
+   MtcsPassDse2 *self = n_slice_alloc0 (sizeof(MtcsPassDse2));
+   mtcs_component_set_mode((MtcsComponent*)self,mtcsMode);
+   mtcs_pass_init((MtcsPass *)self,RTL_PASS,"dse2");
+   mtcsPassDse2Init(self);
+   return self;
+}

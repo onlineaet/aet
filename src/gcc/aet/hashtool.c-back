@@ -1,0 +1,73 @@
+
+#include <string.h>
+
+#include "hashtool.h"
+/* Hash functions.
+ */
+nboolean n_str_equal (nconstpointer v1,
+             nconstpointer v2)
+{
+  const nchar *string1 = v1;
+  const nchar *string2 = v2;
+
+  return strcmp (string1, string2) == 0;
+}
+
+
+nuint n_str_hash (nconstpointer v)
+{
+  const signed char *p;
+  nuint32 h = 5381;
+  for (p = v; *p != '\0'; p++)
+    h = (h << 5) + h + *p;
+
+  return h;
+}
+
+
+nuint n_direct_hash (nconstpointer v)
+{
+  return NPOINTER_TO_UINT (v);
+}
+
+nboolean n_direct_equal (nconstpointer v1,nconstpointer v2)
+{
+  return v1 == v2;
+}
+
+
+nboolean n_int_equal (nconstpointer v1,nconstpointer v2)
+{
+  return *((const nint*) v1) == *((const nint*) v2);
+}
+
+
+nuint n_int_hash (nconstpointer v)
+{
+  return *(const nint*) v;
+}
+
+
+nboolean n_int64_equal (nconstpointer v1,
+               nconstpointer v2)
+{
+  return *((const nint64*) v1) == *((const nint64*) v2);
+}
+
+
+nuint n_int64_hash (nconstpointer v)
+{
+  return (nuint) *(const nint64*) v;
+}
+
+
+nboolean n_double_equal (nconstpointer v1,nconstpointer v2)
+{
+  return *((const ndouble*) v1) == *((const ndouble*) v2);
+}
+
+
+nuint n_double_hash (nconstpointer v)
+{
+  return (nuint) *(const ndouble*) v;
+}

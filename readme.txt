@@ -8,8 +8,6 @@ When using C language, it is very difficult to use object-oriented theory and me
 we can enjoy the simplicity and efficiency brought by C language, and at the same time, we can also use
 The complex software is constructed by using the programming method of surface object.
 
-
-
 “新语”历时2年开发，是一门面象对象、兼容c语言、语法简单、灵活可扩展的编程语言，就像gcc平台中的c++、ada、objc等。
 
 “新语”包含几乎所有面象对象程序语言的特性，支持泛型编程（替换和虚化）以及语法阶段优化。在使用C语言时，很

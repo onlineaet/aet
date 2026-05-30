@@ -122,7 +122,14 @@ AET_MTCS_PTX = aet/mtcs/ptx/mtcsptx.o aet/mtcs/ptx/mtcsptxalign.o aet/mtcs/ptx/m
     aet/mtcs/ptx/gen/ptx-options.o\
     aet/mtcs/ptx/gen/ptx-insn-opinit.o\
     aet/mtcs/ptx/gen/ptx-insn-modes.o
- 
+    
+#在源代码中的gen可能不存在，需要创建
+GEN_DIR := $(srcdir)/aet/mtcs/ptx/gen
+$(GEN_DIR):
+	mkdir -p $@
+$(GEN_DIR)/%.c: | $(GEN_DIR)
+$(GEN_DIR)/%.h: | $(GEN_DIR)
+	
 AET_OBJS = $(AET_BASE) $(AET_TREE) $(AET_MTCS) $(AET_MTCS_PTX)
 
 #------------------------编译mtcsgenxxx.c并用它们编译平台代码----------------

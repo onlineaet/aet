@@ -8,18 +8,20 @@ When using C language, it is very difficult to use object-oriented theory and me
 we can enjoy the simplicity and efficiency brought by C language, and at the same time, we can also use
 The complex software is constructed by using the programming method of surface object.
 
-“新语”历时2年开发，是一门面象对象、兼容c语言、语法简单、灵活可扩展的编程语言，就像gcc平台中的c++、ada、objc等。
+AET是面象对象、兼容c语言、语法简单、灵活可扩展的编程语言，就像gcc平台中的c++、ada、objc等。
 
-“新语”包含几乎所有面象对象程序语言的特性，支持泛型编程（替换和虚化）以及语法阶段优化。在使用C语言时，很
-难用面向对象理论和方法进行复杂的编程。有了“新语”后，我们可以一边享受c语言带来的简单、高效，同时也可采用
+AET包含几乎所有面象对象程序语言的特性，支持泛型编程（替换和虚化）。在使用C语言时，很
+难用面向对象理论和方法进行复杂的编程。有了aet后，我们可以一边享受c语言带来的简单、高效，同时也可采用
 面象对象的编程方法来构建复杂的软件。
 
-如果你感觉使用c++太过复杂，“轻言蔓语”是一个很好的选择。
+最重要的是得益于主从模式的编译器设计，aet是业界第一个集成支持异构芯片的编译语言。编写一次，各芯运行。 
 
-“新语”可以编写运行在各种芯片平台上的系统软件和应用软件。
+如果你感觉使用c++太过复杂，AET是一个很好的选择。
 
-“新语”， 表达它不仅灵活而且扩展性强。翻译成英文是：active expandable translator， 
-缩写aet,也称A语言。所以大家在代码里会看到很多“aet”单词。
+AET可以编写运行在各种芯片平台上的系统软件和应用软件。
+
+aet意思是：active expandable translator， 
+缩写aet,也称A语言。
 
 市场上已有了很多开发语言，为什么自已还要再发明一门新语言呢？
 作者之前有过多年的java开发经验，最近几年用c开发。发现在写c时，时常感觉很难用面象对象的方法来写软件。
@@ -30,7 +32,7 @@ The complex software is constructed by using the programming method of surface o
 所以作者认为构建出自已的语境,可以在将来更好的为提速A语言所写的软件作好准备。
 
  由于完全包含c语言的功能。这里只列出aet特有的一些特性：
-“新语”所提供的关键字如下，基本反映了aet所有的功能。
+“新语”所提供的关键字如下，基本反映了aet在前端的所有的功能。
 aet是基于gcc开发的，为了区别于c++的关键字，除了"__OBJECT__"关键字外，所有的关键字最后一个字母都是"$"
    "class$"     用于声明一个类。在类中可以声明变量和方法，也可定义类中的静态方法。但不能定义类中的方法。类中方法只能在impl$关键字中实现。
    "abstract$"  表示抽象的意思，是一个修饰符。只可修饰类和修饰类方法；
@@ -59,5 +61,6 @@ aet是基于gcc开发的，为了区别于c++的关键字，除了"__OBJECT__"�
    
    除了引入泛型，需要二次编译，其它与c的编译速度基本相同。
    
+   目前AET已支持ptx,下一步在此平台上支持GCN或spirv,与darknet-alex在分类cira上的训练相比 aet 快了20% 。
    
    

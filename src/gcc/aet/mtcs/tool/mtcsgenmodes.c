@@ -22,7 +22,6 @@
 #include "system.h"
 #include "errors.h"
 
-
 static char *extraFile=NULL;
 static char *platName=NULL;
 static char *upperPlatName=NULL;

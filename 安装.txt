@@ -6,7 +6,7 @@ AET 是基于 GCC 15.2.0 修改扩展的编译器。
   Ubuntu 24.04
   GCC 15.2.0
 
-整个编译过程通常需要 15～60 分钟，具体取决于网络速度与CPU性能。
+整个编译过程通常需要 25～60 分钟，具体取决于网络速度与CPU性能。
 
 推荐配置：
   4GB 以上内存
@@ -16,12 +16,12 @@ AET 是基于 GCC 15.2.0 修改扩展的编译器。
 第一步：下载 GCC 15.2.0 源码
 
 官方下载地址：
-https://gcc.gnu.org/releases.html
-如果下载速度较慢，可使用国内镜像：
-清华镜像：
-https://mirrors.tuna.tsinghua.edu.cn/gnu/gcc/gcc-15.2.0/
+https://gcc.gnu.org/mirrors.html
+如果下载速度慢，可使用国内镜像：
 阿里云镜像：
 https://mirrors.aliyun.com/gnu/gcc/gcc-15.2.0/
+清华镜像：
+https://mirrors.tuna.tsinghua.edu.cn/gnu/gcc/gcc-15.2.0/
 
 下载完成后得到：
 gcc-15.2.0.tar.xz
@@ -29,6 +29,8 @@ gcc-15.2.0.tar.xz
 第二步：下载 AET 源码
 
 执行：
+mkdir -p /home/my/aetgit
+cd /home/my/aetgit
 git clone https://github.com/onlineaet/aet.git
 
 第三步：建立工作目录并解压 GCC
@@ -38,6 +40,7 @@ mkdir -p /home/my/aet2.0
 cd /home/my/aet2.0
 
 解压 GCC：
+复制第一步下载的gcc-15.2.0.tar.xz到/home/my/aet2.0，并执行
 tar -xf gcc-15.2.0.tar.xz
 
 GCC解压后目录结构如下：
@@ -51,8 +54,9 @@ GCC解压后目录结构如下：
 第四步：复制 AET 源码到 GCC
 
 将 AET 中的 gcc 和 libcpp 覆盖 GCC 原始源码。
-cp -R aet/gcc/*    /home/my/aet2.0/gcc-15.2.0/gcc/
-cp -R aet/libcpp/* /home/my/aet2.0/gcc-15.2.0/libcpp/
+cd cd /home/my/aet2.0
+cp -R /home/my/aetgit/aet/src/gcc/*    /home/my/aet2.0/gcc-15.2.0/gcc/
+cp -R /home/my/aetgit/aet/src/libcpp/* /home/my/aet2.0/gcc-15.2.0/libcpp/
 
 如果提示：
 overwrite?
@@ -91,8 +95,7 @@ cd build
 
 2. 配置 GCC/AET
 
-下面配置会将 AET 安装到：
-
+下面配置"--prefix=/home/my/aet2.0/install"会将 AET 安装到：
 /home/my/aet2.0/install
 
 ../gcc-15.2.0/configure \
@@ -101,7 +104,7 @@ cd build
     --disable-bootstrap \
     --disable-symvers \
     --prefix=/home/my/aet2.0/install
-
+    
 3. 开始编译
 启用全部 CPU 核心并行编译：
 make -j$(nproc)

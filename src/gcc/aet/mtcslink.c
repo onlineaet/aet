@@ -498,12 +498,10 @@ static void createCodes(NPtrArray *array,NString *codes)
          char *varName=aet_mediator_get_asm_var_name(aet_mediator_get(),platName,version,isa,NULL,(AetMediatorUser*)mtcs_parser_get());
          n_string_append_printf(codes,"const char %s[]= R\"%%%(\n%s\n )%%%\";\n\n",varName,ptxcode);
          {
-            /*
               n_warning("测试 写入数学库到 /home/sns/b.ptx 发布时取消。\n");
               FILE *testFile=fopen("/home/sns/b.ptx","w");
               fwrite(ptxcode,1,strlen(ptxcode),testFile);
               fclose(testFile);
-              */
          }
          n_file_unref(file);
          free(ptxcode);

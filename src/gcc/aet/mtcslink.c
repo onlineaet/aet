@@ -289,7 +289,7 @@ static char* extract_function(const char* ptx, const char* funcname)
 static char *catchLibDeviceCodes(char *libDeviceFile,NPtrArray *funcNameArray)
 {
     // read full libdevice.ptx
-   fprintf(stderr,"catchLibDeviceCodes --- %s\n",libDeviceFile);
+   //fprintf(stderr,"catchLibDeviceCodes --- %s\n",libDeviceFile);
     char *libptx = readLibDeviceFile(libDeviceFile);
     if (!libptx)
        return NULL;
@@ -324,7 +324,6 @@ static char *catchLibDeviceCodes(char *libDeviceFile,NPtrArray *funcNameArray)
     free(libptx);
     return n_string_free(codes,FALSE);
 }
-
 
 static void mtcsLinkInit(MtcsLink *self)
 {
@@ -477,7 +476,7 @@ static void createCodes(NPtrArray *array,NString *codes)
          char *libDevicePath=getLibDevicePath();
          char fileName[512];
          sprintf(fileName,"%scuda_libdevice_%s.ptx",libDevicePath,computeVersion);
-         printf("生成libdevice代码----%s %d %d\n",computeVersion,version,isa);
+         //printf("生成libdevice代码----%s %d %d\n",computeVersion,version,isa);
          NFile *file=n_file_new(fileName);
          if(!n_file_exists(file)){
             NFile *path=n_file_new(libDevicePath);
@@ -498,10 +497,13 @@ static void createCodes(NPtrArray *array,NString *codes)
          char *varName=aet_mediator_get_asm_var_name(aet_mediator_get(),platName,version,isa,NULL,(AetMediatorUser*)mtcs_parser_get());
          n_string_append_printf(codes,"const char %s[]= R\"%%%(\n%s\n )%%%\";\n\n",varName,ptxcode);
          {
-              n_warning("测试 写入数学库到 /home/sns/b.ptx 发布时取消。\n");
-              FILE *testFile=fopen("/home/sns/b.ptx","w");
-              fwrite(ptxcode,1,strlen(ptxcode),testFile);
-              fclose(testFile);
+              char *aetDump=getenv ("GCC_AET_DUMP");
+              if(aetDump && (!strcmp(aetDump,"true") || !strcmp(aetDump,"TRUE"))){
+                 n_debug("mtcslink.c 测试 写入数学库到 matlib \n");
+                 FILE *testFile=fopen("matlib.ptx","w");
+                 fwrite(ptxcode,1,strlen(ptxcode),testFile);
+                 fclose(testFile);
+              }
          }
          n_file_unref(file);
          free(ptxcode);
@@ -622,7 +624,7 @@ static NPtrArray * readFile(char *fileName)
 {
    NPtrArray *array=n_ptr_array_new();
    FILE *fp=fopen(fileName,"r");
-   printf("mtcslink.c readFile  00 fileName:%s fp:%p\n",fileName,fp);
+   //printf("mtcslink.c readFile  00 fileName:%s fp:%p\n",fileName,fp);
    if(fp){
       char buffer[1024*150];
       int rev=fread(buffer,1,1024*150,fp);
@@ -749,7 +751,6 @@ void  mtcs_link_add(MtcsLink *self,const char *linkFuncNames,int version,int isa
    char  *objfile=makefile_parm_get_object_file(makefile_parm_get());
    sprintf(fileName,"%s.mtcslink_new.o",objfile);
    NPtrArray *linkArray=readFile(fileName);
-   printf("mtcs_link_add ---%s linkArray:%d\n",linkFuncNames,linkArray->len);
    int i;
    nboolean find=FALSE;
    for(i=0;i<linkArray->len;i++){
@@ -780,10 +781,10 @@ void  mtcs_link_add(MtcsLink *self,const char *linkFuncNames,int version,int isa
    }
 
    if(linkArray->len==0){
-      printf("mtcs_link_add 11 不写入COMPILE_MTCS_LINK  :%s\n",fileName);
+      //printf("mtcs_link_add 11 不写入COMPILE_MTCS_LINK  :%s\n",fileName);
       remove(fileName);
    }else{
-      printf("mtcs_link_add 22 %s :%s\n",linkFuncNames,fileName);
+      //printf("mtcs_link_add 22 %s :%s\n",linkFuncNames,fileName);
       gcc_assert(self->collectMtcsLinkFile==NULL);
       self->collectMtcsLinkFile=n_strdup(fileName);
       middle_file_modify(middle_file_get(),COMPILE_MTCS_LINK);
@@ -801,7 +802,7 @@ void  mtcs_link_add(MtcsLink *self,const char *linkFuncNames,int version,int isa
 void  mtcs_link_link(MtcsLink *self)
 {
    char *fileName = getenv("GCC_AET_MTCS_LINK_LIST_PATH");
-   printf("mtcs_link_link 进入 %s\n",fileName);
+   //printf("mtcs_link_link 进入 %s\n",fileName);
    if(fileName==NULL ||strlen(fileName)==0){
       return;
    }

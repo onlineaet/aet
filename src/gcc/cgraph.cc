@@ -524,6 +524,32 @@ cgraph_node::create (tree decl)
 
   node->register_symbol ();
   maybe_record_nested_function (node);
+  if (strstr(lang_hooks.decl_printable_name(decl,2),
+             "ignoreXX"))
+  {
+      fprintf(stderr,"\nFOUND ignoreXX decl\n");
+
+      fprintf(stderr,
+              "printable=%s\n",
+              lang_hooks.decl_printable_name(decl,2));
+
+      if (DECL_NAME(decl))
+          fprintf(stderr,
+                  "DECL_NAME=%s\n",
+                  IDENTIFIER_POINTER(
+                      DECL_NAME(decl)));
+
+      if (DECL_ASSEMBLER_NAME_SET_P(decl))
+          fprintf(stderr,
+                  "ASM=%s\n",
+                  IDENTIFIER_POINTER(
+                      DECL_ASSEMBLER_NAME(decl)));
+
+      fprintf(stderr,
+              "external=%d public=%d\n",
+              DECL_EXTERNAL(decl),
+              TREE_PUBLIC(decl));
+  }
 
   return node;
 }

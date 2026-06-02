@@ -95,7 +95,6 @@ impl$  CudaCompiler {
       //const char *lopts[] = {smbuf,"-O3","-split-compile=0","-maxrregcount=512","-no-cache","-fma=3"};
       const char *lopts[] = {smbuf,"-O3"};
       //const char *lopts[] = {smbuf};
-
       NVJITLINK_SAFE_CALL(handle, nvJitLinkCreate(&handle, 2, lopts));
 
       int i;
@@ -104,7 +103,7 @@ impl$  CudaCompiler {
          char *code = ptxCodes->get(i);
          char name[255];
          sprintf(name,"ptx_%d",i);
-         printf("ptx -- i:%d codes:\n%s\n\n",i,code);
+         //printf("ptx -- i:%d codes:\n%s\n\n",i,code);
          NVJITLINK_SAFE_CALL(handle, nvJitLinkAddData(handle, NVJITLINK_INPUT_PTX,(void *)code,strlen(code), name));
       }
 

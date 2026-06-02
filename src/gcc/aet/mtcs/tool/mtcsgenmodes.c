@@ -26,6 +26,7 @@ static char *extraFile=NULL;
 static char *platName=NULL;
 static char *upperPlatName=NULL;
 
+
 /* enum mode_class is normally defined by machmode.h but we can't
    include that header here.  */
 #include "mode-classes.def"

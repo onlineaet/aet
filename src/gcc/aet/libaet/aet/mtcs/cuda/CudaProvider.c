@@ -63,7 +63,7 @@ void mtcs_cuda_init(int number)
 {
    CudaProvider *provider=new$ CudaProvider();
    provider->setNumber(number);
-   printf("mtcs_cuda_init 00\n");
+   printf("mtcs_cuda_init 初始化 number:%d\n",number);
    //为供应商加入监听器
    provider->addListener(MtcsMemMgr.getInstance());
    MtcsDevice *device= provider->getDevice(0);

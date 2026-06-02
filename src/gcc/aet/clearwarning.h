@@ -31,7 +31,6 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
  * 但在aet中，从类转类、类转接口以及接口转类是可能是合法的。
  * 如果通过判断是合法转化，清除原来c中的警告信息。
  */
-int  clear_warning_check_aet_class_convert(tree type ,tree rhstype);
 int  clear_warning_modify_new(int errtype,location_t loc,tree lhtype,
       tree rhs,tree rhstype,int parmnum,tree rname,nboolean needCheck);
 

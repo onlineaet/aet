@@ -567,7 +567,6 @@ void middle_file_save_note(MiddleFile *self)
        n_string_append_printf(content,"newgenfile=%s\n",genericGraph->collectFileName);
 
    MtcsLink *mtcsLink=mtcs_parser_get()->mtcsLink;
-   printf("middle_file_save_note mtcs link is-- :%s %s\n",mtcsLink->collectMtcsLinkFile,in_fnames[0]);
    if(mtcsLink->collectMtcsLinkFile)
        n_string_append_printf(content,"mtcslinkfile=%s\n",mtcsLink->collectMtcsLinkFile);
    if(mtcs_parser_have_mtcs(mtcs_parser_get())){

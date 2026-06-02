@@ -114,7 +114,7 @@ static nboolean  isAetFile(const char *path)
          uint32_t magic;
          lseek(fd, sh[i].sh_offset + 16, SEEK_SET);
          read(fd, &magic, 4);
-         printf("找到了 aet 的 .so %s\n",path);
+         //printf("找到了 aet 的 .so %s\n",path);
          close(fd);
          return magic == ELF_MAGIC;//0x61746531;
       }
@@ -278,7 +278,7 @@ static SegmentData *createSegmentData(char *str)
    data->offset=offset;
    data->size=size;
    data->name=segName;
-   printf("段信息:%s virt:%llu offset:%llu size:%llu\n",data->name,data->virt_addr,data->offset,data->size);
+   //printf("段信息:%s virt:%llu offset:%llu size:%llu\n",data->name,data->virt_addr,data->offset,data->size);
    return data;
 }
 
@@ -327,7 +327,7 @@ static VarInfo *getVarInfo(char *src,char *varName)
 		n_string_free(content,TRUE);
 		return NULL;
 	}
-	printf("getVarInfo 00 is:%s\n",src);
+	//printf("getVarInfo 00 is:%s\n",src);
 	NString *sub=n_string_substring(content,index+1);
 	n_string_trim(sub);
     nchar**	items=n_strsplit(sub->str," ",-1);
@@ -386,7 +386,7 @@ static VarInfo *createVarInfoFromFile(char *fileName,char *varName)
    char cmd[512];
    sprintf(cmd,"readelf -s -W %s | grep %s",fileName,varName);
    FILE *fd = popen(cmd, "r");
-   printf("createVarInfoFromFile is 00 :%s %p\n",cmd,fd);
+   //printf("createVarInfoFromFile is 00 :%s %p\n",cmd,fd);
    char tempBuff[LINE_SIZE];
    if(fd){
       while(TRUE){
@@ -397,7 +397,7 @@ static VarInfo *createVarInfoFromFile(char *fileName,char *varName)
          if(ret!=NULL){
             char *result=getVarName(ret);
             if(result!=NULL && !strcmp(result,varName)){
-               printf("createVarInfoFromFile 找到了变量 is 11 :%s var:%s\n",ret,result);
+               //printf("createVarInfoFromFile 找到了变量 is 11 :%s var:%s\n",ret,result);
                VarInfo *info=getVarInfo(ret,varName);
                n_free(result);
                return info;
@@ -466,7 +466,7 @@ static nboolean varInSegment(SegmentData *dataSeg,VarInfo *varInfo)
    nint64 end=dataSeg->virt_addr+dataSeg->size;
    nint64 varAdd=varInfo->virtAdd+varInfo->size;
    if(varAdd>=begin && varAdd<=end){
-      printf("说明变量:%s在%s段\n",varInfo->name,dataSeg->name);
+      //printf("说明变量:%s在%s段\n",varInfo->name,dataSeg->name);
       return TRUE;
    }
    return FALSE;
@@ -578,7 +578,7 @@ static char *getVarValue(char *varName,char *fileName,int *dataSize)
 	//第四步
 	nint64 begin=dataSeg->virt_addr;
 	nint64 varOffset=0;
-	printf("说明变量:%s在%s段.\n",varInfo->name,dataSeg->name);
+	//printf("说明变量:%s在%s段.\n",varInfo->name,dataSeg->name);
 	nint64 segmentOffset = dataSeg->offset;
 	varOffset= segmentOffset+ (varInfo->virtAdd - begin);
 	char *rec=readOffset(fileName,varOffset,varInfo->size,dataSize);
@@ -858,7 +858,7 @@ static void readVarContent(AetLib *self,char *libFile)
    for(i=0;i<len;i++){
       char *str=items[i];
       if(isAetFile(str)){
-         printf("aet_lib_import_lib value --是aet库- is:%d %s\n",i,str);
+         //printf("aet_lib_import_lib value --是aet库- is:%d %s\n",i,str);
          createGlobalVarBySingleFile_new(self,str);
       }
    }

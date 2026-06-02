@@ -189,7 +189,7 @@ impl$  ElfFile {
       data->offset=offset;
       data->size=size;
       data->name=segName;
-      printf("段信息:%s virt:%llu offset:%llu size:%llu\n",data->name,data->virt_addr,data->offset,data->size);
+      //printf("段信息:%s virt:%llu offset:%llu size:%llu\n",data->name,data->virt_addr,data->offset,data->size);
       return data;
    }
 

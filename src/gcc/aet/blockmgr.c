@@ -614,7 +614,6 @@ void block_mgr_save(BlockMgr *self)
    gcc_assert(codes->len>0);
    FILE *fp=fopen(newName,"w");
    int rx=fwrite(codes->str,1,codes->len,fp);
-   printf("save is ---fileName:%s block :%d %s\n",newName,rx,codes->str);
    fclose(fp);
    n_string_free(codes,TRUE);
    gcc_assert( self->blockFileName==NULL);

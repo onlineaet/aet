@@ -587,7 +587,7 @@ ifeq ($(WITH_CUDA),1)
     
     # 设置编译选项
     CUDA_INCLUDE := -I$(CUDA_PATH)/include
-    CUDA_LIB := -L$(CUDA_PATH)/lib64 -lcudart
+    CUDA_LIB := -L$(CUDA_PATH)/lib64 -lcuda -lcudart -lnvJitLink
     #目标原来只有libaet.so 现在加入 libaet_cuda.so
     AET_LIB_TARGET +=$(AET_CUDA_LIB_TARGET)
     AET_INSTALL_TARGET +=install-libaetcuda

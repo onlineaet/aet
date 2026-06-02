@@ -60,25 +60,25 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 static int    getOuputFile(char *basePath,char **objs,char *match);
 static void   getCompileType(char *content,int *types);
 static char  *getObjRootPath(char *oFile);
-static int    createAetLib_new(char **appendArgs,char **ld_argv,int argc,int usemtcs);
-static void   collectUseLibFile_new(const char *prog,char **ld_argv,
+static int    createAetLib(char **appendArgs,char **ld_argv,int argc,int usemtcs);
+static void   collectUseLibFile(const char *prog,char **ld_argv,
                   const char *atsuffix,char *objectRootPath,int usemtcs);
 static int    getGccInstallPath(char *path);
-static char  *compileSingleFile_new(char *gcc,char *objectRootPath,
+static char  *compileSingleFile(char *gcc,char *objectRootPath,
                   char *src,char *dest,char *cfile,char **argv,int count);
-static char  *compileMiddleFile_new(char *gcc,char *objectRootPath,int compileType,char **argv,int argc);
+static char  *compileMiddleFile(char *gcc,char *objectRootPath,int compileType,char **argv,int argc);
 /**
  * 编译泛型有关的文件
  */
-static char **compileGeneric_new(char *gcc,char *objectRootPath,char *blockListFileName,int *objCount,
+static char **compileGeneric(char *gcc,char *objectRootPath,char *blockListFileName,int *objCount,
       char **objfiles,char **objcontents,int ofileCount);
 
-static char **compileIface_new(char *gcc,char *objectRootPath,int *objCount,char *implFileList,
+static char **compileIface(char *gcc,char *objectRootPath,int *objCount,char *implFileList,
       char **objfiles,char **objcontents,int ofileCount);
 
-static char *compileLinkLibDevice_new(char *gcc,char *objectRootPath,char *mtcsLinkFile);
+static char *compileLinkLibDevice(char *gcc,char *objectRootPath,char *mtcsLinkFile);
 
-static char **createNewArgv_new(char **ld_argv,char *middleFileObj,char *mtcsLinkObj,
+static char **createNewArgv(char **ld_argv,char *middleFileObj,char *mtcsLinkObj,
       int ifaceObjectCount,char **ifaceObjects,int genCount,char **genObjs,char *noteAet,int usemtcs);
 
 #define NULL (void*)0
@@ -402,7 +402,7 @@ static char *compileMain(char *gcc,char *objectRootPath)
       error ("gcc returned %d exit status", ret);
       exit (ret);
    }else{
-      printf("编译完成了最小的main文件 成功了。\n");
+      ;//printf("编译完成了最小的main文件 成功了。\n");
    }
    return xstrdup(dest);
 }
@@ -726,13 +726,13 @@ static char **batch_process_aet_with_pool(const char *prog,char **ld_argv, const
       //只需要加入libaet库
       //编译5.note
       char *noteAet=compileNote(gcc,objectRootPath);
-      char **aetargv=createNewArgv_new(ld_argv,NULL,NULL,
+      char **aetargv=createNewArgv(ld_argv,NULL,NULL,
               0,NULL,0,NULL,noteAet,usemtcs);
       return aetargv;
    }
 
    //1.生成所需要的库文件
-   collectUseLibFile_new(prog,ld_argv, atsuffix,objectRootPath,usemtcs);
+   collectUseLibFile(prog,ld_argv, atsuffix,objectRootPath,usemtcs);
 
    //printf("cfile ---objectRootPath :%s %s compileType:%d\n",objectRootPath,c_file_name,compileType);
    //2.编译middlefile泛型信息对象都存在middlefile中
@@ -878,7 +878,7 @@ static char **batch_process_aet_with_pool(const char *prog,char **ld_argv, const
    argv[4]=newgenListFileParam;
    argv[5]=mtcslinkListFileParam;
    //编译1.temp_func_track_45_NEW.c
-   char *middleFileObj=compileMiddleFile_new(gcc,objectRootPath,compileType,argv,6);
+   char *middleFileObj=compileMiddleFile(gcc,objectRootPath,compileType,argv,6);
    int genericOutputCount=0;
    //在编译temp_func_track_45时，处理泛型类时，会保存块信息到文件blockListFileName+.o中
    //在这里传给temp_func_track_45.c的有泛型信息的文件名列表是通过
@@ -889,7 +889,7 @@ static char **batch_process_aet_with_pool(const char *prog,char **ld_argv, const
    //         重点在generic_code_create_block_codes会把blockListFileName变成blockListFileName+.0用
    //         来保存块信息
    //编译2.temp_func_track_45_NEW.c
-   char **genericOutputFiles=compileGeneric_new(gcc,objectRootPath,blockListFileName,&genericOutputCount,
+   char **genericOutputFiles=compileGeneric(gcc,objectRootPath,blockListFileName,&genericOutputCount,
          objfs,objvalues,count);
 
    //编译3.接口文件，在编译temp_func_track_45_NEW.c时，调用
@@ -900,17 +900,17 @@ static char **batch_process_aet_with_pool(const char *prog,char **ld_argv, const
    //$#@/home/sns/workspace/ai/pc-build/debug/ai0.o
    //$#@后是依赖的对象文件 该内容保存在文件ifaceImplListFileName+.o中
    int ifaceImplCount = 0;
-   char **ifaceimplsObjs= compileIface_new(gcc,objectRootPath,&ifaceImplCount,ifaceImplListFileName,
+   char **ifaceimplsObjs= compileIface(gcc,objectRootPath,&ifaceImplCount,ifaceImplListFileName,
          objfs,objvalues,count);
    //编译4.
-   char *mtcsLinkObj=compileLinkLibDevice_new(gcc,objectRootPath,mtcslinkListFileName);
+   char *mtcsLinkObj=compileLinkLibDevice(gcc,objectRootPath,mtcslinkListFileName);
    //编译5.note
    char *noteAet=compileNote(gcc,objectRootPath);
-   printf("链接准备工作完成 -- 44\n");
+  // printf("链接准备工作完成 -- 44\n");
    //最后一步是生成新的链接参数列表。
-   char **aetargv=createNewArgv_new(ld_argv,middleFileObj,mtcsLinkObj,
+   char **aetargv=createNewArgv(ld_argv,middleFileObj,mtcsLinkObj,
          ifaceImplCount,ifaceimplsObjs,genericOutputCount,genericOutputFiles,noteAet,usemtcs);
-   printf("链接准备工作完成 -- 55\n");
+   //printf("链接准备工作完成 -- 55\n");
    return aetargv;
 }
 
@@ -919,7 +919,7 @@ static char **batch_process_aet_with_pool(const char *prog,char **ld_argv, const
  * 下面代码模拟链接，获取所有库并保存在文件 SAVE_LIB_PARM_FILE (aet_collect2_ld_lib_name.o)
  * 在编译middlefile.c前，打开库文件 SAVE_LIB_PARM_FILE 读取它的内容
  */
-static void collectUseLibFile_new(const char *prog,char **ld_argv,
+static void collectUseLibFile(const char *prog,char **ld_argv,
       const char *atsuffix,char *objectRootPath,int usemtcs)
 {
    char *gcc = c_file_name;
@@ -932,7 +932,7 @@ static void collectUseLibFile_new(const char *prog,char **ld_argv,
    while (ld_argv[argc])
       argc++;
    char *appends[10];
-   int appendCount=createAetLib_new(appends,ld_argv,argc,usemtcs);
+   int appendCount=createAetLib(appends,ld_argv,argc,usemtcs);
   // printf("1. 计算参数个数 :%d prog:%d 加libaet:%d\n",argc,prog,appendCount);
    // 2. 分配新数组 (原参数 + 3: --trace, -o, /dev/null)
    char **real_argv = XCNEWVEC (char *, argc+2+1+appendCount);
@@ -966,7 +966,7 @@ static void collectUseLibFile_new(const char *prog,char **ld_argv,
    }
    // 5. 执行
    struct pex_obj *pex = collect_execute(prog, trace_argv,
-         outFileName, NULL,PEX_LAST | PEX_SEARCH,  HAVE_GNU_LD && at_file_supplied, atsuffix);
+         outFileName, "/dev/null",PEX_LAST | PEX_SEARCH,  HAVE_GNU_LD && at_file_supplied, atsuffix);
    collect_wait(prog, pex);
    // 6. 清理
    for (int i = 0; i<argc+2; i++) {
@@ -975,6 +975,9 @@ static void collectUseLibFile_new(const char *prog,char **ld_argv,
       }
    }
    free(trace_argv);
+   //重要，否则可能报multiple definition of `main';...temp_main.o:temp_main.c
+   //因为temp_main.c 可能创建在输出对象的路径里。
+   remove(mainobj);
 }
 
 static bool haveParam(char *param,char **ld_argv,int argc)
@@ -1006,7 +1009,7 @@ static bool haveCudaLibPath(char **ld_argv,int argc)
  * 如果用户加了，跳过。
  * libaet.so libaet_cudao.so 安装在gcc-aet的 lib64/目录下。
  */
-static int createAetLib_new(char **appendArgs,char **ld_argv,int argc,int usemtcs)
+static int createAetLib(char **appendArgs,char **ld_argv,int argc,int usemtcs)
 {
    //用户参数中没有 -noaetinclude，现在加入libaet.so libaet_cuda.so
    bool addLibAet=false;
@@ -1100,7 +1103,7 @@ static int getGccInstallPath(char *path)
  * 改变原因目前有3个原因:源文件中(1)引用接口,(2)创建泛型类对象或调用泛型函数 (3)泛型类或泛型函数中有泛型块。
  * 编译该文件的过程中 1.生成全局变量 LIB_GLOBAL_VAR_NAME_PREFIX的内容。2.生成接口实现文件.c 3.生成函数块文件.c
  */
-static char *compileMiddleFile_new(char *gcc,char *objectRootPath,int compileType,char **argv,int argc)
+static char *compileMiddleFile(char *gcc,char *objectRootPath,int compileType,char **argv,int argc)
 {
    char src[255];
    sprintf(src,"%s/%s",objectRootPath,ADDITIONAL_MIDDLE_AET_FILE_NEW);
@@ -1128,11 +1131,11 @@ static char *compileMiddleFile_new(char *gcc,char *objectRootPath,int compileTyp
       fwrite(writeContent,1,strlen(writeContent),fw);
       fclose(fw);
    }
-   char *objectFile= compileSingleFile_new(gcc,objectRootPath,src,dest,NULL,argv,argc);
+   char *objectFile= compileSingleFile(gcc,objectRootPath,src,dest,NULL,argv,argc);
    return objectFile;
 }
 
-static char * compileSingleFile_new(char *gcc,char *objectRootPath,char *src,
+static char * compileSingleFile(char *gcc,char *objectRootPath,char *src,
       char *dest,char *cfile,char **appendArgv,int appendCount)
 {
     int fsrc=file_exists(src);
@@ -1214,7 +1217,7 @@ static char * compileSingleFile_new(char *gcc,char *objectRootPath,char *src,
     if(action!=0){
       addObject=xstrdup(dest);
     }
-    //printf("compileSingleFile_new action %d src:%s obj:%s\n",action,src,addObject);
+    //printf("compileSingleFile action %d src:%s obj:%s\n",action,src,addObject);
     return addObject;
 }
 
@@ -1224,7 +1227,7 @@ static char * compileSingleFile_new(char *gcc,char *objectRootPath,char *src,
  * oFile 源.c文件的输出文件
  * srcFile对应的编译参数存在文件 oFile+parm.o文件中。在genericinfo.c generic_info_save中写入参数
  */
-static void secondCompileGeneric_new(char *blockFileName,char *srcFile,char *oFile,
+static void secondCompileGeneric(char *blockFileName,char *srcFile,char *oFile,
       char *params,struct command *cmds,int index)
 {
    static char * SEPARATION ="#$%"; //与gcc.c中的一样
@@ -1269,14 +1272,14 @@ static char *getParams(char **objfiles,char **objcontents,int ofileCount,char *o
 /**
  * 编译泛型有关的文件
  */
-static char **compileGeneric_new(char *gcc,char *objectRootPath,char *blockListFileName,int *objCount,
+static char **compileGeneric(char *gcc,char *objectRootPath,char *blockListFileName,int *objCount,
       char **objfiles,char **objcontents,int ofileCount)
 {
    //与genericcode.c中的generic_code_create_block_codes
    //创建保存块信息的文件名方法一个，在blockListFileName追加.o
    char fileName[512];
    sprintf(fileName,"%s.o",blockListFileName);
-   //printf("compileGeneric_new 00 %s exists:%d\n",fileName,file_exists(fileName));
+   //printf("compileGeneric 00 %s exists:%d\n",fileName,file_exists(fileName));
    if(!file_exists(fileName))
       return NULL;
 
@@ -1304,18 +1307,18 @@ static char **compileGeneric_new(char *gcc,char *objectRootPath,char *blockListF
          //0 泛型块文件的文件名 1 源文件 2 源文件对应的输出o文件
          gcc_assert(length==3);
          int ret=remove((const char *)items[2]); //移走源文件的输出o文件
-         printf("compileGeneric_new 00 -- items[2]:%s\n",items[2]);
+         printf("compileGeneric 00 -- items[2]:%s\n",items[2]);
          char *params = getParams(objfiles,objcontents,ofileCount,items[2]);
-         printf("compileGeneric_new 00 编译泛型文件 源文件是--- %s %s 删除文件:%s ok:%d params:%s\n",
+         printf("compileGeneric 00 编译泛型文件 源文件是--- %s %s 删除文件:%s ok:%d params:%s\n",
                items[0],items[1],items[2],ret,params);
-         secondCompileGeneric_new(items[0],items[1],items[2],params,commands,n_commands++);
+         secondCompileGeneric(items[0],items[1],items[2],params,commands,n_commands++);
          oFiles[i]=items[2];
          free(params);
       }else{
          char *cFile=cFiles[i];
          char oFile[512];
          getOFileName(cFile,oFile);
-         printf("compileGeneric_new 11 -- items[2]:%s\n",oFile);
+         printf("compileGeneric 11 -- items[2]:%s\n",oFile);
 
          char *params = getParams(objfiles,objcontents,ofileCount,oFile);
          if(params==NULL){
@@ -1327,7 +1330,7 @@ static char **compileGeneric_new(char *gcc,char *objectRootPath,char *blockListF
                   break;
             }
          }
-         printf("compileGeneric_new 11 -取参数- cfile:%s ofile:%s params:%s\n",cFile,oFile,params);
+         printf("compileGeneric 11 -取参数- cfile:%s ofile:%s params:%s\n",cFile,oFile,params);
          compileBlockFunc(cFile,oFile,params,commands,n_commands++);
          oFiles[i]=xstrdup(oFile);
          free(params);
@@ -1380,7 +1383,7 @@ static char **compileGeneric_new(char *gcc,char *objectRootPath,char *blockListF
  * 编译实现接口的.c文件
  * IFACE_IMPL_LIST_FILE_NAME 记录所有需要编译的接口.c文件
  */
-static char **compileIface_new(char *gcc,char *objectRootPath,int *objCount,char *implFileList,
+static char **compileIface(char *gcc,char *objectRootPath,int *objCount,char *implFileList,
       char **objfiles,char **objcontents,int ofileCount)
 {
    char indexFileName[512];
@@ -1468,7 +1471,7 @@ static char **compileIface_new(char *gcc,char *objectRootPath,int *objCount,char
 /**
  * 编译链接函数所在的文件,返回.o对象文件
  */
-static char *compileLinkLibDevice_new(char *gcc,char *objectRootPath,char *mtcsLinkFile)
+static char *compileLinkLibDevice(char *gcc,char *objectRootPath,char *mtcsLinkFile)
 {
    //与mtcs_link_link生成的相同
    char compileFileName[255];
@@ -1482,7 +1485,7 @@ static char *compileLinkLibDevice_new(char *gcc,char *objectRootPath,char *mtcsL
    sprintf(cfile,"%s",compileFileName);
    int len=strlen(cfile);
    cfile[len-1]='c';
-   char *objectFile= compileSingleFile_new(gcc,objectRootPath,src,dest,cfile,NULL,0);
+   char *objectFile= compileSingleFile(gcc,objectRootPath,src,dest,cfile,NULL,0);
    return objectFile;
 }
 
@@ -1492,7 +1495,7 @@ static char *compileLinkLibDevice_new(char *gcc,char *objectRootPath,char *mtcsL
  * 1.temp_func_track_45.c 生成的.o文件
  * 2.接口的实现文件。
  */
-static char **createNewArgv_new(char **ld_argv,char *middleFileObj,char *mtcsLinkObj,
+static char **createNewArgv(char **ld_argv,char *middleFileObj,char *mtcsLinkObj,
       int ifaceObjectCount,char **ifaceObjects,int genCount,char **genObjs,char *noteAet,int usemtcs)
 {
     int argc= getArgc(ld_argv);
@@ -1505,9 +1508,10 @@ static char **createNewArgv_new(char **ld_argv,char *middleFileObj,char *mtcsLin
     total+=ifaceObjectCount;
     total+=genCount;
     char *appAetLibs[10];
-    int appAetLibCount=createAetLib_new(appAetLibs,ld_argv,argc,usemtcs);
+    int appAetLibCount=createAetLib(appAetLibs,ld_argv,argc,usemtcs);
     total+=appAetLibCount;
-    total+=1;//加入noteAet;
+    if(noteAet!=NULL)
+       total+=1;//加入noteAet;
     total+=1;//放NULL
 
     char **real_argv = XCNEWVEC (char *, total);
@@ -1526,10 +1530,121 @@ static char **createNewArgv_new(char **ld_argv,char *middleFileObj,char *mtcsLin
     //加入缺省的库libaet.so和libaet_cudao.so
     for(i=0;i<appAetLibCount;i++)
        argv[count++]=appAetLibs[i];
-    argv[count++]=noteAet;
+    if(noteAet)
+       argv[count++]=noteAet;
     argv[count++]=(char*)0;
     return argv;
 }
+
+static int findLast_L_l(char **orig,char count,char find)
+{
+   int i;
+   int pos=-1;
+   for(i=0;i<count;i++){
+       char *str=orig[i];
+       if(str[0]=='-' && str[1]==find){
+          pos=i;
+       }
+   }
+   return pos;
+}
+
+static char **createNewArgv_00(char **ld_argv,char *middleFileObj,char *mtcsLinkObj,
+      int ifaceObjectCount,char **ifaceObjects,int genCount,char **genObjs,char *noteAet,int usemtcs)
+{
+   int argc= getArgc(ld_argv);
+   int total=argc;
+   if(middleFileObj!=NULL)
+      total+=1;
+   if(mtcsLinkObj!=NULL)
+      total+=1;
+   total+=ifaceObjectCount;
+   total+=genCount;
+   char *appAetLibs[10];
+   int appAetLibCount=createAetLib(appAetLibs,ld_argv,argc,usemtcs);
+   total+=appAetLibCount;
+   if(noteAet!=NULL)
+      total+=1;//加入noteAet;
+   total+=1;//放NULL
+   printf("create arg 00 \n");
+   int pos_L = findLast_L_l(ld_argv,argc,'L');
+   int pos_l = findLast_L_l(ld_argv,argc,'l');
+
+   printf("create arg 11 pos:%d %d\n",pos_L,pos_l);
+   char **real_argv = XCNEWVEC (char *, total);
+   const char ** argv = CONST_CAST2 (const char **, char **,real_argv);
+   int i;
+   int count=0;
+   for(i=0;i<argc;i++){
+      char *str=ld_argv[i];
+      argv[count++]=str;
+      if(i==pos_L){
+         //插入libaet libaet_cuda
+         int j;
+         for(j=0;j<appAetLibCount;j++){
+            char *temp=appAetLibs[j];
+            if(temp[0]=='-' && temp[1]=='L'){
+               argv[count++]=appAetLibs[j];
+            }else if(strstr(temp,"-rpath=")){
+               argv[count++]=appAetLibs[j];
+            }
+
+         }
+         if(middleFileObj)
+            argv[count++]=middleFileObj;
+         if(mtcsLinkObj)
+            argv[count++]=mtcsLinkObj;
+         for(j=0;j<ifaceObjectCount;j++)
+            argv[count++]=ifaceObjects[j];
+         for(j=0;j<genCount;j++)
+            argv[count++]=genObjs[j];
+         if(noteAet)
+            argv[count++]=noteAet;
+      }
+      if(i==pos_l){
+         int j;
+         for(j=0;j<appAetLibCount;j++){
+            char *temp=appAetLibs[j];
+            if(temp[0]=='-' && temp[1]=='l'){
+               argv[count++]=appAetLibs[j];
+            }
+         }
+      }
+   }
+
+   if(pos_L == -1){
+      int j;
+      for(j=0;j<appAetLibCount;j++){
+         char *temp=appAetLibs[j];
+         if(temp[0]=='-' && temp[1]=='L'){
+            argv[count++]=appAetLibs[j];
+         }
+      }
+      if(middleFileObj)
+         argv[count++]=middleFileObj;
+      if(mtcsLinkObj)
+         argv[count++]=mtcsLinkObj;
+      for(j=0;j<ifaceObjectCount;j++)
+         argv[count++]=ifaceObjects[j];
+      for(j=0;j<genCount;j++)
+         argv[count++]=genObjs[j];
+      if(noteAet)
+         argv[count++]=noteAet;
+   }
+
+   if(pos_l==-1){
+      int j;
+      for(j=0;j<appAetLibCount;j++){
+         char *temp=appAetLibs[j];
+         if(temp[0]=='-' && temp[1]=='l'){
+            argv[count++]=appAetLibs[j];
+         }
+      }
+   }
+   argv[count++]=(char*)0;
+   return argv;
+}
+
 
 static void printLdArgv(char **ld_argv,char *explain)
 {

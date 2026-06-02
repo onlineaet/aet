@@ -213,7 +213,7 @@ static char *getComputeVersion_cb(AetMediatorUser *user,const char *platName,int
 static char *getAsmVarName_cb(AetMediatorUser *user,const char *platName,int version,int isa,char *fileName)
 {
    char    *ret=mtcs_tool_create_asm_varname(platName,isa,version,fileName);
-   fprintf(stderr,"getAsmVarName_cb-- %s %s\n",ret,fileName);
+   n_debug("mtcscompile.c getAsmVarName_cb-- %s %s\n",ret,fileName);
    return ret;
 }
 

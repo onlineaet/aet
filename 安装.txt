@@ -102,7 +102,6 @@ cd build
     --enable-languages=c,c++ \
     --disable-multilib \
     --disable-bootstrap \
-    --disable-symvers \
     --prefix=/home/my/aet2.0/install
     
 3. 开始编译

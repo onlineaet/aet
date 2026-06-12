@@ -128,7 +128,7 @@ nuint (n_atomic_int_xor) (volatile nuint *atomic,nuint val)
 
 npointer (n_atomic_pointer_get) (const volatile void *atomic)
 {
-  const volatile npointer *ptr = atomic;
+  const volatile npointer *ptr =(const volatile npointer *) atomic;
   npointer value;
   pthread_mutex_lock (&n_atomic_lock);
   value = *ptr;
@@ -138,7 +138,7 @@ npointer (n_atomic_pointer_get) (const volatile void *atomic)
 
 void (n_atomic_pointer_set) (volatile void *atomic,npointer newval)
 {
-  volatile npointer *ptr = atomic;
+  volatile npointer *ptr = (volatile npointer *)atomic;
   pthread_mutex_lock (&n_atomic_lock);
   *ptr = newval;
   pthread_mutex_unlock (&n_atomic_lock);
@@ -146,7 +146,7 @@ void (n_atomic_pointer_set) (volatile void *atomic,npointer newval)
 
 nboolean (n_atomic_pointer_compare_and_exchange) (volatile void *atomic,npointer oldval,npointer newval)
 {
-  volatile npointer *ptr = atomic;
+  volatile npointer *ptr = (volatile npointer *)atomic;
   nboolean success;
 
   pthread_mutex_lock (&n_atomic_lock);
@@ -161,7 +161,7 @@ nboolean (n_atomic_pointer_compare_and_exchange) (volatile void *atomic,npointer
 
 nssize (n_atomic_pointer_add) (volatile void *atomic,nssize  val)
 {
-  volatile nssize *ptr = atomic;
+  volatile nssize *ptr = (volatile nssize *)atomic;
   nssize oldval;
 
   pthread_mutex_lock (&n_atomic_lock);
@@ -174,7 +174,7 @@ nssize (n_atomic_pointer_add) (volatile void *atomic,nssize  val)
 
 nsize (n_atomic_pointer_and) (volatile void *atomic, nsize val)
 {
-  volatile nsize *ptr = atomic;
+  volatile nsize *ptr = (volatile nsize *)atomic;
   nsize oldval;
 
   pthread_mutex_lock (&n_atomic_lock);
@@ -187,7 +187,7 @@ nsize (n_atomic_pointer_and) (volatile void *atomic, nsize val)
 
 nsize (n_atomic_pointer_or) (volatile void *atomic, nsize  val)
 {
-  volatile nsize *ptr = atomic;
+  volatile nsize *ptr = (volatile nsize *)atomic;
   nsize oldval;
 
   pthread_mutex_lock (&n_atomic_lock);
@@ -200,7 +200,7 @@ nsize (n_atomic_pointer_or) (volatile void *atomic, nsize  val)
 
 nsize (n_atomic_pointer_xor) (volatile void *atomic, nsize val)
 {
-  volatile nsize *ptr = atomic;
+  volatile nsize *ptr = (volatile nsize *)atomic;
   nsize oldval;
 
   pthread_mutex_lock (&n_atomic_lock);

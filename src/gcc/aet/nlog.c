@@ -56,7 +56,8 @@ static nboolean          shouldDropMessage (NLogLevelFlags log_level,const NLogF
 static NLogWriterFunc log_writer_func = defaultWriter;
 static npointer       log_writer_user_data = NULL;
 static NDestroyNotify log_writer_user_data_free = NULL;
-static NLogLevelFlags n_log_msg_prefix = N_LOG_LEVEL_ERROR | N_LOG_LEVEL_WARNING ;//| N_LOG_LEVEL_DEBUG;
+static NLogLevelFlags n_log_msg_prefix =(NLogLevelFlags)N_LOG_LEVEL_ERROR
+                                          | (NLogLevelFlags)N_LOG_LEVEL_WARNING ;//| N_LOG_LEVEL_DEBUG;
 static NLogLevelFlags n_log_always_fatal = N_LOG_FATAL_MASK;
 
 static NLogGetCompileFile nLogGetCompileFile=NULL;//获取正在编译的文件的回调函数

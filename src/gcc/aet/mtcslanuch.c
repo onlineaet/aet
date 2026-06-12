@@ -464,7 +464,13 @@ static tree convertCall(location_t loc,tree call)
          tree actualFnName = createKernrlFuncNameActualParam(loc,funcName);
          return actualFnName;
       }else{
-         //fn指向的是函数名，常数
+         // 匹配 op0就是tcs
+         //TFirst *tcs=new$ TFirst();
+         //tcs->setdata(3.2);
+         if(VAR_P(op0)){
+            tree actualFnName = createKernrlFuncNameActualParam(loc,funcName);
+            return actualFnName;
+         }
          return fn;
       }
    }else if(TREE_CODE(fn)==CONVERT_EXPR){
@@ -592,8 +598,10 @@ tree mtcs_lanuch_replace_call(MtcsLanuch *self,tree earlyFuncDeclOrRef,location_
    //获取的是类MtcsSystem中的lanuch函数 Z21debug_mtcs_MtcsSystem6lanuchEPcDiPcDiDiDiDiDiDiDiPvPPvPPv
    tree funcDecl=getLanuchFunction(self,loc,lanuchParamsList,origtypes,arg_loc);
    //如果 funcDecl是空的，说明出错了 由c-parser.c处理 error_mark_node
-   if(funcDecl==NULL_TREE)
+   if(funcDecl==NULL_TREE){
+      fatal_error(loc,"核函数的启动函数没找到，报告此错误！");
       return error_mark_node;
+   }
    tree ret=c_build_function_call_vec (loc, arg_loc, funcDecl, lanuchParamsList, origtypes);
    arg_loc.release();
    vec_free (origtypes);

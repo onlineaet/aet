@@ -105,8 +105,6 @@ impl$  CudaMemAlloctor {
 
    public$ void *memcpyAsync(void *dest,void *src,size_t size ,int direct,MtcsStream *mtcsStream){
       cudaStream_t stream=(cudaStream_t)(mtcsStream!=NULL?(mtcsStream->getStream()):NULL);
-     // if(mtcsStream)
-        // stream = mtcsStream->stream;
       if(direct==MtcsCpyKind.HOST2DEV)
          CUDA_RUNTIME_CALL(cudaMemcpyAsync(dest, src, size, cudaMemcpyHostToDevice,stream));
       else if(direct==MtcsCpyKind.DEV2HOST)
@@ -165,21 +163,21 @@ impl$  CudaMemAlloctor {
       cudaGetDevice(&devNum);
       int pma = 0;
       cudaDeviceGetAttribute(&pma, cudaDevAttrPageableMemoryAccess, devNum);
-      printf("Full Unified Memory Support: %s\n", pma == 1? "YES" : "NO");
+      a_debug("Full Unified Memory Support: %s\n", pma == 1? "YES" : "NO");
       int cma = 0;
       cudaDeviceGetAttribute(&cma, cudaDevAttrConcurrentManagedAccess, devNum);
-      printf("CUDA Managed Memory with full support: %s\n", cma == 1? "YES" : "NO");
+      a_debug("CUDA Managed Memory with full support: %s\n", cma == 1? "YES" : "NO");
       int device =devNum;
       struct cudaDeviceProp prop;
       cudaGetDeviceProperties(&prop, device);
-      printf("CUDA device properties pageableMemoryAccess: %d\n", prop.pageableMemoryAccess);
-      printf("CUDA device properties hostNativeAtomicSupported: %d\n", prop.hostNativeAtomicSupported);
-      printf("CUDA device properties pageableMemoryAccessUsesHostPageTables: %d\n", prop.pageableMemoryAccessUsesHostPageTables);
-      printf("CUDA device properties directManagedMemAccessFromHost: %d\n", prop.directManagedMemAccessFromHost);
-      printf("CUDA device properties concurrentManagedAccess: %d\n", prop.concurrentManagedAccess);
-      printf("CUDA device properties managedMemory: %d\n", prop.managedMemory);
-      printf("CUDA device properties concurrentManagedAccess: %d\n", prop.concurrentManagedAccess);
-      printf("CUDA device properties managedMemory: %d\n", prop.managedMemory);
+      a_debug("CUDA device properties pageableMemoryAccess: %d\n", prop.pageableMemoryAccess);
+      a_debug("CUDA device properties hostNativeAtomicSupported: %d\n", prop.hostNativeAtomicSupported);
+      a_debug("CUDA device properties pageableMemoryAccessUsesHostPageTables: %d\n", prop.pageableMemoryAccessUsesHostPageTables);
+      a_debug("CUDA device properties directManagedMemAccessFromHost: %d\n", prop.directManagedMemAccessFromHost);
+      a_debug("CUDA device properties concurrentManagedAccess: %d\n", prop.concurrentManagedAccess);
+      a_debug("CUDA device properties managedMemory: %d\n", prop.managedMemory);
+      a_debug("CUDA device properties concurrentManagedAccess: %d\n", prop.concurrentManagedAccess);
+      a_debug("CUDA device properties managedMemory: %d\n", prop.managedMemory);
       if(pma==1)
          return UNIFIED_MEMORY_FULL;
       else if(cma==1)

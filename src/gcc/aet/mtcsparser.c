@@ -104,8 +104,8 @@ static tree  getParentDeviceArrayDecl_cb(AetMediatorUser *user,char *sysName)
 //当完成mtcs的汇编生成，从mtcscompile发送需要链接的函数到前端，由前端保存。
 static void  addLinkFunc_cb(AetMediatorUser *aetMediatorUser,const char *linkFuncNames,int version,int isa,const char *platName)
 {
-    MtcsParser *self = (MtcsParser *)aetMediatorUser;
-    mtcs_link_add(self->mtcsLink,linkFuncNames,version,isa,platName);
+   MtcsParser *self = (MtcsParser *)aetMediatorUser;
+   mtcs_link_add(self->mtcsLink,linkFuncNames,version,isa,platName);
 }
 
 /**

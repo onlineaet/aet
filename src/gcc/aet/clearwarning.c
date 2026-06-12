@@ -483,9 +483,9 @@ static int checktype(location_t loc,tree formulaType,tree actualType,int parmnum
          return 1;
       }else{
          if(rname)
-            error_at(loc, "passing argument %d of %qE from incompatible pointer type", parmnum, rname);//zclei
+            error_at(loc, "--passing argument %d of %qE from incompatible pointer type", parmnum, rname);//zclei
          else
-            error_at(loc, "passing argument %d of unknown from incompatible pointer type", parmnum);//zclei
+            error_at(loc, "--xxpassing argument %d of unknown from incompatible pointer type", parmnum);//zclei
          *haveError=1;
          return 0;
       }

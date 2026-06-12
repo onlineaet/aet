@@ -155,15 +155,19 @@ impl$  MtcsSystem {
 
    public$ static void  setDefaultProvider(char *platName){
       int i;
-      printf("setDefaultProvider --- %s %d\n",platName,providerCount);
       for(i=0;i<providerCount;i++){
          MtcsProvider *pri=mtcsProviders[i];
-         printf("setDefaultProvider xx--- %s %d %s\n",platName,providerCount,pri->getName());
          if(strcmp(pri->getName(),platName)==0){
             defaultProvider=pri;
             return;
          }
       }
+   }
+
+   public$ static  void synchronize(){
+      MtcsProvider *provider = getDefaultProvider();
+      MtcsDevice *df=provider->getDefaultDevice();
+      df->synchronize();
    }
 
    //从缺省的供应商获取当前设备号

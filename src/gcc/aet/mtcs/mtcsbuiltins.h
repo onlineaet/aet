@@ -56,7 +56,7 @@ struct _MtcsBuiltins
 
     //从主机来的 gcall转为平台的call。
     nboolean (*replace_call)(MtcsBuiltins *self, gimple *call);
-    //主机的内建函数调用转为平台的内建函数调用，并做优化
+    //主机的内建函数调用转为平台的内建函数调用，并做优化。例如 expf转成平台的调用
     nboolean (*convert_call)(MtcsBuiltins *self, gimple *call);
 
     //expand内建函数

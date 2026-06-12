@@ -2245,28 +2245,28 @@ static void publishVersion_cb(MtcsTarget *mtcsTarget)
 
 MtcsPtx *mtcs_ptx_new_full(int isa,int ptxVersion)
 {
-     MtcsPtx *self = n_slice_alloc0 (sizeof(MtcsPtx));
-     MtcsMode *mtcsMode=(MtcsMode *)mtcs_ptx_mode_new();//必须先创建 下一步创建component依赖mtcsMode;
-     mtcs_mode_set_target(mtcsMode,(npointer)self);
-     ((MtcsTarget*)self)->mtcsMode=mtcsMode;
-     /*HardRegSet初始化需要 mtcsReg中的hardRegElement,所以先创建mtcsReg,
-     *下面的组件可以从mtcsXXxInit方法中获取mtcsreg中的hardRegElement来初始化HardRegSet
-     */
-     ((MtcsTarget*)self)->mtcsReg=(MtcsReg *)mtcs_ptx_reg_new(mtcsMode);//平台 寄存器
-     mtcs_reg_init_reg_sets(((MtcsTarget*)self)->mtcsReg);
-     mtcs_target_init((MtcsTarget*)self);
-     mtcsPtxInit(self);
-     mtcs_libfuncs_set_normalib_def(((MtcsTarget*)self)->mtcsLibfuncs,(struct mtcs_optab_libcall_d*)ptx_get_optab_libcall());
-     mtcs_libfuncs_set_convlib_def(((MtcsTarget*)self)->mtcsLibfuncs,(struct mtcs_convert_optab_libcall_d*)ptx_get_convert_optab_libcall());
-     mtcs_target_set_platform_name((MtcsTarget*)self,"cuda");
-     mtcs_target_set_isa((MtcsTarget*)self,isa);
-     mtcs_target_set_version((MtcsTarget*)self,ptxVersion);
-     //mtcs代码已经过 gimple regular ipa lateipa
-     createAllPass(self);
-     self->mtcsPtxMath=mtcs_ptx_math_new(mtcsMode);
-     ((MtcsTarget*)self)->getLinkFuncName=getLinkFuncName_cb;
-     ((MtcsTarget*)self)->publishVersion=publishVersion_cb;
-     return self;
+   MtcsPtx *self = n_slice_alloc0 (sizeof(MtcsPtx));
+   MtcsMode *mtcsMode=(MtcsMode *)mtcs_ptx_mode_new();//必须先创建 下一步创建component依赖mtcsMode;
+   mtcs_mode_set_target(mtcsMode,(npointer)self);
+   ((MtcsTarget*)self)->mtcsMode=mtcsMode;
+   /*HardRegSet初始化需要 mtcsReg中的hardRegElement,所以先创建mtcsReg,
+   *下面的组件可以从mtcsXXxInit方法中获取mtcsreg中的hardRegElement来初始化HardRegSet
+   */
+   ((MtcsTarget*)self)->mtcsReg=(MtcsReg *)mtcs_ptx_reg_new(mtcsMode);//平台 寄存器
+   mtcs_reg_init_reg_sets(((MtcsTarget*)self)->mtcsReg);
+   mtcs_target_init((MtcsTarget*)self);
+   mtcsPtxInit(self);
+   mtcs_libfuncs_set_normalib_def(((MtcsTarget*)self)->mtcsLibfuncs,(struct mtcs_optab_libcall_d*)ptx_get_optab_libcall());
+   mtcs_libfuncs_set_convlib_def(((MtcsTarget*)self)->mtcsLibfuncs,(struct mtcs_convert_optab_libcall_d*)ptx_get_convert_optab_libcall());
+   mtcs_target_set_platform_name((MtcsTarget*)self,"cuda");
+   mtcs_target_set_isa((MtcsTarget*)self,isa);
+   mtcs_target_set_version((MtcsTarget*)self,ptxVersion);
+   //mtcs代码已经过 gimple regular ipa lateipa
+   createAllPass(self);
+   self->mtcsPtxMath=mtcs_ptx_math_new(mtcsMode);
+   ((MtcsTarget*)self)->getLinkFuncName=getLinkFuncName_cb;
+   ((MtcsTarget*)self)->publishVersion=publishVersion_cb;
+   return self;
 }
 
 MtcsPtx *mtcs_ptx_new()

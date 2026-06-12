@@ -49,6 +49,8 @@ public$ final$  class$ MtcsSystem{
    //由AET生成调用指令，不能直接调用
    public$  static void lanuch(AObject *inClassObj,int staticFunc,char *funcName,dim3 grid,dim3 block,
          auint sharedMemBytes,void *hStream,void **kernelParams,void **extra);
+
+   public$ static  void synchronize();
    /**
    * 取取缺省供应商
    */

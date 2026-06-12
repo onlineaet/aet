@@ -27,6 +27,7 @@
 #include "MtcsCompiler.h"
 #include "MtcsEventListener.h"
 #include "MtcsStream.h"
+#include "MtcsRecord.h"
 
 package$ aet.mtcs;
 
@@ -60,6 +61,10 @@ public$  abstract$ class$ MtcsDevice{
    public$ abstract$ int    setDevice();
    public$ abstract$ MtcsStream *createStream();
    public$ abstract$ MtcsStream *createStream(int flag);
+
+   public$ abstract$ MtcsRecord *createRecord();
+
+   public$ abstract$ void synchronize();
 
 };
 

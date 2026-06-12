@@ -243,13 +243,13 @@ npointer* n_ptr_array_free (NPtrArray *array,       nboolean   free_segment)
 
   n_return_val_if_fail (rarray, NULL);
 
-  flags = (free_segment ? FREE_SEGMENT : 0);
+  flags =(ArrayFreeFlags)(free_segment ? FREE_SEGMENT : 0);
 
   /* if others are holding a reference, preserve the wrapper but
    * do free/return the data
    */
   if (!n_atomic_int_dec_and_test (&rarray->ref_count))
-    flags |= PRESERVE_WRAPPER;
+     flags |= (ArrayFreeFlags)PRESERVE_WRAPPER;
 
   return ptr_array_free (array, flags);
 }
@@ -308,7 +308,7 @@ static void n_ptr_array_maybe_expand (NRealPtrArray *array,
       nuint old_alloc = array->alloc;
       array->alloc = n_nearest_pow (array->len + len);
       array->alloc = MAX (array->alloc, MIN_ARRAY_SIZE);
-      array->pdata = n_realloc (array->pdata, sizeof (npointer) * array->alloc);
+      array->pdata = n_realloc ((void*)array->pdata, sizeof (npointer) * array->alloc);
       if (N_UNLIKELY (n_mem_gc_friendly))
         for ( ; old_alloc < array->alloc; old_alloc++)
           array->pdata [old_alloc] = NULL;

@@ -450,16 +450,16 @@ static tree callItself(FuncCall *self,tree func,CandidateFunc *selected,vec<tree
 static CandidateFunc *selectStaticByRecursion(FuncCall *self,ClassName *className,char *orgiName,vec<tree, va_gc> *exprlist,
         vec<tree, va_gc> *origtypes,vec<location_t> arg_loc,location_t expr_loc,FuncPointerError **errors)
 {
-     if(className==NULL || orgiName==NULL || className->sysName==NULL){
-        return NULL;
-     }
-     CandidateFunc *result=select_field_get_static_func(select_field_get(),className,orgiName,exprlist,origtypes,arg_loc,expr_loc,errors);
-     if(result==NULL){
-        ClassInfo *info=class_mgr_get_class_info_by_class_name(class_mgr_get(),className);
-        n_debug("func_help_select_static_func_by_recursion 再一次从父类找静态方法 selectFunc ---ttt %s %p",className->sysName,info);
-        result=selectStaticByRecursion(self,&info->parentName,orgiName,exprlist,origtypes,arg_loc,expr_loc,errors);
-     }
-     return result;
+   if(className==NULL || orgiName==NULL || className->sysName==NULL){
+      return NULL;
+   }
+   CandidateFunc *result=select_field_get_static_func(select_field_get(),className,orgiName,exprlist,origtypes,arg_loc,expr_loc,errors);
+   if(result==NULL){
+      ClassInfo *info=class_mgr_get_class_info_by_class_name(class_mgr_get(),className);
+      n_debug("func_help_select_static_func_by_recursion 再一次从父类找静态方法 selectFunc ---ttt %s %p",className->sysName,info);
+      result=selectStaticByRecursion(self,&info->parentName,orgiName,exprlist,origtypes,arg_loc,expr_loc,errors);
+   }
+   return result;
 }
 
 /**
@@ -673,6 +673,8 @@ tree func_call_static_select(FuncCall *self,tree func,vec<tree, va_gc> *exprlist
       return error_mark_node;
    CandidateFunc *item=NULL;
    item=selectStaticByRecursion(self,className,funName,exprlist,origtypes,arg_loc,expr_loc,errors);
+   n_debug("func_call_static_select 11 name:%s className:%s func:%s %d item:%p\n",
+     IDENTIFIER_POINTER(id),currentClassName,funName,len,item);
    //如果是field要加入指针，否则访问不到
    if(item!=NULL){
       last=item->classFunc->fieldDecl;

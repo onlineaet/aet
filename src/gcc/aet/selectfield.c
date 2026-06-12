@@ -215,7 +215,8 @@ static CandidateFunc * filterGoodFunc(NList *okList)
    int len=n_list_length(okList);
    if(len==1){
       CandidateFunc *cand=(CandidateFunc *)n_list_nth_data(okList,0);
-      n_debug("找到了声明的函数 成功匹配参数，只有一个 xxx decl code:%s name:%s ",cand->classFunc->orgiName,cand->classFunc->mangleFunName);
+      n_debug("找到了声明的函数 成功匹配参数，只有一个 xxx decl code:%s name:%s ",
+            cand->classFunc->orgiName,cand->classFunc->mangleFunName);
       return cand;
    }else{
       int i;
@@ -637,99 +638,6 @@ static nboolean completeStaticField(SelectField *self,CandidateFunc *candidate,F
 #define CALLBACK_SELECT_FIELD 1
 #define CALLBACK_BUILD_FUNCTION_CALL 2
 
-/**
- * c-typeck.cc调用
- * action = 0 不调用 convert_argument
- * action = 1 调用 convert_argument，但warnopt设为0
- * action = 2 调用 convert_argument,但warnopt设为1
- * action = - 1 出错。
- */
-tree   select_field_call_back00(location_t ploc, tree function, tree fundecl,tree type, tree origtype,
-        tree val, tree valtype, bool npc, tree rname, int parmnum, int argnum,
-        bool excess_precision, int warnopt,int *action)
-{
-   SelectField *self=select_field_get();
-   tree parmval=NULL_TREE;
-   CheckParamCallback *checkCallback=self->checkCallback;
-   int state=checkCallback->state;
-   if(state==CALLBACK_STOP){
-      *action=1;
-      return parmval;
-   }
-
-   //function 调用函数 fundecl函数声明 type 函数参数类型  origtype 实参的原始类型 val具体的实参 valtype具体实参的类型 npc实参是否是空指针
-   //rname =function parmnum当前第几个参数 argnum 总的参数个数+1 excess_precision 超精度 0 是否警告
-   nboolean isGenericType=generic_util_is_generic_pointer(type);//参数是不是:setData(E data)中的E data aet_generic_E aet_generic_F等
-   n_debug("select_field_call_back  origtype code:%s  parmnum:%d 是不是泛型:%d function:%p state:%d",
-         origtype?get_tree_code_name(TREE_CODE(origtype)):"NULL", parmnum,isGenericType,function,state);
-   aet_print_tree(type);
-   aet_print_tree(val);
-   aet_print_tree(valtype);
-   aet_print_tree(origtype);
-   n_debug("xxx--  %d %d %d %d\n",SCALAR_FLOAT_TYPE_P (type),INTEGRAL_TYPE_P (valtype),warn_traditional_conversion,warn_traditional);
-
-
-
-   if(isGenericType){
-      if(state==CALLBACK_SELECT_FIELD){
-         parmval=generic_call_check_parm(generic_call_get(), ploc,function, fundecl,
-         type,  origtype,  val,  valtype, npc, rname, parmnum,argnum,excess_precision,  warnopt,
-         checkCallback->className,checkCallback->generics);
-         if(parmval==error_mark_node){
-            *action=-1;//出错
-            n_debug("泛型检查结果 parmval==error_mark_node\n");
-         }else if(parmval==NULL_TREE){
-            *action=1;//由c-typeck.cc处理
-            n_debug("泛型检查结果 parmval==NULL_TREE 由c-typeck.cc处理\n");
-         }else{
-            n_debug("泛型检查结果 parmval 正确 c-typeck.cc不处理\n");
-            *action=0;//c-typeck.cc不再处理
-         }
-      }else if(state==CALLBACK_BUILD_FUNCTION_CALL){
-         n_debug("替换泛型参数 generic_call_replace_parm_new 状态：CALLBACK_BUILD_FUNCTION_CALL call:%d\n",checkCallback->className->sysName);
-         parmval=generic_call_replace_parm_new(generic_call_get(), ploc,function, fundecl,
-         type,  origtype,  val,  valtype, npc, rname, parmnum,argnum,excess_precision,  warnopt,
-         checkCallback->className,checkCallback->generics);
-         aet_print_tree(parmval);
-         if(parmval==error_mark_node){
-            *action=-1;
-         }else if(parmval==NULL_TREE){
-            *action=1;//由c-typeck.cc处理
-         }else{
-            *action=0;//c-typeck.cc不再处理
-            generic_func_check_parm(generic_func_get(),
-                  checkCallback->className->sysName,checkCallback->classFunc,parmnum,parmval,function);
-         }
-      }else{
-         *action=1;//由c-typeck.cc处理
-      }
-   }else{
-      //           printf("check -----形参:\n");
-      //           printNode(origtype);
-      //             printf("check -----实参:\n\n");
-      //             printNode(val);
-      //             printf("check -----type:\n\n");
-      //             printNode(type);
-      //             printf("check -----valtype:\n\n");
-      //             printNode(valtype);
-      // printf("check -----is static func:%d\n\n",is);
-      if(state==CALLBACK_SELECT_FIELD){
-         if(addFuncPointer_cb(checkCallback,parmnum,val,type)){
-            parmval=val;
-            *action=0;
-         }else{
-            *action=1;//由c-typeck.cc处理 c-typeck.cc将调用 convert_argument
-            // parmval=convert_argument(ploc, function, fundecl, type, origtype,val, valtype, npc, rname, parmnum, argnum,excess_precision, 0);
-         }
-      }else{
-         *action=1;//由c-typeck.cc处理
-         //parmval=convert_argument(ploc, function, fundecl, type, origtype,val, valtype, npc, rname, parmnum, argnum,excess_precision, 0);
-      }
-   }
-
-   return parmval;
-}
-
 //aet_convert_argument最后一个参数是warnopt,在c-typeck.cc中默认是零，
 //但是state==CALLBACK_SELECT_FIELD时，需要打开，以便生成警告信息。
 tree   select_field_call_back(location_t ploc, tree function, tree fundecl,tree type, tree origtype,
@@ -765,7 +673,7 @@ tree   select_field_call_back(location_t ploc, tree function, tree fundecl,tree 
             n_debug("泛型检查结果 parmval==NULL_TREE 由c-typeck.cc处理\n");
             return aet_convert_argument (ploc, function, fundecl, type, origtype,
                                     val, valtype, npc, rname, parmnum, argnum,
-                                    excess_precision, 1/*warnopt=0*/);
+                                    excess_precision, 1/*warnopt=1*/);
          }else{
             n_debug("泛型检查结果 parmval 正确 c-typeck.cc不处理\n");
             return parmval;
@@ -799,7 +707,7 @@ tree   select_field_call_back(location_t ploc, tree function, tree fundecl,tree 
          }else{
             return aet_convert_argument (ploc, function, fundecl, type, origtype,
                                     val, valtype, npc, rname, parmnum, argnum,
-                                    excess_precision, 1/*warnopt=0*/);
+                                    excess_precision, 1/*warnopt=1*/);
          }
       }else{
          return aet_convert_argument (ploc, function, fundecl, type, origtype,
@@ -814,7 +722,8 @@ tree   select_field_call_back(location_t ploc, tree function, tree fundecl,tree 
 static void aet_info_cb(int kind,const char *gmsgid,void *userData)
 {
    CheckParamCallback *checkCallback=(CheckParamCallback *)userData;
-   //printf("aet_info_cb 回调 %d %d %d %d %d gmsgid:%s\n",kind,DK_ERROR,DK_PERMERROR,DK_WARNING,DK_PEDWARN,gmsgid);
+   n_debug("aet_info_cb 回调 kind:%d DK_ERROR:%d DK_PERMERROR:%d DK_WARNING:%d DK_PEDWARN:%d gmsgid:%s\n",
+         kind,DK_ERROR,DK_PERMERROR,DK_WARNING,DK_PEDWARN,gmsgid);
    if(kind==DK_ERROR || kind==DK_PERMERROR)
       checkCallback->error++;
    if(kind==DK_WARNING || kind==DK_PEDWARN)
@@ -1171,7 +1080,7 @@ CandidateFunc *select_field_get_static_func(SelectField *self,ClassName *classNa
    FuncPointerError *localError=NULL;
    if(errors!=NULL)
       localError=(FuncPointerError *)n_slice_new0(FuncPointerError);
-   n_debug("select_field_get_static_func %s %s",className->sysName,orgiFuncName);
+   n_debug("select_field_get_static_func 00 %s %s",className->sysName,orgiFuncName);
    CandidateFunc *candidate=getFuncFromClass(self,
          className,orgiFuncName,exprlist,origtypes,arg_loc,expr_loc,FALSE,NULL,staticArray,STATIC_FUNC,localError);
    //如果是field要加入指针，否则访问不到

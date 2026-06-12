@@ -38,7 +38,6 @@ impl$  CudaModule {
    * 实现抽象方法 createModule
    */
    public$ aboolean createModule(void *bin,int size){
-      printf("cudamodule.c createModule devNum:%d bin:%p size:%d\n",devNum,bin,size);
       CUDA_RUNTIME_CALL(cudaSetDevice(devNum));
       CUDA_DRIVER_CALL(cuModuleLoadData(&module, bin));
       return TRUE;

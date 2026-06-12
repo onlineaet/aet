@@ -206,7 +206,7 @@ nchar* n_convert_with_iconv (const nchar *str,
   outbuf_size = len + NUL_TERMINATOR_LENGTH;
 
   outbytes_remaining = outbuf_size - NUL_TERMINATOR_LENGTH;
-  outp = dest = n_malloc (outbuf_size);
+  outp = dest = (nchar*)n_malloc (outbuf_size);
 
   while (!done && !have_error){
       if (reset)
@@ -225,7 +225,7 @@ nchar* n_convert_with_iconv (const nchar *str,
 	      {
 		    nsize used = outp - dest;
 		    outbuf_size *= 2;
-		    dest = n_realloc (dest, outbuf_size);
+		    dest = (nchar*)n_realloc (dest, outbuf_size);
 		    outp = dest + used;
 		    outbytes_remaining = outbuf_size - used - NUL_TERMINATOR_LENGTH;
 	      }
@@ -509,7 +509,7 @@ nchar* n_convert_with_fallback (const nchar *str,
 
   outbuf_size = len + NUL_TERMINATOR_LENGTH;
   outbytes_remaining = outbuf_size - NUL_TERMINATOR_LENGTH;
-  outp = dest = n_malloc (outbuf_size);
+  outp = dest =(nchar*) n_malloc (outbuf_size);
 
   while (!done && !have_error)
     {
@@ -528,7 +528,7 @@ nchar* n_convert_with_fallback (const nchar *str,
 		nsize used = outp - dest;
 
 		outbuf_size *= 2;
-		dest = n_realloc (dest, outbuf_size);
+		dest =(nchar*) n_realloc (dest, outbuf_size);
 
 		outp = dest + used;
 		outbytes_remaining = outbuf_size - used - NUL_TERMINATOR_LENGTH;
@@ -702,7 +702,7 @@ static nchar *convert_checked (const nchar      *string,
 
   if ((flags & CONVERT_CHECK_NO_NULS_IN_INPUT) && len > 0)
     {
-      const nchar *early_nul = memchr (string, '\0', len);
+      const nchar *early_nul =(nchar*) memchr (string, '\0', len);
       if (early_nul != NULL)
         {
           if (bytes_read)
@@ -786,7 +786,7 @@ struct _GFilenameCharsetCache {
 
 static void filename_charset_cache_free (npointer data)
 {
-  GFilenameCharsetCache *cache = data;
+  GFilenameCharsetCache *cache = (GFilenameCharsetCache*)data;
   n_free (cache->charset);
   n_strfreev (cache->filename_charsets);
   n_free (cache);
@@ -808,7 +808,7 @@ nboolean n_get_filename_charsets (const nchar ***filename_charsets)
   const nchar *charset;
 
   if (!cache)
-    cache = n_malloc0(sizeof (GFilenameCharsetCache));//n_thread_specific_set_alloc0 (&cache_private, sizeof (GFilenameCharsetCache));
+    cache = (GFilenameCharsetCache *)n_malloc0(sizeof (GFilenameCharsetCache));//n_thread_specific_set_alloc0 (&cache_private, sizeof (GFilenameCharsetCache));
 
   n_get_charset (&charset);
 
@@ -908,8 +908,7 @@ nchar* n_filename_from_utf8 (const nchar *utf8string,
     return strdup_len (utf8string, len, bytes_read, bytes_written, error);
   else
     return convert_checked (utf8string, len, charset, "UTF-8",
-                            CONVERT_CHECK_NO_NULS_IN_INPUT |
-                            CONVERT_CHECK_NO_NULS_IN_OUTPUT,
+                            (ConvertCheckFlags)(CONVERT_CHECK_NO_NULS_IN_INPUT |CONVERT_CHECK_NO_NULS_IN_OUTPUT),
                             bytes_read, bytes_written, error);
 }
 

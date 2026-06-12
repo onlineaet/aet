@@ -280,7 +280,7 @@ nchar *n_utf8_substring (const nchar *str,
   start = n_utf8_offset_to_pointer (str, start_pos);
   end = n_utf8_offset_to_pointer (start, end_pos - start_pos);
 
-  out = n_malloc (end - start + 1);
+  out =(nchar*) n_malloc (end - start + 1);
   memcpy (out, start, end - start);
   out[end - start] = 0;
 

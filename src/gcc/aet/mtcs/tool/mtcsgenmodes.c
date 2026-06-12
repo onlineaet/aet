@@ -2260,3 +2260,4 @@ main (int argc, char **argv)
     return FATAL_EXIT_CODE;
   return SUCCESS_EXIT_CODE;
 }
+

@@ -23,7 +23,7 @@
 #include "CudaCompiler.h"
 #include "cudamicro.h"
 #include "CudaStream.h"
-
+#include "CudaRecord.h"
 
 impl$  CudaDevice {
 
@@ -35,7 +35,6 @@ impl$  CudaDevice {
       CudaMemAlloctor *alloctor=new$ CudaMemAlloctor(devNum);
       CudaCompiler *compiler=new$ CudaCompiler(devNum);
       CudaLanucher *lancher=new$ CudaLanucher(devNum,(CudaModule *)compiler->getModule());
-      printf("CudaDevice init --- compiler:%p\n",compiler);
       setAlloctor(alloctor);
       setLanucher(lancher);
       setCompiler(compiler);
@@ -49,7 +48,6 @@ impl$  CudaDevice {
     * num 供应商序号
     */
    public$ void setProviderNumber(int num){
-     printf("在 cudadevice setProviderNumber %d\n",num);
      CudaMemAlloctor *alloctor=(CudaMemAlloctor *)getMemAlloctor();
      alloctor->setProviderNumber(num);
      CudaLanucher *lancher=(CudaLanucher *)getLanucher();
@@ -110,12 +108,22 @@ impl$  CudaDevice {
 
    //把设备设为当前线程的运行设备 返回0成功，否则失败。
    public$ int setDevice(){
-      printf("setdevice -- %d\n",getNumber());
       CUDA_RUNTIME_CALL(cudaSetDevice(getNumber()));
       CUDA_RUNTIME_CALL(cudaSetDeviceFlags(cudaDeviceScheduleBlockingSync));
       return 0;
    }
 
+   public$ void synchronize(){
+      CUDA_RUNTIME_CALL(cudaDeviceSynchronize()); // Retrieve and print output.
+   }
+
+   //实现MtcsDevice的抽象方法
+   public$ MtcsRecord *createRecord(){
+       int devNum =getNumber();
+       CUDA_RUNTIME_CALL(cudaSetDevice(devNum));
+       CudaRecord *record=new$ CudaRecord(devNum);
+       return record;
+   }
 };
 
 

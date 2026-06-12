@@ -376,7 +376,7 @@ static char *getLibDevicePath()
       sprintf(fileName,"/proc/%d/exe",pid);
       ret = readlink(fileName,path,sizeof(path)-1);
       if(ret==-1){
-         printf("--angian-- get exec name fail!!\n");
+         //printf("--angian-- get exec name fail!!\n");
          return NULL;
       }
    }
@@ -755,6 +755,7 @@ void  mtcs_link_add(MtcsLink *self,const char *linkFuncNames,int version,int isa
    nboolean find=FALSE;
    for(i=0;i<linkArray->len;i++){
       LinkInfo *info=n_ptr_array_index(linkArray,i);
+      //printf("mtcslink info---%d %s\n",i,linkFuncNames);
       if(strcmp(info->platName,platName)==0 && info->version==version && info->isa==isa){
          //有相同的平台 version,isa
          //用新的linkFuncNames覆盖老的

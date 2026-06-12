@@ -70,7 +70,7 @@ void n_slice_free_chain_with_offset (nsize mem_size,npointer mem_chain,nsize nex
 {
     npointer slice = mem_chain;
     while (slice){
-        nuint8 *current = slice;
+        nuint8 *current =(nuint8*) slice;
         slice = *(npointer*) (current + next_offset);
         n_free (current);
    }

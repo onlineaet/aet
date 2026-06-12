@@ -669,7 +669,7 @@ MtcsPass           *mtcs_target_get_pass(MtcsTarget *self,enum opt_pass_type typ
 MtcsGimple         *mtcs_target_get_gimple(MtcsTarget *self);
 //原型 target_default_pointer_address_modes_p target.h targhooks.cc
 bool                mtcs_target_target_default_pointer_address_modes_p (MtcsTarget *self);
-//获取需要链接的函数名
+//获取需要链接的函数名 getLinkFuncName
 char               *mtcs_target_get_link_funcname(MtcsTarget *self);
 //由于同一个平台有多个版本号，往往这些版本号是全局的，所以在编译前用每个target的版本号设为全局变量。
 void                mtcs_target_publish_version(MtcsTarget *self);

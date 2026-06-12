@@ -510,13 +510,12 @@ static nboolean optimize_EXPF(MtcsPtxMath *self,gcall *stmt)
 {
    if(!flag_unsafe_math_optimizations)
       return FALSE;
-   // 确保是单精度
    if (gimple_call_num_args (stmt) != 1)
      return FALSE;
 
    tree arg = gimple_call_arg (stmt, 0);
    tree type = TREE_TYPE (arg);
-
+   // 确保是单精度
    if (TYPE_PRECISION (type) != 32)  // 确保是 float
      return FALSE;
 
@@ -545,7 +544,53 @@ static nboolean optimize_EXPF(MtcsPtxMath *self,gcall *stmt)
       gimple_call_set_lhs(new_stmt, lhs);
    gsi_replace (&gsi, new_stmt, true);
    return TRUE;
+}
 
+static nboolean optimize_LOGF(MtcsPtxMath *self,gcall *stmt)
+{
+   if (!flag_unsafe_math_optimizations)
+      return FALSE;
+
+   if (gimple_call_num_args(stmt) != 1)
+      return FALSE;
+
+   tree arg = gimple_call_arg(stmt, 0);
+   tree type = TREE_TYPE(arg);
+
+   /* 只处理 float */
+   if (TYPE_PRECISION(type) != 32)
+      return FALSE;
+
+   if (builtin_decl_explicit(BUILT_IN_LOG2F) == NULL_TREE)
+      return FALSE;
+
+   gimple_stmt_iterator gsi = gsi_for_stmt(stmt);
+
+   location_t loc = gimple_location(stmt);
+
+   /* log2f(arg) */
+   tree log2_decl = builtin_decl_explicit(BUILT_IN_LOG2F);
+
+   tree tmp =  make_temp_ssa_name(type, NULL, "log2f");
+
+   gimple *log2_stmt = gimple_build_call(log2_decl, 1, arg);
+
+   gimple_call_set_lhs(log2_stmt, tmp);
+   gimple_set_location(log2_stmt, loc);
+   gsi_insert_before(&gsi, log2_stmt, GSI_SAME_STMT);
+
+   /* 常量 ln(2) */
+   REAL_VALUE_TYPE ln2;
+   real_from_string(&ln2, "0.69314718055994530942");
+   real_convert(&ln2, TYPE_MODE(type), &ln2);
+   tree const_val = build_real(type, ln2);
+
+   tree mult = fold_build2_loc(loc,MULT_EXPR,type,tmp,const_val);
+   tree lhs = gimple_call_lhs(stmt);
+   gimple *new_stmt = gimple_build_assign(lhs, mult);
+   gimple_set_location(new_stmt, loc);
+   gsi_replace(&gsi, new_stmt, true);
+   return TRUE;
 }
 
 //// .globl   __nv_fast_powf
@@ -738,6 +783,9 @@ static nboolean optimize_FMINMAX(MtcsPtxMath *self, gcall *stmt)
    return TRUE;
 }
 
+/**
+ * 如果数学函数可以被优化返回TRUE
+ */
 nboolean mtcs_ptx_math_convert_call(MtcsPtxMath *self,gimple *call)
 {
    gcall *stmt = as_a <gcall *>(call);
@@ -760,7 +808,8 @@ nboolean mtcs_ptx_math_convert_call(MtcsPtxMath *self,gimple *call)
       case BUILT_IN_FMAX:
       case BUILT_IN_FMAXL:
          return optimize_FMINMAX(self,call);
-
+      case BUILT_IN_LOGF:
+         return optimize_LOGF(self,call);
    }
    return FALSE;
 }

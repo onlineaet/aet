@@ -43,7 +43,6 @@ impl$  CudaProvider {
            struct cudaDeviceProp deviceProp; //获取设备名称
            CUDA_RUNTIME_CALL(cudaGetDeviceProperties(&deviceProp, i));
            CudaDevice *d=new$ CudaDevice(deviceProp.name,i);
-           printf("device name :%d %s\n",i,deviceProp.name);
            addDevice(d);
            d->unref();
         }
@@ -55,8 +54,6 @@ impl$  CudaProvider {
         CUDA_RUNTIME_CALL(cudaGetDevice(&n));
         return n;
     }
-
-
 };
 
 void mtcs_cuda_init(int number)

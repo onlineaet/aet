@@ -552,7 +552,10 @@ static nboolean replaceCall_cb(MtcsBuiltins *mtcsBuiltins, gimple *call)
    return FALSE;
 }
 
-//实现父类声明的方法
+/**
+ * 实现父类声明的方法    nboolean (*convert_call)(MtcsBuiltins *self, gimple *call);
+ * 在mtcsclones.c中调用mtcs_builtins_convert_call
+ */
 static gimple  *convertCall_cb(MtcsBuiltins *mtcsBuiltins, gimple *call)
 {
    MtcsMode *mtcsMode=MTCS_GET_MODE_OBJECT(mtcsBuiltins);

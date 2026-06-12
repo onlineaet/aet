@@ -135,7 +135,6 @@ impl$  MtcsMem {
       }
 
       //printf("MtcsMem.memcpy 源内存所在设备 -- %d %d sHost:%d\n",providerNum2,devNum2,sHost);
-
       if(dHost && sHost){
          a_error("不支持两个主机的内存复制。");
          return NULL;
@@ -254,8 +253,6 @@ impl$  MtcsMem {
       alloctor->free(data);
       MtcsMemMgr.getInstance()->remove((unsigned long)data);
    }
-
-
 
 };
 

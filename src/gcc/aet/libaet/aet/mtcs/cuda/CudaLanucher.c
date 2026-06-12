@@ -26,13 +26,11 @@
 #include <cuda_runtime.h>
 #include <nvJitLink.h>
 #include <aet/time/Time.h>
-
 #include "CudaLanucher.h"
 #include "cudamicro.h"
 #include "../MtcsStream.h"
 
 #include "../ElfFile.h"
-
 
 impl$  CudaLanucher {
 
@@ -43,40 +41,17 @@ impl$  CudaLanucher {
       self->cudaModule=cudaModule->ref();
       self->funcHash=new$ AHashTable(AHashTable.strHash,AHashTable.strEqual);
    }
-   
-//   public$  void lanuch(char *funcName,auint gridX,auint gridY,auint gridZ,
-//         auint blockX,auint blockY,auint blockZ,auint sharedMemBytes,void *hStream,void **kernelParams,void **extra){
-//      //找到设备对应的驱动
-//      CUdevice cuDevice;
-//      CUcontext context;
-//      CUmodule module;
-//      CUfunction kernel;
-//
-//      CUDA_SAFE_CALL(cuDeviceGet(&cuDevice, devNum));
-//      CUDA_SAFE_CALL(cuCtxCreate(&context, 0, cuDevice));
-//      CUDA_SAFE_CALL(cuModuleLoadData(&module, cubin));
-//      CUDA_SAFE_CALL(cuModuleGetFunction(&kernel, module, funcName));//得到函数
-//      printf("ok ---- cubinSize:%d %s\n",cubinSize,funcName);
-//
-//      CUDA_SAFE_CALL( cuLaunchKernel(kernel,
-//      gridX,  gridY, gridZ, // grid dim
-//      blockX, blockY, blockZ, // block dim
-//      sharedMemBytes, hStream, // shared mem and stream
-//      kernelParams, extra)); // arguments
-//      CUDA_SAFE_CALL(cuCtxSynchronize()); // Retrieve and print output.
-//   }
 
-   public$  void lanuch(char *funcName,auint gridX,auint gridY,auint gridZ, 
+   public$  void lanuch(char *funcName,auint gridX,auint gridY,auint gridZ,
          auint blockX,auint blockY,auint blockZ,auint sharedMemBytes,void *hStream,void **kernelParams,void **extra){
       //找到设备对应的驱动
-      //CUDA_RUNTIME_CALL(cudaSetDevice(devNum));
-      CUmodule module=cudaModule->getModule();
-      CUfunction kernel=NULL;
       //printf("CudaLanucher lanuch funcName 00 funcName:%s kernel:%p mtcsStreamData:%p\n",funcName,kernel,hStream);
-      kernel = funcHash->get(funcName);
+      CUfunction kernel = funcHash->get(funcName);
      // printf("lanuch kernel--:%s %p\n",funcName,kernel);
       if(kernel==NULL){
+         CUmodule module=cudaModule->getModule();
          CUDA_DRIVER_CALL(cuModuleGetFunction(&kernel, module, funcName));//得到函数
+         //CUDA_DRIVER_CALL(cuFuncSetCacheConfig(kernel, CU_FUNC_CACHE_PREFER_SHARED));
          funcHash->put(strdup(funcName),kernel);
       }
       cudaStream_t stream=NULL;
@@ -91,9 +66,6 @@ impl$  CudaLanucher {
       blockX, blockY, blockZ, // block dim
       sharedMemBytes, stream, // shared mem and stream
       kernelParams, extra)); // arguments
-      //CUDA_DRIVER_CALL(cuCtxSynchronize()); // Retrieve and print output.
-     // CUDA_RUNTIME_CALL(cudaPeekAtLastError());
-
    }
    
    /**

@@ -89,7 +89,7 @@ impl$  CudaCompiler {
       CUDA_DRIVER_CALL(cuDeviceGetAttribute(&major, CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MAJOR, cuDevice));
       CUDA_DRIVER_CALL(cuDeviceGetAttribute(&minor, CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MINOR, cuDevice));
       int arch =  major*10 + minor;
-      printf("arch is :%d ptxCodes->size():%d\n",arch,ptxCodes->size());
+      a_debug("arch is :%d ptxCodes->size():%d\n",arch,ptxCodes->size());
       char smbuf[100];
       sprintf(smbuf, "-arch=sm_%d", arch);
       //const char *lopts[] = {"-lto", smbuf};
@@ -108,20 +108,6 @@ impl$  CudaCompiler {
          NVJITLINK_SAFE_CALL(handle, nvJitLinkAddData(handle, NVJITLINK_INPUT_PTX,(void *)code,strlen(code), name));
       }
 
-#if 0
-      char buffer[4096];
-      readFile("/home/sns/a.ptx",buffer,4096);
-      printf("code is 00 :%s\n",buffer);
-      NVJITLINK_SAFE_CALL(handle, nvJitLinkAddData(handle, NVJITLINK_INPUT_PTX,(void *)buffer,strlen(buffer), "testptx1"));
-      readFile("/home/sns/b.ptx",buffer,4096);
-      printf("code is 11 :%s\n",buffer);
-      NVJITLINK_SAFE_CALL(handle, nvJitLinkAddData(handle, NVJITLINK_INPUT_PTX,(void *)buffer,strlen(buffer), "testptx2"));
-
-#endif
-
-      // The call to nvJitLinkComplete causes linker to link together the two
-      // LTO IR modules (offline and online), do optimization on the linked LTO IR,
-      // and generate cubin from it.
       NVJITLINK_SAFE_CALL(handle, nvJitLinkComplete(handle));
       size_t cubinSize;
       NVJITLINK_SAFE_CALL(handle, nvJitLinkGetLinkedCubinSize(handle, &cubinSize));
@@ -168,70 +154,12 @@ impl$  CudaCompiler {
          codes->unref();
          a_debug("编译后的 cuda bin 大小 size:%d %p\n",self->cubinSize,cubin);
          setBin(cubin,cubinSize);
-//         FILE *fx=fopen("/home/sns/aet-gemm_2.cubin","w");
-//         fwrite(cubin,1,cubinSize,fx);
-//         fclose(fx);
       }
    }
 
    public$ char *getName(){
       return "cuda";
    }
-
-   static void compile00(){
-      CUdevice cuDevice;
-      CUcontext context;
-      CUDA_RUNTIME_CALL(cudaSetDevice(devNum));
-      CUDA_DRIVER_CALL(cuDeviceGet(&cuDevice, devNum));
-      CUDA_DRIVER_CALL(cuCtxGetCurrent(&context));
-      struct cudaDeviceProp prop;
-      cudaGetDeviceProperties(&prop, devNum);       // 获取GPU的特性，看是否支持地址映射
-      if (!prop.canMapHostMemory){
-         printf("MtcsSystem.c compile managedMemory 失败--- %d\n",prop.managedMemory);
-         abort();
-      }
-      // Load the generated LTO IR and the LTO IR generated offline
-      // and link them together.
-      nvJitLinkHandle handle;
-      // Dynamically determine the arch to link for
-      int major = 0;
-      int minor = 0;
-      CUDA_DRIVER_CALL(cuDeviceGetAttribute(&major, CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MAJOR, cuDevice));
-      CUDA_DRIVER_CALL(cuDeviceGetAttribute(&minor, CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MINOR, cuDevice));
-      int arch =  major*10 + minor;
-      printf("MtcsSystem.c compile 00 arch is :%d cuCtxCreate:%p\n",arch,context);
-      char smbuf[100];
-      sprintf(smbuf, "-arch=sm_%d", arch);
-     // const char *lopts[] = {"-lto", smbuf};
-      const char *lopts[] = {smbuf,"-O3"};
-     // const char *lopts[] = {smbuf,"-O3","-split-compile=0","-maxrregcount=512","-no-cache","-fma=3"};
-      NVJITLINK_SAFE_CALL(handle, nvJitLinkCreate(&handle, 2, lopts));
-
-      //NVJITLINK_SAFE_CALL(handle, nvJitLinkCreate(&handle, 6, lopts));
-
-      int i;
-      char buffer[4096*10];
-      FILE *fp=fopen("/home/sns/a.ptx","r");
-
-      int rev=fread(buffer,1,4096*10,fp);
-      if(!rev)
-         return ;
-      fclose(fp);
-      buffer[rev]='\0';
-      NVJITLINK_SAFE_CALL(handle, nvJitLinkAddData(handle, NVJITLINK_INPUT_PTX,(void *)buffer,strlen(buffer), "testptx2"));
-      NVJITLINK_SAFE_CALL(handle, nvJitLinkComplete(handle));
-      size_t cubinSize;
-      NVJITLINK_SAFE_CALL(handle, nvJitLinkGetLinkedCubinSize(handle, &cubinSize));
-      void *cubin = malloc(cubinSize);
-      NVJITLINK_SAFE_CALL(handle, nvJitLinkGetLinkedCubin(handle, cubin));
-      NVJITLINK_SAFE_CALL(handle, nvJitLinkDestroy(&handle));
-      setBin(cubin,cubinSize);
-
-      FILE *fx=fopen("/home/sns/aet-gemm_1.cubin","w");
-      fwrite(cubin,1,cubinSize,fx);
-      fclose(fx);
-   }
-
 
 };
 

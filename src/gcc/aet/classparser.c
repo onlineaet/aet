@@ -1749,8 +1749,10 @@ nboolean class_parser_add_include(ClassParser *self)
 
    backupToken(self);
    //必须加入'\n'否则报有游离的#号错误
-   char incstr[128];
-   sprintf(incstr,";\n#include <aet.h>\n %s %d\n",RID_AET_GOTO_STR,GOTO_ADD_H_FILE);
+   char incstr[256];
+   //sprintf(incstr,";\n#include <aet.h>\n %s %d\n",RID_AET_GOTO_STR,GOTO_ADD_H_FILE);
+   sprintf(incstr,";\n#include <aet.h>\n \n#include <aet_mtcs.h>\n %s %d\n",RID_AET_GOTO_STR,GOTO_ADD_H_FILE);
+
    addAetBuiltinCodes(parse_in,incstr,strlen(incstr),loc);
    return TRUE;
 }

@@ -47,11 +47,10 @@ impl$  CudaLanucher {
       //找到设备对应的驱动
       //printf("CudaLanucher lanuch funcName 00 funcName:%s kernel:%p mtcsStreamData:%p\n",funcName,kernel,hStream);
       CUfunction kernel = funcHash->get(funcName);
-     // printf("lanuch kernel--:%s %p\n",funcName,kernel);
+      //printf("lanuch kernel--:%s %p\n",funcName,kernel);
       if(kernel==NULL){
          CUmodule module=cudaModule->getModule();
          CUDA_DRIVER_CALL(cuModuleGetFunction(&kernel, module, funcName));//得到函数
-         //CUDA_DRIVER_CALL(cuFuncSetCacheConfig(kernel, CU_FUNC_CACHE_PREFER_SHARED));
          funcHash->put(strdup(funcName),kernel);
       }
       cudaStream_t stream=NULL;
@@ -59,8 +58,8 @@ impl$  CudaLanucher {
          MtcsStream *data=(MtcsStream *)hStream;
          stream=(cudaStream_t)data->getStream();
       }
-     // printf("CudaLanucher lanuch funcName 11 funcName:%s kernel:%p stream:%p grid:%dx%dx%d block:%dx%dx%d\n",
-          //  funcName,kernel,stream,gridX,  gridY, gridZ,blockX, blockY, blockZ);
+      //printf("CudaLanucher lanuch funcName 11 funcName:%s kernel:%p stream:%p grid:%dx%dx%d block:%dx%dx%d\n",
+            //funcName,kernel,stream,gridX,  gridY, gridZ,blockX, blockY, blockZ);
       CUDA_DRIVER_CALL( cuLaunchKernel(kernel,
       gridX,  gridY, gridZ, // grid dim
       blockX, blockY, blockZ, // block dim

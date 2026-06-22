@@ -8,4 +8,4 @@
 #include "aet/lang/AObject.h"
 
 
-#endif /* ! GCC_C_AET_H */
+#endif /* ! __AET_H__ */

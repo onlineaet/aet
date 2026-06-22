@@ -1,5 +1,4 @@
 
-
 #ifndef __A_LIB_H__
 #define __A_LIB_H__
 
@@ -14,4 +13,4 @@
 #include "aet/aprintf.h"
 
 
-#endif /* ! GCC_C_AET_H */
+#endif /* ! __A_LIB_H__ */

@@ -18,10 +18,6 @@
  * AET was originally developed  by the zclei@sina.com
  */
 
-#include <stdio.h>
-#include <string.h>
-#include <unistd.h>
-
 #include "MtcsModule.h"
 
 impl$ MtcsModule{

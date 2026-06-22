@@ -24,10 +24,7 @@
 #include "../../aet.h"
 #include "MtcsModule.h"
 
-
 package$ aet.mtcs;
-
-
 
 public$ abstract$ class$ MtcsCompiler {
 
@@ -38,9 +35,6 @@ public$ abstract$ class$ MtcsCompiler {
    public$ MtcsModule *getModule();
    public$ void setBin(char *bin,int binSize);
    public$ char *getBin(int *binSize);
-
-
-
 };
 
 #endif /* __N_MEM_H__ */

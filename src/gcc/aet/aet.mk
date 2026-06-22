@@ -615,7 +615,7 @@ endif
 AET_XGCC = ./xgcc -B./
 LIBGCC_BUILD_DIR := $(objdir)/../$(target)/libgcc
 
-# 如果用 $(CFLAGS) 系统默认的是 -g -o2 当编译MtcsTest.c时出错
+# 如果用 $(CFLAGS) 系统默认的是 -g -O2 当编译MtcsTest.c时出错
 AET_CFLAGS :=-O3
 #编译aet中的库时一定要加该选项，否则报找不到libaet.so错，该选项只针对aet和测试程序，对用户程序不需要该选项，
 AET_NOINCLUDE :=-noaetinclude

@@ -1,10 +1,8 @@
 # AET Language
 
-AET (Active Expandable Translator) is a system-level programming
-language designed for the era of heterogeneous computing.
+AET (Active Expandable Translator) is a system-level programming language and compiler platform for heterogeneous computing, built on GCC.
 
-AET is not simply adding several object-oriented keywords to C, nor is
-it another implementation of C++.
+AET treats execution domains as part of the language semantics, allowing heterogeneous computation to participate in semantic analysis, optimization, and code generation throughout the compiler pipeline.
 
 The goal of AET is:
 
@@ -350,16 +348,11 @@ Current development focuses on:
 
 ## Vision
 
-Future software development should not revolve around one specific chip.
+For decades, programming languages have focused on describing algorithms.
 
-Future programming languages should not belong only to CPU.
+AET explores whether future programming languages should also describe **where computation belongs**. 
 
-AET aims to build a true system-level language for the era of
-heterogeneous computing.
-
-Allowing developers to focus on algorithms and business logic,
-
-while compiler handles cross-chip optimization and code generation.
+The long-term goal is to make execution domains a first-class language semantic, allowing compilers to reason about heterogeneous systems from parsing to machine code generation.
 
 ------------------------------------------------------------------------
 

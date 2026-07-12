@@ -16,7 +16,7 @@ heterogeneous computing into one language system.
 
 ------------------------------------------------------------------------
 
-# Why AET is Needed
+## Why AET is Needed
 
 Over the past decades:
 
@@ -44,7 +44,7 @@ compiler itself.
 
 ------------------------------------------------------------------------
 
-# Why AET Is Still Needed in the AI Era
+## Why AET Is Still Needed in the AI Era
 
 In recent years, large language models can help developers:
 
@@ -100,7 +100,7 @@ AET is responsible for deploying the algorithm to:
 
 ------------------------------------------------------------------------
 
-# From Source Compilation to Computation Deployment
+## From Source Compilation to Computation Deployment
 
 Traditional compilers solve:
 
@@ -128,7 +128,7 @@ AET believes:
 
 ------------------------------------------------------------------------
 
-# Core Capabilities of AET
+## Core Capabilities of AET
 
 ## Object-Oriented Programming
 
@@ -173,36 +173,20 @@ The compiler generates code for different platforms.
 
 ------------------------------------------------------------------------
 
-# Comparison with Mainstream Solutions
+## Comparison with Mainstream Solutions
 
 ----------------------------------------------------------------------------------------------
 
-  Language/Framework   C Compatibility OOP         Heterogeneous    Complexity    Compiler
-                                                   Computing                      Optimization
+| Language/Framework | C Compatibility | OOP        | Heterogeneous Computing  | Complexity  | Compiler Optimization |
+| ------------------ | --------------- | ---------- | ------------------------ | ----------- | --------------------- |
+| **C**              | Native          | Weak       | Manual (CUDA etc.)       | Low         | Very strong           |
+| **C++**            | Excellent       | Strong     | CUDA / SYCL              | High        | Strong                |
+| **Rust**           | General         | Medium     | Limited                  | Medium-high | Strong                |
+| **CUDA / HIP**     | Good            | Weak       | Single GPU platform      | Medium      | Medium                |
+| **SYCL / oneAPI**  | Good            | Medium     | Multi-platform (limited) | Medium      | Medium                |
+| **AET**            | **Native**      | **Strong** | **Compiler-native**      | **Low**     | **Very strong**       |
 
--------------------- --------------- ----------- ---------------- ------------- --------------
-
-  C                    Native          Weak        Manual (CUDA     Low           Very strong
-                                                   etc.)                          
-
-  C++                  Excellent       Strong      CUDA / SYCL      High          Strong
-
-  Rust                 General         Medium      Limited          Medium-high   Strong
-
-  CUDA / HIP           Good            Weak        Single GPU       Medium        Medium
-                                                   platform                       
-
-  SYCL / oneAPI        Good            Medium      Multi-platform   Medium        Medium
-                                                   (limited)                      
-
-  AET                  Native          Strong      **Compiler       **Low**       Very strong
-
-                                                   native**                       
-  ----------------------------------------------------------------------------------------------
-
-------------------------------------------------------------------------
-
-# AET Innovation
+## AET Innovation
 
 AET is not only a language.
 
@@ -242,7 +226,7 @@ capability.
 
 ------------------------------------------------------------------------
 
-# Implemented Features
+## Implemented Features
 
 Current version includes:
 
@@ -272,7 +256,7 @@ and other mainstream heterogeneous platforms.
 
 ------------------------------------------------------------------------
 
-# Practical Applications
+## Practical Applications
 
 AET has been used to develop deep learning training frameworks.
 
@@ -287,12 +271,12 @@ Implemented:
 
 In CIFAR image classification training tests,
 
-the AET-based training framework achieved about 20% performance
+the AET-based training framework achieved about 30%-40% performance
 improvement compared with the darknet-alex baseline implementation.
 
 ------------------------------------------------------------------------
 
-# Example
+## Example
 
 ``` c
 #include <stdio.h>
@@ -321,7 +305,7 @@ int main(){
 
 ------------------------------------------------------------------------
 
-# AET and C++
+## AET and C++
 
 AET does not aim to become another C++.
 
@@ -342,7 +326,7 @@ AET hopes to:
 
 ------------------------------------------------------------------------
 
-# Installation
+## Installation
 
 Please refer to:
 
@@ -350,7 +334,7 @@ Please refer to:
 
 ------------------------------------------------------------------------
 
-# Project Status
+## Project Status
 
 Current development focuses on:
 
@@ -364,7 +348,7 @@ Current development focuses on:
 
 ------------------------------------------------------------------------
 
-# Vision
+## Vision
 
 Future software development should not revolve around one specific chip.
 
@@ -379,7 +363,7 @@ while compiler handles cross-chip optimization and code generation.
 
 ------------------------------------------------------------------------
 
-# License
+## License
 
 GPL v3
 

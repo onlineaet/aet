@@ -129,6 +129,16 @@ static char *getParmName(tree arg)
  * component_ref
  * 加参数FuncGenParmInfo *tempFgpi1234到第二个位置
  * var_decl 带有初始化的值
+ * 重要改变 泛型块函数void _int_0_Abc__gen_block_func_0(Abc * self,aet_generic_E a)
+ * 中的参数有泛型类型的被转成了 aet_generic_E
+ * 参数名 a要重命名为a1
+ * 然后在泛型块函数内的第一行，加入如下代码
+ * E a
+ * 重要，如果参数是泛型类型 A_Z,参数要加前缀"_gen_",然后在函数体的最前参数被改回原来的名字。
+ * void setdata(aet_generic_E a) 参数a-->aet_generic_E a变成 aet_generic_E _gen_a
+ * 在函数体最前插入代码
+ * E a =&((E *)_gen_a);
+ * 如果直实的数据不是指針
  */
 void generic_block_set_parm(GenericBlock *self,vec<tree, va_gc> *exprlist)
 {
@@ -159,10 +169,17 @@ void generic_block_set_parm(GenericBlock *self,vec<tree, va_gc> *exprlist)
          }else
             error_at(input_location,"在generic_block_set_parm出错。参数%qs找不到类型名。",parmName);
       }
-      n_debug("generic_block_set_parm 00 有参数 %d %s %s\n",ix,typeStr,parmName);
+
+      n_debug("generic_block_set_parm 00 有参数 %d %s %s 是不是泛型类型参数:%d\n",
+            ix,typeStr,parmName, generic_util_start_with_generic(typeStr));
       n_string_append(parmStr,typeStr);
       n_string_append(parmStr," ");
-      n_string_append(parmStr,parmName);
+      if(generic_util_start_with_generic(typeStr)){
+         char *newName=generic_util_create_param_new_name(parmName);
+         n_string_append(parmStr,newName);
+         free(newName);
+      }else
+         n_string_append(parmStr,parmName);
       n_string_append(parmStr,",");
       n_free(typeStr);
       if(needFree)
@@ -286,6 +303,9 @@ static NPtrArray *readBlock(char *buffer)
    return array;
 }
 
+/**
+ * 从字符串中创建block 调用该方法时处理二次编译
+ */
 NPtrArray *generic_block_create_block(char *content)
 {
    NPtrArray *array=readBlock(content);
@@ -309,7 +329,6 @@ NPtrArray *generic_block_create_block(char *content)
    }
    n_ptr_array_unref(array);
    return blockArray;
-
 }
 
 

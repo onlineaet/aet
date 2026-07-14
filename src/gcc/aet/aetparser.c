@@ -4111,7 +4111,8 @@ static struct c_parm * c_parser_parameter_declaration (c_parser *parser, tree at
    while (c_parser_next_token_is (parser, CPP_PRAGMA))
       c_parser_pragma (parser, pragma_param, NULL, NULL_TREE);
 
-   generic_func_parameter_declaration/*!generic_util_parameter_declaration*/(generic_func_get());//zclei 检查并替换token->value为泛型声明
+   //zclei 检查并替换token->value为泛型声明
+   generic_func_parameter_declaration/*!generic_util_parameter_declaration*/(generic_func_get());
    if (!c_parser_next_token_starts_declspecs (parser)
    && !c_parser_nth_token_starts_std_attributes (parser, 1)){
       c_token *token = c_parser_peek_token (parser);
@@ -9262,7 +9263,7 @@ static struct c_expr c_parser_sizeof_expression (c_parser *parser)
    }else{
       //zclei generic_impl_calc_sizeof 方法中把 E 换成了 int,char 等
       aetGeneric=generic_impl_calc_sizeof(generic_impl_get(),classImpl->className);
-      n_debug("c_parser_sizeof_expression 11 处理sizeof ()中是一个表达式 aetGeneric:%d",aetGeneric);
+      n_debug("c_parser_sizeof_expression 11 处理sizeof ()中是一个表达式或常数或宏定义 aetGeneric:%d",aetGeneric);
       expr_loc = c_parser_peek_token (parser)->location;
       expr = c_parser_unary_expression (parser);
       finish = expr.get_finish ();
@@ -10208,10 +10209,6 @@ classAccessLabel:
             case RID_AET_OBJECT://zclei
                expr = class_impl_parser_object(classImpl);//zclei 10.4.0
                break;
-           // case RID_AET_SUPER://zclei
-              // printf("c_parser_postfix_expression RID_AET_SUPER\n");
-              // expr=class_impl_parser_super_at_postfix_expression(classImpl,expr);//zclei 10.4.0
-             //  break;
             case RID_VA_ARG:
             {
                location_t start_loc = loc;

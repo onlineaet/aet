@@ -246,7 +246,6 @@ static inline int _find_class_by_AClass(AClass *class,char *findSysName)
 static inline void* dynamic_iface_to_class(void *atClass,char *ifaceSysName,char *destSysName,char *compileFile,int line,int column)
 {
    AClass *class=((AObject*)atClass)->getClass();
-   unsigned long offset=0;
    int find= _find_class_by_AClass(class,destSysName);
    if(!find){
       //动态转化是错的，给用户报位置

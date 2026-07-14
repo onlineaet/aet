@@ -1308,7 +1308,7 @@ static void registerCollectPass()
    gimple_opt_pass *mtcsCollectFuncs = new pass_mtcs_collect_funcs (g);
    register_pass_info mtcsCollectFuncsInfo = { mtcsCollectFuncs, "*warn_function_noreturn", 1, PASS_POS_INSERT_AFTER };
    register_pass (&mtcsCollectFuncsInfo);
-   //加在插件'simdclone'后
+   //加在pass'simdclone'后
    simple_ipa_opt_pass *mtcsCollectVars = new pass_mtcs_collect_vars (g);
    register_pass_info mtcsCollectVarsInfo = { mtcsCollectVars, "simdclone", 1, PASS_POS_INSERT_AFTER };
    register_pass (&mtcsCollectVarsInfo);

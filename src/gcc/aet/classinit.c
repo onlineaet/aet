@@ -843,8 +843,6 @@ static ClassFunc *findParentImplInterface(ClassInit *self,ClassInfo *info,ClassN
    }
    char *atSysName=NULL;
    n_debug("find interface ---%s %s %s\n",className->sysName,func->rawMangleName,interfaceMethod->mangleFunName);
-   printf("find interface ---%s %s %s %s\n",className->sysName,func->rawMangleName,interfaceMethod->mangleFunName,
-         info->parentName.sysName);
 
    //从父类找接口实现的方法或声明。
    ClassFunc *impl = func_mgr_get_interface_impl_from_parent(func_mgr_get(), &info->parentName, interfaceMethod,&atSysName);

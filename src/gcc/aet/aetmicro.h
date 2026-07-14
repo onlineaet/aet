@@ -50,7 +50,8 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 //2025-11-03 新加
 #define GENERIC_BLOCK_FILE_NAME             "_block_func_" //泛型块函数输出文件名
 
-//接口声明中的变量，由aet加入，变量指向实现该接口的类对象
+
+//接口声明中的变量，由aet加入，变量指向实现该接口的类对象 IfaceCommonData123 定义在AObject.h中。
 #define IFACE_AT_CLASS                     "_atClass123"
 #define IFACE_COMMON_STRUCT_NAME           "IfaceCommonData123"
 #define IFACE_COMMON_STRUCT_VAR_NAME       "_iface_common_var"

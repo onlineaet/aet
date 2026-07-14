@@ -157,52 +157,54 @@ static void createSizeofToken(GenericImpl *self,int index,nboolean fromFuncGen)
  */
 nboolean  generic_impl_calc_sizeof(GenericImpl *self,ClassName *className)
 {
-	c_parser *parser=self->parser->parser;
-	if(!self->parser->isAet && !aet_parser_is_generic_state(self->parser))
-		return FALSE;
-    tree openbrace = c_parser_peek_token (parser)->value;
-    tree id=c_parser_peek_2nd_token (parser)->value;
-    if(id==NULL)
-    	return FALSE;
-    location_t loc=c_parser_peek_token (parser)->location;
-    tree decl = lookup_name (id);
-    //printf("generic_impl_calc_sizeof 11 is %p %p\n",id,decl);
-    if(decl)
-    	return FALSE ;
-    //找不到ID对应的声明，可能是一个泛型E
-    ClassInfo *info=NULL;
-    if(self->parser->isAet){
-        info=class_mgr_get_class_info_by_class_name(class_mgr_get(),className);
-    }else if(aet_parser_is_generic_state(self->parser)){
-       	tree id=aet_utils_create_ident("self");
-       	tree obj=lookup_name(id);
-       	tree type=TREE_TYPE(obj);
-       	char *sysClassName=class_util_get_class_name(type);
-        info=class_mgr_get_class_info(class_mgr_get(),sysClassName);
-    }
-    if(info==NULL)
-    	return FALSE;
-    if(c_parser_peek_nth_token (parser,3)->type!=CPP_CLOSE_PAREN)
-    	return FALSE;
-    nboolean isGenericDecl=class_info_is_generic_decl(info,id);
-    if(!isGenericDecl){
-	  GenericModel *funcDecl=c_aet_get_func_generics_model(current_function_decl);
-	  n_debug("generic_impl_calc_sizeof ---所在类没有泛型声明，或者不是泛型类:%d %s\n",class_info_is_generic_class(info),IDENTIFIER_POINTER(id));
-	  nboolean find=generic_model_exits_ident(funcDecl,IDENTIFIER_POINTER(id));
-	  n_debug("generic_impl_calc_sizeof 22 检查是不在在泛型函数中使用sizeof %s 泛型函数的泛型:%p 中泛型函数中找到 ok:%d\n",IDENTIFIER_POINTER(id),funcDecl,find);
-	  if(!find)
-		 return FALSE;
-	  int index=getIndexFromFuncGenc(id,current_function_decl);
-	  createSizeofToken(self,index,TRUE);
-    }else{
-	   int index=class_info_get_generic_index(info,IDENTIFIER_POINTER(id));
-	   if(index<0){
-		 n_warning("在类%s中的泛型声明没有包括泛型%s。\n",className->sysName,IDENTIFIER_POINTER(id));
-		 return FALSE;
-	   }
-	   createSizeofToken(self,index,FALSE);
-    }
-    return TRUE;
+   c_parser *parser=self->parser->parser;
+   if(!self->parser->isAet && !aet_parser_is_generic_state(self->parser))
+      return FALSE;
+   tree openbrace = c_parser_peek_token (parser)->value;
+   tree id=c_parser_peek_2nd_token (parser)->value;
+   if(id==NULL || CONSTANT_CLASS_P (id))
+      return FALSE;
+   location_t loc=c_parser_peek_token (parser)->location;
+   tree decl = lookup_name (id);
+   if(decl)
+      return FALSE ;
+   //找不到ID对应的声明，可能是一个泛型E
+   ClassInfo *info=NULL;
+   if(self->parser->isAet){
+      info=class_mgr_get_class_info_by_class_name(class_mgr_get(),className);
+   }else if(aet_parser_is_generic_state(self->parser)){
+      tree id=aet_utils_create_ident("self");
+      tree obj=lookup_name(id);
+      tree type=TREE_TYPE(obj);
+      char *sysClassName=class_util_get_class_name(type);
+      info=class_mgr_get_class_info(class_mgr_get(),sysClassName);
+   }
+
+   if(info==NULL)
+      return FALSE;
+   if(c_parser_peek_nth_token (parser,3)->type!=CPP_CLOSE_PAREN)
+      return FALSE;
+   nboolean isGenericDecl=class_info_is_generic_decl(info,id);
+   if(!isGenericDecl){
+      GenericModel *funcDecl=c_aet_get_func_generics_model(current_function_decl);
+      n_debug("generic_impl_calc_sizeof ---所在类没有泛型声明，或者不是泛型类:%d %s\n",
+            class_info_is_generic_class(info),IDENTIFIER_POINTER(id));
+      nboolean find=generic_model_exits_ident(funcDecl,IDENTIFIER_POINTER(id));
+      n_debug("generic_impl_calc_sizeof 22 检查是不在在泛型函数中使用sizeof %s 泛型函数的泛型:%p 中泛型函数中找到 ok:%d\n",
+            IDENTIFIER_POINTER(id),funcDecl,find);
+      if(!find)
+         return FALSE;
+      int index=getIndexFromFuncGenc(id,current_function_decl);
+      createSizeofToken(self,index,TRUE);
+   }else{
+      int index=class_info_get_generic_index(info,IDENTIFIER_POINTER(id));
+      if(index<0){
+         n_warning("在类%s中的泛型声明没有包括泛型%s。\n",className->sysName,IDENTIFIER_POINTER(id));
+         return FALSE;
+      }
+      createSizeofToken(self,index,FALSE);
+   }
+   return TRUE;
 }
 
 

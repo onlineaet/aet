@@ -46,7 +46,6 @@ struct _GenericBlock
 	tree funcTypeDecl;
 	tree callTree;//等同于(* (setData_1_typedecl)self->_gen_blocks_array_897[0])(self,5);
 	int index;//在类中出现的顺序
-
 };
 
 

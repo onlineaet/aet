@@ -116,37 +116,32 @@ static inline void assign_key_or_value (apointer a, auint index, aboolean is_big
  */
 static inline apointer evict_key_or_value (apointer a, auint index, aboolean is_big, apointer v)
 {
-  is_big = TRUE;
-  if (is_big)
-    {
+   is_big = TRUE;
+   if (is_big){
       apointer r = *(((apointer *) a) + index);
       *(((apointer *) a) + index) = v;
       return r;
-    }
-  else
-    {
+   }else{
       apointer r = AUINT_TO_POINTER (*(((auint *) a) + index));
       *(((auint *) a) + index) = APOINTER_TO_UINT (v);
       return r;
-    }
+   }
 }
 
 
 static inline aboolean get_status_bit (const auint32 *bitmap, auint index)
 {
-  return (bitmap[index / 32] >> (index % 32)) & 1;
+   return (bitmap[index / 32] >> (index % 32)) & 1;
 }
 
 static inline void set_status_bit (auint32 *bitmap, auint index)
 {
-  bitmap[index / 32] |= 1U << (index % 32);
+   bitmap[index / 32] |= 1U << (index % 32);
 }
-
-
 
 static inline apointer reallocKeyOrValue(apointer a, auint size, A_GNUC_UNUSED aboolean is_big)
 {
-    return a_renew (apointer, a, size);
+   return a_renew (apointer, a, size);
 }
 
 impl$ HashIter{
@@ -727,15 +722,15 @@ DEFINE_RESIZE_FUNC (resize_set)
    }
 
    /**
-    * 释放前最后的清除工作
-    */
+   * 释放前最后的清除工作
+   */
    ~AHashTable(){
-	 removeAllNodes (TRUE, TRUE);
-	 if (priv->keys != priv->values)
-	   a_free (priv->values);
-	 a_free (priv->keys);
-	 a_free (priv->hashes);
-	 a_free(priv);
+      removeAllNodes (TRUE, TRUE);
+      if (priv->keys != priv->values)
+      a_free (priv->values);
+      a_free (priv->keys);
+      a_free (priv->hashes);
+      a_free(priv);
    }
 
    static aboolean strEqual (const char *string1,const char *string2){

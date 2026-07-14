@@ -266,8 +266,7 @@ static tree superAtPostfixExpression(SuperCall *self,ClassName *className,locati
    tree recordId=aet_utils_create_ident(sysName);
    tree record=lookup_name(recordId);
    if(!record || record==NULL_TREE || record==error_mark_node){
-      printf("没有找到 %s\n",sysName);
-      error("没有找到 class");
+      error("没有找到 class %qs",sysName);
    }
    tree recordType=TREE_TYPE(record);
    tree type=build_pointer_type(recordType);
@@ -408,7 +407,7 @@ static nboolean findNoAbstractClass(char *from,char *to)
  * 然后这样调用
  * (setData) (((AObject *)self)->superCalls[index])
  */
-//------------------第三版super设计，数组变成全局的，原来是定义在类中--------------------------
+//------------------第三版super设计，数组变成全局的，原来的是定义在类中--------------------------
 static void createParentSuperVarName(char *sysName,char *afterfix,char *buffer)
 {
    sprintf(buffer,"_%s_parent_%s",sysName,afterfix);
@@ -634,7 +633,6 @@ tree super_call_replace_super_call(SuperCall *self,location_t expr_loc,tree expr
       createParentSuperVar(self,expr_loc,currentClassName,AET_SUPER_KERNEL_NAME_ARRAY);
       expr=createExpr(self,expr_loc,typeDecl,currentClassName,x,AET_SUPER_KERNEL_NAME_ARRAY);
    }else if(class_func_is_device(toFunc)){
-      printf("xxd ss :%d %d\n",class_func_is_host(toFunc),class_func_is_divide(toFunc));
       if(class_func_is_host(toFunc)){
          //如果是host device函数，创建两个parent变量，因为从host device函数分裂的设备函数是setData_device对用户胆不可见的，
          //不会进入这里 到mtcsclones再把主机super调用的表达式替换为调用AET_SUPER_DEVICE_ADDRESS_ARRAY的表达式。

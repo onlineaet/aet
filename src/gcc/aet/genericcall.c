@@ -165,6 +165,7 @@ tree generic_call_check_parm(GenericCall *self,location_t ploc, tree function, t
     str=generic_util_get_generic_str(origGenericDecl);
     n_debug("generic_call_check_param --00 如果找不到泛型字符,返回str:%s globalClassName:%s function:%p %s\n",
             str,globalClassName->sysName,function,funName);
+    aet_print_tree(origGenericDecl);
     if(str==NULL){
        return parmval;
     }

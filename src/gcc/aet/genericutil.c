@@ -92,14 +92,91 @@ nboolean generic_util_is_generic_ident(char *name)
    }
    return FALSE;
 }
+
+/**
+ * str的开始部分是否是genericIdentifier
+ * str 字符串 例如 "aet_generic_E * atcs"
+ */
+nboolean generic_util_start_with_generic(char *str)
+{
+   if(!str)
+      return FALSE;
+   int i;
+   for(i=0;i<26;i++){
+      if(startswith(str,genericIdentifier[i]))
+         return TRUE;
+   }
+   return FALSE;
+}
+
+/**
+ * 返回字符前的泛型类型
+ * str 字符串 例如 "aet_generic_E * atcs"
+ * 返回 aet_generic_E
+ */
+char * generic_util_get_start_with_generic(char *str)
+{
+   if(!str)
+      return NULL;
+   int i;
+   for(i=0;i<26;i++){
+      if(startswith(str,genericIdentifier[i])){
+         char ret[50];
+         strncpy(ret,str,strlen(genericIdentifier[i]));
+         ret[strlen(genericIdentifier[i])]='\0';
+         return xstrdup(ret);
+      }
+   }
+   return NULL;
+}
+
+#define CHANGE_PARAM_NAME_PREFIX "_aetGenNewParamPrefix_"
+//如果参数是泛型类型，需要改变为新的名字
+char *generic_util_create_param_new_name(char *origName)
+{
+   char param[512];
+   sprintf(param,"%s%s",CHANGE_PARAM_NAME_PREFIX,origName);
+   return xstrdup(param);
+}
+
+//_aetGenNewParamPrefix_atcs取出原来的名字
+char *generic_util_get_orig_param_name(char *newName)
+{
+   if(newName==NULL)
+      return NULL;
+   if(strlen(newName)<=strlen(CHANGE_PARAM_NAME_PREFIX))
+      return NULL;
+   char orig[128];
+   sprintf(orig,"%s",newName+strlen(CHANGE_PARAM_NAME_PREFIX));
+   return xstrdup(orig);
+}
+
+/**
+ * aet_generic_E *或  aet_generic_E **，能正确的获取到 aet_generic_E;
+ */
+static tree getTypeFromPointer(tree type)
+{
+   if(TREE_CODE(type)==POINTER_TYPE){
+      tree typeName=TYPE_NAME(type);
+      if(typeName!=NULL){
+         return type;
+      }else{
+         return getTypeFromPointer(TREE_TYPE(type));
+      }
+   }
+   return type;
+}
+
 /**
  * 判断type 是不是 aet_generic_A aet_generic_B等
  * 如 setData(E data) data的类型是aet_generic_E
+ * 如果 type 是 aet_generic_A *，也返回类型是泛型
  */
-nboolean  generic_util_is_generic_pointer(tree type)
+nboolean  generic_util_is_generic_pointer(tree type0)
 {
-    if(TREE_CODE(type)!=POINTER_TYPE)
+    if(TREE_CODE(type0)!=POINTER_TYPE)
     	return FALSE;
+    tree type= getTypeFromPointer(type0);
     tree typeName=TYPE_NAME(type);
     tree mainVar=TYPE_MAIN_VARIANT (type);
     tree ptd=TREE_TYPE (type);
@@ -125,34 +202,35 @@ nboolean  generic_util_is_generic_pointer(tree type)
  * 获取泛型的字符串A-Z。如:E、F
  * type:类声明和定义中函数声明或定义的参数。
  */
-char *generic_util_get_generic_str(tree type)
+char *generic_util_get_generic_str(tree type0)
 {
-	if(!aet_utils_valid_tree(type))
-		return NULL;
-    if(TREE_CODE(type)!=POINTER_TYPE)
-    	return NULL;
-    tree typeName=TYPE_NAME(type);
-    tree mainVar=TYPE_MAIN_VARIANT (type);
-    tree ptd=TREE_TYPE (type);
-    if(!aet_utils_valid_tree(typeName) || !aet_utils_valid_tree(mainVar)|| !aet_utils_valid_tree(ptd))
-    	return NULL;
-    if(TREE_CODE(typeName)!=TYPE_DECL)
-    	return NULL;
-    if(TREE_CODE(mainVar)!=POINTER_TYPE)
-    	return NULL;
-    if(TREE_CODE(ptd)!=VOID_TYPE)
-    	return NULL;
-    tree declName=DECL_NAME(typeName);
-    if(!aet_utils_valid_tree(declName))
-     	return NULL;
-    char *name=IDENTIFIER_POINTER(declName);
-    if(!generic_util_is_generic_ident(name))
-       return NULL;
-    char ax=name[strlen(name)-1];
-    char *re=(char*)n_malloc(2);
-    re[0]=ax;
-    re[1]='\0';
-    return re;
+   if(!aet_utils_valid_tree(type0))
+      return NULL;
+   if(TREE_CODE(type0)!=POINTER_TYPE)
+      return NULL;
+   tree type= getTypeFromPointer(type0);
+   tree typeName=TYPE_NAME(type);
+   tree mainVar=TYPE_MAIN_VARIANT (type);
+   tree ptd=TREE_TYPE (type);
+   if(!aet_utils_valid_tree(typeName) || !aet_utils_valid_tree(mainVar)|| !aet_utils_valid_tree(ptd))
+      return NULL;
+   if(TREE_CODE(typeName)!=TYPE_DECL)
+      return NULL;
+   if(TREE_CODE(mainVar)!=POINTER_TYPE)
+      return NULL;
+   if(TREE_CODE(ptd)!=VOID_TYPE)
+      return NULL;
+   tree declName=DECL_NAME(typeName);
+   if(!aet_utils_valid_tree(declName))
+      return NULL;
+   char *name=IDENTIFIER_POINTER(declName);
+   if(!generic_util_is_generic_ident(name))
+      return NULL;
+   char ax=name[strlen(name)-1];
+   char *re=(char*)n_malloc(2);
+   re[0]=ax;
+   re[1]='\0';
+   return re;
 }
 
 /**
@@ -409,7 +487,21 @@ tree generic_util_create_target_loc(char *codes,location_t loc)
    return target;
 }
 
-
+/**
+ * 是否泛型 aet_generic_E或..F等
+ */
+static char *getGenericA_Z(tree type)
+{
+   tree typeName=TYPE_NAME(type);
+   if(!aet_utils_valid_tree(typeName))
+      return NULL;
+   if(TREE_CODE(typeName)==TYPE_DECL){
+      tree name=DECL_NAME(typeName);
+      if(generic_util_is_generic_ident(IDENTIFIER_POINTER(name)))
+         return IDENTIFIER_POINTER(name);
+   }
+   return NULL;
+}
 
 static char *getId(tree arg,int *pointer)
 {
@@ -418,6 +510,11 @@ static char *getId(tree arg,int *pointer)
       return NULL;
    if(TREE_CODE(type)==POINTER_TYPE){
       *pointer=*pointer+1;
+      char *genericA_Z=getGenericA_Z(type);
+      if(genericA_Z!=NULL){
+         *pointer=*pointer-1;
+         return genericA_Z;
+      }
       return getId(type,pointer);
    }else{
       tree typeName=TYPE_NAME(type);

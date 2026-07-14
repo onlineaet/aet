@@ -924,7 +924,7 @@ struct c_typespec class_parser_parser_class_specifier (ClassParser *self)
       }
       classType=CLASS_TYPE_INTERFACE;
    }else{
-      c_parser_error (parser, "类型不正确。只能是Class、AbstractClass、Interface");
+      c_parser_error (parser, "类型不正确。支持类，抽象类和接口。");
       return ret;
    }
 
@@ -1062,7 +1062,17 @@ struct c_typespec class_parser_parser_class_specifier (ClassParser *self)
          decls = c_parser_class_declaration(self,classInfo,type,classType,&isStatic);
          if(decls==NULL_TREE){//如果是一个枚举，并且没有声明变量，就会进这里
             class_permission_stop(self->classPermission);
-            continue;
+            if (parser->error){
+               ret.spec = error_mark_node;
+               ret.kind = ctsk_tagref;
+               ret.expr = NULL_TREE;
+               ret.expr_const_operands = true;
+               self->state=CLASS_STATE_STOP;
+               self->currentClassName=NULL;
+               return ret;
+            }else{
+               continue;
+            }
          }
          n_debug("新 ---分析struct 55-1 检查MTCS函数");
          mtcs_parser_check(mtcs_parser_get(),decls,TRUE);
@@ -1144,7 +1154,7 @@ struct c_typespec class_parser_parser_class_specifier (ClassParser *self)
          tree decls= class_finalize_create_unref_decl(self->classFinalize,&classInfo->className,type);
          contents = chainon (decls, contents);
       }
-       //生成两个类变量 _generic_1234_array 保存泛型类的泛型类弄 和 _gen_blocks_array_897 非泛型函数的泛型块指针
+       //生成两个类变量 _generic_1234_array 保存泛型类的泛型类型 和 _gen_blocks_array_897 非泛型函数的泛型块指针
        //泛型函数中的泛型块用AObject.h中声明的全局变量 __thread generic_func_block_addr;
       int genericCount=class_info_get_generic_count(classInfo);
       if((genericCount>0 || func_mgr_have_generic_func(func_mgr_get(),&classInfo->className))

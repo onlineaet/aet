@@ -97,5 +97,22 @@ static inline void   generic_unit_create_block_func_prefix(char *typeName,int po
      sprintf(buffer,"_%s_%d",typeName,pointerCount);
 }
 
+/**
+ * str的开始部分是否是genericIdentifier
+ * aet_generic_E * atcs
+ */
+nboolean generic_util_start_with_generic(char *str);
+/**
+ * 返回字符前的泛型类型
+ * str 字符串 例如 "aet_generic_E * atcs"
+ * 返回 aet_generic_E
+ */
+char * generic_util_get_start_with_generic(char *str);
+
+//如果参数是泛型类型，需要改变为新的名字
+char *generic_util_create_param_new_name(char *origName);
+//_aetGenNewParamPrefix_atcs取出原来的名字
+char *generic_util_get_orig_param_name(char *newName);
+
 #endif
 

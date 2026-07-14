@@ -513,14 +513,11 @@ void generic_func_parameter_declaration (GenericFunc *self)
                //正在classparser,是否正在解析泛型函数,如果是，应该有泛型函数的genericmode
                if(class_parser_is_parsering(class_parser_get())){
                   funcGen= class_parser_get_func_generic_mode(class_parser_get());
-                 // printf("取fungen----%p\n",funcGen);
                }else if(aet_parser_get()->isAet){
-                 // printf("取fungen---xxx-%p\n",funcGen);
                   funcGen= class_impl_get_func_generic_mode(class_impl_get());
                }
             }
             char *genericStr=IDENTIFIER_POINTER(cur->value);
-            //printf("泛型函数中有吗xxx: %s %p %p\n",genericStr,funcGen,current_function_decl);
             nboolean find=generic_model_include_decl_by_str(funcGen ,genericStr);
             if(!find){
                find=generic_model_include_decl_by_str(belongGen,genericStr);

@@ -196,6 +196,89 @@ static char *createModelDirective(char *funcUnitsForCompile,char *classUnitsForC
       n_string_append(codes,classUnitsForCompile);
    return n_string_free(codes,FALSE);
 }
+
+/**
+ * 代码如下:
+ *  void _int_0_Abc__gen_block_func_0(Abc * self,aet_generic_T _aetGenNewParamPrefix_atcs)
+ {
+T atcs=*((T *)_aetGenNewParamPrefix_atcs);
+ T x = acts * 5 ; printf ( "vvv :%d\n" , x ) ;
+ paramsStr=Abc * self,aet_generic_T * _aetGenNewParamPrefix_atcs
+ 经过replaceParams 变成如下
+ T atcs=*((T *)_aetGenNewParamPrefix_atcs);
+
+ }
+ */
+static char * replaceParams(GenericObj *genObj,char *paramsStr)
+{
+   if(paramsStr==NULL)
+      return NULL;
+   char **items=n_strsplit(paramsStr,",",-1);
+   int len=n_strv_length(items);
+   int i,j;
+   NString *restoreParam=n_string_new("");
+   for(i=0;i<len;i++){
+      char *param=items[i];
+      if(param!=NULL && generic_util_start_with_generic(param)){
+         int strSize=strlen(param);
+         char *genericType= generic_util_get_start_with_generic(param);
+         int pointer=0;
+         for(j=strlen(genericType);i<strSize;j++){
+            if(param[j] ==' ')
+               continue;
+            else if(param[j]=='*'){
+               pointer++;
+            }else
+               break;
+         }
+         //获取变量名
+         char varName[512];
+         strncpy(varName,param+j,strSize-j);
+         varName[strSize-j] ='\0';
+         char *origName=generic_util_get_orig_param_name(varName);
+         if(origName==NULL){
+            n_error("泛型块函数中的参数:%s不是有效的名字，报告此错误！\n",varName);
+            return;
+         }
+           //printf("formatGenericUnitForCompile --- %p %p %d\n",obj,obj->origModel,obj->infoLen);
+           for(j=0;j<genObj->infoLen;j++){
+              RunGenericInfo *info=genObj->infos[j];
+              char *gname=genObj->origModel->genUnits[j]->name;
+              if(endswith(genericType,gname)){
+                 n_string_append(restoreParam,gname);
+                 n_string_append(restoreParam," ");
+                 if(pointer==1)
+                    n_string_append(restoreParam,"*");
+                 else if(pointer==2)
+                    n_string_append(restoreParam,"**");
+                 else if(pointer==3)
+                    n_string_append(restoreParam,"***");
+                 n_string_append(restoreParam,origName);
+                 n_string_append(restoreParam,"=");
+                 if(info->genUnit->pointerCount==0){
+                     if(pointer==0)
+                        n_string_append_printf(restoreParam,"*((%s *)%s)",gname,varName);
+                     else
+                        n_string_append_printf(restoreParam,"(%s *)%s",gname,varName);
+
+                 }else{
+                    n_string_append_printf(restoreParam,"(%s *)%s",gname,varName);
+
+                 }
+                 n_string_append(restoreParam,";\n");
+              }
+              n_debug("replaceParams info -- is:j:%d %s %s %d %d\n",
+                    j,gname,info->genUnit->name,info->genUnit->pointerCount,info->genUnit->size);
+
+           }
+      }
+   }
+   if(restoreParam->len==0){
+      n_string_free(restoreParam,TRUE);
+      return NULL;
+   }
+   return n_string_free(restoreParam,FALSE);
+}
 /**
 * 生成泛型块函数
 * 重要的是两个地方
@@ -208,13 +291,17 @@ static char *createModelDirective(char *funcUnitsForCompile,char *classUnitsForC
   }
 *
 */
-static char *createBlockFuncCode(GenericBlock *block,char *newFuncName)
+static char *createBlockFuncCode(GenericObj *genObj,GenericBlock *block,char *newFuncName)
 {
    NString *codes=n_string_new("");
+   char *replace= replaceParams(genObj,block->parms);
+
    n_string_append_printf(codes," %s ",block->returnType);
    n_string_append(codes,newFuncName);
    n_string_append_printf(codes,"(%s)\n",block->parms);
    n_string_append(codes," {\n");
+   if(replace!=NULL)
+      n_string_append(codes,replace);
    n_string_append_printf(codes,"%s\n",block->body);
    n_string_append(codes," }\n");
    n_debug("生成确定的泛型块函数 源代码是:\n%s\n",codes->str);
@@ -258,7 +345,7 @@ static char *createCodesForGenfunc(GenericObj *funObj,GenericInfo *info,
 
          if(block->isFuncGeneric && !strcmp(block->belongFunc,funObj->callee->mangleFunName)){
             char *newFuncName=createFuncName(block->name,funcDefineUnits,NULL);
-            char *funcdefine=createBlockFuncCode(block,newFuncName);
+            char *funcdefine=createBlockFuncCode(funObj,block,newFuncName);
             n_string_append(codes,funcdefine);
             n_string_append(codes,"\n");
             gcc_assert(block->index==i);
@@ -287,7 +374,7 @@ static char *createCodesForGenfunc(GenericObj *funObj,GenericInfo *info,
                   n_string_append_printf(codes,"%s %d \n",RID_AET_GOTO_STR,GOTO_ENTER_COMPILE_GENERIC_BLOCK_FUNC);
                   n_string_append_printf(codes,"\"%s\"\n",directive);
                   char *newFuncName=createFuncName(block->name,funcDefineUnits,defineClassObjUnits);
-                  char *funcdefine=createBlockFuncCode(block,newFuncName);
+                  char *funcdefine=createBlockFuncCode(funObj,block,newFuncName);
                   n_string_append(codes,funcdefine);
                   n_string_append(codes,"\n");
                   gcc_assert(block->index==i);
@@ -347,7 +434,7 @@ static char *createCodesForClass(GenericObj *classGenObj,GenericInfo *info,NPtrA
          n_string_append_printf(codes,"\"%s\"\n",directive);
       }
       char *newFuncName=createFuncName(block->name,NULL,classDefineUnits);
-      char *blockFuncCode=createBlockFuncCode(block,newFuncName);
+      char *blockFuncCode=createBlockFuncCode(classGenObj,block,newFuncName);
       n_string_append_printf(codes,"%s\n\n",blockFuncCode);
       gcc_assert(block->index==i);
       BlockFuncIndex *bi=createBlockFuncIndex(newFuncName,blockAtClassName,classDefineUnits,NULL,block->index);

@@ -1022,7 +1022,7 @@ struct c_expr class_impl_replace_func_id(ClassImpl *self,struct c_expr expr,vec<
          }
          tree id=aet_utils_create_ident(funName);
          tree value=implicitly_call_call_skip_builtin(self->implicitlyCall,expr_loc/*!DECL_SOURCE_LOCATION(func)*/,id);
-         printf("class_impl_replace_func_id 55aa 有函数但没找到匹配的 作implicitly处理，funcName:%s %s\n",funName,in_fnames[0]);
+         n_debug("class_impl_replace_func_id 55aa 有函数但没找到匹配的 作implicitly处理，funcName:%s %s\n",funName,in_fnames[0]);
          if(aet_utils_valid_tree(value)){
             selectFunc->implicitlyFunc=TRUE;//是一个隐藏函数
          }else{

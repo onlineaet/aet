@@ -29,8 +29,8 @@ package$ aet.util;
 typedef struct _AHashTablePriv AHashTablePriv;
 
 public$ class$ HashIter{
-	  void  *hashTable;
-	  aint   position;
+   void  *hashTable;
+   aint   position;
 };
 
 public$ class$ AHashTable{

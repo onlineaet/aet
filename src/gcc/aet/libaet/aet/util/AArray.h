@@ -18,8 +18,8 @@
  * AET was originally developed  by the zclei@sina.com
  */
 
-#ifndef __AET_UTIL_A_VECTOR_H__
-#define __AET_UTIL_A_VECTOR_H__
+#ifndef __AET_UTIL_A_ARRAY_H__
+#define __AET_UTIL_A_ARRAY_H__
 
 #include "../../aet.h"
 

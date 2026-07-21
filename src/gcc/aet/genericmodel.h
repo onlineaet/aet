@@ -63,6 +63,7 @@ struct _GenericModel
 	GenericUnit  *genUnits[5];
 	GenericFrom from;
 	char toString[255];
+   char toString_1[255];
 };
 
 
@@ -88,6 +89,7 @@ void          generic_model_free(GenericModel *self);
 nboolean      generic_model_exits_ident(GenericModel *self,char *genIdent);
 nboolean      generic_model_have_query(GenericModel *self);
 char         *generic_model_tostring(GenericModel *self);
+char         *generic_model_tostring_1(GenericModel *self);//指针形式 int **
 GenericModel *generic_model_create_default(GenericModel *self);
 GenericModel *generic_model_merge(GenericModel *self,GenericModel *other);
 nboolean      generic_model_exits_unit(GenericModel *self,GenericUnit *unit);

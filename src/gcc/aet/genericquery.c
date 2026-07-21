@@ -155,6 +155,13 @@ static tree getFieldInfo(tree field,char *fN,tree *lastField)
                 tree func=TREE_OPERAND (field, 0);
                 if(TREE_CODE(func)==FUNCTION_DECL){
                     GenericModel *mm=c_aet_get_generics_model(func);
+                    if(mm==NULL){
+                       //看看返回值是不是有泛型
+                       tree rtn=TREE_TYPE(TREE_TYPE(func));
+                       GenericModel *genModel=c_aet_get_generics_model(rtn);
+                       printf("是不是有泛型:%s\n",generic_model_tostring(genModel));
+                       aet_print_tree(rtn);
+                    }
                     n_debug("在genericquery.c getFieldInfo mode iss model:%s\n",generic_model_tostring(mm));
                     field=func;
                 }
@@ -690,7 +697,8 @@ static int findDeclAtClassOrGenericFunc(GenericModel *model,GenericUnit *dest)
  * from 来自泛型函数还是泛型类
  * 检查声明的返回值。如果没有错,再与实际的返回值比较。
  */
-static nboolean checkRhsModel(tree initOrRhs,char *fieldName,GenericModel *rhsModel,char *errorInfo,int *from,nboolean isCast)
+static nboolean checkRhsModel(tree initOrRhs,char *fieldName,GenericModel *rhsModel,
+      char *errorInfo,int *from,nboolean isCast)
 {
    if(TREE_CODE(initOrRhs)==CALL_EXPR){
        //取变量
@@ -700,7 +708,8 @@ static nboolean checkRhsModel(tree initOrRhs,char *fieldName,GenericModel *rhsMo
        GenericModel *classGenDefine=getClassGenDefine(caller);//调用函数的变量定义的泛型类型
        GenericModel *funcGenDecl=getGenericFuncDecl(fieldName);
        GenericModel *funcGenDefine=getGenericFuncDefine(fn);
-       n_debug("4个泛型:class:%s %s genfunc:%s %s\n",generic_model_tostring(classGenDecl),generic_model_tostring(classGenDefine),
+       n_debug("4个泛型:class:%s %s genfunc:%s %s\n",generic_model_tostring(classGenDecl),
+             generic_model_tostring(classGenDefine),
                generic_model_tostring(funcGenDecl),generic_model_tostring(funcGenDefine));
        if(classGenDecl && classGenDefine==NULL)
            classGenDefine=classGenDecl;
@@ -830,6 +839,7 @@ void  generic_query_check_var_and_parm(GenericQuery *self,tree decl,tree initOrR
        tree type=getFieldInfo(initOrRhs,fieldName,&last);
        n_debug("generic_query_check_var_and_parm 00 变量:%s的泛型声明是:%s initOrRhs:%s type:%p\n",
                      name,generic_model_tostring(lhsModel),get_tree_code_name(TREE_CODE(initOrRhs)),type);
+       aet_print_tree(initOrRhs);
        if(!aet_utils_valid_tree(type))
           return;
        location_t loc=input_location;
@@ -837,10 +847,12 @@ void  generic_query_check_var_and_parm(GenericQuery *self,tree decl,tree initOrR
            loc=EXPR_LOCATION(initOrRhs);
        if(DECL_P(initOrRhs))
            loc=DECL_SOURCE_LOCATION(initOrRhs);
-
+       printf("fieldName --- %s\n",fieldName);
+       aet_print_tree(type);
        GenericModel *rhsModel=c_aet_get_generics_model(last);//声明的返回值泛型
        n_debug("generic_query_check_var_and_parm 11 变量:%s的泛型声明是:%s initOrRhs:%s rhsModel:%p\n",
                          name,generic_model_tostring(lhsModel),get_tree_code_name(TREE_CODE(initOrRhs)),rhsModel);
+       aet_print_tree(last);
        if(rhsModel==NULL){
            if(TREE_CODE(last)==VAR_DECL || TREE_CODE(last)==PARM_DECL){
                char *sysName=class_util_get_class_name(TREE_TYPE(last));
@@ -850,7 +862,7 @@ void  generic_query_check_var_and_parm(GenericQuery *self,tree decl,tree initOrR
                }
            }
            if(rhsModel==NULL){
-              printf("generic_query_check_var_and_parm 11 变量:%s的泛型声明是:%s initOrRhs:%s rhsModel:%p\n",
+              printf("generic_query_check_var_and_parm 22 变量:%s的泛型声明是:%s initOrRhs:%s rhsModel:%p\n",
                                       name,generic_model_tostring(lhsModel),get_tree_code_name(TREE_CODE(initOrRhs)),rhsModel);
               aet_print_tree_skip_debug(last);
               aet_print_tree_skip_debug(current_function_decl);
@@ -862,14 +874,16 @@ void  generic_query_check_var_and_parm(GenericQuery *self,tree decl,tree initOrR
            error_at(loc,"变量%qs定义的泛型是%qs,但右值的泛型是:%qs。泛型单元数量不等。",name,generic_model_tostring(lhsModel),generic_model_tostring(rhsModel));
            return;
        }
-       n_debug("generic_query_check_var_and_parm 11 变量:%s的右值泛型声明是:%s fieldName:%s\n",name,generic_model_tostring(rhsModel),fieldName);
+       n_debug("generic_query_check_var_and_parm 33 变量:%s的右值泛型声明是:%s fieldName:%s\n",name,generic_model_tostring(rhsModel),fieldName);
        //检查有没有强转的泛型
        GenericModel *castModel=generic_impl_get_cast_model(generic_impl_get(),initOrRhs);
        nboolean isCast=FALSE;
        if(castModel!=NULL){
-           n_debug("generic_query_check_var_and_parm 22 变量:%s的右值泛型声明是(来自强转的):%s fieldName:%s\n",name,generic_model_tostring(castModel),fieldName);
+           n_debug("generic_query_check_var_and_parm 44 变量:%s的右值泛型声明是(来自强转的):%s fieldName:%s\n",
+                 name,generic_model_tostring(castModel),fieldName);
            if(!generic_model_can_cast(rhsModel,castModel)){
-               error_at(loc,"变量%qs不能强转泛型%qs %qs",name,generic_model_tostring(rhsModel),generic_model_tostring(castModel));
+               error_at(loc,"变量%qs不能强转泛型%qs %qs",
+                     name,generic_model_tostring(rhsModel),generic_model_tostring(castModel));
                return ;
            }
            rhsModel=castModel;
@@ -886,10 +900,19 @@ void  generic_query_check_var_and_parm(GenericQuery *self,tree decl,tree initOrR
        char errorInfo[1024];
        int from=0;
        if(!checkRhsModel(initOrRhs,fieldName,rhsModel,errorInfo,&from,isCast)){
-           error_at(loc,"变量%qs定义的泛型是%qs,但右值的泛型是:%qs。",name,generic_model_tostring(lhsModel),generic_model_tostring(rhsModel));
+           //再一次检查，右边是确定的类型，变量也是确定睥类型，主为是相同的。
+           if(generic_model_equal(lhsModel,rhsModel)
+                 &&  !generic_model_have_query(lhsModel)
+                 &&  generic_model_get_undefine_count(lhsModel)==0){
+              printf("完全相同的----- %s\n",generic_model_tostring_1(rhsModel));
+              //如果两个相同并且都是定义类型
+              return;
+           }
+           error_at(loc,"变量%qs定义的泛型是%qs,但右值的泛型是:%qs。",
+                 name,generic_model_tostring_1(lhsModel),generic_model_tostring_1(rhsModel));
            return;
        }
-       n_debug("generic_query_check_var_and_parm  33 %s\n",generic_model_tostring(lhsModel));
+       n_debug("generic_query_check_var_and_parm  55 %s\n",generic_model_tostring(lhsModel));
        int i;
        for(i=0;i<generic_model_get_count(lhsModel);i++){
            GenericUnit *lhsUnit=generic_model_get(lhsModel,i);

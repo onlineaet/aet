@@ -577,19 +577,43 @@ nboolean generic_model_have_query(GenericModel *self)
 	return FALSE;
 }
 
+/**
+ * 返回泛型的字符串
+ */
+char  *generic_model_tostring_1(GenericModel *self)
+{
+   if(self==NULL)
+      return NULL;
+   NString *codes=n_string_new("");
+   int i,j;
+   for(i=0;i<self->unitCount;i++){
+      GenericUnit *unit=self->genUnits[i];
+      n_string_append(codes,unit->name);
+      if(unit->pointerCount>0)
+         n_string_append_c(codes,' ');
+      for(j=0;j<unit->pointerCount;j++)
+         n_string_append(codes,"*");
+      if(i<self->unitCount-1)
+         n_string_append_c(codes,',');
+   }
+   sprintf(self->toString_1,"%s",codes->str);
+   n_string_free(codes,TRUE);
+   return self->toString_1;
+}
+
 char  *generic_model_tostring(GenericModel *self)
 {
-	   if(self==NULL)
-			return NULL;
-		NString *codes=n_string_new("");
-		int i;
-		for(i=0;i<self->unitCount;i++){
-			GenericUnit *unit=self->genUnits[i];
-			n_string_append_printf(codes,"%s_%d,",unit->name,unit->pointerCount);
-		}
-		sprintf(self->toString,"%s",codes->str);
-		n_string_free(codes,TRUE);
-		return self->toString;
+   if(self==NULL)
+      return NULL;
+   NString *codes=n_string_new("");
+   int i;
+   for(i=0;i<self->unitCount;i++){
+      GenericUnit *unit=self->genUnits[i];
+      n_string_append_printf(codes,"%s_%d,",unit->name,unit->pointerCount);
+   }
+   sprintf(self->toString,"%s",codes->str);
+   n_string_free(codes,TRUE);
+   return self->toString;
 }
 
 
@@ -847,6 +871,15 @@ nboolean generic_model_can_cast(GenericModel *self,GenericModel *dest)
     for(i=0;i<self->unitCount;i++){
         GenericUnit *unit1=self->genUnits[i];
         GenericUnit *unit2=dest->genUnits[i];
+        //如果两个都是声明，但符号相同，不能转化
+        if(generic_unit_is_undefine(unit1) && generic_unit_is_undefine(unit2) &&
+              !generic_unit_equal(unit1,unit2))
+           return FALSE;
+        if(!generic_unit_is_undefine(unit1) && !generic_unit_is_undefine(unit2) &&
+                 !generic_unit_equal(unit1,unit2))
+           return FALSE;
+        if(!generic_unit_is_undefine(unit1) && generic_unit_is_undefine(unit2))
+           return FALSE;
     }
     return TRUE;
 }

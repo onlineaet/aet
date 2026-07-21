@@ -48,7 +48,7 @@ tree generic_call_check_parm(GenericCall *self,location_t ploc, tree function, t
                     bool excess_precision, int warnopt,ClassName *globalClassName,GenericModel *globalGenericsDefine);
 
 
-tree generic_call_replace_parm_new(GenericCall *self,location_t ploc, tree function, tree fundecl,
+tree generic_call_replace_parm(GenericCall *self,location_t ploc, tree function, tree fundecl,
                         tree type, tree origtype, tree val, tree valtype,
                         bool npc, tree rname, int parmnum, int argnum,
                         bool excess_precision, int warnopt,ClassName *globalClassName,GenericModel *globalGenericsDefine);

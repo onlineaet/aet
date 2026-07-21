@@ -88,6 +88,52 @@ static GenericUnit *getGenericRealType(ClassName *className,GenericModel *generi
     return genericsdefine->genUnits[index];
 }
 
+/**
+ * 内部检查是实参否能转化到形参的类型。
+ */
+static tree internelConvert(tree realGenericType,tree realParmType,tree val)
+{
+   enum tree_code codel= TREE_CODE(realGenericType);
+    enum tree_code coder = TREE_CODE (realParmType);
+    tree rhstype = realParmType;
+    tree rhs = val;
+    if (coder == ERROR_MARK)
+       return error_mark_node;
+    if (TYPE_MAIN_VARIANT (realGenericType) == TYPE_MAIN_VARIANT (rhstype)){
+       return val;
+    }
+    if (coder == VOID_TYPE){
+       return error_mark_node;
+    }
+
+   if (codel == REFERENCE_TYPE && coder != REFERENCE_TYPE){
+        if (!lvalue_p (rhs)){
+           return error_mark_node;
+        }
+        if (!c_mark_addressable (rhs))
+           return error_mark_node;
+        n_debug("泛型参数检查 left=REFERENCE_TYPE coder != REFERENCE_TYPE");
+        return rhs;
+     }
+     /* Some types can interconvert without explicit casts.  */
+     else if (codel == VECTOR_TYPE && coder == VECTOR_TYPE
+     && vector_types_convertible_p (realGenericType, realParmType, true)){
+        n_debug("泛型参数检查 left=VECTOR_TYPE right == VECTOR_TYPE\
+               vector_types_convertible_p (realGenericType, realParmType, true)=true");
+        return rhs;
+     /* Arithmetic types all interconvert, and enum is treated like int.  */
+     }else if ((codel == INTEGER_TYPE || codel == REAL_TYPE
+     || codel == FIXED_POINT_TYPE
+     || codel == ENUMERAL_TYPE || codel == COMPLEX_TYPE
+     || codel == BOOLEAN_TYPE || codel == BITINT_TYPE)
+     && (coder == INTEGER_TYPE || coder == REAL_TYPE
+     || coder == FIXED_POINT_TYPE
+     || coder == ENUMERAL_TYPE || coder == COMPLEX_TYPE
+     || coder == BOOLEAN_TYPE || coder == BITINT_TYPE)){
+        n_debug("泛型参数检查 left=数字 coder == 数字");
+        return rhs;
+     }
+}
 
 /**
  * setData(E value)
@@ -99,43 +145,45 @@ static tree convertGeneric_1(tree realGenericType,location_t ploc, tree function
                         bool npc, tree rname, int parmnum, int argnum,
                         bool excess_precision, int warnopt,nboolean replace)
 {
-//      printf("convertGeneric 00 打印泛型定义\n");
-//      aet_print_tree(realGenericType);
-//      printf("convertGeneric 11 打印等待转化的表达式\n");
-//      aet_print_tree(val);
-//      printf("convertGeneric 22 打印泛型的void *类型可能是aet_generic_T，aet_generic_E等\n");
-//      aet_print_tree(type);
-        location_t loc=ploc;
-        tree parmval=error_mark_node;
-        tree realParmType=valtype;
-        //printf("convertGeneric 33 --从实参转为用户设的类型:%s\n",get_tree_code_name(TREE_CODE(realParmType)));
-       // aet_print_tree(realParmType);
-        if(TREE_CODE(realGenericType)==POINTER_TYPE){
-            //printf("convertGeneric 44 --泛型定义是一个指针:\n");
-            if(TREE_CODE(realParmType)!=POINTER_TYPE){
-                inform(loc,"泛型定义为指针%qE，但实参%qE类型并不是指针。",realGenericType,realParmType);
-                n_warning("泛型定义为指针，但实参类型并不是指针。");
-                return parmval;
-            }else{
-                //inform(loc,"泛型定义为指针%qE，实参%qE类型也是指针。",realGenericType,realParmType);
-                return val;
-            }
-        }
-        if(TREE_CODE(realParmType)==POINTER_TYPE){
-            inform(loc,"泛型定义不是指针%qE，但实参%qE类型是指针。直接返回参数:%qE",realGenericType,realParmType,val);
-            return val;
-        }
-        //如果需要转化，再转化一次，否则返回由系统转
-        //n_debug("convertGeneric 77 打印void *\n");
-        //1.val转定义的泛型(realGenericType=int或其它） 2.转化后的实参再转成type类型 type=void *=a_generic_E
+//   printf("convertGeneric 00 打印泛型定义\n");
+//   aet_print_tree(realGenericType); //泛型定义
+//   printf("convertGeneric 11 打印等待转化的表达式\n");
+//   aet_print_tree(val); //实参
+//   printf("convertGeneric 22 打印泛型的void *类型可能是aet_generic_T，aet_generic_E等\n");
+//   aet_print_tree(type);//函数声明的类型setdata(E data) E 是 aet_generic_E void *
+   location_t loc=ploc;
+   tree parmval=error_mark_node;
+   tree realParmType=valtype;//实参类型
+   //printf("convertGeneric 33 --从实参转为用户设的类型:%s\n",get_tree_code_name(TREE_CODE(realParmType)));
+   //aet_print_tree(realParmType);
+   if(TREE_CODE(realGenericType)==POINTER_TYPE){
+      //printf("convertGeneric 44 --泛型定义是一个指针:\n");
+      if(TREE_CODE(realParmType)!=POINTER_TYPE){
+         inform(loc,"泛型定义为指针%qE，但实参%qE类型并不是指针。",realGenericType,realParmType);
+         n_warning("泛型定义为指针，但实参类型并不是指针。");
+         return parmval;
+      }else{
+         //inform(loc,"泛型定义为指针%qE，实参%qE类型也是指针。",realGenericType,realParmType);
+         return val;
+      }
+   }
+   if(TREE_CODE(realParmType)==POINTER_TYPE){
+      error_at(loc,"泛型定义不是指针%qE，但实参%qE类型是指针。直接返回参数:%qE",realGenericType,realParmType,val);
+      return val;
+   }
 
-          parmval = aet_convert_argument (ploc, function, fundecl, realGenericType, origtype,val, valtype, npc, rname, parmnum, argnum,
-                               excess_precision, warnopt);
-          if(parmval==error_mark_node)
-             return parmval;
-          aet_print_tree(parmval);
-          parmval= generic_convert(ploc,type,parmval,replace);
-          return parmval;
+
+   //如果需要转化，再转化一次，否则返回由系统转
+   //n_debug("convertGeneric 77 打印void *\n");
+   //1.val转定义的泛型(realGenericType=int或其它） 2.转化后的实参再转成type类型 type=void *=a_generic_E
+
+   parmval = aet_convert_argument (ploc, function, fundecl, realGenericType,
+         origtype,val, valtype, npc, rname, parmnum, argnum, excess_precision, warnopt);
+   if(parmval==error_mark_node)
+      return parmval;
+   aet_print_tree(parmval);
+   parmval= generic_convert(ploc,type,parmval,replace);
+   return parmval;
 
 }
 
@@ -148,13 +196,11 @@ static tree convertGeneric_1(tree realGenericType,location_t ploc, tree function
  * 不要抛出例外。只是选择函数时所用。
  * 处于函数选择的状态static CheckParamCallback *checkParamCallback！=NULL;
  */
-//tree  generic_call_check_parm(GenericCall *self,location_t loc,tree function,tree origGenericDecl,tree val,
- //       nboolean npc,nboolean excessrecision,ClassName *globalClassName,GenericModel *globalGenericsDefine)
-//{
 tree generic_call_check_parm(GenericCall *self,location_t ploc, tree function, tree fundecl,
                         tree type, tree origtype, tree val, tree valtype,
                         bool npc, tree rname, int parmnum, int argnum,
-                        bool excess_precision, int warnopt,ClassName *globalClassName,GenericModel *globalGenericsDefine)
+                        bool excess_precision, int warnopt,
+                        ClassName *globalClassName,GenericModel *globalGenericsDefine)
 {
     char *str=NULL;
     tree origGenericDecl=type;
@@ -163,7 +209,7 @@ tree generic_call_check_parm(GenericCall *self,location_t ploc, tree function, t
     tree realGenericType;
     char *funName=IDENTIFIER_POINTER(DECL_NAME(function));
     str=generic_util_get_generic_str(origGenericDecl);
-    n_debug("generic_call_check_param --00 如果找不到泛型字符,返回str:%s globalClassName:%s function:%p %s\n",
+    n_debug("generic_call_check_param 00 如果找不到泛型字符,返回str:%s globalClassName:%s function:%p %s\n",
             str,globalClassName->sysName,function,funName);
     aet_print_tree(origGenericDecl);
     if(str==NULL){
@@ -174,7 +220,8 @@ tree generic_call_check_parm(GenericCall *self,location_t ploc, tree function, t
         tree valtype=TREE_TYPE(val);
         bool equal=c_tree_equal (origGenericDecl,valtype);
         char *varStr=generic_util_get_generic_str(valtype);
-        n_info("generic_call_check_param --11 在类实现中调用带有泛型参数的方法。这时类没有实例化。所以无泛型定义。%s 相等吗：？:%d %s",str,equal,varStr);
+        n_info("generic_call_check_param 11 在类实现中调用带有泛型参数的方法。这时类没有实例化。所以无泛型定义。%s 相等吗：？:%d %s",
+              str,equal,varStr);
         if(equal && varStr!=NULL && !strcmp(str,varStr)){
              n_free(str);
              n_free(varStr);
@@ -224,11 +271,11 @@ tree generic_call_check_parm(GenericCall *self,location_t ploc, tree function, t
            n_debug("generic_call_check_param --66 真正的泛型定义类型如下：参数是不是aet_void_E等：%s\n",parmTypeStr);
            if(parmTypeStr!=NULL && generic_util_is_generic_ident(parmTypeStr)){
                 char *typeName=generic_util_get_type_str(genericParm->decl);
-                error_at(loc,"类%qs定义的泛型是%qs，但参数是%qs,不匹配。",globalClassName?globalClassName->userName:"null",typeName,str);
+                error_at(loc,"类%qs定义的泛型是%qs，但参数是%qs,不匹配。",
+                      globalClassName?globalClassName->userName:"null",typeName,str);
                 return parmval;
            }
            realGenericType=TREE_TYPE(genericParm->decl);
-          // parmval=convertGeneric(loc,function,realGenericType,origGenericDecl,val,npc,excessrecision,FALSE);
            parmval=convertGeneric_1(realGenericType,ploc, function,  fundecl,type,  origtype,  val,
                              valtype, npc,rname,parmnum,argnum, excess_precision,warnopt,FALSE);
            n_free(str);
@@ -238,7 +285,6 @@ tree generic_call_check_parm(GenericCall *self,location_t ploc, tree function, t
        //printf("generic_call_check_param --77 泛型函数的泛型定义类型就是实参的类型：\n");
        tree realGenericType=TREE_TYPE(val);
        aet_print_tree(realGenericType);
-      // parmval=convertGeneric_1(loc,function,realGenericType,origGenericDecl,val,npc,excessrecision,FALSE);
        parmval=convertGeneric_1(realGenericType,ploc,  function,  fundecl,type,  origtype,  val,
                valtype, npc,  rname,  parmnum,  argnum, excess_precision,  warnopt,FALSE);
        n_free(str);
@@ -249,142 +295,7 @@ tree generic_call_check_parm(GenericCall *self,location_t ploc, tree function, t
 /**
  * 把泛型对应的参数转换后，替换向量中的实参
  */
-//int  generic_call_replace_parm(GenericCall *self,location_t ploc,tree function,vec<tree, va_gc> *values,
-//        ClassName *globalClassName,GenericModel *globalGenericsDefine)
-//{
-//    tree  funcType = TREE_TYPE (function);
-//    int count=0;
-//    int varargs_p = 1;
-//    for (tree al = TYPE_ARG_TYPES (funcType); al; al = TREE_CHAIN (al)){
-//        tree type=TREE_VALUE(al);
-//        if(type == void_type_node){
-//            varargs_p=0;
-//            break;
-//        }
-//        count++;
-//    }
-//    int tt=type_num_arguments (funcType);
-//   // printf("generic_call_replace_parm xx 不替换，参数个数不匹配! 形参：%d %d 实参:%d varargs_p:%d %p\n",count,tt,values->length(),varargs_p,values);
-//
-//    if(count!=values->length() && varargs_p==0){
-//     // printf("generic_call_replace_parm 00 不替换，参数个数不匹配! 形参：%d 实参:%d\n",count,values->length());
-//     // printf("generic_call_replace_parm 00 不替换，参数个数不匹配! 形参：%d %d 实参:%d\n",count,tt,values->length());
-//      return -1;
-//    }
-//    int replaceCount=0;
-//    bool type_generic_overflow_p = false;
-//    bool type_generic_remove_excess_precision = false;
-//    const bool type_generic=FALSE;
-//    tree builtin_typelist = NULL_TREE;
-//    unsigned int parmnum;
-//    tree typelist=TYPE_ARG_TYPES (funcType);
-//    tree typetail, builtin_typetail, val;
-//    for (typetail = typelist,builtin_typetail = builtin_typelist,parmnum = 0; values && values->iterate (parmnum, &val);++parmnum){
-//            /* The type of the function parameter (if it was declared with one).  */
-//           tree type = typetail ? TREE_VALUE (typetail) : NULL_TREE;
-//            /* The type of the built-in function parameter (if the function
-//           is a built-in).  Used to detect type incompatibilities in
-//           calls to built-ins declared without a prototype.  */
-//           tree builtin_type = (builtin_typetail ? TREE_VALUE (builtin_typetail) : NULL_TREE);
-//            /* The original type of the argument being passed to the function.  */
-//           tree valtype = TREE_TYPE (val);
-//            /* The called function (or function selector in Objective C).  */
-//           tree rname = function;
-//           int argnum = parmnum + 1;
-//           const char *invalid_func_diag;
-//           /* Set for EXCESS_PRECISION_EXPR arguments.  */
-//           bool excess_precision = false;
-//           /* The value of the argument after conversion to the type
-//            of the function parameter it is passed to.  */
-//           tree parmval;
-//
-//
-////          printf("generic_conv_replace_param 44 进入循环 parmnum:%d type:%p type:%s \n",
-////                     parmnum,type,(type  && type!=error_mark_node)?get_tree_code_name(TREE_CODE(type)):"null");
-////          printf("generic_conv_replace_param 44-- 进入循环 parmnum:%d val %p val:%s \n",
-////                             parmnum,val,(val!=NULL_TREE && val  && val!=error_mark_node)?get_tree_code_name(TREE_CODE(val)):"null");
-////          printf("generic_conv_replace_param 44--xx 进入循环  val %p reftype:%p \n",val,TREE_TYPE(val));
-//
-//           if (type == void_type_node){
-//              printf("generic_call_replace_parm 11 进入循环 错误 type == void_type_node 直接返回 parmnum:%d\n",parmnum);
-//              return  -1 ;
-//           }
-//           if (builtin_type == void_type_node){
-//
-//              //printf("generic_conv_replace_param 66 进入循环 错误 builtin_type == void_type_node parmnum:%d  %s %s %d\n",
-//                //             parmnum,__FILE__,__FUNCTION__,__LINE__);
-//              builtin_typetail = NULL_TREE;
-//           }
-//
-//
-//          /* Determine if VAL is a null pointer constant before folding it.  */
-//           bool npc = null_pointer_constant_p (val);
-//
-//              /* If there is excess precision and a prototype, convert once to
-//             the required type rather than converting via the semantic
-//             type.  Likewise without a prototype a float value represented
-//             as long double should be converted once to double.  But for
-//             type-generic classification functions excess precision must
-//             be removed here.  */
-//           if (TREE_CODE (val) == EXCESS_PRECISION_EXPR && (type || !type_generic || !type_generic_remove_excess_precision)){
-//              val = TREE_OPERAND (val, 0);
-//              excess_precision = true;
-//           }
-//           tree tempval = aet_c_fully_fold (val, false, NULL);
-//           //printf(" generic_conv_replace_param aet_c_fully_fold 改变了吗? tempval:%p val:%p %d\n",tempval,val,tempval==val);
-//           val=tempval;
-//           STRIP_TYPE_NOPS (val);
-//           val = aet_require_complete_type (ploc, val);
-//           if(val==error_mark_node)
-//               return -1;
-//
-//           if (type != NULL_TREE){
-//              nboolean isGenericType=generic_util_is_generic_pointer(type);
-//              n_debug("generic_conv_replace_param 22  parmnum:%d  是不是泛型:%d\n",parmnum,isGenericType);
-//              aet_print_tree(type);
-//              if(isGenericType){
-//                char *str=generic_util_get_generic_str(type);
-//                n_debug("generic_conv_replace_param 33 泛型声明是: %s\n",str);
-//                if(str!=NULL){
-//                    GenericUnit *genericParm=getGenericRealType(globalClassName,globalGenericsDefine,str);
-//                    if(genericParm && genericParm->isDefine){
-//                        tree realGenericType=TREE_TYPE(genericParm->decl);
-//                        parmval=convertGeneric(ploc,function,realGenericType,type,val,npc,excess_precision,TRUE);
-//                        n_debug("generic_conv_replace_param 44 是一个泛型对象，类型就是对象创建时所定义的类型 %s parmnum:%d ok:%d\n",str,parmnum,parmval!=error_mark_node);
-//                        if(parmval==error_mark_node)
-//                            return -1;
-//                        aet_print_tree(parmval);
-//                        (*values)[parmnum] = parmval;
-//                        replaceCount++;
-//                    }else{
-//                        GenericModel *funcGen=c_aet_get_func_generics_model(function);
-//                        if(funcGen){
-//                           tree realGenericType=TREE_TYPE(val);
-//                           n_debug("generic_conv_replace_param ----realGenericType。");
-//                           parmval=convertGeneric(ploc,function,realGenericType,type,val,npc,excess_precision,TRUE);
-//                           n_debug("generic_conv_replace_param 55 是一个泛型函数，类型就用实参的类型 %s parmnum:%d ok:%d\n",str,parmnum,parmval!=error_mark_node);
-//                           if(parmval==error_mark_node)
-//                                return -1;
-//                           (*values)[parmnum] = parmval;
-//                           replaceCount++;
-//                        }
-//                    }
-//                    n_free(str);
-//                }
-//              }
-//           }
-//           n_debug("generic_conv_replace_param 66 进入循环  结束一次循环 typetail:%p builtin_typetail:%p parmnum:%d\n",
-//                   typetail, builtin_typetail,parmnum);
-//           if (typetail)
-//              typetail = TREE_CHAIN (typetail);
-//           if (builtin_typetail)
-//              builtin_typetail = TREE_CHAIN (builtin_typetail);
-//    }//end for
-//
-//    return replaceCount;
-//}
-
-tree generic_call_replace_parm_new(GenericCall *self,location_t ploc, tree function, tree fundecl,
+tree generic_call_replace_parm(GenericCall *self,location_t ploc, tree function, tree fundecl,
                         tree type, tree origtype, tree val, tree valtype,
                         bool npc, tree rname, int parmnum, int argnum,
                         bool excess_precision, int warnopt,ClassName *globalClassName,GenericModel *globalGenericsDefine)
@@ -425,29 +336,38 @@ tree generic_call_replace_parm_new(GenericCall *self,location_t ploc, tree funct
 }
 
 /**
+ * 该函数是从componentref找出引用的变量，参数或域中的泛型定义。
+ * 1,无，2.有定义 3.只有泛型声明
  * 当AObject *var=new$ AObject<int>();
  * var->setData(15);
  * 是一个组件引用 componentref，在var中 struct lang_type 保存有泛型的定义int
  * 或：
  * self->var->setData(15)
  * 从INDIRECT_REF中找到COMPONENT_REF
+ * 或
+ * void setData(AArray<int> *ff)
+ * ff是一个参数，并且帯有泛型 int
+ * bug 096,描述了原来没有处理PARAM_DECL引起的错误。
  */
 GenericModel * generic_call_get_generic_from_component_ref(GenericCall *self,tree componentRef)
 {
    if(TREE_CODE (componentRef)!=COMPONENT_REF)
 	   return NULL;
    tree indirect=TREE_OPERAND(componentRef,0);
-   if(TREE_CODE (indirect)!=INDIRECT_REF && TREE_CODE (indirect)!=VAR_DECL)
+   if(TREE_CODE (indirect)!=INDIRECT_REF
+         && TREE_CODE (indirect)!=VAR_DECL
+         && TREE_CODE (indirect)!=PARM_DECL)
 	   return NULL;
+
    tree type=TREE_TYPE(indirect);
    if(TREE_CODE(type)!=RECORD_TYPE)
 	   return NULL;
    tree var=NULL_TREE;
-   if(TREE_CODE (indirect)==VAR_DECL)
+   if(TREE_CODE (indirect)==VAR_DECL || TREE_CODE (indirect)==PARM_DECL)
 	   var=indirect;
    else
 	   var=TREE_OPERAND(indirect,0);
-   if(TREE_CODE(var)!=VAR_DECL && TREE_CODE(var)!=COMPONENT_REF)
+   if(TREE_CODE(var)!=VAR_DECL && TREE_CODE (var)!=PARM_DECL && TREE_CODE(var)!=COMPONENT_REF)
   	   return NULL;
    if(TREE_CODE(var)==COMPONENT_REF){
 	   tree fieldDecl=TREE_OPERAND(var,1);
@@ -457,7 +377,7 @@ GenericModel * generic_call_get_generic_from_component_ref(GenericCall *self,tre
    ClassInfo *info=class_mgr_get_class_info(class_mgr_get(),sysName);
    if(info==NULL)
 	   return NULL;
-   if(TREE_CODE(var)==VAR_DECL || TREE_CODE(var)==FIELD_DECL){
+   if(TREE_CODE(var)==VAR_DECL || TREE_CODE(var)==PARM_DECL || TREE_CODE(var)==FIELD_DECL){
       GenericModel *generic=c_aet_get_generics_model(var);
       return generic;
    }else {

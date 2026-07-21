@@ -94,13 +94,13 @@ static const aint prime_mod [] =
 
 static inline apointer realloc_key_or_value_array (apointer a, auint size, A_GNUC_UNUSED aboolean is_big)
 {
-  return a_renew (apointer, a, size);
+   return a_renew (apointer, a, size);
 }
 
 static inline apointer fetch_key_or_value (apointer a, auint index, aboolean is_big)
 {
-  is_big = TRUE;
-  return is_big ? *(((apointer *) a) + index) : AUINT_TO_POINTER (*(((auint *) a) + index));
+   is_big = TRUE;
+   return is_big ? *(((apointer *) a) + index) : AUINT_TO_POINTER (*(((auint *) a) + index));
 }
 
 static inline void assign_key_or_value (apointer a, auint index, aboolean is_big, apointer v)
@@ -149,7 +149,7 @@ impl$ HashIter{
 
 impl$ AHashTable{
 
-   static void setShift(aint shift){
+   void setShift(aint shift){
 	  priv->size = 1 << shift;
 	  priv->mod  = prime_mod [shift];
 
@@ -160,7 +160,7 @@ impl$ AHashTable{
 	  priv->mask = priv->size - 1;
    }
 
-   static void setupStorage(){
+   void setupStorage(){
 	  setShift (HASH_TABLE_MIN_SHIFT);
 	  priv->have_big_keys = TRUE;
 	  priv->have_big_values = TRUE;
@@ -169,7 +169,7 @@ impl$ AHashTable{
 	  priv->hashes = a_new0 (auint, priv->size);
    }
 
-   static void init(AHashFunc hashFunc,AEqualFunc keyEqualFunc,ADestroyNotify keyDestroyFunc,ADestroyNotify valueDestroyFunc){
+   void init(AHashFunc hashFunc,AEqualFunc keyEqualFunc,ADestroyNotify keyDestroyFunc,ADestroyNotify valueDestroyFunc){
  	   priv=a_malloc(sizeof(AHashTablePriv));
  	   priv->hashFunc=hashFunc ? hashFunc : (AHashFunc)AHashTable.directHash;
  	   priv->keyEqualFunc=keyEqualFunc;
@@ -192,7 +192,7 @@ impl$ AHashTable{
       init(AHashTable.strHash,AHashTable.strEqual,NULL,NULL);
    }
 
-   static inline auint hashToIndex(auint hash){
+   inline auint hashToIndex(auint hash){
      /* Multiply the hash by a small prime before applying the modulo. This
       * prevents the table from becoming densely packed, even with a poor hash
       * function. A densely packed table would have poor performance on
@@ -200,7 +200,7 @@ impl$ AHashTable{
       return (hash * 11) % priv->mod;
    }
 
-   static inline auint lookupNode(aconstpointer  key,auint *hash_return){
+   inline auint lookupNode(aconstpointer  key,auint *hash_return){
       auint node_index;
       auint node_hash;
       auint hash_value;
@@ -246,29 +246,28 @@ impl$ AHashTable{
       return node_index;
    }
 
-   static inline void ensure_keyval_fits (apointer key, apointer value){
+   inline void ensure_keyval_fits (apointer key, apointer value){
       aboolean is_a_set = (priv->keys == priv->values);
       /* Just split if necessary */
       if (is_a_set && key != value)
          priv->values = a_memdup (priv->keys, sizeof (apointer) * priv->size);
    }
 
-   static aint findClosestShift(aint n){
+   aint findClosestShift(aint n){
       aint i;
       for (i = 0; n; i++)
          n >>= 1;
-
       return i;
    }
 
-   static void setShiftFromSize (aint size){
+   void setShiftFromSize (aint size){
       aint shift;
       shift = findClosestShift (size);
       shift = MAX (shift, HASH_TABLE_MIN_SHIFT);
       setShift (shift);
    }
 
-   static void  reallocArrays (aboolean is_a_set){
+   void  reallocArrays (aboolean is_a_set){
       priv->hashes = a_renew (auint, priv->hashes, priv->size);
       priv->keys = realloc_key_or_value_array (priv->keys, priv->size, priv->have_big_keys);
 
@@ -666,26 +665,26 @@ DEFINE_RESIZE_FUNC (resize_set)
    }
 
    aboolean  iterNext(HashIter *iter,apointer *key,apointer *value){
-	  aint position;
+      aint position;
       if(iter->hashTable!=self)
          return FALSE;
-	  a_return_val_if_fail (iter != NULL, FALSE);
-	  a_return_val_if_fail (iter->position < (assize) priv->size, FALSE);
+      a_return_val_if_fail (iter != NULL, FALSE);
+      a_return_val_if_fail (iter->position < (assize) priv->size, FALSE);
       position = iter->position;
       do{
-	        position++;
-	        if (position >= (assize) priv->size){
-	        	iter->position = position;
-	            return FALSE;
-	        }
-	  }while (!HASH_IS_REAL (priv->hashes[position]));
+         position++;
+         if (position >= (assize) priv->size){
+            iter->position = position;
+            return FALSE;
+         }
+      }while (!HASH_IS_REAL (priv->hashes[position]));
 
-	  if (key != NULL)
-	     *key = fetch_key_or_value (priv->keys, position, priv->have_big_keys);
-	  if (value != NULL)
-	     *value = fetch_key_or_value (priv->values, position, priv->have_big_values);
-	  iter->position = position;
-	  return TRUE;
+      if (key != NULL)
+         *key = fetch_key_or_value (priv->keys, position, priv->have_big_keys);
+      if (value != NULL)
+         *value = fetch_key_or_value (priv->values, position, priv->have_big_values);
+      iter->position = position;
+      return TRUE;
    }
 
    void iterInit (HashIter *iter){
@@ -727,7 +726,7 @@ DEFINE_RESIZE_FUNC (resize_set)
    ~AHashTable(){
       removeAllNodes (TRUE, TRUE);
       if (priv->keys != priv->values)
-      a_free (priv->values);
+         a_free (priv->values);
       a_free (priv->keys);
       a_free (priv->hashes);
       a_free(priv);

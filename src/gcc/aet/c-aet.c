@@ -223,6 +223,9 @@ void c_aet_copy_lang(tree dest,tree src)
  	 lang->info.genericsModel=model;
  }
 
+ /**
+  * 设泛型函数的泛型
+  */
  void c_aet_set_func_generics_model(tree dest,void *model)
  {
 	 TreeLangDecl *lang=getTreeLangDeclNeedCreate(dest);

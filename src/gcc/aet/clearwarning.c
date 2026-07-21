@@ -444,8 +444,6 @@ static int  matchTree(tree lhtype,tree rhs,tree origRhType,int errortype)
    return 0;
 }
 
-
-
 /**
  * 如果不是类之间的转换
  * 只支持 void * 转 XXX *
@@ -490,8 +488,6 @@ static int checktype(location_t loc,tree formulaType,tree actualType,int parmnum
          return 0;
       }
    }else if(formulaSysName==NULL || actualSysName==NULL){
-
-
       n_debug("clearwqrning.c 不是AET类之间的转化，由系统处理 %s %s\n",formulaSysName,actualSysName);
       aet_print_tree(formulaType);
       aet_print_tree(actualType);
@@ -530,11 +526,12 @@ int  clear_warning_modify_new(int errtype,location_t loc,tree lhtype,tree rhs,tr
 {
    int  ret =  matchTree(lhtype,rhs,rhstype,errtype);
    n_debug("clear_warning_modify_new 00 errtype:%d ret:%d parmnum:%d needCheck:%d\n",errtype,ret,parmnum,needCheck);
-   aet_print_tree(lhtype);
-   aet_print_tree(rhs);
-   aet_print_tree(rhstype);
+//   aet_print_tree(lhtype);
+//   aet_print_tree(rhs);
+//   aet_print_tree(rhstype);
    if(!needCheck || ret)
       return ret;
+   n_debug("clear_warning_modify_new 11 errtype:%d ret:%d parmnum:%d needCheck:%d\n",errtype,ret,parmnum,needCheck);
    ret = 0;
    pp_markup::element_expected_type e_type (lhtype);
    pp_markup::element_actual_type e_rhstype (rhstype);
@@ -544,15 +541,13 @@ int  clear_warning_modify_new(int errtype,location_t loc,tree lhtype,tree rhs,tr
          ret=checktype(loc,lhtype,rhstype,parmnum,rname,&haveError);
          break;
       case ic_assign:
+         n_debug("clear_warning_modify_new 22 errtype:%d ret:%d parmnum:%d needCheck:%d\n",errtype,ret,parmnum,needCheck);
+
          ret=checktype(loc,lhtype,rhstype,parmnum,rname,&haveError);
          break;
       default:
          break;
    }
    return ret;
-
 }
-
-
-
 

@@ -1847,8 +1847,10 @@ mtcs_label:
          c_parser_error (parser, "泛型只能用在类中。");
       }
    }
-   //n_debug("分析声明说明符 33 解决在 impl 中有修饰如static等声明或定义的泛型函数 static <T> AObject<E> * getCats() funcGenericModel:%p genericDefineModel:%p\n",funcGenericModel);
-   n_debug("分析声明说明符 33：finish_declspecs storage_class:%d genericDefineModel:%p", specs->storage_class,genericDefineModel);
+   //n_debug("分析声明说明符 33 解决在 impl 中有修饰如static等声明或定义的泛型函数 static <T> AObject<E> * getCats()
+   //funcGenericModel:%p genericDefineModel:%p\n",funcGenericModel);
+   n_debug("分析声明说明符 33：finish_declspecs storage_class:%d genericDefineModel:%p",
+         specs->storage_class,genericDefineModel);
    //aet_print_specs(specs);
    bool gnu_auto_type_p = specs->typespec_word == cts_auto_type;
    bool std_auto_type_p = specs->c23_auto_p;
@@ -2248,15 +2250,17 @@ mtcs_label:
                generic_impl_check_var_and_parm(generic_impl_get(),d,init.value);//zclei 10.4.0
                finish_decl (d, init_loc, init.value, init.original_type, asm_name);
                result = d;
-               n_debug("分析声明说明符 111aa 完成带初始化的定义：调用 mtcs_parser_check ");
+               n_debug("分析声明说明符 111aa 完成带初始化的定义：调用 mtcs_parser_check d:%p genericDefineModel:%p",
+                     d,genericDefineModel);
                mtcs_parser_check(mtcs_parser_get(),d,TRUE);//zclei 检查是不是mtcs变量
-
                //如果是aet对象 设变量的对象类名是什么
                if(new_object_ctor(new_object_get(),init_loc,d)){//zclei 10.4.0
                   ;
                }else{
                   if(genericDefineModel){
                      c_aet_set_generics_model(d,genericDefineModel);
+                     GenericModel *mm=c_aet_get_generics_model(d);
+                     printf("进入这里检查泛型----%p %p\n",genericDefineModel,mm);
                      generic_impl_check_var(generic_impl_get(),d,genericDefineModel);
                      generic_query_check_var_and_parm(generic_query_get(),d,init.value);
                   }
@@ -2361,7 +2365,7 @@ mtcs_label:
                if(aetParser->isAet && setFundecl){//zclei
                   ;
                }else{
-                  n_debug("分析声明说明符 120 :为变量设泛型 count:%d %p tree readonly:%p",
+                  n_debug("分析声明说明符 120 :为变量或函数声明设泛型 count:%d %p tree readonly:%p",
                         testcount,TREE_TYPE(d),TREE_READONLY(d));
                   aet_print_tree(d);
                   if(genericDefineModel){//zclei
@@ -2520,6 +2524,12 @@ mtcs_label:
       if(aetParser->isAet && !genericBlockFuncDefine && nested==0){//zclei 10.4.0
          generic_impl_check_and_set_func(generic_impl_get(),fndecl,genericDefineModel,funcGenericModel);
          class_impl_end_function(classImpl,changeNameOk);
+      }else if(!aetParser->isAet && genericDefineModel && nested==0){
+         //区本如下代码 泛型设在函数声明中，代码不是类中函数，是文件内的函数
+         //static  AArray<int> * setdata(){
+         //     return NULL;
+         //}
+         c_aet_set_generics_model(fndecl,genericDefineModel);
       }
       //zclei 检查是否是MTCS函数，如果是进一步检查并加入集合 FALSE 表示没有调用finish_function
       mtcs_parser_check(mtcs_parser_get(),fndecl,FALSE);
@@ -5172,8 +5182,6 @@ static struct c_expr c_parser_initializer (c_parser *parser, tree decl)
    else{
       struct c_expr ret;
       location_t loc = c_parser_peek_token (parser)->location;
-      n_debug("c_parser_initializer ---------00");
-      aet_print_token(c_parser_peek_token (parser));
       ret = c_parser_expr_no_commas (parser, NULL);
       if (decl != error_mark_node && C_DECL_VARIABLE_SIZE (decl)){
          error_at (loc,
@@ -12096,10 +12104,8 @@ static struct c_expr c_parser_postfix_expression_after_primary (c_parser *parser
                   expr.value,selectFunc.classFunc,selectFunc.sucessed,exprlist);//zclei
 
             if(class_func_is_func_generic(selectFunc.classFunc)){
-              // GenericModel *generics=generic_call_get_generic_from_component_ref(generic_call_get(),expr.value);//对象是否有泛型的真实类型.
-             //  GenericModel *funcGenericDefine=c_aet_get_func_generics_model(expr.value);//如果funcGenericDefine是有效的说明这是一个泛型函数
-               //expr.value= generic_call_build_call(generic_call_get(), selectFunc.classFunc,funcGenericDefine,expr_loc,expr.value);
-               expr.value= generic_call_build_call(generic_call_get(), selectFunc.classFunc,defineGenModel,expr_loc,expr.value);
+               expr.value= generic_call_build_call(generic_call_get(), selectFunc.classFunc,
+                     defineGenModel,expr_loc,expr.value);
               // printf("调用泛型函数转为 target_expr 或 bind_expr\n");
               // aet_print_tree(expr.value);
             }

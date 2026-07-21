@@ -655,85 +655,100 @@ void generic_impl_cast_by_token(GenericImpl *self,c_token *token)
 }
 
 /////////////////////////////改为GenericModel
-
+/**
+ * 检查变量或函数声明中的泛型是否合法
+ * Abc<int> abc,Abc<E> *abc
+ * 或
+ * Abc<E> *get();
+ * Abc<int> *get();
+ */
 nboolean  generic_impl_check_var(GenericImpl *self,tree decl,GenericModel *varGen)
 {
-    tree type=TREE_TYPE(decl);
-	char *genericStr=generic_util_get_generic_str(type);
-	if(genericStr==NULL && !varGen)
-		return TRUE;
-	location_t loc=DECL_SOURCE_LOCATION(decl);
-	char *varName=IDENTIFIER_POINTER(DECL_NAME(decl));
-    ClassName *belongClassName=getBelongClassName(self);
-    GenericModel *belongGen=NULL;
-    GenericModel *funcGen=NULL;
-    if(belongClassName){
-       ClassInfo *belongInfo=class_mgr_get_class_info_by_class_name(class_mgr_get(),belongClassName);
-       belongGen= belongInfo->genericModel;
-    }
-    if(current_function_decl){
-    	funcGen=c_aet_get_func_generics_model(current_function_decl);
-    }
-    if(genericStr!=NULL){
-    	nboolean find=generic_model_include_decl_by_str(belongGen,genericStr);
-		if(!find){
-	    	find=generic_model_include_decl_by_str(funcGen,genericStr);
-	    	if(!find){
-	    	   if(belongClassName)
-			      error_at(loc,"变量%qs声明为泛型%qs，但类%qs中并不存在此泛型声明。",varName,genericStr,belongClassName->userName);
-	    	   else
-				  error_at(loc,"变量%qs声明为泛型(%qs)，但找不到这样的泛型声明。",varName,genericStr);
-			   return FALSE;
-	    	}
-		}
-    }else if(varGen){
-		char *sysClassName=class_util_get_class_name(type);
-	    //printf("generic_impl_check_var 44 belong:%p %s\n",belongClassName,sysClassName);
-		ClassName *varClassName=class_mgr_get_class_name_by_sys(class_mgr_get(),sysClassName);
-		if(!varClassName){
-		   aet_print_tree_skip_debug(type);
-		   error_at(loc,"变量%qs不能使用泛型，因为变量类型不是类。",varName);
-		   return FALSE;
-		}
-	    ClassInfo *varClassInfo=class_mgr_get_class_info_by_class_name(class_mgr_get(),varClassName);
-	    if(!class_info_is_generic_class(varClassInfo)){
-		  	error_at(loc,"变量%qs不能声明为泛型变量，因为类%qs不是泛型类。",varName,varClassName->userName);
-		  	return FALSE;
-	    }
-	    int c1=generic_model_get_count(varClassInfo->genericModel);
-	    int c2=generic_model_get_count(varGen);
-	    if(c1!=c2){
-	  	   error_at(loc,"类%qs声明的泛型数量与变量%qs定义的不匹配。",varClassName->userName,varName);
-	  	   return FALSE;
-	    }
-	    if(funcGen){
-	    	//在泛型函数中
-	    	if(generic_model_get_undefine_count(varGen)!=0){
-			   nboolean re=generic_model_include_decl(funcGen,varGen);
-			   if(!re){
-				  re=generic_model_include_decl(belongGen,varGen);
-			   }
-			   if(!re){
-		 	  	   error_at(loc,"变量%qs定义的泛型中还包含有未定义的泛型单元，在当前上下文中并没有之与匹配的声明。",varName);
-	    		   return FALSE;
-			   }
-	        }else{
-	            n_debug("应该检查具体的类型是否是 extends下的类型。");
-	        }
-	    }else{
-	    	//检果是不是有undefine如果有，就是错了
-	    	if(generic_model_get_undefine_count(varGen)!=0){
-			   nboolean re=generic_model_include_decl(belongGen,varGen);
-			   if(!re){
-				  error_at(loc,"变量%qs定义的泛型中还包含有未定义的泛型单元，在当前上下文中并没有之与匹配的声明。",varName);
-				  return FALSE;
-			   }
-	    	}else{
-	    	    n_debug("应该检查具体的类型是否是 extends下的类型。");
-	    	}
-	    }
-    }
-    return TRUE;
+   tree type=TREE_TYPE(decl);
+   char *genericStr=generic_util_get_generic_str(type);
+   if(genericStr==NULL && !varGen)
+      return TRUE;
+   location_t loc=DECL_SOURCE_LOCATION(decl);
+   char *varName=IDENTIFIER_POINTER(DECL_NAME(decl));
+   ClassName *belongClassName=getBelongClassName(self);
+   GenericModel *belongGen=NULL;
+   GenericModel *funcGen=NULL;
+   if(belongClassName){
+      ClassInfo *belongInfo=class_mgr_get_class_info_by_class_name(class_mgr_get(),belongClassName);
+      belongGen= belongInfo->genericModel;
+   }
+   if(current_function_decl){
+      funcGen=c_aet_get_func_generics_model(current_function_decl);
+   }
+   if(genericStr!=NULL){
+      nboolean find=generic_model_include_decl_by_str(belongGen,genericStr);
+      if(!find){
+         find=generic_model_include_decl_by_str(funcGen,genericStr);
+         if(!find){
+            if(belongClassName)
+               error_at(loc,"变量%qs声明为泛型%qs，但类%qs中并不存在此泛型声明。",varName,genericStr,belongClassName->userName);
+            else
+               error_at(loc,"变量%qs声明为泛型(%qs)，但找不到这样的泛型声明。",varName,genericStr);
+            return FALSE;
+         }
+      }
+   }else if(varGen){
+      char *sysClassName=class_util_get_class_name(type);
+      ClassName *varClassName=class_mgr_get_class_name_by_sys(class_mgr_get(),sysClassName);
+      if(!varClassName){
+         //匹配 static  AArray<int> * setdata();不在类中，在文件范围内
+         if(TREE_CODE(decl)==FUNCTION_DECL){
+            tree rtn=TREE_TYPE(type);
+            char *sysName=class_util_get_class_name(rtn);
+            ClassInfo *info=class_mgr_get_class_info(class_mgr_get(),sysName);
+            if(info && info->genericModel && generic_model_can_cast(info->genericModel,varGen)){
+               printf("匹配 static  AArray<int> * setdata();\n");
+               return TRUE;
+            }
+         }
+         aet_print_tree_skip_debug(type);
+         error_at(loc,"变量%qs不能使用泛型，因为变量类型不是类。",varName);
+         return FALSE;
+      }
+      ClassInfo *varClassInfo=class_mgr_get_class_info_by_class_name(class_mgr_get(),varClassName);
+      if(!class_info_is_generic_class(varClassInfo)){
+         error_at(loc,"变量%qs不能声明为泛型变量，因为类%qs不是泛型类。",varName,varClassName->userName);
+         return FALSE;
+      }
+      int c1=generic_model_get_count(varClassInfo->genericModel);
+      int c2=generic_model_get_count(varGen);
+      if(c1!=c2){
+         error_at(loc,"类%qs声明的泛型数量与变量%qs定义的不匹配。",varClassName->userName,varName);
+         return FALSE;
+      }
+      if(funcGen){
+         //在泛型函数中
+         if(generic_model_get_undefine_count(varGen)!=0){
+            nboolean re=generic_model_include_decl(funcGen,varGen);
+            if(!re){
+               re=generic_model_include_decl(belongGen,varGen);
+            }
+            if(!re){
+               error_at(loc,"变量%qs定义的泛型中还包含有未定义的泛型单元，在当前上下文中并没有之与匹配的声明。",varName);
+               return FALSE;
+            }
+         }else{
+            n_debug("应该检查具体的类型是否是 extends下的类型。");
+         }
+      }else{
+         //检果是不是有undefine如果有，就是错了
+         if(generic_model_get_undefine_count(varGen)!=0){
+            nboolean re=generic_model_include_decl(belongGen,varGen);
+            if(!re){
+               error_at(loc,"变量%qs定义的泛型中还包含有未定义的泛型单元，在当前上下文中并没有之与匹配的声明。",varName);
+               return FALSE;
+            }
+         }else{
+               n_debug("应该检查具体的类型是否是 extends下的类型。");
+         }
+      }
+   }
+   return TRUE;
 }
 
 

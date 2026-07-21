@@ -65,11 +65,13 @@ void     a_slice_free_chain_with_offset (asize block_size,apointer mem_chain, as
 #define a_slice_dup(type, mem)                                  \
   (1 ? (type*) a_slice_copy (sizeof (type), (mem))              \
      : ((void) ((type*) 0 == (mem)), (type*) 0))
+
 #define a_slice_free(type, mem)                                 \
 A_STMT_START {                                                  \
   if (1) a_slice_free1 (sizeof (type), (mem));			\
   else   (void) ((type*) 0 == (mem)); 				\
 } A_STMT_END
+
 #define a_slice_free_chain(type, mem_chain, next)               \
 A_STMT_START {                                                  \
   if (1) a_slice_free_chain_with_offset (sizeof (type),		\

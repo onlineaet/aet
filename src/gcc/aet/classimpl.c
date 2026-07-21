@@ -1062,6 +1062,8 @@ struct c_expr class_impl_replace_func_id(ClassImpl *self,struct c_expr expr,vec<
       n_debug("class_impl_replace_func_id 77 这是指针引用  funcName:%s",funcName);
       aet_print_tree(func);
       last=func_call_deref_select(self->funcCall,func,exprlist,origtypes,arg_loc,expr_loc,&errors,selectFunc);
+      n_debug("class_impl_replace_func_id 88 这是指针引用  funcName:%s",funcName);
+      aet_print_tree(last);
       class_cast_parm_convert_from_deref(self->classCast,last,exprlist);
    }else if(TREE_CODE (func)==COMPONENT_REF && AET_LANG_FLAG_5(func)==1){
       tree field=TREE_OPERAND(func,1);

@@ -486,11 +486,15 @@ tree func_call_deref_select(FuncCall *self,tree func,vec<tree, va_gc> *exprlist,
    if(className==NULL || lowClassName==NULL)
       return error_mark_node;
    CandidateFunc *item=NULL;
-   GenericModel *generics=generic_call_get_generic_from_component_ref(generic_call_get(),func);//对象是否有泛型的真实类型.
-   GenericModel *funcGenericDefine=c_aet_get_func_generics_model(func);//如果funcGenericDefine是有效的说明这是一个泛型函数
+   //重要：对象是否有泛型的真实类型.func可能是一个component_ref，比如：var->setdata(5)这样的调用
+   //var可能是变量，参数或域，这里可以获取var的泛型定义或声明。
+   GenericModel *generics=generic_call_get_generic_from_component_ref(generic_call_get(),func);
+   //如果funcGenericDefine是有效的说明这是一个泛型函数
+   GenericModel *funcGenericDefine=c_aet_get_func_generics_model(func);
    if(class_mgr_is_interface(class_mgr_get(),className)){
       //这是接口引用，首先检查接口是不是在lowClassName范围内或lowClassName父类中
-      item=select_field_get_func(select_field_get(),className,funName,exprlist,origtypes,arg_loc,expr_loc,FALSE,generics,errors);
+      item=select_field_get_func(select_field_get(),className,funName,exprlist,origtypes,
+            arg_loc,expr_loc,FALSE,generics,errors);
       if(item==NULL){
          error_at(expr_loc,"接口%qs没有%qs方法。",className->userName,funName);
          return last;
@@ -509,9 +513,12 @@ tree func_call_deref_select(FuncCall *self,tree func,vec<tree, va_gc> *exprlist,
          vec_safe_insert (exprlist, 0, firstParm);
       }
    }else{
-      n_debug("func_call_deref_select bbb name:%s className:%s func:%s %d refVarClassName:%s generics:%p exprlist:%p %d\n",
-      IDENTIFIER_POINTER(id),currentClassName,funName,len,fromLowClassName,generics,exprlist,exprlist->length());
-      item=selectFunc(self,lowClassName,funName,exprlist,origtypes,arg_loc,expr_loc,FALSE,generics,funcGenericDefine,errors,selRet);
+      n_debug("func_call_deref_select 11 name:%s className:%s func:%s %d refVarClassName:%s\n\
+            generics:%p exprlist:%p %d generics generics:%p funcGenericDefine:%p\n",
+            IDENTIFIER_POINTER(id),currentClassName,funName,len,
+            fromLowClassName,generics,exprlist,exprlist->length(),generics,funcGenericDefine);
+      item=selectFunc(self,lowClassName,funName,exprlist,origtypes,arg_loc,
+            expr_loc,FALSE,generics,funcGenericDefine,errors,selRet);
       if(item!=NULL){
          //convertParmForGenerics(self,item,exprlist,expr_loc,FALSE,generics);//转化实参到void*
          if(!strcmp(item->sysName,lowClassName->sysName)){
@@ -523,7 +530,6 @@ tree func_call_deref_select(FuncCall *self,tree func,vec<tree, va_gc> *exprlist,
             // item->sysName,item->classFunc->mangleFunName,lowClassName->sysName);
             last=callParentOrParentIface(self,func,item,exprlist,expr_loc,FALSE);
          }
-         GenericModel *genericsxx=generic_call_get_generic_from_component_ref(generic_call_get(),last);//对象是否有泛型的真实类型.
          //设置后再select_field_build_function_call_vec再调用setGenericQuery
          selRet->genericQuery=1;
       }else{
@@ -539,6 +545,18 @@ tree func_call_deref_select(FuncCall *self,tree func,vec<tree, va_gc> *exprlist,
       selRet->sysName=class_mgr_get_class_name_by_sys(class_mgr_get(),item->sysName)->sysName;
       access_controls_access_method(access_controls_get(),expr_loc,item->classFunc);
       select_field_free_candidate(item);
+   }else{
+      n_debug("func_call_deref_select 没找到函数 尝试找出是不是泛型参数的原因");
+      NString *info=n_string_new("");
+      n_string_append(info,"\n可能的原因：\n");
+      n_string_append_printf(info,"1.参数个数不匹配。\n");
+      n_string_append_printf(info,"2.形参与实参类型数不匹配。\n");
+      if(generics)
+         n_string_append_printf(info,"3.参数定义了泛型%s,但实参不匹配。\n",generic_model_tostring(generics));
+      if(funcGenericDefine)
+         n_string_append_printf(info,"4.泛型函数的类型是:%qs,但实参不匹配。\n",generic_model_tostring(funcGenericDefine));
+      error_at(expr_loc,"在对象%qs中，没找到与实参匹配的方法%qs。%s",className->userName,funName,info->str);
+      n_string_free(info,TRUE);
    }
    return last;
 }

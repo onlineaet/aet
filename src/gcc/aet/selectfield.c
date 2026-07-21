@@ -358,7 +358,8 @@ static CandidateFunc * checkStaticFuncParam(SelectField *self,location_t loc,Cla
 
    if(value==error_mark_node){
       n_debug("selectfield.c checkStaticFuncParam 不能匹配参数 decl code:%s name:%s 错误数:%d warn:%d",
-              get_tree_code_name(TREE_CODE(decl)),IDENTIFIER_POINTER(DECL_NAME(decl)),self->checkCallback->error,self->checkCallback->warn);
+              get_tree_code_name(TREE_CODE(decl)),IDENTIFIER_POINTER(DECL_NAME(decl)),
+              self->checkCallback->error,self->checkCallback->warn);
    }else{
       n_debug("checkStaticFuncParam 有错误吗? decl code:%s name:%s 错误数:%d warn:%d ",
             get_tree_code_name(TREE_CODE(decl)),IDENTIFIER_POINTER(DECL_NAME(decl)),
@@ -679,8 +680,8 @@ tree   select_field_call_back(location_t ploc, tree function, tree fundecl,tree 
             return parmval;
          }
       }else if(state==CALLBACK_BUILD_FUNCTION_CALL){
-         n_debug("替换泛型参数 generic_call_replace_parm_new 状态：CALLBACK_BUILD_FUNCTION_CALL call:%d\n",checkCallback->className->sysName);
-         parmval=generic_call_replace_parm_new(generic_call_get(), ploc,function, fundecl,
+         n_debug("替换泛型参数 generic_call_replace_parm 状态：CALLBACK_BUILD_FUNCTION_CALL call:%d\n",checkCallback->className->sysName);
+         parmval=generic_call_replace_parm(generic_call_get(), ploc,function, fundecl,
          type,  origtype,  val,  valtype, npc, rname, parmnum,argnum,excess_precision,  0/*warnopt=0*/,
          checkCallback->className,checkCallback->generics);
          aet_print_tree(parmval);
@@ -786,6 +787,7 @@ static tree testParam(SelectField *self,location_t loc, vec<location_t> arg_loc,
         vec<tree, va_gc> *params,vec<tree, va_gc> *origtypes,ClassName *className,GenericModel *generics)
 {
    CheckParamCallback *checkCallback=self->checkCallback;
+   n_debug("selectfield.c testParam %p %s\n",generics,generic_model_tostring(generics));
    checkCallback->className=className;
    checkCallback->generics=generics;
    checkCallback->funcPointerCount=0;
@@ -806,7 +808,8 @@ static tree testParam(SelectField *self,location_t loc, vec<location_t> arg_loc,
    return ret;
 }
 
-static CandidateFunc * checkCallParam(SelectField *self,ClassFunc *func,tree decl,vec<tree, va_gc> *exprlist,vec<tree, va_gc> *origtypes,
+static CandidateFunc * checkCallParam(SelectField *self,ClassFunc *func,tree decl,
+        vec<tree, va_gc> *exprlist,vec<tree, va_gc> *origtypes,
         vec<location_t> arg_loc,location_t expr_loc,int ctorStaticOrNoramlFuncType,FuncPointerError *errors,
         ClassName *className,GenericModel *generics)
 {
@@ -849,10 +852,11 @@ static CandidateFunc * checkCallParam(SelectField *self,ClassFunc *func,tree dec
    mark_exp_read (value);
    value= testParam (self,expr_loc, arg_loc, value,exprlist, origtypes,className,generics);
    if(value==error_mark_node){
-      n_debug("checkCallParam 不能匹配参数 decl code:%s name:%s ",get_tree_code_name(TREE_CODE(decl)),IDENTIFIER_POINTER(DECL_NAME(decl)));
+      n_debug("checkCallParam 不能匹配参数 decl code:%s name:%s ",
+            get_tree_code_name(TREE_CODE(decl)),IDENTIFIER_POINTER(DECL_NAME(decl)));
    }else{
       n_debug("checkCallParam 有错误吗? decl code:%s name:%s 错误数:%d warn:%d ",
-      get_tree_code_name(TREE_CODE(decl)),IDENTIFIER_POINTER(DECL_NAME(decl)),
+            get_tree_code_name(TREE_CODE(decl)),IDENTIFIER_POINTER(DECL_NAME(decl)),
       self->checkCallback->error,self->checkCallback->warn);
       if(self->checkCallback->error==0){
          CandidateFunc *candidate=createCandidate();
@@ -873,7 +877,8 @@ static CandidateFunc * checkCallParam(SelectField *self,ClassFunc *func,tree dec
  * 先在本类中找
  * allscope==TRUE 找定义、声明、field，否则只找field
  */
-static CandidateFunc *getFuncFromClass(SelectField *self,ClassName *className,char *orgiFuncName,vec<tree, va_gc> *exprlist,
+static CandidateFunc *getFuncFromClass(SelectField *self,ClassName *className,
+      char *orgiFuncName,vec<tree, va_gc> *exprlist,
         vec<tree, va_gc> *origtypes,vec<location_t> arg_loc,location_t expr_loc,nboolean allscope,
         GenericModel *generics,NPtrArray *funcArray,int funcType,FuncPointerError *errors)
 {
@@ -884,8 +889,9 @@ static CandidateFunc *getFuncFromClass(SelectField *self,ClassName *className,ch
       if(strcmp(item->orgiName,orgiFuncName))
          continue;
       //查找语句
-      n_debug("getFuncFromClass index:%d %s allscope:%d orgiFuncName:%s field?:%d item->fromImplDefine:%p",
-            i,className->sysName,allscope,orgiFuncName,aet_utils_valid_tree(item->fieldDecl),item->fromImplDefine);
+      n_debug("getFuncFromClass index:%d %s allscope:%d orgiFuncName:%s field?:%d item->fromImplDefine:%p generics:%p",
+            i,className->sysName,allscope,orgiFuncName,
+            aet_utils_valid_tree(item->fieldDecl),item->fromImplDefine,generics);
       tree decl=NULL_TREE;
       if(allscope){
          if(aet_utils_valid_tree(item->fieldDecl)){
@@ -930,14 +936,15 @@ static CandidateFunc *getFuncFromClass(SelectField *self,ClassName *className,ch
 /**
  * 从类中找出最好的函数。
  */
-static CandidateFunc *selectFuncByLocal(SelectField *self,ClassName *className,char *orgiFuncName,vec<tree, va_gc> *exprlist,
+static CandidateFunc *selectFuncByLocal(SelectField *self,ClassName *className,
+        char *orgiFuncName,vec<tree, va_gc> *exprlist,
         vec<tree, va_gc> *origtypes,vec<location_t> arg_loc,location_t expr_loc,
         nboolean allscope,GenericModel *generics,FuncPointerError *errors)
 {
    if(className==NULL || orgiFuncName==NULL || className->sysName==NULL)
       return NULL;
    NList *okList=NULL;
-   n_debug("select_field_get_func 00 类名：%s 函数名：%s",className->sysName,orgiFuncName);
+   n_debug("select_field_get_func 00 类名：%s 函数名：%s generics:%p",className->sysName,orgiFuncName,generics);
    NPtrArray *funcArray=func_mgr_get_funcs(func_mgr_get(),className);
    if(funcArray!=NULL && funcArray->len>0){
       CandidateFunc *candidate=getFuncFromClass(self,className,orgiFuncName,exprlist,origtypes,arg_loc,
@@ -978,13 +985,17 @@ static CandidateFunc *selectFuncByLocal(SelectField *self,ClassName *className,c
 }
 
 
-static void selectFuncByRecursion(SelectField *self,ClassName *className,char *orgiName,vec<tree, va_gc> *exprlist,
-        vec<tree, va_gc> *origtypes,vec<location_t> arg_loc,location_t expr_loc,nboolean allscope,GenericModel *generics,
+static void selectFuncByRecursion(SelectField *self,ClassName *className,
+        char *orgiName,vec<tree, va_gc> *exprlist,
+        vec<tree, va_gc> *origtypes,vec<location_t> arg_loc,
+        location_t expr_loc,nboolean allscope,GenericModel *generics,
         NPtrArray *selectedArray,FuncPointerError *errors)
 {
    if(className==NULL || orgiName==NULL || className->sysName==NULL)
       return;
-   CandidateFunc *result=selectFuncByLocal(self,className,orgiName,exprlist,origtypes,arg_loc,expr_loc,allscope,generics,errors);
+   n_debug("selectfield.c selectFuncByRecursion generics:%p orgiFuncName:%s\n",generics,orgiName);
+   CandidateFunc *result=selectFuncByLocal(self,className,orgiName,exprlist,
+         origtypes,arg_loc,expr_loc,allscope,generics,errors);
    if(result!=NULL){
       if(result->warn==0){
          n_ptr_array_remove_range(selectedArray,0,selectedArray->len);
@@ -1003,13 +1014,18 @@ static void selectFuncByRecursion(SelectField *self,ClassName *className,char *o
 /**
  * 从类中找出最好的函数。
  */
-CandidateFunc *select_field_get_func(SelectField *self,ClassName *className,char *orgiFuncName,vec<tree, va_gc> *exprlist,
-        vec<tree, va_gc> *origtypes,vec<location_t> arg_loc,location_t expr_loc,nboolean allscope,GenericModel *generics,FuncPointerError **errors)
+CandidateFunc *select_field_get_func(SelectField *self,ClassName *className,
+      char *orgiFuncName,vec<tree, va_gc> *exprlist,
+        vec<tree, va_gc> *origtypes,vec<location_t> arg_loc,location_t expr_loc,
+        nboolean allscope,GenericModel *generics,FuncPointerError **errors)
 {
     FuncPointerError *localError=NULL;
      if(errors!=NULL)
         localError=(FuncPointerError *)n_slice_new0(FuncPointerError);
-     CandidateFunc *candidate=selectFuncByLocal(self,className,orgiFuncName,exprlist,origtypes,arg_loc,expr_loc,allscope,generics,localError);
+     n_debug("selectfield.c select_field_get_func generics:%p orgiFuncName:%s\n",generics,orgiFuncName);
+
+     CandidateFunc *candidate=selectFuncByLocal(self,className,orgiFuncName,
+           exprlist,origtypes,arg_loc,expr_loc,allscope,generics,localError);
      replaceFunctionPointer(candidate,exprlist);
      if(errors!=NULL)
         *errors=localError;
@@ -1019,14 +1035,17 @@ CandidateFunc *select_field_get_func(SelectField *self,ClassName *className,char
 /**
  * 从当前类遍历父类和接口
  */
-CandidateFunc *select_field_get_func_by_recursion(SelectField *self,ClassName *className,char *orgiName,vec<tree, va_gc> *exprlist,
-            vec<tree, va_gc> *origtypes,vec<location_t> arg_loc,location_t expr_loc,nboolean allscope,GenericModel *generics,FuncPointerError **errors)
+CandidateFunc *select_field_get_func_by_recursion(SelectField *self,ClassName *className,
+            char *orgiName,vec<tree, va_gc> *exprlist,
+            vec<tree, va_gc> *origtypes,vec<location_t> arg_loc,
+            location_t expr_loc,nboolean allscope,GenericModel *generics,FuncPointerError **errors)
 {
     FuncPointerError *localError=NULL;
     if(errors!=NULL)
        localError=(FuncPointerError *)n_slice_new0(FuncPointerError);
     NPtrArray *selectArray=n_ptr_array_new_with_free_func(freeCandidate_cb);
-    selectFuncByRecursion(self,className,orgiName,exprlist,origtypes,arg_loc,expr_loc,allscope,generics,selectArray,localError);
+    selectFuncByRecursion(self,className,orgiName,exprlist,origtypes,arg_loc,
+          expr_loc,allscope,generics,selectArray,localError);
     if(selectArray->len==0){
         n_ptr_array_unref(selectArray);
         if(errors!=NULL)

@@ -1237,3 +1237,40 @@ int main(){
    t.setdata();
    return 0;
 }
+
+//测试29 测试泛型在类中创建或文件内创建
+#include <aet/util/AArray.h>
+class$ TFirst{
+   AArray<int> * setdata();
+};
+
+impl$ TFirst{
+   AArray<int> * setdata(){
+        AArray<int> * tt=new$  AArray();
+        tt->add(7);
+        return tt;
+   }
+};
+
+static  AArray<int> * setdata()
+{
+   AArray<int> * tt=new$  AArray();
+   tt->add(5);
+   return tt;
+}
+
+int main()
+{
+   AArray<int> * array0=setdata();
+   int data0=array0->get(0);
+   printf("data0 is:%d\n",data0);
+   TFirst t=new$  TFirst();
+   AArray<int> * array1=t.setdata();
+   int data1=array1->get(0);
+   printf("data0 is:%d\n",data1);
+   return 0;
+}
+
+
+
+

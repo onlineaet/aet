@@ -354,6 +354,11 @@ impl$ ASList{
     self(NULL);
   }
 
+  SListNode *getHead(){
+     return head;
+  }
+
+
   ~ASList(){
 	 if(destoryItemFunc!=NULL)
 	    foreach((AFunc)destoryItemFunc, NULL);

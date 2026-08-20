@@ -85,13 +85,13 @@ public$ class$ ASourceMgr implements$ EventMgr{
     protected$ aboolean iterate (aboolean mayBlock,aboolean dispatch,AThread *current);
     public$    aboolean iterate (aboolean mayBlock);
 
-    protected$ aboolean pending();
+    public$    aboolean pending();
     public$    auint    add(EventSource *source);
     public$    EventSource *find(auint id);
     public$    aboolean remove(EventSource *source);
     public$    aboolean remove(auint id);
     public$    aboolean removeAll();
-    protected$ void     wakupSignal();
+    public$ void     wakupSignal();
     public$    aboolean isOwner();
     public$    void invoke(EventSourceCallback callback,apointer data);
     public$    void invoke(int priority,EventSourceCallback callback,apointer data,ADestroyNotify notify);

@@ -77,7 +77,6 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 #include "classimpl.h"
 
 
-
 static void genericBlockInit(GenericBlock *self)
 {
 	self->name=NULL;
@@ -174,6 +173,7 @@ void generic_block_set_parm(GenericBlock *self,vec<tree, va_gc> *exprlist)
             ix,typeStr,parmName, generic_util_start_with_generic(typeStr));
       n_string_append(parmStr,typeStr);
       n_string_append(parmStr," ");
+
       if(generic_util_start_with_generic(typeStr)){
          char *newName=generic_util_create_param_new_name(parmName);
          n_string_append(parmStr,newName);
@@ -209,8 +209,6 @@ static tree getParmType(tree arg)
 	}
 	return NULL;
 }
-
-
 
 void generic_block_set_body(GenericBlock *self,char *source)
 {
@@ -253,7 +251,8 @@ char *generic_block_create_codes(GenericBlock *self)
 }
 
 /**
- * static xxxx_var *="belongFuncNEW_OBJECT_GENERIC_SPERATOR0NEW_OBJECT_GENERIC_SPERATORint Abc__inner_generic_func(Abc *self...."
+ * static xxxx_var *="belongFuncNEW_OBJECT_GENERIC_SPERATOR0NEW_OBJECT_GENERIC_SPERATORint
+ *  Abc__inner_generic_func(Abc *self...."
  * 所属函数名，该函数是不是泛型函数
  * 以便保存在.o文件中，当生成库时可以从.so中取出
  */
@@ -335,6 +334,7 @@ NPtrArray *generic_block_create_block(char *content)
 void  generic_block_set_return_type(GenericBlock *self,tree lhs)
 {
     if(!aet_utils_valid_tree(lhs)){
+      n_debug("generic_block_set_return_type 00 void\n");
     	self->returnType=n_strdup("void");
     }else{
     	char *rnt=generic_util_get_type_str(lhs);
@@ -365,10 +365,6 @@ nboolean generic_block_match_field_and_func(GenericBlock *self,tree funcdel,tree
 	tree fieldRetn=TREE_TYPE(field);//得到的是pointer_type
 	fieldRetn=TREE_TYPE(fieldRetn); //得到的是function_type
 	fieldRetn=TREE_TYPE(fieldRetn); //得到的是retn
-	printf("generic_block_check 11 %s\n",self->name);
-	aet_print_tree(field);
-	printf("generic_block_check 22 %s\n",self->name);
-	aet_print_tree(fieldRetn);
 	NPtrArray *array=n_ptr_array_new();
 	c_aet_dump_return_expr(funcdel,array);
     tree expr=NULL_TREE;
@@ -376,7 +372,6 @@ nboolean generic_block_match_field_and_func(GenericBlock *self,tree funcdel,tree
 	for(i=array->len-1;i>=0;i--){
 		expr=n_ptr_array_index(array,i);
 		printf("return stamt 比较返回的表达式类型是否一样 :%d\n",i);
-		aet_print_tree(expr);
 	}
 	n_ptr_array_unref(array);
 	if(expr==NULL_TREE && TREE_CODE(fieldRetn)==VOID_TYPE)
@@ -448,32 +443,7 @@ void generic_block_create_type_decl(GenericBlock *self,tree lhs,vec<tree, va_gc>
    self->funcTypeDecl=decl;
 }
 
-/**
- * 创建(* (setData_1_typedecl)self->_gen_blocks_array_897[0])(self,tempFgpi1234,5);
- *找当前所在函数中参数中是否有tempFgpi1234，如果没有，找全局变量
- * #define AET_GENERIC_BLOCK_ARRAY_VAR_NAME  "_gen_blocks_array_897" //类中的泛型块函数指针数组变量名称 void *_gen_blocks_array_897[xx];
- *  创建:
- *  (* (setData_1_typedecl)self->_gen_blocks_array_897[0])(self,tempFgpi1234,5);
- *  (* (_test_AMutex__inner_generic_func_1_typedecl)blockInfo->blockFuncs[blockIndex].blockFuncsPointer[index-1])(self,tempFgpi1234);
- */
-void generic_block_create_call00(GenericBlock *self,int index,tree lhs,vec<tree, va_gc> *exprlist)
-{
-   tree arrayRefType=build_pointer_type(void_type_node);
-   location_t loc=input_location;
-   tree selfid=lookup_name(aet_utils_create_ident("self"));
-   tree selfref=build_indirect_ref (loc,selfid,RO_ARROW);
-   tree component1=aet_utils_create_ident(AET_GENERIC_BLOCK_ARRAY_VAR_NAME);
-   tree componetRef = build_component_ref (loc,selfref,component1, loc,UNKNOWN_LOCATION);//
-   tree arrayIndex=build_int_cst(integer_type_node,index-1);
-   tree arrayRef = build4 (ARRAY_REF, arrayRefType, componetRef, arrayIndex, NULL_TREE,NULL_TREE);
-   tree type=TREE_TYPE(self->funcTypeDecl);//typedef void (*setData_1_typedecl)(MatrixOps *self,int abcts)中的functype
-   tree nopExpr= build1 (NOP_EXPR, type, arrayRef);
-   tree rtn=void_type_node;
-   if(aet_utils_valid_tree(lhs))
-      rtn=TREE_TYPE(lhs);
-   tree result = build_call_vec (rtn,nopExpr, exprlist);
-   self->callTree=result;
-}
+
 
 /**
  * * 创建(* (setData_1_typedecl)self->_gen_blocks_array_897[0])(self,5);
@@ -544,6 +514,18 @@ static void createCallInGenericFunc(GenericBlock *self,tree lhs,vec<tree, va_gc>
    tree result = build_call_vec (rtn,nopExpr, exprlist);
    self->callTree=result;
 }
+
+/**
+ * 创建(* (setData_1_typedecl)self->_gen_blocks_array_897[0])(self,tempFgpi1234,5);
+ *找当前所在函数中参数中是否有tempFgpi1234，如果没有，找全局变量
+ * #define AET_GENERIC_BLOCK_ARRAY_VAR_NAME  "_gen_blocks_array_897"
+ * //类中的泛型块函数指针数组变量名称 void *_gen_blocks_array_897[xx];
+ *  创建:
+ *  (* (setData_1_typedecl)self->_gen_blocks_array_897[0])(self,tempFgpi1234,5);
+ *  (* (_test_AMutex__inner_generic_func_1_typedecl)blockInfo->blockFuncs[blockIndex].
+ *  blockFuncsPointer[index-1])(self,tempFgpi1234);
+ */
+
 
 /**
  * 有两处调用块函数

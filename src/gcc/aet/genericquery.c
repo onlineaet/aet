@@ -613,6 +613,8 @@ static nboolean checkSame(tree initOrRhs,tree decl,GenericUnit *lhsUnit,char *er
        return TRUE;
    }else if(TREE_CODE(initOrRhs)==NON_LVALUE_EXPR){
         return TRUE;
+   }else if(TREE_CODE(initOrRhs)==COMPONENT_REF){
+        return TRUE;
    }else{
        n_error("类型%s没有处理，在函数checkAgain中。\n",get_tree_code_name(TREE_CODE(initOrRhs)));
    }
@@ -847,8 +849,6 @@ void  generic_query_check_var_and_parm(GenericQuery *self,tree decl,tree initOrR
            loc=EXPR_LOCATION(initOrRhs);
        if(DECL_P(initOrRhs))
            loc=DECL_SOURCE_LOCATION(initOrRhs);
-       printf("fieldName --- %s\n",fieldName);
-       aet_print_tree(type);
        GenericModel *rhsModel=c_aet_get_generics_model(last);//声明的返回值泛型
        n_debug("generic_query_check_var_and_parm 11 变量:%s的泛型声明是:%s initOrRhs:%s rhsModel:%p\n",
                          name,generic_model_tostring(lhsModel),get_tree_code_name(TREE_CODE(initOrRhs)),rhsModel);
@@ -904,7 +904,6 @@ void  generic_query_check_var_and_parm(GenericQuery *self,tree decl,tree initOrR
            if(generic_model_equal(lhsModel,rhsModel)
                  &&  !generic_model_have_query(lhsModel)
                  &&  generic_model_get_undefine_count(lhsModel)==0){
-              printf("完全相同的----- %s\n",generic_model_tostring_1(rhsModel));
               //如果两个相同并且都是定义类型
               return;
            }

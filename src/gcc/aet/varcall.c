@@ -377,7 +377,7 @@ FuncAndVarMsg var_call_get_process_var_method(VarCall *self,location_t loc,tree 
 }
 
 /**
- * var 重整为  self->var,
+ * var 重整为  self->var
  */
 void  var_call_add_deref(VarCall *self,tree id,ClassName *className)
 {

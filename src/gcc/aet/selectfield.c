@@ -130,6 +130,7 @@ static CandidateFunc *createCandidate()
    candidate->funcPointerCount=0;
    candidate->error=0;
    candidate->warn=0;
+   candidate->warnZeroAsNullPointerConst=0;
    return candidate;
 }
 
@@ -145,6 +146,7 @@ static CandidateFunc *cloneCand(CandidateFunc *src)
       candidate->implSysName=n_strdup(src->implSysName);
    candidate->error=src->error;
    candidate->warn=src->warn;
+   candidate->warnZeroAsNullPointerConst=src->warnZeroAsNullPointerConst;
    int funcps=src->funcPointerCount;
    int i;
    for(i=0;i<funcps;i++){
@@ -211,15 +213,12 @@ static CandidateFunc * filterGoodFunc(NList *okList)
       n_debug("filterGoodFunc 没有匹配的函数!!! ");
       return NULL;
    }
-   okList=n_list_sort(okList,warnCompare_cb);
-   int len=n_list_length(okList);
-   if(len==1){
+   if(n_list_length(okList)==1){
       CandidateFunc *cand=(CandidateFunc *)n_list_nth_data(okList,0);
       n_debug("找到了声明的函数 成功匹配参数，只有一个 xxx decl code:%s name:%s ",
             cand->classFunc->orgiName,cand->classFunc->mangleFunName);
       return cand;
    }else{
-      int i;
       CandidateFunc *first=(CandidateFunc *)n_list_nth_data(okList,0);
       nboolean genericFunc=class_func_is_func_generic(first->classFunc);
       if(!genericFunc){
@@ -236,19 +235,19 @@ static CandidateFunc * filterGoodFunc(NList *okList)
 
 static CandidateFunc *findBest(CandidateFunc **arrays,int count,ClassName *className)
 {
-     //按从子类到父类的顺序取
-    int i;
-    for(i=0;i<count;i++){
-        CandidateFunc *selected=arrays[i];
-        if(!strcmp(selected->sysName,className->sysName)){
-            return selected;
-        }
-    }
-    ClassInfo *info=class_mgr_get_class_info_by_class_name(class_mgr_get(),className);
-    if(info->parentName.sysName==NULL){
-        n_error("报告此错误。findBest count:%d sysName:%s",count,className->sysName);
-    }
-    return findBest(arrays,count,&info->parentName);
+   //按从子类到父类的顺序取
+   int i;
+   for(i=0;i<count;i++){
+      CandidateFunc *selected=arrays[i];
+      if(!strcmp(selected->sysName,className->sysName)){
+         return selected;
+      }
+   }
+   ClassInfo *info=class_mgr_get_class_info_by_class_name(class_mgr_get(),className);
+   if(info->parentName.sysName==NULL){
+      n_error("报告此错误。findBest count:%d sysName:%s",count,className->sysName);
+   }
+   return findBest(arrays,count,&info->parentName);
 }
 
 
@@ -288,7 +287,8 @@ static CandidateFunc *getBest(NPtrArray *selectArray,ClassName *className)
 /**
  * 创建一个在选取类函数给函数指针赋值时出现的错误信息。
  */
-static FuncPointerErrorInfo *createErrorInfoForFuncPointer(int errorNo,char *sysName,ClassFunc *classFunc,int paramNum,tree lhs)
+static FuncPointerErrorInfo *createErrorInfoForFuncPointer(int errorNo,
+      char *sysName,ClassFunc *classFunc,int paramNum,tree lhs)
 {
     FuncPointerErrorInfo *info=(FuncPointerErrorInfo *)n_slice_new(FuncPointerErrorInfo);
     info->sysName=n_strdup(sysName);
@@ -305,6 +305,7 @@ static tree func_param_compare(SelectField *self,location_t init_loc, tree decl,
    checkCallback->funcPointerCount=0;
    checkCallback->error=0;
    checkCallback->warn=0;
+   checkCallback->warnZeroAsNullPointerConst=0;
 
    tree value, type;
    bool npc = false;
@@ -368,61 +369,89 @@ static CandidateFunc * checkStaticFuncParam(SelectField *self,location_t loc,Cla
         CandidateFunc *candidate=createCandidate();
         candidate->error=self->checkCallback->error;
         candidate->warn=self->checkCallback->warn;
+        candidate->warnZeroAsNullPointerConst=self->checkCallback->warnZeroAsNullPointerConst;
         return candidate;
      }
   }
   return NULL;
 }
 
+static NList *removeZeroAsNullPoiner(NList *okList)
+{
+   if(!okList || n_list_length(okList)<=1)
+      return okList;
+   int i;
+   int count = 0;
+   for(i=0;i<n_list_length(okList);i++){
+      CandidateFunc *item=(CandidateFunc *)n_list_nth_data(okList,i);
+      if(item->warnZeroAsNullPointerConst>0){
+         count++;
+      }
+   }
+   if(count==n_list_length(okList))
+      return okList;
+   for(i=0;i<n_list_length(okList);i++){
+      CandidateFunc *item=(CandidateFunc *)n_list_nth_data(okList,i);
+      if(item->warnZeroAsNullPointerConst>0){
+         okList = n_list_remove(okList,item);
+         freeCandidate_cb(item);
+         i--;
+      }
+   }
+   return okList;
+}
+
 static CandidateFunc *getStaticFuncFromClass(SelectField *self,location_t loc,ClassName *className,
         char *orgiFuncName,tree lhs,FuncPointerError *errors)
 {
-    NList *okList=NULL;
-    NPtrArray *array=func_mgr_get_static_funcs(func_mgr_get(),className);
-    if(array==NULL)
-        return NULL;
-    int i;
-    for(i=0;i<array->len;i++){
-        ClassFunc *item=(ClassFunc *)n_ptr_array_index(array,i);
-        if(strcmp(item->orgiName,orgiFuncName))
+   NList *okList=NULL;
+   NPtrArray *array=func_mgr_get_static_funcs(func_mgr_get(),className);
+   if(array==NULL)
+      return NULL;
+   int i;
+   for(i=0;i<array->len;i++){
+      ClassFunc *item=(ClassFunc *)n_ptr_array_index(array,i);
+      if(strcmp(item->orgiName,orgiFuncName))
+         continue;
+      //查找语句
+      //printf("selectfield.c getStaticFuncFromClass index:%d %s orgiFuncName:%s field?:%p\n", i,className->sysName,orgiFuncName,item->fieldDecl);
+      tree decl=NULL_TREE;
+      if(aet_utils_valid_tree(item->fieldDecl)){
+         decl=item->fieldDecl;
+      }
+      if(decl==NULL_TREE)
+         continue;
+      CandidateFunc *candidate=checkStaticFuncParam(self,loc,item,decl,lhs);
+      if(candidate!=NULL){
+         candidate->classFunc=item;
+         candidate->sysName=n_strdup(className->sysName);
+         int paramNum=0;
+         int ok=func_pointer_check(lhs,decl,&paramNum);//aet检查函数指针与右值的返回值和参数是否匹配。
+         //printf("selectfield.c func_pointer_check ok:%d\n",ok);
+         if(ok!=0){
+            printf("selectfield.c getStaticFuncFromClass index:%d %s orgiFuncName:%s field?:%p 函数指针参数aet比较:%d\n",
+                     i,className->sysName,orgiFuncName,item->fieldDecl,ok);
+            if(errors!=NULL){
+               FuncPointerErrorInfo *errInfo=createErrorInfoForFuncPointer(ok,className->sysName,item,paramNum,lhs);
+               errors->message[errors->count++]=errInfo;
+            }
+            freeCandidate_cb(candidate);
             continue;
-            //查找语句
-        //printf("selectfield.c getStaticFuncFromClass index:%d %s orgiFuncName:%s field?:%p\n", i,className->sysName,orgiFuncName,item->fieldDecl);
-        tree decl=NULL_TREE;
-        if(aet_utils_valid_tree(item->fieldDecl)){
-            decl=item->fieldDecl;
-        }
-        if(decl==NULL_TREE)
-            continue;
-        CandidateFunc *candidate=checkStaticFuncParam(self,loc,item,decl,lhs);
-        if(candidate!=NULL){
-              candidate->classFunc=item;
-              candidate->sysName=n_strdup(className->sysName);
-              int paramNum=0;
-              int ok=func_pointer_check(lhs,decl,&paramNum);//aet检查函数指针与右值的返回值和参数是否匹配。
-              //printf("selectfield.c func_pointer_check ok:%d\n",ok);
-              if(ok!=0){
-                  printf("selectfield.c getStaticFuncFromClass index:%d %s orgiFuncName:%s field?:%p 函数指针参数aet比较:%d\n",
-                          i,className->sysName,orgiFuncName,item->fieldDecl,ok);
-                  if(errors!=NULL){
-                      FuncPointerErrorInfo *errInfo=createErrorInfoForFuncPointer(ok,className->sysName,item,paramNum,lhs);
-                      errors->message[errors->count++]=errInfo;
-                  }
-                  freeCandidate_cb(candidate);
-                  continue;
-              }
-              if(candidate->error==0 && candidate->warn==0){
-                    n_list_free_full(okList,freeCandidate_cb);
-                    n_debug("checkParm 静态函数 检查没有错误，没有警告，直接返回:%s %s className:%s\n",item->orgiName,item->mangleFunName,className->sysName);
-                    return candidate;
-              }
-              okList=n_list_append(okList,candidate);
-        }
-    }
-    CandidateFunc *okCand=filterGoodFunc(okList);
-    CandidateFunc *result=cloneCand(okCand);
-    n_list_free_full(okList,freeCandidate_cb);
-    return result;
+         }
+         if(candidate->error==0 && candidate->warn==0){
+            n_list_free_full(okList,freeCandidate_cb);
+            n_debug("checkParm 静态函数 检查没有错误，没有警告，直接返回:%s %s className:%s\n",
+                  item->orgiName,item->mangleFunName,className->sysName);
+            return candidate;
+         }
+         okList=n_list_append(okList,candidate);
+      }
+   }
+   okList = removeZeroAsNullPoiner(okList);
+   CandidateFunc *okCand=filterGoodFunc(okList);
+   CandidateFunc *result=cloneCand(okCand);
+   n_list_free_full(okList,freeCandidate_cb);
+   return result;
 }
 
 static CandidateFunc *getSelectedStaticFunc(SelectField *self,location_t loc,ClassName *className,char *orgiFuncName,tree lhs,FuncPointerError *errors)
@@ -457,6 +486,7 @@ static CandidateFunc *getSelectedStaticFunc(SelectField *self,location_t loc,Cla
           okList=n_list_append(okList,ifaceCandidate);
        }
     }
+    okList = removeZeroAsNullPoiner(okList);
     CandidateFunc *okCand=filterGoodFunc(okList);
     CandidateFunc *result=cloneCand(okCand);
     n_list_free_full(okList,freeCandidate_cb);
@@ -467,25 +497,48 @@ static CandidateFunc *getSelectedStaticFunc(SelectField *self,location_t loc,Cla
 static void selectGoodStaticFunc(SelectField *self,location_t loc,ClassName *className,char *orgiFuncName,
                                       tree lhs,NPtrArray *selectedArray,FuncPointerError *errors)
 {
-    if(className==NULL || orgiFuncName==NULL || className->sysName==NULL){
-        return;
-    }
-    CandidateFunc *result=getSelectedStaticFunc(self,loc,className,orgiFuncName,lhs,errors);
-    if(result!=NULL){
-        if(result->warn==0){
-            n_ptr_array_remove_range(selectedArray,0,selectedArray->len);
-            n_ptr_array_add(selectedArray,result);
-            return;
-        }
-        n_ptr_array_add(selectedArray,result);
-    }
-     ClassInfo *info=class_mgr_get_class_info_by_class_name(class_mgr_get(),className);
-     if(info==NULL)
+   if(className==NULL || orgiFuncName==NULL || className->sysName==NULL){
+      return;
+   }
+   CandidateFunc *result=getSelectedStaticFunc(self,loc,className,orgiFuncName,lhs,errors);
+   if(result!=NULL){
+      if(result->warn==0){
+         n_ptr_array_remove_range(selectedArray,0,selectedArray->len);
+         n_ptr_array_add(selectedArray,result);
          return;
-     n_debug("selectGoodStaticFunc 当前类%s找候选函数:%p，递归的向父类%s再找。",className->sysName,result,info->parentName.sysName);
-     selectGoodStaticFunc(self,loc,&info->parentName,orgiFuncName,lhs,selectedArray,errors);
+      }
+      n_ptr_array_add(selectedArray,result);
+   }
+   ClassInfo *info=class_mgr_get_class_info_by_class_name(class_mgr_get(),className);
+   if(info==NULL)
+      return;
+   n_debug("selectGoodStaticFunc 当前类%s找候选函数:%p，递归的向父类%s再找。",
+         className->sysName,result,info->parentName.sysName);
+   selectGoodStaticFunc(self,loc,&info->parentName,orgiFuncName,lhs,selectedArray,errors);
 }
 
+static void removeZeroNullPointer(NPtrArray *array)
+{
+   if(array->len<=1)
+      return;
+   int i;
+   int count = 0;
+   for(i=0;i<array->len;i++){
+      CandidateFunc *item=n_ptr_array_index(array,i);
+      if(item->warnZeroAsNullPointerConst>0){
+         count++;
+      }
+   }
+   if(count==array->len)
+      return;
+   for(i=0;i<array->len;i++){
+      CandidateFunc *item=n_ptr_array_index(array,i);
+      if(item->warnZeroAsNullPointerConst>0){
+         n_ptr_array_remove(array,item);
+         i--;
+      }
+   }
+}
 
 /**
  * 根据左值获取静态函数。
@@ -499,6 +552,7 @@ static CandidateFunc *selectStaticFunc(SelectField *self,location_t loc,ClassNam
         return NULL;
     }
     n_ptr_array_sort(selectArray,sortCandidateFunc_cb);
+    removeZeroNullPointer(selectArray);
     CandidateFunc *result=getBest(selectArray,className);
     CandidateFunc *last=cloneCand(result);
     n_ptr_array_unref(selectArray);
@@ -716,9 +770,7 @@ tree   select_field_call_back(location_t ploc, tree function, tree fundecl,tree 
                                  excess_precision, 0/*warnopt=0*/);
       }
    }
-
 }
-
 
 static void aet_info_cb(int kind,const char *gmsgid,void *userData)
 {
@@ -727,8 +779,14 @@ static void aet_info_cb(int kind,const char *gmsgid,void *userData)
          kind,DK_ERROR,DK_PERMERROR,DK_WARNING,DK_PEDWARN,gmsgid);
    if(kind==DK_ERROR || kind==DK_PERMERROR)
       checkCallback->error++;
-   if(kind==DK_WARNING || kind==DK_PEDWARN)
+   if(kind==DK_WARNING || kind==DK_PEDWARN){
       checkCallback->warn++;
+      if(strstr(gmsgid,"zero as null pointer constant")){
+         //把零当作NULL空指针处理
+         printf("aet_info_cb 回调  --- zero as null pointer constant %s\n",checkCallback->classFunc->mangleFunName);
+         checkCallback->warnZeroAsNullPointerConst++;
+      }
+   }
 }
 
 /**
@@ -793,6 +851,7 @@ static tree testParam(SelectField *self,location_t loc, vec<location_t> arg_loc,
    checkCallback->funcPointerCount=0;
    checkCallback->error=0;
    checkCallback->warn=0;
+   checkCallback->warnZeroAsNullPointerConst=0;
    checkCallback->state=CALLBACK_SELECT_FIELD;
    vec<tree, va_gc> *exprList=params==NULL?NULL:cloneParams(params);
    global_dc->aetRunning=TRUE;
@@ -857,7 +916,7 @@ static CandidateFunc * checkCallParam(SelectField *self,ClassFunc *func,tree dec
    }else{
       n_debug("checkCallParam 有错误吗? decl code:%s name:%s 错误数:%d warn:%d ",
             get_tree_code_name(TREE_CODE(decl)),IDENTIFIER_POINTER(DECL_NAME(decl)),
-      self->checkCallback->error,self->checkCallback->warn);
+            self->checkCallback->error,self->checkCallback->warn);
       if(self->checkCallback->error==0){
          CandidateFunc *candidate=createCandidate();
          nboolean ok=completeStaticField(self,candidate,errors);//完成类中静态函数的选取
@@ -867,6 +926,8 @@ static CandidateFunc * checkCallParam(SelectField *self,ClassFunc *func,tree dec
          }
          candidate->error=self->checkCallback->error;
          candidate->warn=self->checkCallback->warn;
+         candidate->warnZeroAsNullPointerConst=self->checkCallback->warnZeroAsNullPointerConst;
+
          return candidate;
       }
    }
@@ -926,6 +987,7 @@ static CandidateFunc *getFuncFromClass(SelectField *self,ClassName *className,
          okList=n_list_append(okList,candidate);
       }
    }
+   okList = removeZeroAsNullPoiner(okList);
    CandidateFunc *okCand=filterGoodFunc(okList);
    CandidateFunc *result=cloneCand(okCand);
    n_list_free_full(okList,freeCandidate_cb);
@@ -978,6 +1040,7 @@ static CandidateFunc *selectFuncByLocal(SelectField *self,ClassName *className,
          okList=n_list_append(okList,ifaceCandidate);
       }
    }
+   okList = removeZeroAsNullPoiner(okList);
    CandidateFunc *okCand=filterGoodFunc(okList);
    CandidateFunc *result=cloneCand(okCand);
    n_list_free_full(okList,freeCandidate_cb);
@@ -1008,7 +1071,8 @@ static void selectFuncByRecursion(SelectField *self,ClassName *className,
    if(info==NULL)
       return;
    n_debug("当前类%s找不到匹配的函数，递归的向父类再找。classInfo:%p",className->sysName,info);
-   selectFuncByRecursion(self,&info->parentName,orgiName,exprlist,origtypes,arg_loc,expr_loc,allscope,generics,selectedArray,errors);
+   selectFuncByRecursion(self,&info->parentName,orgiName,exprlist,origtypes,arg_loc,expr_loc,
+         allscope,generics,selectedArray,errors);
 }
 
 /**
@@ -1053,6 +1117,7 @@ CandidateFunc *select_field_get_func_by_recursion(SelectField *self,ClassName *c
         return NULL;
     }
     n_ptr_array_sort(selectArray,sortCandidateFunc_cb);
+    removeZeroNullPointer(selectArray);
     CandidateFunc *result=getBest(selectArray,className);
     CandidateFunc *candidate=cloneCand(result);
     n_ptr_array_unref(selectArray);

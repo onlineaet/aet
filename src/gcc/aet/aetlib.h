@@ -39,8 +39,11 @@ struct _AetLib
    nboolean haveGenericObjs;//是否已从库人取出的泛型对象。
    NPtrArray *genObjArray;
    NPtrArray *genInfoAndBlockArray;
+   NPtrArray *funcWithGbArray;//库中的带泛型块函数源代码
    nboolean haveGenericInfoAndBlock;
    nboolean haveClassIfaceImplInfo;//有没有接口实现信息
+   nboolean haveFuncWithGb;//存在带泛型块函数的源代码吗？
+
    char *classIfaceImplInfo;//库中的类实现接口信息
    char *buffer;//aet库中的内容
 };
@@ -50,5 +53,6 @@ nboolean   aet_lib_have_iface(AetLib *self,char *sysName);
 NPtrArray *aet_lib_get_generic_objs(AetLib *self);
 NPtrArray *aet_lib_get_generic_info_and_block(AetLib *self);
 char      *aet_lib_get_class_iface_impl_info(AetLib *self);
+NPtrArray *aet_lib_get_func_with_gb(AetLib *self);
 
 #endif

@@ -40,7 +40,6 @@ ClassFinal *class_final_new();
 void        class_final_parser(ClassFinal *self,ClassParserState state,struct c_declspecs *specs);
 nboolean    class_final_is_final(ClassFinal *self);
 void        class_final_set_final(ClassFinal *self,nboolean is);
-nboolean    class_final_set_field(ClassFinal *self,tree decls,ClassName *className);
 void        class_final_check_and_set(ClassFinal *self,ClassParserState state);
 
 

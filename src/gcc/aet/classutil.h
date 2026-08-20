@@ -76,6 +76,8 @@ tree                  class_util_create_string_actual_param(location_t loc,char 
 tree                  class_util_create_integer_actual_param(location_t loc,int value);
 //判断是否有编译错误
 nboolean              class_util_have_error();
+char *class_util_get_fndecl_type_name(tree fndecl);
+char *class_util_get_return_type_name (tree fndecl);
 
 
 #endif /* ! GCC_C_AET_H */

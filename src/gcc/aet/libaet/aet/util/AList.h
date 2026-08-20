@@ -86,7 +86,6 @@ public$ class$ AList{
     public$ aboolean find(aconstpointer data,ACompareFunc func);
     public$  void    reverse();
 
-
 };
 
 

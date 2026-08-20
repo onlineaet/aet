@@ -265,29 +265,29 @@ int fun_call_find_func(FuncCall *self,ClassName *className,tree id)
  */
 static void addSelfToFunc(c_parser *parser,ClassName *className)
 {
-	  c_token *openParen = c_parser_peek_token (parser);//"（*"
-	  c_token *who=c_parser_peek_2nd_token(parser);
-	  int tokenCount=parser->tokens_avail;
-	  if(tokenCount+4>AET_MAX_TOKEN){
-			error("token太多了");
-			return;
-	  }
-	  int i;
-	  if(who->type == CPP_CLOSE_PAREN){ //()->(Abc *self)
-		  parser->tokens_avail=tokenCount+1;
-		  for(i=tokenCount;i>1;i--){
-			  aet_utils_copy_token(&parser->tokens[i-1],&parser->tokens[i-1+1]);
-		  }
-	  }else{
-		 //(int->(Abc *self,int
-		  parser->tokens_avail=tokenCount+2;
-		  for(i=tokenCount;i>1;i--){
-			 aet_utils_copy_token(&parser->tokens[i-1],&parser->tokens[i-1+2]); //多一个逗号
-		  }
-  		  aet_utils_create_token(&parser->tokens[2],CPP_COMMA,(char *)",",1);
-	  }
-	  aet_utils_create_token(&parser->tokens[1],CPP_NAME,"self",4);
-	  aet_print_token_in_parser("func_call addSelfToFunc className ---- %s",className->sysName);
+   c_token *openParen = c_parser_peek_token (parser);//"（*"
+   c_token *who=c_parser_peek_2nd_token(parser);
+   int tokenCount=parser->tokens_avail;
+   if(tokenCount+4>AET_MAX_TOKEN){
+      error("token太多了");
+      return;
+   }
+   int i;
+   if(who->type == CPP_CLOSE_PAREN){ //()->(Abc *self)
+      parser->tokens_avail=tokenCount+1;
+      for(i=tokenCount;i>1;i--){
+         aet_utils_copy_token(&parser->tokens[i-1],&parser->tokens[i-1+1]);
+      }
+   }else{
+      //(int->(Abc *self,int
+      parser->tokens_avail=tokenCount+2;
+      for(i=tokenCount;i>1;i--){
+         aet_utils_copy_token(&parser->tokens[i-1],&parser->tokens[i-1+2]); //多一个逗号
+      }
+      aet_utils_create_token(&parser->tokens[2],CPP_COMMA,(char *)",",1);
+   }
+   aet_utils_create_token(&parser->tokens[1],CPP_NAME,"self",4);
+   aet_print_token_in_parser("func_call addSelfToFunc className ---- %s",className->sysName);
 }
 
 /**
@@ -390,13 +390,13 @@ static tree callParentOrParentIface(FuncCall *self,tree func,CandidateFunc *sele
 
 static void test_print_exprlist(vec<tree, va_gc> *exprlist)
 {
-        int ix;
-        tree arg;
-        int count=0;
-        for (ix = 0; exprlist->iterate (ix, &arg); ++ix){
-            printf("print_exprlist -- %d\n",count++);
-            aet_print_tree(arg);
-        }
+   int ix;
+   tree arg;
+   int count=0;
+   for (ix = 0; exprlist->iterate (ix, &arg); ++ix){
+      printf("print_exprlist -- %d\n",count++);
+      aet_print_tree(arg);
+   }
 }
 
 /**
@@ -406,11 +406,12 @@ static void test_print_exprlist(vec<tree, va_gc> *exprlist)
  * exprlist->ordered_remove(0);
 *  vec_safe_insert (exprlist, 0, firstParm);
  */
-static tree callItself(FuncCall *self,tree func,CandidateFunc *selected,vec<tree, va_gc> *exprlist,location_t loc,nboolean allscope)
+static tree callItself(FuncCall *self,tree func,CandidateFunc *selected,vec<tree, va_gc> *exprlist,
+      location_t loc,nboolean allscope)
 {
-    ClassInfo *info=class_mgr_get_class_info(class_mgr_get(),selected->sysName);
-	ClassFunc *item=selected->classFunc;
-    tree decl=NULL_TREE;
+   ClassInfo *info=class_mgr_get_class_info(class_mgr_get(),selected->sysName);
+   ClassFunc *item=selected->classFunc;
+   tree decl=NULL_TREE;
 	if(class_info_is_interface(info)){
 		if(aet_utils_valid_tree(item->fromImplDefine)){
 			error_at(DECL_SOURCE_LOCATION(item->fromImplDefine),"接口%qs不应有定义。",selected->sysName);
@@ -427,14 +428,14 @@ static tree callItself(FuncCall *self,tree func,CandidateFunc *selected,vec<tree
 		}
 	}else{
 		if(aet_utils_valid_tree(item->fieldDecl)){
-			//printf("func_call_select localClass 11 在这里创建本身的field引用 类:%s\n",selected->sysName);
-            tree firstParm= NULL;//(*exprlist)[0];
-            decl=func_help_create_itself_deref_new(self->funcHelp,func,item->fieldDecl,loc,&firstParm);
-           // printf("func_call_select localClass 11ccccc 在这里创建本身的field引用 类:%s\n",selected->sysName);
-            if(aet_utils_valid_tree(decl)){
-                exprlist->ordered_remove(0);
-                vec_safe_insert (exprlist, 0, firstParm);
-            }
+      //printf("func_call_select localClass 11 在这里创建本身的field引用 类:%s\n",selected->sysName);
+         tree firstParm= NULL;//(*exprlist)[0];
+         decl=func_help_create_itself_deref_new(self->funcHelp,func,item->fieldDecl,loc,&firstParm);
+        // printf("func_call_select localClass 11ccccc 在这里创建本身的field引用 类:%s\n",selected->sysName);
+         if(aet_utils_valid_tree(decl)){
+             exprlist->ordered_remove(0);
+             vec_safe_insert (exprlist, 0, firstParm);
+         }
 		}else if(aet_utils_valid_tree(item->fromImplDefine) && allscope){
 		    //printf("func_call_select localClass 11 有定义直接用 类:%s\n",selected->sysName);
 			decl=item->fromImplDefine;
@@ -709,51 +710,20 @@ tree func_call_static_select(FuncCall *self,tree func,vec<tree, va_gc> *exprlist
  * 如果在implimpl field,interface有这个方法存在
  * 等参数解析完后再设self访问或不设
  */
-FuncAndVarMsg func_call_get_process_express_method00(FuncCall *self,tree id, ClassName *className)
-{
-   char *idStr=IDENTIFIER_POINTER(id);
-   ClassName *info=class_mgr_get_class_name_by_user(class_mgr_get(),idStr);
-   if(info!=NULL){
-      n_debug("func_call_get_process_express_method 00 class:%s id:%s 是构造函数 ",className==NULL?"null":className->sysName,idStr);
-      return ID_IS_CONSTRUCTOR;
-   }
-   tree decl = lookup_name (id);
-   if(decl && decl != error_mark_node){
-      n_debug("func_call_get_process_express_method 11 找到了声明的变量或函数返回后由系统build_external_ref处理 decl code:%s id:%s ",
-            get_tree_code_name(TREE_CODE(decl)),idStr);
-      return ID_EXISTS;
-   }
-   c_parser *parser=self->parser->parser;
-   if(className==NULL)
-      return ID_NOT_FIND;
-   if(self->parser->isAet){
-      tree classId=aet_utils_create_ident(className->sysName);
-      tree classDecl=lookup_name(classId);
-      if(!classDecl || classDecl==NULL_TREE || classDecl==error_mark_node){
-         n_debug("func_call_get_process_express_method 22 在isAet中找不到 classname:%s id:%s 由系统build_external_ref处理",className->sysName,idStr);
-         return ID_NOT_FIND;
-      }
-      int re=fun_call_find_func(self,className,id);
-      n_debug("func_call_get_process_express_method 33 在isAet中找函数结果是 %d classname:%s id:%s ",re,className->sysName,idStr);
-      return re;
-   }
-   n_debug("func_call_get_process_express_method 44 找不到任何关于名称的信息 由系统build_external_ref处理 classname:%s id:%s ",className,idStr);
-   return ID_NOT_FIND;
-}
-
 FuncAndVarMsg func_call_get_process_express_method(FuncCall *self,tree id, ClassName *className)
 {
    char *idStr=IDENTIFIER_POINTER(id);
    ClassName *info=class_mgr_get_class_name_by_user(class_mgr_get(),idStr);
    if(info!=NULL){
-      n_debug("func_call_get_process_express_method 00 class:%s id:%s 是构造函数 ",className==NULL?"null":className->sysName,idStr);
+      n_debug("func_call_get_process_express_method 00 class:%s id:%s 是构造函数 ",
+            className==NULL?"null":className->sysName,idStr);
       return ID_IS_CONSTRUCTOR;
    }
    nboolean lookupExists=FALSE;
    tree decl = lookup_name (id);
    if(decl && decl != error_mark_node){
-      n_debug("func_call_get_process_express_method 11 找到了声明的变量或函数返回后由系统build_external_ref处理 decl code:%s id:%s ",
-            get_tree_code_name(TREE_CODE(decl)),idStr);
+      n_debug("func_call_get_process_express_method 11 找到了声明的变量或函数返回后由系统build_external_ref处理\
+             decl code:%s id:%s ",get_tree_code_name(TREE_CODE(decl)),idStr);
       lookupExists = TRUE;
    }
    c_parser *parser=self->parser->parser;
@@ -762,10 +732,10 @@ FuncAndVarMsg func_call_get_process_express_method(FuncCall *self,tree id, Class
          return ID_EXISTS;
       return ID_NOT_FIND;
    }
-   if(self->parser->isAet){
+   if(self->parser->isAet || aet_parser_is_generic_state(self->parser)){
       tree classId=aet_utils_create_ident(className->sysName);
       tree classDecl=lookup_name(classId);
-      if(!classDecl || classDecl==NULL_TREE || classDecl==error_mark_node){
+      if(!aet_utils_valid_tree(classDecl)){
          n_debug("func_call_get_process_express_method 22 在isAet中找不到 classname:%s id:%s 由系统build_external_ref处理",
                className->sysName,idStr);
          if(lookupExists)

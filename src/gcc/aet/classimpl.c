@@ -500,6 +500,7 @@ void class_impl_parser(ClassImpl *self)
    updateClassName(self,NULL);
    n_debug("impl 结束 %s %s",IDENTIFIER_POINTER (ident),in_fnames[0]);
    access_controls_save_access_code(access_controls_get(),tempClassName);//保存访问控制码到当前文件中的全局变量中。
+   generic_parser_save_fwgb(generic_parser_get(),tempClassName);
    class_name_free(tempClassName);
 }
 
@@ -718,6 +719,48 @@ static tree createTempStaticFunction(char *sysClassName,tree component,nboolean 
 }
 
 /**
+ * 是否是正在编译泛型块函数
+ */
+static nboolean atCompileGenericBlock(ClassImpl *self)
+{
+   return (current_function_decl
+      && aet_parser_is_generic_state(self->parser)
+      && generic_util_is_block_func_name(IDENTIFIER_POINTER(DECL_NAME(current_function_decl))));
+}
+
+/**
+ * 处于编译泛型块的状态
+ * 处理  queue[0]需要转化为(XXX)self->queue
+ *   genericblock$(avs){
+        queue[0]=avs;
+      };
+ */
+static nboolean atGenericBlockOrFwgb(ClassImpl *self,location_t loc,char *name)
+{
+   if(!current_function_decl || !name)
+      return FALSE;
+   //获取类型
+   tree param = lookup_name(get_identifier("self"));
+   if(!param ||  TREE_CODE(param)!=PARM_DECL)
+      return FALSE;
+   char *sysName = class_util_get_class_name(TREE_TYPE(param));
+   if(sysName){
+      VarEntity *entity = var_mgr_get_var(var_mgr_get(),sysName,name);
+      if(entity){
+         //是不是声明为泛型E,A,B str内容是aet_generic_A * aet_generic_A **...
+         int pointer=0;
+         char *genericDeclName=generic_util_get_type_str(entity->decl,&pointer);
+         n_debug("processGenericBlockFunc 在这里找到self对应的类 %s %s entity:%p %s pointer:%d\n",
+               sysName,name,entity,genericDeclName,pointer);
+         ClassName *className = class_mgr_get_class_name_by_sys(class_mgr_get(),sysName);
+         var_call_add_deref(self->varCall,get_identifier(name),className);
+         return TRUE;
+      }
+   }
+   return FALSE;
+}
+
+/**
  * 进这里说明标识符CPP_NAME前没有加self->
  * 如果是isaet，在本类和父类中找变量，如果找到了加self->
  * 然后进c_parser_postfix_expression_after_primary
@@ -739,6 +782,12 @@ struct c_expr class_impl_process_expression(ClassImpl *self,struct c_expr expr,l
          //printf("class_impl_process_expression 没在aet中。检查在不在classparser中。%d\n",classParser->state==CLASS_STATE_FIELD);
          gcc_assert(classParser->currentClassName!=NULL);
          className = classParser->currentClassName;
+      }else if(aet_parser_is_generic_state(self->parser) && current_function_decl){
+         tree selfparm=lookup_name(get_identifier("self"));
+         if(selfparm){
+            char *sysName = class_util_get_class_name(TREE_TYPE(selfparm));
+            className = class_mgr_get_class_name_by_sys(class_mgr_get(),sysName);
+         }
       }
    }
    vec<tree, va_gc> *lanuchList=NULL;//mtcs的启动参数setData<<<1,2>>>(...
@@ -859,7 +908,8 @@ fun_entry:
             }else{
                //在classparser中找静态变量
                nboolean parseing = class_parser_is_parsering(class_parser_get());
-               n_debug("classimpl.c 变量找不到，是不是静态函数指针赋值。101 %s exists:%d parseing:%d\n",IDENTIFIER_POINTER(id),exists,parseing);
+               n_debug("classimpl.c 变量找不到，是不是静态函数指针赋值。101 %s exists:%d parseing:%d\n",
+                     IDENTIFIER_POINTER(id),exists,parseing);
                if(parseing){
                   //判断是不是静态变量
                   ClassName  *className=class_parser_get_class_name(class_parser_get());
@@ -873,6 +923,14 @@ fun_entry:
                          expr.value=value;
                          *action = 2;
                       }
+                  }
+               }else{
+                  //如果是进入了泛型文件的编译，加上self是不能处理
+                  if(aet_parser_is_generic_state(self->parser)){
+                     if(atGenericBlockOrFwgb(self,loc,IDENTIFIER_POINTER(id))){
+                        n_debug("classimpl.c atGenericBlockOrFwgb 在泛型块编译中\n");
+                        *action = 1;
+                     }
                   }
                }
             }
@@ -890,8 +948,16 @@ GenericModel *class_impl_get_func_generic_model(ClassImpl *self,tree id)
 {
    c_parser *parser=self->parser->parser;
    ClassName *className=self->className;
+   if(!className && aet_parser_is_generic_state(self->parser)){
+      tree selfparm=lookup_name(get_identifier("self"));
+      if(selfparm){
+         char *sysName=class_util_get_class_name(TREE_TYPE(selfparm));
+         className=class_mgr_get_class_name_by_sys(class_mgr_get(),sysName);
+      }
+   }
    FuncAndVarMsg msg=func_call_get_process_express_method(self->funcCall,id,className);
-   n_debug("class_impl_check_func_generic_define 00 找函数 %s className:%s re:%d",IDENTIFIER_POINTER(id),className==NULL?"null":className->sysName,msg);
+   n_debug("class_impl_check_func_generic_define 00 找函数 %s className:%s re:%d",
+         IDENTIFIER_POINTER(id),className==NULL?"null":className->sysName,msg);
    if(msg!=ISAET_FIND_FUNC)
 	   return NULL;
    n_debug("class_impl_check_func_generic_define 11 创建 -----------className:%s funcName:%s",
@@ -932,17 +998,17 @@ static CreateClassMethod getCreateObjectMethod(tree func)
  */
 static nboolean isInnerFunction(char *funcName)
 {
-     char *sysName=aet_utils_get_sys_name_from_init_method(funcName);
-     if(sysName!=NULL){
-        n_debug("这是一个AET初始化的方法，不需要检查参数 %s",funcName);
-        return TRUE;
-     }
-     sysName=generic_util_sys_name_from_block_func(funcName);
-     if(sysName!=NULL){
-          n_debug("这是一个AET泛型块的内部函数，不需要检查参数 %s",funcName);
-          return TRUE;
-     }
-     return FALSE;
+   char *sysName=aet_utils_get_sys_name_from_init_method(funcName);
+   if(sysName!=NULL){
+      n_debug("这是一个AET初始化的方法，不需要检查参数 %s",funcName);
+      return TRUE;
+   }
+   sysName=generic_util_sys_name_from_block_func(funcName);
+   if(sysName!=NULL){
+      n_debug("这是一个AET泛型块的内部函数，不需要检查参数 %s",funcName);
+      return TRUE;
+   }
+   return FALSE;
 }
 
 /**
@@ -959,7 +1025,6 @@ struct c_expr class_impl_replace_func_id(ClassImpl *self,struct c_expr expr,vec<
    tree func=expr.value;
    if(TREE_CODE (func) != FUNCTION_DECL && TREE_CODE (func)!=COMPONENT_REF){
       n_info("class_impl_replace_func_id 00 不是正确的类型 FUNCTION_DECL或COMPONENT_REF code:%s", get_tree_code_name(TREE_CODE (func)));
-      aet_print_tree(func);
       return expr;
    }
    tree returnType=TREE_TYPE(func);
@@ -1056,15 +1121,21 @@ struct c_expr class_impl_replace_func_id(ClassImpl *self,struct c_expr expr,vec<
          return expr;
       }
    }else if(TREE_CODE (func)==COMPONENT_REF && AET_LANG_FLAG_6(func)==1){
+   label_1:
       tree field=TREE_OPERAND(func,1);
       tree id=DECL_NAME (field);
       char *funcName=IDENTIFIER_POINTER(DECL_NAME (field));
       n_debug("class_impl_replace_func_id 77 这是指针引用  funcName:%s",funcName);
-      aet_print_tree(func);
-      last=func_call_deref_select(self->funcCall,func,exprlist,origtypes,arg_loc,expr_loc,&errors,selectFunc);
+      last=func_call_deref_select(self->funcCall,
+            func,exprlist,origtypes,arg_loc,expr_loc,&errors,selectFunc);
       n_debug("class_impl_replace_func_id 88 这是指针引用  funcName:%s",funcName);
-      aet_print_tree(last);
       class_cast_parm_convert_from_deref(self->classCast,last,exprlist);
+      n_debug("class_impl_replace_func_id 99 这是指针引用  funcName:%s",funcName);
+
+      //是否优化为函数调用
+      last = cmp_ref_opt_outside(self->cmpRefOpt,last,selectFunc->classFunc,exprlist,expr_loc);
+      n_debug("class_impl_replace_func_id 100 这是指针引用  funcName:%s",funcName);
+
    }else if(TREE_CODE (func)==COMPONENT_REF && AET_LANG_FLAG_5(func)==1){
       tree field=TREE_OPERAND(func,1);
       char *funcName=IDENTIFIER_POINTER(DECL_NAME (field));
@@ -1093,7 +1164,33 @@ struct c_expr class_impl_replace_func_id(ClassImpl *self,struct c_expr expr,vec<
    }else{
       if(TREE_CODE (func)==FUNCTION_DECL){
          char *funcName=IDENTIFIER_POINTER(DECL_NAME(func));
-         n_info("class_impl_replace_func_id 99 不处理的函数 由implicilty处理，funcName:%s %s",funcName,in_fnames[0]);
+         n_info("class_impl_replace_func_id 99 不处理的函数由implicilty处理，funcName:%s %s",funcName,in_fnames[0]);
+         if(aet_parser_is_generic_state(self->parser)){
+            n_debug("处于编译泛型块函数或fwg的状态 implicilty处理---- goto label_1;\n");
+            tree selfparam = lookup_name(get_identifier("self"));
+            if(selfparam && TREE_CODE(selfparam)==PARM_DECL){
+              char *sysName = class_util_get_class_name(TREE_TYPE(selfparam));
+              if(sysName){
+                 ClassName *cn = class_mgr_get_class_name_by_sys(class_mgr_get(),sysName);
+                 char *mangleName = func_mgr_get_mangle_func_name(func_mgr_get(),cn,funcName);
+                 if(mangleName){
+                    ClassFunc *fn=func_mgr_get_entity(func_mgr_get(),cn,mangleName);
+                    if(fn->fieldDecl){
+                       tree newFun = aet_utils_create_temp_func_name(sysName,funcName);
+                       tree obj = build1(INDIRECT_REF,TREE_TYPE(TREE_TYPE(selfparam)),selfparam);
+                       tree record=lookup_name(get_identifier(sysName));
+                       tree  field = build_decl (expr_loc,FIELD_DECL, newFun, build_pointer_type(TREE_TYPE(record)));
+                       tree component = build3 (COMPONENT_REF,TREE_TYPE (field),obj,field,NULL_TREE);
+                       func = component;
+                       vec_safe_insert(exprlist,0,selfparam);//插入self参数到第一个位置
+                       if(origtypes)
+                          vec_safe_insert(origtypes,0,TREE_TYPE(selfparam));
+                       goto label_1;
+                    }
+                 }
+              }
+            }
+         }
          if(implicitly_call_have_func(self->implicitlyCall,func)){
             selectFunc->implicitlyFunc=TRUE;//是一个隐藏函数
          }else{
@@ -1119,7 +1216,8 @@ struct c_expr class_impl_replace_func_id(ClassImpl *self,struct c_expr expr,vec<
 
    if(aet_utils_valid_tree(last)){
       n_debug("class_impl_replace_func_id 100 expr.value 被改变了 id:%s func:%s %p name:%s implicitlyFunc:%d",
-            fName,get_tree_code_name(TREE_CODE (func)),func,selectFunc->classFunc->mangleFunName,selectFunc->implicitlyFunc);
+            fName,get_tree_code_name(TREE_CODE (func)),func,selectFunc->classFunc->mangleFunName,
+            selectFunc->implicitlyFunc);
       void *gen=c_aet_get_func_generics_model(last);
       //ogriGen！=NULL说明是泛型函数，泛型类型是orgiGen,如果last没有泛型类型，则用func的泛型类型设给last
       void *ogriGen=c_aet_get_func_generics_model(func);
@@ -1150,12 +1248,15 @@ static void printParams( vec<tree, va_gc> *params)
  * select_field_build_function_call_vec可以处理函数中带泛型的参数
  */
 tree class_impl_build_function_call_vec(ClassImpl *self,location_t loc, vec<location_t> arg_loc,
-        tree function, vec<tree, va_gc> *params, vec<tree, va_gc> *origtypes,SelectFunc *selectFunc,GenericModel **defineGenModel)
+        tree function, vec<tree, va_gc> *params, vec<tree, va_gc> *origtypes,
+        SelectFunc *selectFunc,GenericModel **defineGenModel)
 {
    printParams(params);
    tree ret;
    if(selectFunc->sucessed==0){
       //说明是一个外部函数 如果在源文件前有太多错误，ret返回的是error_mark_node bug 041
+      //检查参数中是否有需要转化的泛型类型 E *queue queue[0]=...
+      generic_parser_parm(generic_parser_get(),params,origtypes);
       ret=c_build_function_call_vec (loc, arg_loc, function, params, origtypes);
       if(!aet_utils_valid_tree(ret))
          return error_mark_node;
@@ -1164,9 +1265,11 @@ tree class_impl_build_function_call_vec(ClassImpl *self,location_t loc, vec<loca
          implicitly_call_set_call(self->implicitlyCall,ret,arg_loc);
       }
    }else{
-      ret=select_field_build_function_call_vec(select_field_get(),loc, arg_loc, function, params, origtypes,selectFunc);
+      ret=select_field_build_function_call_vec(select_field_get(),loc,
+            arg_loc, function, params, origtypes,selectFunc);
       if(class_func_is_func_generic(selectFunc->classFunc)){
-         GenericModel *funcGenericDefine=c_aet_get_func_generics_model(function);//如果funcGenericDefine是有效的说明这是一个泛型函数
+         //如果funcGenericDefine是有效的说明这是一个泛型函数
+         GenericModel *funcGenericDefine=c_aet_get_func_generics_model(function);
          *defineGenModel=funcGenericDefine;
       }
    }
@@ -1425,6 +1528,7 @@ void   class_impl_compile_over(ClassImpl *self)
 	   middle_file_iface_impl_check(middle_file_get());
 	   makefile_parm_append_d_file(makefile_parm_get());
 	   generic_graph_save(generic_graph_get());
+	   generic_parser_register_fwg(generic_parser_get());
 	   nuint64 diff=(self->compileTime.end-self->compileTime.start);//毫秒
 	   if(diff>1000){
 	      n_warning("生成语法树所花时间：%s %llu\n",in_fnames[0],diff);
@@ -1535,8 +1639,17 @@ struct c_expr class_impl_parser_object(ClassImpl *self)
    return expr;
 }
 
-void   class_impl_finish_function(ClassImpl *self,tree fndecl)
+void   class_impl_finish_function(ClassImpl *self,tree fndecl,location_t endLoc)
 {
+   if(self->parser->isAet){
+      //检查覆盖了final$方法
+      ClassFunc    *cf= func_mgr_get_func(func_mgr_get(),fndecl);
+      if(cf){
+         n_debug("class_impl_finish_function -- %s\n",cf->orgiName);
+         class_func_set_end_location(cf,endLoc);
+         func_mgr_parent_have_final(func_mgr_get(),DECL_SOURCE_LOCATION(fndecl),cf);
+      }
+   }
    object_return_finish_function(object_return_get(),fndecl);
    cmp_ref_opt_add(self->cmpRefOpt,fndecl);
 }
@@ -1558,8 +1671,11 @@ tree   class_impl_add_return(ClassImpl *self,location_t loc,tree retExpr,tree ex
          aet_print_tree(retExpr);
       }
    }
+   generic_parser_return(generic_parser_get(),&retExpr);
    object_return_add_return(object_return_get(),retExpr);
    tree expr=object_return_convert(object_return_get(),loc,retExpr);
+   expr=object_return_convert_block(object_return_get(),expr);
+
    return expr;
 }
 
@@ -1611,15 +1727,6 @@ tree class_impl_modify_or_init_func_pointer(ClassImpl *self,location_t loc,tree 
        // printf("class_impl_modify_or_init_func_pointer 检查调用隐藏函数的返回值是否与lhs匹配 %s\n",self->className->sysName);
         nboolean isCallImplic= implicitly_call_set_init_or_modify_impl_conv(self->implicitlyCall,
                 lhs,rhs,rhsOrigType,self->className->sysName,isModify);
-//        printf("class_impl_modify_or_init_func_pointer 11 %d\n",isCallImplic);
-//        aet_print_tree(rhs);
-//
-//        if(isCallImplic){
-//             printf("class_impl_modify_or_init_func_pointer left -------\n");
-//             aet_print_tree(lhs);
-//             printf("class_impl_modify_or_init_func_pointer right -------\n");
-//             aet_print_tree(rhs);
-//        }
     }
    return parser_static_modify_or_init_func_pointer(parser_static_get(),loc,lhs,rhs);
 }
@@ -1749,7 +1856,6 @@ tree  class_impl_record_mtcs_call(ClassImpl *self,location_t loc,tree earlyFuncD
    if(classFunc==NULL){
       if(mtcs_parser_is_compiling(mtcs_parser_get())){
          n_debug("在核函数或设备函数中调用主机函数\n");
-         aet_print_tree(call);
       }
       return call;
    }
@@ -2012,6 +2118,25 @@ tree class_impl_push_parm_decl(ClassImpl *self,const struct c_parm *parm, tree *
    decl = pushdecl (decl);
    finish_decl (decl, input_location, NULL_TREE, NULL_TREE, NULL_TREE);
    return decl; //zclei
+}
+
+/**
+ * 是否需要把类中的函数定义为全局函数
+ */
+nboolean class_impl_can_global(ClassImpl *self,tree fndecl)
+{
+   if(!fndecl)
+      return FALSE;
+   if(!self->parser->isAet)
+      return FALSE;
+   ClassFunc *func=func_mgr_get_func(func_mgr_get(),fndecl);
+   if(!func)
+      return FALSE;
+   if(class_func_is_private(func) || !class_func_is_normal(func))
+      return FALSE;
+   //如果所在的类是final$可以全局 或 函数本身是final$的
+   ClassInfo *cinfo = class_mgr_get_class_info_by_class_name(class_mgr_get(),func->className);
+   return class_info_is_final(cinfo) || class_func_is_final(func);
 }
 
 ClassImpl *class_impl_get()

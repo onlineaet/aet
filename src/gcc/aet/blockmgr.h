@@ -38,7 +38,7 @@ struct _BlockMgr
 	AetParser *parser;
 	GenericInfo *genericInfos[20];
 	int infoCount;
-	tree lhs;
+	tree lhs;//genericblock$(...的返回值，如查是return genericblock$(...返回值与当前所在函数一样。
 	char *currentBlockName;
 	//新版
 	char *saveString;
@@ -58,7 +58,11 @@ NPtrArray     *block_mgr_get_output_generic_info(BlockMgr *self);
 nboolean       block_mgr_parser_goto(BlockMgr *self,nboolean start_attr_ok,AetGotoTag re);
 void           block_mgr_set_lhs(BlockMgr *self,tree lhs);
 int            block_mgr_get_block_count(BlockMgr *self,ClassName *className);
-int            block_mgr_have_block(BlockMgr *self,ClassName *className);
+//类中函数有多少个泛型块
+int            block_mgr_get_block_count_by_func(BlockMgr *self,ClassFunc *func);
+//整个编译单元是不有泛型块函数
+nboolean       block_mgr_have_block(BlockMgr *self);
+GenericInfo   *block_mgr_get_info (BlockMgr *self,ClassName *className);
 
 
 

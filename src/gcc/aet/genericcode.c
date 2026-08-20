@@ -67,32 +67,29 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 #include "genericutil.h"
 #include "genericcode.h"
 
-//用编译单元生成编译文件。
-typedef struct _CompileUnit CompileUnit;
-struct _CompileUnit
-{
-   GenericInfo *info;
-   NString *codes;
-   NPtrArray *genObjArray; //创建代码 #include ...
-   //生成代码 BlockFuncIndex
-   //static BlockFuncData _bfi_value_0[]={
-   //{(void*)_float_0_TFirst__gen_block_func_1,"_float_0_TFirst__gen_block_func_1","_float_0","TFirst",1}};
-   NPtrArray *blockIndexArray;
-   CompileUnit *merges[20];
-   int mergeCount;
-};
 
 /**
  * 收集函数的信息，以便通过泛型单元，类名，块索引号找到对应的函数地址
  */
 typedef struct _BlockFuncIndex
 {
-   char *funcName;
-   char *genericModel;
-   char *sysName;
-   int index;
+   char *funcName;  //泛型块函数名
+   char *genericModel;//泛型定义 不是E 是具体的类型如 int
+   char *sysName;  //所在类名
+   int index; //泛型块在类中的序号，从0开始
 }BlockFuncIndex;
 
+typedef struct _GenericParams
+{
+    char **params;      /* 参数字符串数组 */
+    int    count;       /* 参数个数 */
+} GenericParams;
+
+
+static char *replace_genericblock(const char *src,NPtrArray *blocks,int firstNumber);
+static int extract_generic_params(const char *src, GenericParams *out);
+static char *replaceFuncName(char *src,char *managleFuncName,char *genericMode);
+static char *createFuncNameWithGb(char *managleFuncName,char *genericMode);
 
 static void genericCodeInit(GenericCode *self)
 {
@@ -138,7 +135,8 @@ static char *formatGenericUnitForCompile(GenericObj *obj)
  * defineFuncUnits 泛型函数的泛型单元字符化 格式 如:_float_0
  * defineClassUnits 泛型类的泛型单元字会化  格式 如:_int_0
  */
-static BlockFuncIndex *createBlockFuncIndex(char *funcName,char *sysName,char *defineFuncUnits,char *defineClassUnits,int index)
+static BlockFuncIndex *createBlockFuncIndex(char *funcName,char *sysName,
+      char *defineFuncUnits,char *defineClassUnits,int index)
 {
    BlockFuncIndex *f=n_slice_new0(BlockFuncIndex);
    NString *codes=n_string_new("");
@@ -213,17 +211,19 @@ static char * replaceParams(GenericObj *genObj,char *paramsStr)
 {
    if(paramsStr==NULL)
       return NULL;
+   //取出函数的参数
    char **items=n_strsplit(paramsStr,",",-1);
    int len=n_strv_length(items);
    int i,j;
    NString *restoreParam=n_string_new("");
    for(i=0;i<len;i++){
       char *param=items[i];
+      //如果参数据类型是 aet_generic_E或T等
       if(param!=NULL && generic_util_start_with_generic(param)){
          int strSize=strlen(param);
          char *genericType= generic_util_get_start_with_generic(param);
          int pointer=0;
-         for(j=strlen(genericType);i<strSize;j++){
+         for(j=strlen(genericType);j<strSize;j++){
             if(param[j] ==' ')
                continue;
             else if(param[j]=='*'){
@@ -235,12 +235,13 @@ static char * replaceParams(GenericObj *genObj,char *paramsStr)
          char varName[512];
          strncpy(varName,param+j,strSize-j);
          varName[strSize-j] ='\0';
-         char *origName=generic_util_get_orig_param_name(varName);
+         char *origName=generic_util_get_block_orig_param_name(varName);
          if(origName==NULL){
             n_error("泛型块函数中的参数:%s不是有效的名字，报告此错误！\n",varName);
-            return;
+            return NULL;
          }
            //printf("formatGenericUnitForCompile --- %p %p %d\n",obj,obj->origModel,obj->infoLen);
+
            for(j=0;j<genObj->infoLen;j++){
               RunGenericInfo *info=genObj->infos[j];
               char *gname=genObj->origModel->genUnits[j]->name;
@@ -254,23 +255,22 @@ static char * replaceParams(GenericObj *genObj,char *paramsStr)
                  else if(pointer==3)
                     n_string_append(restoreParam,"***");
                  n_string_append(restoreParam,origName);
-                 n_string_append(restoreParam,"=");
+                 n_string_append(restoreParam,"= ");
                  if(info->genUnit->pointerCount==0){
                      if(pointer==0)
                         n_string_append_printf(restoreParam,"*((%s *)%s)",gname,varName);
                      else
                         n_string_append_printf(restoreParam,"(%s *)%s",gname,varName);
-
                  }else{
-                    n_string_append_printf(restoreParam,"(%s *)%s",gname,varName);
-
+                    n_string_append_printf(restoreParam,"(%s )%s",gname,varName);
                  }
                  n_string_append(restoreParam,";\n");
               }
-              n_debug("replaceParams info -- is:j:%d %s %s %d %d\n",
-                    j,gname,info->genUnit->name,info->genUnit->pointerCount,info->genUnit->size);
+             // printf("replaceParams info -- is:j:%d %s %s %d %d\n",
+                 //   j,gname,info->genUnit->name,info->genUnit->pointerCount,info->genUnit->size);
 
            }
+
       }
    }
    if(restoreParam->len==0){
@@ -279,6 +279,8 @@ static char * replaceParams(GenericObj *genObj,char *paramsStr)
    }
    return n_string_free(restoreParam,FALSE);
 }
+
+
 /**
 * 生成泛型块函数
 * 重要的是两个地方
@@ -289,13 +291,13 @@ static char * replaceParams(GenericObj *genObj,char *paramsStr)
  {
     int f ;
   }
-*
 */
 static char *createBlockFuncCode(GenericObj *genObj,GenericBlock *block,char *newFuncName)
 {
    NString *codes=n_string_new("");
    char *replace= replaceParams(genObj,block->parms);
-
+   //printf("createBlockFuncCode return ---- %s\n",block->returnType);
+   n_string_append(codes,"static inline ");
    n_string_append_printf(codes," %s ",block->returnType);
    n_string_append(codes,newFuncName);
    n_string_append_printf(codes,"(%s)\n",block->parms);
@@ -335,6 +337,7 @@ static char *createCodesForGenfunc(GenericObj *funObj,GenericInfo *info,
    if(!info->isGenericClass){
       //泛型函数所在的类不是泛型类
       char *directive=genFunUnitsForCompile;
+      //重要标记，查找到块代码的指示
       n_string_append_printf(codes,"%s %d \n",RID_AET_GOTO_STR,GOTO_ENTER_COMPILE_GENERIC_BLOCK_FUNC);
       n_string_append_printf(codes,"\"%s\"\n",directive);
       for(i=0;i<info->blocksCount;i++){
@@ -346,6 +349,7 @@ static char *createCodesForGenfunc(GenericObj *funObj,GenericInfo *info,
          if(block->isFuncGeneric && !strcmp(block->belongFunc,funObj->callee->mangleFunName)){
             char *newFuncName=createFuncName(block->name,funcDefineUnits,NULL);
             char *funcdefine=createBlockFuncCode(funObj,block,newFuncName);
+            printf("createCodesForGenfunc 00 %s -- %s\n",newFuncName,funcdefine);
             n_string_append(codes,funcdefine);
             n_string_append(codes,"\n");
             gcc_assert(block->index==i);
@@ -430,7 +434,9 @@ static char *createCodesForClass(GenericObj *classGenObj,GenericInfo *info,NPtrA
          continue;
       if(codes==NULL){
          codes=n_string_new("");
+         //生成 aet_goto_compile$ 16
          n_string_append_printf(codes,"%s %d \n",RID_AET_GOTO_STR,GOTO_ENTER_COMPILE_GENERIC_BLOCK_FUNC);
+         //生成"E_int_0_4"
          n_string_append_printf(codes,"\"%s\"\n",directive);
       }
       char *newFuncName=createFuncName(block->name,NULL,classDefineUnits);
@@ -448,22 +454,6 @@ static char *createCodesForClass(GenericObj *classGenObj,GenericInfo *info,NPtrA
       return NULL;
 }
 
-static CompileUnit *createCompileUnit(NPtrArray *compileUnitArray,GenericInfo *newInfo)
-{
-   int i;
-   for(i=0;i<compileUnitArray->len;i++){
-      CompileUnit *unit=n_ptr_array_index(compileUnitArray,i);
-      if(unit->info==newInfo)
-         return unit;
-   }
-   CompileUnit *unit=n_slice_new0(CompileUnit);
-   unit->info=newInfo;
-   unit->codes=n_string_new("");
-   unit->genObjArray=n_ptr_array_new();
-   unit->blockIndexArray=n_ptr_array_new();
-   n_ptr_array_add(compileUnitArray,unit);
-   return unit;
-}
 
 /**
  * 头文件是否存在
@@ -479,210 +469,366 @@ static nboolean existsHeaderFile(NPtrArray *headerFileArray,char *file)
    return FALSE;
 }
 
-static void createHeader(CompileUnit *unit,NPtrArray *headerFileArray)
+/////////////////------------------开始新版------------------------
+/**
+ * 比较两个对象的泛型定义是否相同
+ */
+static nboolean isSameRunGenInfo(GenericObj *a,GenericObj *b)
 {
-   int i,j;
-   for(i=0;i<unit->genObjArray->len;i++){
-      GenericObj *obj=n_ptr_array_index(unit->genObjArray,i);
-     // printf("createHeader---- %s\n",obj->declClassFile);
-      if(obj->declClassFile!=NULL && !existsHeaderFile(headerFileArray,obj->declClassFile) && endswith(obj->declClassFile,".h")){
-          n_ptr_array_add(headerFileArray,obj->declClassFile);
-      }
-      for(j=0;j<obj->infoLen;j++){
-         RunGenericInfo *info=obj->infos[j];
-         if(info->file!=NULL && !existsHeaderFile(headerFileArray,info->file) && endswith(info->file,".h")){
-            n_ptr_array_add(headerFileArray,info->file);
-         }
-      }
+   if(!a || !b)
+      return FALSE;
+   if(a->infoLen!=b->infoLen)
+      return FALSE;
+   int i;
+   for(i=0;i<a->infoLen;i++){
+      RunGenericInfo *ar=a->infos[i];
+      RunGenericInfo *br=b->infos[i];
+      if(!generic_unit_equal(ar->genUnit,br->genUnit))
+         return FALSE;
    }
+   return TRUE;
 }
 
-/*
- * 生成BlockFuncData数据
-static BlockFuncData _bfi_value_0[]={
-{(void*)_double_0_com_ai_linear_SVD__gen_block_func_0,"_double_0_com_ai_linear_SVD__gen_block_func_0","_double_0","com_ai_linear_SVD",0},
-*/
-static void createFuncAddressCodes(NPtrArray *funcNameArray,NString *codes)
+/**
+ * 生成
+ * static BlockFuncData _bfi_value_0[]={
+    {(void*)_int_0_debug_ASecond__gen_block_func_0,"_int_0_debug_ASecond__gen_block_func_0","_int_0","debug_ASecond",0}};
+ */
+static void genBlockAddressVar(NPtrArray *funcNameArray,NPtrArray *blockFuncArressArray)
 {
    int i;
-   int len=funcNameArray->len;
-   for(i=0;i<len;i++){
+   for(i=0;i<funcNameArray->len;i++){
       BlockFuncIndex *b=n_ptr_array_index(funcNameArray,i);
-      n_string_append_printf(codes,"{(void*)%s,",b->funcName);
-      n_string_append_printf(codes,"\"%s\",",b->funcName);
-      n_string_append_printf(codes,"\"%s\",",b->genericModel);
-      n_string_append_printf(codes,"\"%s\",",b->sysName);
-      n_string_append_printf(codes,"%d}",b->index);
-      if(i<funcNameArray->len-1)
-         n_string_append(codes,",\n");
+      char *address = n_strdup_printf("{(void*)%s,\"%s\",\"%s\",\"%s\",%d}",
+            b->funcName,b->funcName,b->genericModel,b->sysName,b->index);
+      n_ptr_array_add(blockFuncArressArray,address);
    }
 }
 
-/*生成如下代码:
- * static BlockFuncData _bfi_value[]={
-{(void*)_float_0_TFirst__gen_block_func_0,"_float_0_TFirst__gen_block_func_0","_float_0","TFirst",0}};
-
-static __attribute__((constructor)) void load_generic_data()
+typedef struct _CompileFile
 {
-   add_generic_data(_bfi_value);
-}
- */
+   char *fileName;//new 对象和调用泛型函数的所在.c源文件
+   char *oFile;//.c源文件的输出源文件
+   //块函数定义
+   NPtrArray *blockFuncArray;
+   //带泛型块函数的定义
+   NPtrArray *funcWithGbArray;
+   //块函数的地址
+   //{(void*)_int_0_TFirst__gen_block_func_0,"_int_0_TFirst__gen_block_func_0","_int_0","TFirst",0}
+   NPtrArray *blockFuncAddressArray;
+   //带泛型块函数的地址
+   NPtrArray *funcWithGbAddressArray;
+   NPtrArray *headerArray;//头文件
+   GenericInfo *infos[50];//一个文件编译単元中关联的GenericInfo
+   int infoCount;
+}CompileFile;
 
-static int createBlockIndex(CompileUnit *unit,NString *codes,NString *addCodes,int total)
+static void addHeader(CompileFile *cf,GenericObj *obj)
 {
-   int len=unit->blockIndexArray->len;
-   int i;
-   int count=total;
-   for(i=0;i<len;i++){
-       NPtrArray *sub=n_ptr_array_index(unit->blockIndexArray,i);
-       n_string_append_printf(codes,"static BlockFuncData _bfi_value_%d[]={\n",count);
-       createFuncAddressCodes(sub,codes);
-       n_string_append(codes,"};\n");
-       n_string_append(codes,"\n");
-       n_string_append_printf(addCodes,"\tadd_generic_data(_bfi_value_%d,%d);\n",count,sub->len);
-       count++;
-   }
-   return count;
-}
-
-static void createFuncAddress(NString *codes,CompileUnit *unit)
-{
-   int count=0;
-   NString *ic1=n_string_new("");
-   NString *ic2=n_string_new("");
-   count=createBlockIndex(unit,ic1,ic2,count);
-   int i;
-   for(i=0;i<unit->mergeCount;i++){
-      count=createBlockIndex(unit->merges[i],ic1,ic2,count);
-   }
-   n_string_append(codes,ic1->str);
-   n_string_append(codes,"static __attribute__((constructor)) void load_generic_data()\n");
-   n_string_append(codes,"{\n");
-   n_string_append(codes,ic2->str);
-   n_string_append(codes,"}\n");
-   n_string_free(ic1,TRUE);
-   n_string_free(ic2,TRUE);
-}
-
-/**
- * 加入函数代码到编译单元
- * funcNameArray 属于CompileUnit的所有函数名
- */
-static void addCodes(CompileUnit *unit,GenericObj *genObj,char *blockCodes,NPtrArray *funcNameArray)
-{
-    n_string_append(unit->codes,blockCodes);
-    n_ptr_array_add(unit->genObjArray,genObj);
-    n_ptr_array_add(unit->blockIndexArray,funcNameArray);
-}
-
-static void addCodes(CompileUnit *unit,GenericObj *genObj,NPtrArray *dependClassGenObjArray,char *blockCodes,NPtrArray *funcNameArray)
-{
-    n_string_append(unit->codes,blockCodes);
-    n_ptr_array_add(unit->genObjArray,genObj);
-    int i;
-    for(i=0;i<dependClassGenObjArray->len;i++)
-       n_ptr_array_add(unit->genObjArray,n_ptr_array_index(dependClassGenObjArray,i));
-    n_ptr_array_add(unit->blockIndexArray,funcNameArray);
-}
-
-/**
- * 在NPtrArray是否已存在GenericObj obj
- */
-static CompileUnit *existsUnit(NPtrArray *newArray,CompileUnit *unit)
-{
-    int i;
-    for(i=0;i<newArray->len;i++){
-       CompileUnit *item=n_ptr_array_index(newArray,i);
-       if(unit==item){
-          n_error("有两个相同的编译单元。%s",item->info->className->sysName);
-          return NULL;
-       }
-       char *a=unit->info->classDeclBelongFile;
-       char *b=item->info->classDeclBelongFile;
-       if(strcmp(a,b)==0 && endswith(a,".c"))
-          return item;
-    }
-    return NULL;
-}
-
-/**
- * 移走全定义相同的泛型对象。
- */
-static void mergeUnit(NPtrArray *unitArray)
-{
-   if(unitArray->len<=1)
-      return;
-   NPtrArray *newArray=n_ptr_array_new();
    int i,j;
-   for(i=0;i<unitArray->len;i++){
-      CompileUnit *item=n_ptr_array_index(unitArray,i);
-      CompileUnit *exists=existsUnit(newArray,item);
-      if(exists){
-         exists->merges[exists->mergeCount++]=item;
-      }else{
-         n_ptr_array_add(newArray,item);
+   // printf("createHeader---- %s\n",obj->declClassFile);
+   if(obj->declClassFile!=NULL &&
+   !existsHeaderFile(cf->headerArray,obj->declClassFile)
+   && endswith(obj->declClassFile,".h")){
+      n_ptr_array_add(cf->headerArray,obj->declClassFile);
+   }
+   for(j=0;j<obj->infoLen;j++){
+      RunGenericInfo *info=obj->infos[j];
+      if(info->file!=NULL && !existsHeaderFile(cf->headerArray,info->file) && endswith(info->file,".h")){
+         n_ptr_array_add(cf->headerArray,info->file);
       }
    }
-   n_ptr_array_remove_range(unitArray,0,unitArray->len);
-   for(i=0;i<newArray->len;i++)
-      n_ptr_array_add(unitArray,n_ptr_array_index(newArray,i));
-   n_ptr_array_unref(newArray);
+}
+
+static void addGenInfo(CompileFile *cf,GenericInfo *info)
+{
+    int i;
+    for(i=0;i<cf->infoCount;i++){
+       if(cf->infos[i]==info)
+          return;
+    }
+    cf->infos[cf->infoCount++] = info;
+}
+
+
+/**
+ *生成带泛型块的真实函数
+ */
+static char *genFuncWithGbCode(GenericInfo *info,NPtrArray *blockIndexArray)
+{
+   char *sysName= info->className->sysName;
+   int i,j;
+   //类中带泛型块的函数
+   FuncWithGbData *datas[100];
+   int count=generic_parser_get_func(generic_parser_get(),sysName,datas);
+   if(count==0)
+      return NULL;
+   NString *codes=n_string_new("");
+   for(i=0;i<count;i++){
+      FuncWithGbData *item = datas[i];
+      char *code=item->code;
+      BlockFuncIndex *b=n_ptr_array_index(blockIndexArray,0);
+      char *newfunc = replace_genericblock(code,blockIndexArray,item->firstNumber);
+      char *replace = replaceFuncName(newfunc,item->mangleFunName,b->genericModel);
+      n_string_append(codes,"\n");
+      n_string_append(codes,replace);
+      n_string_append(codes,"\n");
+      //printf("genFuncWithGbCode 11 %s %s %s\n",b->genericModel,item->mangleFunName,replace);
+      free(newfunc);
+      free(replace);
+   }
+   if(codes->len==0){
+      n_string_free(codes,TRUE);
+      return NULL;
+   }else
+      return n_string_free(codes,false);
 }
 
 /**
- * 创建编译单元
- * index是索引号
- * 返回要编译的文件名。
- * 重点：如果要编译的内容加到源代码中编译，返回的文件名格式是:
- * 泛型块文件+","+类声明所在的.c文件+","类声明所在的.c文件的o文件
+ * 生成带泛型块函数的变量
+ * static BlockFuncData _fwgd_value_[]={
+   {(void*)_int_0__Z7ASecond4pushEPN7ASecondEPv,"_int_0__Z7ASecond4pushEPN7ASecondEPv","_int_0","debug_ASecond",0},
+   {(void*)_int_0__Z7ASecond4setaEPN7ASecondEPv,"_int_0__Z7ASecond4setaEPN7ASecondEPv","_int_0","debug_ASecond",1},
+};
+ *funcCount在类中的带泛型块数据的数量
  */
-static char *createCompileUnitFile(CompileUnit *unit,int index,char *parentPath)
+static void genFuncWithGbAddress(GenericInfo *info,NPtrArray *blockIndexArray,NPtrArray *funcWithGbAddressArray)
 {
-   //生成include的内容
+   char *sysName= info->className->sysName;
    int i,j;
-   //writeCfile=true 表示在在项目.c文件后，追加编译 见 aetcollect.c
-   nboolean writeCfile=unit->info->classDeclBelongFile && endswith(unit->info->classDeclBelongFile,".c");
-   NPtrArray *headerFileArray=n_ptr_array_new();
-   createHeader(unit,headerFileArray);
-   for(i=0;i<unit->mergeCount;i++)
-      createHeader(unit->merges[i],headerFileArray);
+   //类中带泛型块的函数结构体，count是个有多少个
+   FuncWithGbData *datas[100];
+   int count=generic_parser_get_func(generic_parser_get(),sysName,datas);
+   if(count==0)
+      return NULL;
+   for(i=0;i<count;i++){
+      FuncWithGbData *item = datas[i];
+      BlockFuncIndex *b=n_ptr_array_index(blockIndexArray,0);
+      char *newFuncName = createFuncNameWithGb(item->mangleFunName,b->genericModel);
+      char *address = n_strdup_printf("{(void*)%s,\"%s\",\"%s\",\"%s\",%d}",
+            newFuncName,newFuncName,b->genericModel,sysName,i);
+      free(newFuncName);
+      n_ptr_array_add(funcWithGbAddressArray,address);
+   }
+}
 
+static void genClassCodes(CompileFile *cf,GenericObj *classGenObj)
+{
+   NPtrArray *genInfoArray=block_mgr_get_output_generic_info(block_mgr_get());
+   n_debug("genericcode.c genClassCodes 00 %s\n",classGenObj->newObject->className.sysName);
+   GenericInfo *info=getGenericInfo(genInfoArray,classGenObj->newObject->className.sysName);
+   if(info==NULL){
+//      printf("genClassCodes 00 %p\n",classGenObj);
+//      printf("genClassCodes 11 %p\n",classGenObj->newObject);
+//      printf("genClassCodes 22 %p\n",classGenObj->newObject->className.sysName);
+      n_debug("genericcode.c genClassCodes 类%s中没有泛型块。%s\n",classGenObj->newObject->className.sysName);
+      return;
+   }
+   n_debug("genericcode.c genClassCodes 00 普通函数中的块 genObj:%p info:%p\n",
+         classGenObj,info);
+   n_debug("genericcode.c genClassCodes 11 普通函数中的块 className:%s  atClassFunc:%p oFile:%s\n",
+        classGenObj->newObject->className.sysName,classGenObj->atFunc,info->oFile);
+   //收集生成的新函数名
+   NPtrArray *funcNameArray=n_ptr_array_new();
+   //1.生成泛型块代码
+   char *codes=createCodesForClass(classGenObj,info,funcNameArray);
+   n_ptr_array_add(cf->blockFuncArray,codes);
+   //2.生成泛型块函数地址。
+   genBlockAddressVar(funcNameArray,cf->blockFuncAddressArray);
+   char *funcWithGbCodes=genFuncWithGbCode(info,funcNameArray);
+   if(funcWithGbCodes){
+      n_ptr_array_add(cf->funcWithGbArray,funcWithGbCodes);
+      genFuncWithGbAddress(info,funcNameArray,cf->funcWithGbAddressArray);
+   }
+   n_ptr_array_unref(funcNameArray);
+   //3.加头文件
+   addHeader(cf,classGenObj);
+   //4.加info
+   addGenInfo(cf,info);
+   //printf("生成的代码如下:-------------------\n");
+  // printf("泛型块函数:\n%s\n",codes);
+   //printf("带泛型块函数:\n%s\n",funcWithGbCodes);
+}
+
+/**
+ * 获取一个源文件对应的一个CompileFile，如果不存在创建新的
+ */
+static CompileFile *createCompileFile(char *cFile,char *oFile)
+{
+   CompileFile *f=n_slice_new0(CompileFile);
+   f->fileName=cFile;
+   f->oFile = oFile;
+   f->blockFuncArray=n_ptr_array_new();
+   f->funcWithGbArray=n_ptr_array_new();
+   f->blockFuncAddressArray=n_ptr_array_new();
+   f->funcWithGbAddressArray=n_ptr_array_new();
+   f->headerArray = n_ptr_array_new();
+   f->infoCount = 0;
+   return f;
+}
+
+/**
+ * 返回输出的.o文件
+ */
+static void genGenericFuncCodes(CompileFile *cf,GenericObj *funcGenObj,NPtrArray *classGenObjArray)
+{
+   NPtrArray *genInfoArray=block_mgr_get_output_generic_info(block_mgr_get());
+   GenericInfo *info=NULL;
+   char *sysName=funcGenObj->callee->className->sysName;
+   info=getGenericInfo(genInfoArray,sysName);
+   if(info==NULL){
+      n_debug("genericcode.c genGenericFuncCodes 类%s中没有泛型块。%s cf:%s\n",sysName,cf->fileName);
+      return;
+   }
+   //收集所有引用到的泛型对象。
+   NPtrArray *dependClassGenObjArray=n_ptr_array_new();
+   //收集所有生成的新函数名
+   NPtrArray *funcNameArray=n_ptr_array_new();
+   char  *codes=createCodesForGenfunc(funcGenObj,info,classGenObjArray,dependClassGenObjArray,funcNameArray);
+   n_ptr_array_add(cf->blockFuncArray,codes);
+   //2.生成泛型块函数地址。
+   genBlockAddressVar(funcNameArray,cf->blockFuncAddressArray);
+   //3.加头文件
+   addHeader(cf,funcGenObj);
+   //4.加info
+   addGenInfo(cf,info);
+  // printf("生成的泛型函数代码如下:-------------------\n");
+  // printf("泛型函数代码:\n%s\n",codes);
+   n_ptr_array_unref(funcNameArray);
+   n_ptr_array_unref(dependClassGenObjArray);
+}
+
+static char *genHeaderStr(CompileFile *cf)
+{
    NString *codes=n_string_new("\n");
-   if(!writeCfile && unit->info->includeStr){
-      n_string_append(codes,unit->info->includeStr);
+   int i;
+   for(i=0;i<cf->infoCount;i++){
+      n_string_append(codes,cf->infos[i]->includeStr);
       n_string_append(codes,"\n");
    }
-   for(i=0;i<headerFileArray->len;i++){
-      n_string_append_printf(codes,"#include \"%s\"\n",n_ptr_array_index(headerFileArray,i));
+   for(i=0;i<cf->headerArray->len;i++){
+      n_string_append_printf(codes,"#include \"%s\"\n",n_ptr_array_index(cf->headerArray,i));
    }
    n_string_append(codes,"\n");
-   n_string_append(codes,unit->codes->str);
-   n_string_append(codes,"\n");
-   for(i=0;i<unit->mergeCount;i++)
-      n_string_append(codes,unit->merges[i]->codes->str);
-   //生成函数地址变量
-   createFuncAddress(codes,unit);
-   //类声明在.c文件中。泛型块函数需要在该.c中编译。aet_collect 会删除对应的.o文件，并传递参数给该文件，说是第二次编译。
-   //在编译完本文件后，追加下面的内容。
-   char saveFile[256];
-   sprintf(saveFile,"%s/%s_%d.c",parentPath,GENERIC_BLOCK_FILE_NAME,index);
-   FILE *fp=fopen(saveFile,"w");
-   fwrite(codes->str,1,codes->len,fp);
-   fclose(fp);
-   NString *returnFile=n_string_new("");
-   n_string_append(returnFile,saveFile);
-   if(writeCfile){
-      n_string_append(returnFile,",");
-      n_string_append(returnFile,unit->info->classDeclBelongFile);
-      n_string_append(returnFile,",");
-      n_string_append(returnFile,unit->info->oFile);
-   }
-   n_debug("创建的块内容 :返回的文件名:%s %s\n",returnFile->str,codes->str);
-   n_string_free(codes,TRUE);
-   return  n_string_free(returnFile,FALSE);
+   return n_string_free(codes,FALSE);
 }
 
 /**
+ * 生成最终代码，每个编译单元一个,并写入文件 _block_func__0.o
+ * 返回三段文件 泛型块+带泛型块函数源代码，编译源代码，编译源代码的输出文件
+ */
+static char * createFinalCodes( NPtrArray *compileFileArray)
+{
+   char *fileName = getenv("GCC_AET_BLOCK_LIST_PATH");
+   NFile *f=n_file_new(fileName);
+   NFile *parent=n_file_get_parent_file(f);
+   NFile *canon=n_file_get_canonical_file(parent);
+   const char *parentPath=n_file_get_absolute_path(canon);
+
+   int i,j;
+   NString *listFile=n_string_new("");
+   for(i=0;i<compileFileArray->len;i++){
+      CompileFile *cf=n_ptr_array_index(compileFileArray,i);
+      NString *codes=n_string_new("");
+      n_string_append_printf(codes,"/*为文件 %s 生成泛型代码。*/\n",cf->fileName);
+      /*
+      char *header=genHeaderStr(cf);
+      n_string_append(codes,header);
+      free(header);
+      */
+      for(j=0;j<cf->blockFuncArray->len;j++){
+         char *code=n_ptr_array_index(cf->blockFuncArray,j);
+         n_string_append(codes,code);
+         n_string_append(codes,"\n");
+      }
+      n_string_append(codes,"\n");
+      n_string_append(codes,"static BlockFuncData _bfi_value[]={\n");
+      for(j=0;j<cf->blockFuncAddressArray->len;j++){
+         char *code=n_ptr_array_index(cf->blockFuncAddressArray,j);
+         //{(void*)_int_0_TFirst__gen_block_func_0,"_int_0_TFirst__gen_block_func_0","_int_0","TFirst",0}
+         n_string_append(codes,"\t");
+         n_string_append(codes,code);
+         if(j==cf->blockFuncAddressArray->len-1)
+            n_string_append(codes,"\n");
+         else
+            n_string_append(codes,",\n");
+      }
+      n_string_append(codes,"};\n\n");
+      n_string_append(codes,"static __attribute__((constructor(1))) void load_generic_data()\n");
+      n_string_append(codes,"{\n");
+      n_string_append_printf(codes,"\tadd_generic_data(_bfi_value,%d);\n",cf->blockFuncAddressArray->len);
+      n_string_append(codes,"}\n");
+
+      if(cf->funcWithGbArray->len>0){
+         for(j=0;j<cf->funcWithGbArray->len;j++){
+            char *code=n_ptr_array_index(cf->funcWithGbArray,j);
+            n_string_append(codes,code);
+            n_string_append(codes,"\n");
+         }
+
+         n_string_append(codes,"\n");
+         n_string_append(codes,"static BlockFuncData _fwgb_value_[]={\n");
+         for(j=0;j<cf->funcWithGbAddressArray->len;j++){
+            char *code=n_ptr_array_index(cf->funcWithGbAddressArray,j);
+            //{(void*)_int_0__Z7ASecond4pushEPN7ASecondEPv,"_int_0__Z7ASecond4pushEPN7ASecondEPv","_int_0","debug_ASecond",0},
+            n_string_append(codes,"\t");
+            n_string_append(codes,code);
+            if(j==cf->funcWithGbAddressArray->len-1)
+               n_string_append(codes,"\n");
+            else
+               n_string_append(codes,",\n");
+         }
+         n_string_append(codes,"};\n\n");
+         n_string_append(codes,"static __attribute__((constructor(1))) void load_func_with_gb_data()\n");
+         n_string_append(codes,"{\n");
+         n_string_append_printf(codes,"\tadd_func_with_gb_data(_fwgb_value_,%d);\n",cf->funcWithGbAddressArray->len);
+         n_string_append(codes,"}\n");
+      }
+      //printf("源文件的代码:%s\n%s\n",cf->fileName,codes->str);
+
+      char saveFile[256];
+      sprintf(saveFile,"%s/%s_%d.o",parentPath,GENERIC_BLOCK_FILE_NAME,i);
+      FILE *fp=fopen(saveFile,"w");
+      fwrite(codes->str,1,codes->len,fp);
+      fclose(fp);
+      n_string_free(codes,TRUE);
+      n_string_append_printf(listFile,"%s,%s,%s\n",saveFile,cf->fileName,cf->oFile);
+   }
+   return n_string_free(listFile,FALSE);
+}
+
+
+/**
+ * 每个编译文件都有一套源代码
+ * 这是new对象
+ * rootArray 中的 GenericObj有调用new Object或call genericfunc或父组件设泛型类型
+ * 多个GnericObj可能是同一个sourcefile
+ */
+static CompileFile *createCodeForSingleFile(GraphData *graphData,
+      NPtrArray *classGenObjArray,NPtrArray *genFuncGenObjArray)
+{
+   //这是每个编译单元的新建对象和调用泛型函数的具体泛型
+   int i;
+   CompileFile *cf=createCompileFile(graphData->cFile,graphData->oFile);
+   n_debug("createCodeForSingleFile 为文件生成泛型块函数和fwgb函数源代码:%s classObj:%d genFuncObj:%d\n",
+         graphData->cFile,classGenObjArray->len,genFuncGenObjArray->len);
+   for(i=0;i<classGenObjArray->len;i++){
+      GenericObj *classGenObj=n_ptr_array_index(classGenObjArray,i);
+     // generic_obj_print(classGenObj);
+      genClassCodes(cf,classGenObj);
+   }
+
+   for(i=0;i<genFuncGenObjArray->len;i++){
+      GenericObj *funcGenObj=n_ptr_array_index(genFuncGenObjArray,i);
+      //printf("打印具体的泛型函数000 %d\n",i);
+      //generic_obj_print(funcGenObj);
+      genGenericFuncCodes(cf,funcGenObj,classGenObjArray);
+   }
+   return cf;
+}
+
+/**
+ * 调用该方法时处理编译temp_func_track_45.c
  * 生成编译单元
  * 1.一个类一个编译单元，如果类不是泛型类，但有泛型函数，也以类名生成编译单元。
  * 从 generic_graph_read.c generic_graph_ready 方法输出泛型对象。
@@ -696,9 +842,15 @@ static char *createCompileUnitFile(CompileUnit *unit,int index,char *parentPath)
  *1. _float_0_int_1..
  *2.类名 TFirst
  *3.索引号
+ *把生成的块函数源代码所在的源文件，还有块函数源文件的编译所依赖的项目文件，项目文件的输出.o文件
+ *三者存入fileName.o文件，供aetcollect.c中进行第二次编译泛型块函数编译 。
  */
 void generic_code_create_block_codes(GenericCode *self)
 {
+   //整个项目有泛型块文件列表的文件名。GCC_AET_BLOCK_LIST_PATH
+   //生成的结果是 block,.c,.o格式的字符串
+   //来自aetcollect
+   //sprintf(blockListFileParam,"-Daetblocklist%s",strlen(blockfiles)>0?blockListFileName:"");
    char *fileName = getenv("GCC_AET_BLOCK_LIST_PATH");
    if(fileName==NULL){
       //n_error("进入这里不应该没GCC_AET_BLOCK_LIST_PATH文件名");
@@ -707,11 +859,11 @@ void generic_code_create_block_codes(GenericCode *self)
    char saveFile[512];
    //这是与aetcollect的协议 在ifaceimpl.c中也有类似
    sprintf(saveFile,"%s.o",fileName);
-   printf("generic_code_create_block_codes 11 saveFile:%s\n",saveFile);
+   n_debug("generic_code_create_block_codes 11 saveFile:%s\n",saveFile);
 
-   NPtrArray *genObjArray=generic_graph_get_output_generic_obj(generic_graph_get());
+   NPtrArray *graphArray=generic_graph_files_graph(generic_graph_get());
    //没有genericobj对象
-   if(genObjArray==NULL || genObjArray->len==0){
+   if(!graphArray || graphArray->len==0){
       remove(saveFile);
       return;
    }
@@ -721,101 +873,332 @@ void generic_code_create_block_codes(GenericCode *self)
       remove(saveFile);
       return;
    }
-   printf("generic_code_create_block_codes 22 saveFile:%s\n",saveFile);
+   n_debug("generic_code_create_block_codes 22 saveFile:%s\n",saveFile);
+   NPtrArray *cfArray=n_ptr_array_new();
+   int i,j;
+   for(i=0;i<graphArray->len;i++){
+      GraphData *item=n_ptr_array_index(graphArray,i);
+      //现在我们有了定义的泛型对象和块代码，把块中的泛型单元替换为定义的泛型单元
+      //并生成新函数代码
+      //genObjArray分成泛型对象与泛型函数两个，分别处理
+      NPtrArray *genObjArray = item->out;
+      NPtrArray *classGenObjArray=n_ptr_array_new();
+      NPtrArray *funcGenObjArray=n_ptr_array_new();
+      for(j=0;j<genObjArray->len;j++){
+         GenericObj *obj=n_ptr_array_index(genObjArray,j);
+         if(obj->type==GEN_FUNC)
+            n_ptr_array_add(funcGenObjArray,obj);
+         else
+            n_ptr_array_add(classGenObjArray,obj);
 
-   //现在我们有了定义的泛型对象和块代码，把块中的泛型单元替换为定义的泛型单元
-   //并生成新函数代码
-   //genObjArray分成泛型对象与泛型函数两个，分别处理
-   NPtrArray *classGenObjArray=n_ptr_array_new();
-   NPtrArray *funcGenObjArray=n_ptr_array_new();
-
-   int i;
-   for(i=0;i<genObjArray->len;i++){
-      GenericObj *obj=n_ptr_array_index(genObjArray,i);
-      if(obj->type==GEN_FUNC)
-         n_ptr_array_add(funcGenObjArray,obj);
-      else
-         n_ptr_array_add(classGenObjArray,obj);
-   }
-   //按类名来分编译单元的。
-   NPtrArray *compileUnitArray=n_ptr_array_new();
-
-   for(i=0;i<funcGenObjArray->len;i++){
-      GenericObj *funcGenObj=n_ptr_array_index(funcGenObjArray,i);
-      GenericInfo *info=NULL;
-     // char className[256];
-      //char funcName[256];
-     // int ok=func_mgr_get_orig_func_and_class_name(func_mgr_get(),funcGenObj->callee->mangleFunName,className,funcName);
-      char *sysName=funcGenObj->callee->className->sysName;
-      info=getGenericInfo(genInfoArray,sysName);
-      n_debug("genericcode.c 泛型函数中的块代码 00 --- %p %s %s\n",info,sysName,   funcGenObj->callee->mangleFunName);
-      if(n_log_is_debug_file(NULL,NULL))
-         generic_obj_print(funcGenObj);
-      if(info==NULL)
-         continue;
-      CompileUnit *unit=createCompileUnit(compileUnitArray,info);
-      //收集所有引用到的泛型对象。
-      NPtrArray *dependClassGenObjArray=n_ptr_array_new();
-      //收集所有生成的新函数名
-      NPtrArray *funcNameArray=n_ptr_array_new();
-      char  *codes=createCodesForGenfunc(funcGenObj,info,classGenObjArray,dependClassGenObjArray,funcNameArray);
-      n_debug("genericcode.c 泛型函数中的块代码 11--- %p %s\n",info,codes);
-
-      if(codes){
-         addCodes(unit,funcGenObj,dependClassGenObjArray,codes,funcNameArray);
-         n_free(codes);
-      }else{
-         n_ptr_array_unref(funcNameArray);
       }
-      n_ptr_array_unref(dependClassGenObjArray);
+      CompileFile *cf=createCodeForSingleFile(item,classGenObjArray,funcGenObjArray);
+      n_ptr_array_add(cfArray,cf);
    }
-   NFile *f=n_file_new(fileName);
-   NFile *parent=n_file_get_parent_file(f);
-   NFile *canon=n_file_get_canonical_file(parent);
-   const char *parentPath=n_file_get_absolute_path(canon);
-
-
-   for(i=0;i<classGenObjArray->len;i++){
-      GenericObj *classGenObj=n_ptr_array_index(classGenObjArray,i);
-      GenericInfo *info=NULL;
-      info=getGenericInfo(genInfoArray,classGenObj->newObject->className.sysName);
-      n_debug("genericcode.c  普通函数中的块 --- %p %p %s\n",classGenObj,info,classGenObj->newObject->className.sysName);
-      if(info==NULL)
-         continue;
-      CompileUnit *unit=createCompileUnit(compileUnitArray,info);
-      //收集所有生成的新函数名
-      NPtrArray *funcNameArray=n_ptr_array_new();
-      char *codes=createCodesForClass(classGenObj,info,funcNameArray);
-      if(codes){
-         addCodes(unit,classGenObj,codes,funcNameArray);
-         n_free(codes);
-      }else{
-         n_ptr_array_unref(funcNameArray);
-      }
-   }
-   mergeUnit(compileUnitArray);//合并同一个.c文件的所有编译单元。
-   NString *compileFileList=n_string_new("");
-   int unitIndex=0;
-   //创建编译文件，并返回这些编译文件给aet_collect.c
-   for(i=0;i<compileUnitArray->len;i++){
-      CompileUnit *unit=n_ptr_array_index(compileUnitArray,i);
-      char *compileFileName=createCompileUnitFile(unit,unitIndex++,parentPath);
-      n_string_append_printf(compileFileList,"%s\n",compileFileName);
-      n_free(compileFileName);
-   }
+   char *listFile = createFinalCodes(cfArray);
    FILE *fp=fopen(saveFile,"w");
-   fwrite(compileFileList->str,1,compileFileList->len,fp);
+   fwrite(listFile,1,strlen(listFile),fp);
    fclose(fp);
 }
 
+/**
+ * 通过 unit index获取对应的块函数名
+ * 每个泛型真实泛型类型对应一个NPtrArray
+ * unit可能有1到多个真实泛型类型
+ */
+static char *getGenericBlockFuncName(NPtrArray *blocks,int index)
+{
+   int i;
+   for(i=0;i<blocks->len;i++){
+      BlockFuncIndex *b=n_ptr_array_index(blocks,i);
+      if(b->index==index){
+         return b->funcName;
+      }
+   }
+   return NULL;
+}
+
+//创建带泛型块的函数的新名字
+static char *createFuncNameWithGb(char *managleFuncName,char *genericMode)
+{
+   char *str=xmalloc(512);
+   sprintf(str,"%s_%s",genericMode,managleFuncName);
+   return str;
+}
+
+/**
+ * 替换函数名
+ * managleFuncName 函数混淆名
+ * src像这样 void push ( E ab ) {... 来自genericparser.c中对源函数代码token化后字符串
+ * genericMode:定义的泛型 如 _int_0
+ */
+static char *replaceFuncName(char *src,char *managleFuncName,char *genericMode)
+{
+   char sysName[512]; //类名
+   char funcName[512];//原始函数名
+   int ret=func_mgr_get_orig_func_and_class_name(func_mgr_get(),managleFuncName,sysName,funcName);
+   if(!ret){
+      n_error("不是有效的函数名，报告此错误。%s\n",managleFuncName);
+      return NULL;
+   }
+   NString *re=n_string_new(src);
+   char haveparm[512];
+   sprintf(haveparm,"%s ( )",funcName);
+   int indexof = n_string_indexof(re,haveparm);
+   char find[512];
+   sprintf(find,"%s (",funcName);
+   char *newFuncName = createFuncNameWithGb(managleFuncName,genericMode);
+   char replace[1024];
+   if(indexof<0)
+       sprintf(replace,"%s (%s *self,",newFuncName,sysName);
+   else
+      sprintf(replace,"%s (%s *self",newFuncName,sysName);
+   n_string_replace(re,find,replace,1);
+   static const char *specs="static ";
+   n_string_insert_len(re,0,specs,strlen(specs));//zclei
+   free(newFuncName);
+   return n_string_free(re,FALSE);
+}
+
+
+///替换genericblock$
+/* ======================== 提取 generic$(...) 参数 ======================== */
+
+
+/* 判断是否是标识符字符 */
+static int isIdchar(char c)
+{
+    return ISALNUM((unsigned char)c) || c == '_' || c == '$';
+}
+
+/* 跳过空白 */
+static const char *skip_space(const char *p)
+{
+    while (*p && ISSPACE((unsigned char)*p))
+       p++;
+    return p;
+}
+
+/*
+ * 从 pos 开始找到与之匹配的 };
+ * 返回指向 }; 后面那个字符的指针，失败返回 NULL
+ * 会正确处理嵌套大括号
+ */
+static const char *find_matching_end(const char *pos)
+{
+   int brace = 0;
+   const char *p = pos;
+   while (*p) {
+      if (*p == '{') {
+         brace++;
+         p++;
+      }else if (*p == '}') {
+         brace--;
+         p++;
+         if (brace == 0) {
+            /* 已经匹配到最外层 }，看后面是不是 ; */
+            p = skip_space(p);
+            if (*p == ';')
+               return p + 1;   /* 指向 ; 后面 */
+            else
+               return NULL;    /* 没有 ;，格式不对 */
+         }
+      }else {
+         p++;
+      }
+   }
+   return NULL;   /* 没找到匹配的 */
+}
+
+/**
+ * 泛型块被调用函数替换
+ */
+static char *createCall(char *funcName,GenericParams *gp)
+{
+   char *re=xcalloc(1,1024);
+   strcat(re,funcName);
+   if(gp->count>0)
+      strcat(re,"(self,");
+   else
+      strcat(re,"(self");
+   int i;
+   for(i=0;i<gp->count;i++){
+      strcat(re,gp->params[i]);
+      if(i<gp->count-1)
+        strcat(re,",");
+   }
+   strcat(re,");");
+   return re;
+}
+
+/*
+ * 把所有 genericblock$ ... }; 替换成 replacement
+ * 返回新分配的字符串，调用者负责 free
+ */
+static char *replace_genericblock(const char *src,NPtrArray *blocks,int firstNumber)
+{
+   size_t src_len = strlen(src);
+   /* 预估结果长度（给足空间） */
+   size_t capacity = 5*src_len + 1;
+   char *result = (char *)xmalloc(capacity);
+   if (!result)
+      return NULL;
+   int show=0;
+   size_t out = 0;               /* 结果当前写入位置 */
+   const char *p = src;
+   while (*p) {
+      /* 尝试匹配 "genericblock$" */
+      if (strncmp(p, "genericblock$", 13) == 0 && !isIdchar(p[13])) {          /* 确保是完整单词 */
+
+         const char *start = p;
+         const char *end = find_matching_end(p + 13);
+         if (end) {
+            /* 找到完整块，写入替换字符串 */
+            int len=strlen(start)-strlen(end);
+            char header[len+1];
+            memcpy(header,start,len);
+            header[len]='\0';
+            /* 测试参数提取 */
+            GenericParams gp;
+            if (!extract_generic_params(header, &gp) == 0) {
+               n_error("替换泛型块出错 %s\n",src);
+               return 0;
+            }
+            char *funcName = getGenericBlockFuncName(blocks,firstNumber+show);
+            char *replace = createCall(funcName,&gp);
+            int rep_len=strlen(replace);
+            memcpy(result + out, replace, rep_len);
+            out += rep_len;
+            show++;
+            free(replace);
+            p = end;   /* 跳过整个 genericblock$ ... }; */
+            continue;
+         }
+         /* 没找到匹配的 };，就当普通字符处理 */
+      }
+      result[out++] = *p++;
+   }
+
+   result[out] = '\0';
+   return result;
+}
+
+
+/* 释放参数 */
+static void free_generic_params(GenericParams *gp)
+{
+    if (!gp) return;
+    for (int i = 0; i < gp->count; i++)
+        free(gp->params[i]);
+    free(gp->params);
+    gp->params = NULL;
+    gp->count = 0;
+}
+
+/*
+ * 从字符串中提取 generic$(parm1, parm2, ...) 的参数
+ * 成功返回 0，并把结果放在 out 里（需要调用 free_generic_params 释放）
+ * 失败返回 -1
+ * 支持嵌套括号，例如：generic$(a, func(b,c), d)
+ */
+static int extract_generic_params(const char *src, GenericParams *out)
+{
+   if (!src || !out)
+      return -1;
+   memset(out, 0, sizeof(*out));
+   const char *p = src;
+   /* 查找 "generic$" */
+   while (*p) {
+      if (strncmp(p, "genericblock$", 13) == 0 && !isIdchar(p[13])) {
+         p += 13;
+         p = skip_space(p);
+         if (*p == '(') {
+            p++;   /* 跳过 '(' */
+            break;
+         }
+      }
+      p++;
+   }
+
+   if (*p == '\0')
+      return -1;   /* 没找到 generic$( */
+
+   /* 现在 p 指向第一个参数开始的位置 */
+   const char *arg_start = p;
+   int paren = 1;               /* 已经进入一层括号 */
+   int capacity = 8;
+   out->params = (char **)xmalloc(capacity * sizeof(char *));
+   if (!out->params)
+      return -1;
+
+   while (*p && paren > 0) {
+      if (*p == '(') {
+         paren++;
+         p++;
+      } else if (*p == ')') {
+         paren--;
+         if (paren == 0) {
+            /* 到达最外层的 ')'，收集最后一个参数 */
+            const char *arg_end = p;
+            /* 去掉尾部空白 */
+            while (arg_end > arg_start && ISSPACE((unsigned char)arg_end[-1]))
+               arg_end--;
+
+            if (arg_end > arg_start) {
+               if (out->count >= capacity) {
+                  capacity *= 2;
+                  char **tmp = (char **)xrealloc(out->params, capacity * sizeof(char *));
+                  if (!tmp) {
+                     free_generic_params(out);
+                     return -1;
+                  }
+                  out->params = tmp;
+               }
+               out->params[out->count++] = xstrndup(arg_start, arg_end - arg_start);
+            }
+            break;
+         }
+         p++;
+      } else if (*p == ',' && paren == 1) {
+         /* 最外层逗号，说明一个参数结束 */
+         const char *arg_end = p;
+         while (arg_end > arg_start && ISSPACE((unsigned char)arg_end[-1]))
+            arg_end--;
+
+         if (out->count >= capacity) {
+            capacity *= 2;
+            char **tmp = (char **)xrealloc(out->params, capacity * sizeof(char *));
+            if (!tmp) {
+               free_generic_params(out);
+               return -1;
+            }
+            out->params = tmp;
+         }
+         out->params[out->count++] = xstrndup(arg_start, arg_end - arg_start);
+
+         p++;
+         p = skip_space(p);
+         arg_start = p;   /* 下一个参数开始 */
+      } else {
+         p++;
+      }
+   }
+
+   if (paren != 0) {          /* 括号不匹配 */
+      free_generic_params(out);
+      return -1;
+   }
+
+   return 0;
+}
 
 GenericCode *generic_code_get()
 {
-    static GenericCode *singleton = NULL;
-    if (!singleton){
-         singleton =n_slice_alloc0 (sizeof(GenericCode));
-         genericCodeInit(singleton);
-    }
-    return singleton;
+   static GenericCode *singleton = NULL;
+   if (!singleton){
+      singleton =n_slice_alloc0 (sizeof(GenericCode));
+      genericCodeInit(singleton);
+   }
+   return singleton;
 }
 

@@ -44,6 +44,7 @@
 #define  SPACE_FREE  2
 #define  SPACE_USABLE  3
 
+
 /**
  * 以下是非AFile类的函数
  */

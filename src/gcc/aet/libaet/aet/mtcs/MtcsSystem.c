@@ -240,10 +240,10 @@ void mtcs_copy_device_address_to_super(unsigned long *hostParentDeviceAddress,in
 static volatile int initLibrary=0;
 
 // 优先级可以是 0-65535，数字越小优先级越高，不写默认在普通构造函数后执行
-__attribute__((constructor(1))) void mtcs_library_init(void)
+__attribute__((constructor)) void mtcs_library_init(void)
 {
    if(!({int v1=1;int v2=1;__atomic_exchange(&initLibrary,&v1,&v2,__ATOMIC_SEQ_CST);v2;})){
-      //printf("库已被加载，这是第一个执行的函数！\n");
+      printf("库已被加载，这是第一个执行的函数！\n");
       MtcsSystem.init();
    }
 }

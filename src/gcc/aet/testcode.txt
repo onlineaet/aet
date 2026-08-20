@@ -1271,6 +1271,270 @@ int main()
    return 0;
 }
 
+//测试30 测试泛型容器的性能。
+#include <stdio.h>
+#include <sys/time.h>
+#include <time.h>
+#include "AObject.h"
+
+#define LOOP 100000000
+class$ TFirst<E>{
+   E *queue;
+   int size;
+   void push(E value);
+};
+
+impl$ TFirst{
+   TFirst(){
+      queue=malloc(sizeof(E)*LOOP);
+      size=sizeof(E);
+   }
+
+   void push(E avs){
+      genericblock$(avs){
+         queue[avs]=avs;
+      };
+   }
+};
+
+static aint64 currentTime(){
+    struct timeval val;
+    gettimeofday (&val, NULL);
+    return (((aint64) val.tv_sec) * 1000000) + val.tv_usec;
+}
+
+static void valid(void *data)
+{
+   int *dx=(int *)data;
+   int i;
+   for(i=0;i<LOOP-1;i++){
+      if((dx[i]+1)!=dx[i+1]){
+         printf("错误----- i:%d %d\n",i,dx[i]);
+         exit(0);
+      }
+   }
+   printf("data is:%d\n",dx[LOOP-1]);
+}
+
+typedef struct _TestData
+{
+   int *data;
+}TestData;
+
+static inline  void insert_new(TestData *m,void * order)
+{
+   int v=*((int*)order);
+   m->data[v] = v;
+}
 
 
+int main()
+{
+   TFirst<int> *tyx=new$ TFirst();
+   int i;
+   aint64 t=currentTime();
+   for(i=0;i<LOOP;i++)
+     tyx->push(i);
+   aint64 t1=currentTime();
+   printf("泛型块 spend time:%lld\n",t1-t);
+   TestData *dx=malloc(sizeof(TestData));
+   dx->data=malloc(sizeof(int)*LOOP);
+   aint64 t2=currentTime();
+   for(i=0;i<LOOP;i++)
+      insert_new(dx,&i);
+   aint64 t3=currentTime();
+   printf("普通内联 spend time:%lld\n",t3-t2);
+   valid(tyx->queue);
+   return 0;
+}
 
+
+//测试31 测试最简单的泛型容器。观察生成的_block_func__0.o内容是否正确
+//1.有一个泛型块+1个带泛型块函数的实现+2个构造读入数组的方法。
+#include "AObject.h"
+
+class$ TFirst<E>{
+   E *queue;
+   void push(E value);
+};
+
+
+impl$ TFirst{
+   TFirst(){
+      queue=malloc(sizeof(E)*10);
+   }
+
+   void push(E avs){
+      genericblock$(avs){
+         queue[avs]=avs;
+      };
+   }
+};
+
+int main()
+{
+   TFirst<int> *tyx=new$ TFirst();
+   tyx->push(5);
+   return 0;
+}
+
+//测试32 测试泛型块的返回值是 E 
+#include "AObject.h"
+class$ TFirst<E>{
+   E push(E value);
+};
+impl$ TFirst{
+   E  push(E tcsxy){
+     return  genericblock$(tcsxy){
+         int ycs3=3;
+         return tcsxy+ycs3;
+      };
+   }
+};
+int main()
+{
+   TFirst<int> *tyx=new$ TFirst();
+   int re = tyx->push(5);
+   printf("re is %d\n",re);
+   return 0;
+}
+
+//测试33 测试泛型容器从数组返回 E 。
+#include "AObject.h"
+class$ TFirst<E>{
+   E *queue;
+   E get(int index);
+};
+
+impl$ TFirst{
+   TFirst(){
+      queue=malloc(sizeof(E)*10);
+      ((int *)queue)[5] = 137;
+   }
+   E get(int index){
+      return genericblock$(index){
+         return queue[index];
+      };
+   }
+};
+
+int main()
+{
+   TFirst<int> *tyx=new$ TFirst();
+   int ret = tyx->get(5);
+   printf("ret is :%d\n",ret);
+   return 0;
+}
+
+
+//测试33 容器是 E *类型，赋值操作。
+//用数组访问  queue[0]
+
+#include "AObject.h"
+class$ TFirst<E>{
+   E *queue;
+   void push(E value);
+};
+
+impl$ TFirst{
+   TFirst(){
+      queue=malloc(sizeof(E)*100);
+   }
+
+   void push(E avs){
+      genericblock$(avs){
+         queue[0]=avs;
+      };
+   }
+};
+
+typedef struct _TestData
+{
+    int a;
+    int b;
+}TestData;
+
+int main()
+{
+   TFirst<int *> *tyx1=new$ TFirst();
+   int temp=5;
+   tyx1->push(&temp);
+   int **values=(int **)tyx1->queue;
+   int *v=values[0];
+   printf("指针 is :%d\n",*v);
+
+   TFirst<int> *tyx2=new$ TFirst();
+   int temp1=25;
+   tyx2->push(temp1);
+   int *values1=(int *)tyx2->queue;
+   int v1=values1[0];
+   printf("值 is :%d\n",v1);
+
+   TFirst<TestData> *tyx3=new$ TFirst();
+   TestData test={1,2};
+     tyx3->push(test);
+     TestData *values2=(TestData *)tyx3->queue;
+     TestData v2=values2[0];
+     printf("结构体的值 is :%d %d\n",v2.a,v2.b);
+
+   return 0;
+}
+
+//测试34 泛型在泛型块函数中从右值转成左值
+//区配 convert_E_E_INDIRECT_REF_RHS convert_E_EP_INDIRECT_REF_RHS
+//改为 E *queue 匹配  convert_EP_E_INDIRECT_REF_RHS convert_EP_EP_INDIRECT_REF_RHS
+#include "AObject.h"
+class$ TFirst<E>{
+   E queue; //也可改为 E *queue
+   E get(int avxs);
+};
+
+impl$ TFirst{
+   TFirst(){
+      queue = malloc(200);
+      aboolean isPointer       =generic_is_pointer(E);
+      if(isPointer)
+         setPointer();
+      else
+         setvalue();
+   }
+
+   void setvalue(){
+      ((int*)queue)[0]=123;
+      ((int*)queue)[1]=456;
+      ((int*)queue)[2]=789;
+      printf("初始化值类型的数据 123 456 789\n");
+   }
+
+   void setPointer(){
+      int *vx1=malloc(20);
+      int *vx2=malloc(20);
+      int *vx3=malloc(20);
+      ((int**)queue)[0]=vx1;
+      ((int**)queue)[1]=vx2;
+      ((int**)queue)[2]=vx3;
+      printf("初始化指针类型的数据 queue:%p 0:%p 1:%p 2:%p ((int**)queue):%p\n",queue,vx1,vx2,vx3,((int**)queue));
+   }
+
+   E get(int index){
+      return  genericblock$(index){
+         return queue[index];
+      };
+   }
+};
+
+int main()
+{
+   TFirst<int > *valueObj=new$ TFirst();
+   int r0 = valueObj->get(0);
+   int r1 = valueObj->get(1);
+   int r2 = valueObj->get(2);
+   printf("值类型:%d %d %d\n",r0,r1,r2);
+   
+   TFirst<int *> *pointerObj=new$ TFirst();
+   int *p0 = pointerObj->get(0);
+   int *p1 = pointerObj->get(1);
+   int *p2 = pointerObj->get(2);
+   printf("指钍类型:%p %p %p\n",p0,p1,p2);
+   return 0;
+}

@@ -375,10 +375,8 @@ static void setNopExpr(ClassCast *self ,location_t loc,tree decl,tree nopexpr,ch
       char *className=class_util_get_class_name(TREE_TYPE(op));
       n_debug("从设setNopExpr COMPONENT_REF-----不处理 右边:%s declClassName:%s",className,declClassName);
       castClassToInterface(loc,className,declClassName,nopexpr,op);
-      aet_print_tree(nopexpr);
    }else if(nopexprTypeCode==POINTER_TYPE && TREE_CODE(op)==POINTER_PLUS_EXPR){
       n_debug("从设setNopExpr POINTER_PLUS_EXPR-----不处理。");
-      aet_print_tree(nopexpr);
    }
 }
 

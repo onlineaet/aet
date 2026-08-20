@@ -22,12 +22,12 @@
 #include "ElfFile.h"
 
 
-typedef struct _SegmentData{
+struct _SegmentData{
 	char *name;
 	auint64 virt_addr;
 	auint64 offset;
 	auint64 size;
-}SegmentData;
+};
 
 #define SEGMENT_NAME_DATA ".data"
 #define SEGMENT_NAME_BSS ".bss"
@@ -80,13 +80,13 @@ impl$  ElfFile {
     * varNamePrefix=mtcs_asm_code_
     * ret = 2875: 00000000006dff40  4720 OBJECT  LOCAL  DEFAULT   26 mtcs_asm_code_cuda_3_7_2962277237
     */
-   AArray *getMatchVar(char *varNamePrefix){
+   AArray<VarInfo *> *getMatchVar(char *varNamePrefix){
       char cmd[512];
       sprintf(cmd,"readelf -s -W %s | grep %s",fileName,varNamePrefix);
       FILE *fd = popen(cmd, "r");
       //printf("getMatchVar 00 :%s %p fileName:%s\n",cmd,fd,fileName);
       char tempBuff[LINE_SIZE];
-      AArray<char*> *array=new$ AArray<char*>();
+      AArray<VarInfo *> *array=new$ AArray();
       if(fd){
          while(TRUE){
             char *ret=fgets(tempBuff, sizeof(tempBuff), fd); //将刚刚FILE* stream的数据流读取到buf中
@@ -94,7 +94,6 @@ impl$  ElfFile {
                break;
             if(ret!=NULL && strstr(ret,varNamePrefix)){
                char *trueVarName=getFullVarName(ret,varNamePrefix);
-               //printf("getMatchVar--- trueVarName %s\n",trueVarName);
                if(trueVarName){
                   VarInfo *info=getVarInfo(ret,trueVarName);
                   array->add(info);
@@ -102,7 +101,7 @@ impl$  ElfFile {
                }
             }
          }
-         fclose(fd);
+         pclose(fd);
       }
       return array;
    }
@@ -193,27 +192,27 @@ impl$  ElfFile {
       return data;
    }
 
-   AArray *createSegmentFromFile(){
+   AArray<SegmentData *> *createSegmentFromFile(){
       //char *cmd="readelf -S /home/sns/workspace/testblock/bin/libapptest.so | grep -P \"(bss|data)\"";
       char cmd[512];
       sprintf(cmd,"readelf -S -W %s | grep -P \"(bss|data)\"",fileName);
       FILE *fd = popen(cmd, "r");
       //printf("findOffsetDataRoDataBss is 00 :%s %p\n",cmd,fd);
       char tempBuff[LINE_SIZE];
-      AArray<SegmentData *> *array=new$ AArray<SegmentData *>();
+      AArray<SegmentData *> *array=new$ AArray();
       if(fd){
          while(TRUE){
             char *ret=fgets(tempBuff, sizeof(tempBuff), fd); //将FILE* stream的数据流读取到buf中
             if(ret==NULL)
                break;
             if(ret!=NULL){
-               //printf("readDataSegmentVirtAdd 找到了变量 is 11 :%s\n",ret);
+               //printf("readDataSegmentVirtAdd 找到了变量 is 11 :%s array:%p %d\n",ret,array,array->size());
                SegmentData *data=createSegmentData(ret);
                if(data!=NULL)
                   array->add(data);
             }
          }
-         fclose(fd);
+         pclose(fd);
       }
       return array;
    }
@@ -264,7 +263,7 @@ impl$  ElfFile {
                }
             }
          }
-         fclose(fd);
+         pclose(fd);
       }
       return NULL;
    }
@@ -341,7 +340,7 @@ impl$  ElfFile {
       return FALSE;
    }
 
-   SegmentData *matchSegment(AArray *segments,VarInfo *varInfo){
+   SegmentData *matchSegment(AArray<SegmentData*> *segments,VarInfo *varInfo){
       int i;
       for(i=0;i<segments->size();i++){
          SegmentData *dataSeg=segments->get(i);
@@ -391,7 +390,7 @@ impl$  ElfFile {
                appendData(ret,content,&dataLen);
             }
          }
-         fclose(fd);
+         pclose(fd);
       }
       //printf("readContent 数据多少:%d %s\n",dataLen,content);
       if(dataLen==0)
@@ -435,9 +434,9 @@ impl$  ElfFile {
    //来自编译器 mtcstool.c mtcs_tool_create_asm_varname
    //char *ret=n_strdup_printf("%s_%s_%d_%d",MTCS_ASM_VARNAME_PREFIX,platform,isa_version,hashcode);
    //mtcs_asm_code_cuda_6_5_23428
-   public$ AArray *getCode(char *platform){
-      AArray *result= getMatchVar(MTCS_ASM_VARNAME_PREFIX);
-      AArray<char *> *asmCodes=new$ AArray<char *>();
+   public$ AArray<char *> *getCode(char *platform){
+      AArray<VarInfo *> *result= getMatchVar(MTCS_ASM_VARNAME_PREFIX);
+      AArray<char *> *asmCodes=new$ AArray();
       //从文件取出全局变量的值
       int i;
       char *ret=NULL;
@@ -453,6 +452,15 @@ impl$  ElfFile {
       }
       result->unref();
       return asmCodes;
+   }
+   ~ElfFile(){
+      if(fileName){
+         free(fileName);
+      }
+      if(segmentArray){
+         segmentArray->unref();
+         segmentArray = NULL;
+      }
    }
 };
 

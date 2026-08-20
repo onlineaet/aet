@@ -110,7 +110,7 @@ static void  addLinkFunc_cb(AetMediatorUser *aetMediatorUser,const char *linkFun
 
 /**
  * 完成主机asm，编译mtcs后 mtcscompile 发送消息到AST
- * 要求写入中间代码汇编文件的.aetprog section中并追击追加到主机汇编的最后
+ * 要求写入中间代码汇编文件(ptx)到.aetprog section中并追加到主机汇编的最后
  */
 static void  writeNote_cb(AetMediatorUser *aetMediatorUser)
 {

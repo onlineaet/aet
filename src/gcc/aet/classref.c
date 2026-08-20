@@ -70,7 +70,8 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 #include "genericutil.h"
 #include "aetprinttoken.h"
 #include "mtcsparser.h"
-
+#include "varmgr.h"
+#include "genericparser.h"
 
 static void classRefInit(ClassRef *self)
 {
@@ -84,7 +85,6 @@ static int exitsFunc(ClassRef *self,char *sysClassName,tree component)
 	int ret= fun_call_find_func(((ClassAccess*)self)->funcCall,className,component);
 	return ret;//re==ISAET_FIND_FUNC;
 }
-
 
 static tree createNormalOrSuperRef(ClassRef *self,location_t loc,location_t component_loc,tree component,tree exprValue,nboolean isSuper)
 {
@@ -107,7 +107,6 @@ static tree createNormalOrSuperRef(ClassRef *self,location_t loc,location_t comp
 	 //if(!haveFunc){
 	 if(haveFunc!=ISAET_FIND_FUNC && haveFunc!=ISAET_FIND_STATIC_FUNC){
 		 n_debug("找不到需要的函数 class:%s func:%s\n",isSuper?className:lowestClass,IDENTIFIER_POINTER(component));
-		 aet_print_tree(exprValue);
 		 return NULL_TREE;
 	 }
 	 //把函数名变成_A3Abc4open1。
@@ -125,21 +124,39 @@ static tree createNormalOrSuperRef(ClassRef *self,location_t loc,location_t comp
 	 return ref;
 }
 
+
+/**
+ * 在编译泛型块函数
+ *    genericblock$(evsvalue,pos){
+         self->queue[pos] = evsvalue;
+      };
+      生成
+      aet_goto_compile$ 16
+"E_int_0_4"
+ void _int_0_TFirst__gen_block_func_0(TFirst * self,aet_generic_E _aetGenNewParamPrefix_evsvalue,int pos)
+ {
+E evsvalue=*((E *)_aetGenNewParamPrefix_evsvalue);
+ self -> queue [ pos ] = evsvalue ;
+ }
+ */
 static tree processVar(ClassRef *self,location_t loc,location_t component_loc,tree component,tree exprValue)
 {
-	 VarRefRelation *item=class_access_create_relation_ship((ClassAccess *)self,loc,component,exprValue);
-	 if(item==NULL)
-		 return exprValue;
-	 tree staticVar=NULL_TREE;
-	 exprValue=var_call_pass_one_convert(((ClassAccess*)self)->varCall,component_loc,exprValue,component,item,&staticVar);
-	 if(staticVar!=NULL_TREE){
-		 //printf("class_ref_build_deref 变量处理 11 是静态变量----\n");
-		 return staticVar;
-	 }
-	 tree datum=build_indirect_ref (loc,exprValue,RO_ARROW);
-	 tree ref = build_component_ref (loc,datum,component, component_loc,UNKNOWN_LOCATION);
-	//printf("class_ref_build_deref 变量处理 22 是静态变量吗 %d ref:%p reftype:%p\n",staticVar!=NULL_TREE,ref,TREE_TYPE(ref));
-	 return ref;
+   VarRefRelation *item=class_access_create_relation_ship((ClassAccess *)self,loc,component,exprValue);
+   if(item==NULL)
+      return exprValue;
+   tree staticVar=NULL_TREE;
+   tree oldExpr = exprValue;
+   exprValue=var_call_pass_one_convert(((ClassAccess*)self)->varCall,
+   component_loc,exprValue,component,item,&staticVar);
+   if(staticVar!=NULL_TREE){
+      //printf("class_ref_build_deref 变量处理 11 是静态变量----\n");
+      return staticVar;
+   }
+   tree datum=build_indirect_ref (loc,exprValue,RO_ARROW);
+   tree ref = build_component_ref (loc,datum,component, component_loc,UNKNOWN_LOCATION);
+   n_debug("class_ref_build_deref 变量处理 22 是静态变量吗 %d ref:%p reftype:%p\n",
+         staticVar!=NULL_TREE,ref,TREE_TYPE(ref));
+   return ref;
 }
 
 nboolean class_ref_is_class_ref(ClassRef *self,tree exprValue)
@@ -246,13 +263,14 @@ tree  class_ref_build_deref(ClassRef *self,location_t loc,location_t component_l
          return ref;
       }
    }else{
-      //printf("class_ref_build_deref  变量处理 00 还要重新处理，先这样 是不是super状态:%d\n",super);
       nboolean super =TREE_CODE(exprValue)==NOP_EXPR && AET_LANG_FLAG_5(exprValue)==1;
+     // printf("class_ref_build_deref  变量处理 00 还要重新处理，先这样 是不是super状态:%d\n",super);
       if(super)
           AET_LANG_FLAG_5(exprValue)=0;
       tree ref=processVar(self,loc,component_loc,component,exprValue);
       //设置input_location等于当前token
-      aet_parser_c_parser_set_source_position_from_token/*!c_parser_set_source_position_from_token*/(c_parser_peek_token (parser));
+      aet_parser_c_parser_set_source_position_from_token/*!c_parser_set_source_position_from_token*/
+      (c_parser_peek_token (parser));
       return ref;
    }
    return error_mark_node;

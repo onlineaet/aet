@@ -38,9 +38,6 @@ struct _GenericCode
    int reserver;
 };
 
-
-
-
 GenericCode *generic_code_get();
 void generic_code_create_block_codes(GenericCode *self);
 

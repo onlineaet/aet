@@ -167,7 +167,7 @@ static void setInitGlobalVar(NewHeap *self,tree var,ClassName *className)
 {
 	char *varName=IDENTIFIER_POINTER(DECL_NAME(var));
 	struct timeval tv;
-    gettimeofday (&tv, NULL);
+   gettimeofday (&tv, NULL);
 	long local_tick = (unsigned) tv.tv_sec * 1000 + tv.tv_usec / 1000;
 	long randNumber=local_tick+rand ();
 	char ctorName[255];
@@ -227,10 +227,9 @@ void  new_heap_finish(NewHeap *self,CreateClassMethod method,tree func)
    char *varName=new_strategy_get_var_name((NewStrategy*)self);
    NewObjectType varType=new_strategy_get_var_type((NewStrategy*)self);
    if(((NewStrategy*)self)->nest==0){
-	 n_warning("new_heap_finish 没有初始化变量 返回");
-	 return ;
+      n_warning("new_heap_finish 没有初始化变量 返回");
+      return ;
    }
-   n_debug("new_heap_finish xxx %s %s varType:%d\n",className->sysName,varName,varType);
    new_strategy_recude_new((NewStrategy*)self);
 }
 
@@ -273,7 +272,8 @@ static nboolean newHeapObject(NewHeap *self,location_t loc,tree var,nboolean mod
 	}else{
 		setInitLocalVar(self,loc,var,className,modify);
 	}
-	setVarProperties(self,(isPublic || isFileStatic)?NEW_OBJECT_GLOBAL:(isStatic?NEW_OBJECT_LOCAL_STATIC:NEW_OBJECT_LOCAL));
+	setVarProperties(self,(isPublic
+	      || isFileStatic)?NEW_OBJECT_GLOBAL:(isStatic?NEW_OBJECT_LOCAL_STATIC:NEW_OBJECT_LOCAL));
 	return TRUE;
 }
 

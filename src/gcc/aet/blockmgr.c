@@ -172,8 +172,6 @@ static vec<tree, va_gc> *c_parser_expr_list (BlockMgr *self, bool convert_p, boo
     return ret;
 }
 
-
-
 static void c_parser_skip_to_pragma_eol (c_parser *parser, bool error_if_not_eol = true)
 {
   gcc_assert (parser->in_pragma);
@@ -213,82 +211,78 @@ static void c_parser_consume_pragma (c_parser *parser)
   parser->in_pragma = true;
 }
 
+/**
+ * 原型来自aetparser.h
+ */
 static void c_parser_skip_to_end_of_block_or_statement (c_parser *parser,NString *codes)
 {
-  unsigned nesting_depth = 0;
-  bool save_error = parser->error;
-  enum cpp_ttype previewType=0;
-  while (true)
-    {
+   unsigned nesting_depth = 0;
+   bool save_error = parser->error;
+   enum cpp_ttype previewType=0;
+   while (true){
       c_token *token;
-
       /* Peek at the next token.  */
       token = c_parser_peek_token (parser);
+      switch (token->type){
+         case CPP_EOF:
+            return;
 
-      switch (token->type)
-	{
-	case CPP_EOF:
-	  return;
+         case CPP_PRAGMA_EOL:
+            if (parser->in_pragma)
+               return;
+            break;
 
-	case CPP_PRAGMA_EOL:
-	  if (parser->in_pragma)
-	    return;
-	  break;
+         case CPP_SEMICOLON:
+            /* If the next token is a ';', we have reached the
+            end of the statement.  */
+            if (!nesting_depth){
+               /* Consume the ';'.  */
+               c_parser_consume_token (parser);
+               goto finished;
+            }
+            break;
 
-	case CPP_SEMICOLON:
-	  /* If the next token is a ';', we have reached the
-	     end of the statement.  */
-	  if (!nesting_depth)
-	    {
-	      /* Consume the ';'.  */
-	      c_parser_consume_token (parser);
-	      goto finished;
-	    }
-	  break;
+         case CPP_CLOSE_BRACE:
+            /* If the next token is a non-nested '}', then we have
+            reached the end of the current block.  */
+            if (nesting_depth == 0 || --nesting_depth == 0){
+               c_parser_consume_token (parser);
+               goto finished;
+            }
+            break;
 
-	case CPP_CLOSE_BRACE:
-	  /* If the next token is a non-nested '}', then we have
-	     reached the end of the current block.  */
-	  if (nesting_depth == 0 || --nesting_depth == 0)
-	    {
-	      c_parser_consume_token (parser);
-	      goto finished;
-	    }
-	  break;
+         case CPP_OPEN_BRACE:
+            /* If it the next token is a '{', then we are entering a new
+            block.  Consume the entire block.  */
+            ++nesting_depth;
+            break;
 
-	case CPP_OPEN_BRACE:
-	  /* If it the next token is a '{', then we are entering a new
-	     block.  Consume the entire block.  */
-	  ++nesting_depth;
-	  break;
-
-	case CPP_PRAGMA:
-	  /* If we see a pragma, consume the whole thing at once.  We
-	     have some safeguards against consuming pragmas willy-nilly.
-	     Normally, we'd expect to be here with parser->error set,
-	     which disables these safeguards.  But it's possible to get
-	     here for secondary error recovery, after parser->error has
-	     been cleared.  */
-	  c_parser_consume_pragma (parser);
-	  c_parser_skip_to_pragma_eol (parser);
-	  parser->error = save_error;
-	  continue;
-	default:
-	  break;
-	}
+         case CPP_PRAGMA:
+            /* If we see a pragma, consume the whole thing at once.  We
+            have some safeguards against consuming pragmas willy-nilly.
+            Normally, we'd expect to be here with parser->error set,
+            which disables these safeguards.  But it's possible to get
+            here for secondary error recovery, after parser->error has
+            been cleared.  */
+            c_parser_consume_pragma (parser);
+            c_parser_skip_to_pragma_eol (parser);
+            parser->error = save_error;
+            continue;
+         default:
+            break;
+      }
       char *source=aet_utils_convert_token_to_string(token);
       n_string_append(codes,source);
       if(previewType==CPP_CLOSE_PAREN && token->type==CPP_SEMICOLON){
-    	  n_string_append(codes,"\n");
+         n_string_append(codes,"\n");
       }else{
-          n_string_append(codes," ");
+         n_string_append(codes," ");
       }
       previewType=token->type;
       c_parser_consume_token (parser);
-    }
-
- finished:
-  parser->error = false;
+   }
+finished:
+   parser->error = false;
 }
 
 /**
@@ -404,17 +398,19 @@ static void genBlockFuncCompileOver(BlockMgr *self)
    self->currentBlockName=NULL;
 }
 
+/**
+ * 编译泛型块文件
+ */
 static void compileFile(BlockMgr *self)
 {
    //printf("generic_expand_create_generic_class 00 %s\n",in_fnames[0]);
    MakefileParm  *makefileParm=makefile_parm_get();
    FILE *fp=fopen(makefileParm->compileFileName,"r");
-   char buffer[1024*50];
-   int rev=fread(buffer,1,1024*50,fp);
+   char buffer[1024*500];
+   int rev=fread(buffer,1,1024*500,fp);
    buffer[rev]='\0';
    fclose(fp);
    aet_utils_add_token(parse_in,buffer,rev);
-
 }
 
 /*
@@ -436,7 +432,7 @@ nboolean  block_mgr_parser_goto(BlockMgr *self,nboolean start_attr_ok,AetGotoTag
       n_info("测试泛型块函数结束了\n");
       genBlockFuncCompileOver(self);
       return FALSE;
-   }else if(re==GOTO_READY_COMPILE_GENERIC_BLOCK_FUNC){//新加的 11-10
+   }else if(re==GOTO_READY_COMPILE_GENERIC_BLOCK_FUNC){//新加的 20025-11-10
         c_parser_consume_token (parser);//consume   RID_AET_GOTO
         c_parser_consume_token (parser);//consume   GOTO_READY_COMPILE_GENERIC_BLOCK_FUNC
         MakefileParm  *makefileParm=makefile_parm_get();
@@ -447,7 +443,7 @@ nboolean  block_mgr_parser_goto(BlockMgr *self,nboolean start_attr_ok,AetGotoTag
       c_parser_consume_token (parser);//consume   RID_AET_GOTO
       c_parser_consume_token (parser);//consume   GOTO_ENTER_COMPILE_GENERIC_BLOCK_FUNC
       generic_parser_enter(generic_parser_get());
-      n_info("解析某个泛型定义\n");
+      n_info("解析某个泛型定义，进入编译泛型块函数\n");
       return FALSE;
    }else{
       error_at(input_location,"在 block_mgr_parser_goto 不可知的错误！");
@@ -500,7 +496,8 @@ struct c_expr  block_mgr_parser(BlockMgr *self)
    ClassInfo *classInfo=class_mgr_get_class_info_by_class_name(class_mgr_get(),className);
    tree currentFunc=current_function_decl;
    char *funcName=IDENTIFIER_POINTER(DECL_NAME(currentFunc));
-   nboolean isFuncGen=func_mgr_is_generic_func(func_mgr_get(),className,funcName);
+   ClassFunc *classFunc=func_mgr_get_func(func_mgr_get(),currentFunc);
+   nboolean isFuncGen=class_func_is_func_generic(classFunc);
    if(!class_info_is_generic_class(classInfo) && !isFuncGen){
       //是不是泛型函数
       error_at(input_location,"%qs泛型块只能用在泛型类或泛型函数中。",className->userName);
@@ -542,7 +539,9 @@ struct c_expr  block_mgr_parser(BlockMgr *self)
    //生成名字和参数
 
    GenericInfo *ginfo=getInfoAndCreate(self,className);
-   GenericBlock *block=generic_info_add_block(ginfo,self->lhs,exprlist,body->str,funcName,isFuncGen);
+   GenericBlock *block=generic_info_add_block(ginfo,self->lhs,exprlist,
+         body->str,classFunc->mangleFunName,isFuncGen);
+   class_func_add_generic_block(classFunc);
    generic_block_set_loc(block,startLoc,endLoc);
    generic_block_print(block);
    //testBlock(self,block); //在同一个函数内有块又调用泛型函数，testBlock会出错
@@ -568,6 +567,9 @@ struct c_expr  block_mgr_parser(BlockMgr *self)
  * int abc 就是lhs,lhs是在c_parser_expr_no_commas生成的
  * rhs是 genericblock$(){};但不知道lhs是什么，在这里设后，
  * genericblock就知道返回的类型了
+ * lhs只有generic_block创建call时调用，取的是lhs的TREE_TYPE(lhs);
+ * 如果 return genericblock$(... lhs是当前函数的TREE_TYPE,进入generic_block再调用
+ * TREE_TYPE(lsh)刚好是当前函数的rtn。
  */
 void  block_mgr_set_lhs(BlockMgr *self,tree lhs)
 {
@@ -584,6 +586,25 @@ int block_mgr_get_block_count(BlockMgr *self,ClassName *className)
    return generic_info_get_block_count(info);
 }
 
+//整个编译单元是不有泛型块函数
+nboolean  block_mgr_have_block(BlockMgr *self)
+{
+   return self->infoCount>0;
+}
+
+//类中函数有多少个泛型块
+int   block_mgr_get_block_count_by_func(BlockMgr *self,ClassFunc *func)
+{
+   if(!func)
+      return 0;
+   GenericInfo *info=getInfo(self,func->className);
+   if(info==NULL){
+      return 0;
+   }
+   return generic_info_get_block_count_by_belong(info,func->mangleFunName);
+}
+
+
 /**
  * 保存块到xxx.block.o文件中
  * xxx是in_fnames[0]对应的输出文件名
@@ -591,7 +612,7 @@ int block_mgr_get_block_count(BlockMgr *self,ClassName *className)
 void block_mgr_save(BlockMgr *self)
 {
    if(makefile_parm_is_second_compile(makefile_parm_get())){
-      n_debug("blockmgr.c genericgraph.c 是第二次编译 %s 不需要写入任何接口信息。\n",in_fnames[0]);
+      n_debug("blockmgr.c block_mgr_save.c 是第二次编译 %s 不需要写入任何信息。\n",in_fnames[0]);
       return;
    }
    char  *objfile=makefile_parm_get_object_file(makefile_parm_get());
@@ -626,6 +647,8 @@ void block_mgr_save(BlockMgr *self)
  */
 static char * readLocaFile(char *localFileList)
 {
+   if(!localFileList || strlen(localFileList)==0)
+      return NULL;
    nchar **items=n_strsplit(localFileList,"\n",-1);
    int length= n_strv_length(items);
    int i;
@@ -645,31 +668,21 @@ static char * readLocaFile(char *localFileList)
       }
    }
    n_strfreev(items);
+   if(codes->len==0){
+      n_string_free(codes,TRUE);
+      return NULL;
+   }
    return n_string_free(codes,FALSE);
 }
 
 /**
  * 调用该方法时正在编译middlefile.c
- * GENERIC_BLOCK_INDEX_FILE 保存的是文件名列表。
+ * GENERIC_BLOCK_INDEX_FILE 保存的是有泛型块的文件名列表。
  * 这些文件名是在各个编译单元中创建的文件，名字如xxx_block.o
  * 在这些文件中存放字符串化GenericInfo和GenericBlock
  * 进入这里属于编译temp_func_track_45.c 主要靠gcc.cc中传递的参数获取在aetcollect中收集的数据
- */
-void block_mgr_ready(BlockMgr *self)
-{
-   char *fileName = getenv("GCC_AET_BLOCK_LIST_PATH");
-   if(fileName==NULL ||strlen(fileName)==0){
-      return;
-   }
-   FILE *fp=fopen(fileName,"r");
-   char fileList[50*1024];
-   int rev=fread(fileList,1,50*1024,fp);
-   fclose(fp);
-   fileList[rev]='\0';
-   if(strlen(fileList)==0)
-      return;
-   /*content的内容如下:
-    *  class_block start:
+ * content的内容如下:
+   class_block start:
      TFirst
      /home/sns/workspace/ai/src/debug/ai0.c 类实现所在文件
      1  是不是泛型类
@@ -683,10 +696,23 @@ void block_mgr_ready(BlockMgr *self)
      }
      block end:
      class_block end:
-     */
-   char *content = readLocaFile(fileList);
-   if(content==NULL || strlen(content)==0)
+ */
+void block_mgr_ready(BlockMgr *self)
+{
+   char *fileName = getenv("GCC_AET_BLOCK_LIST_PATH");
+   if(fileName==NULL ||strlen(fileName)==0){
       return;
+   }
+   FILE *fp=fopen(fileName,"r");
+   char *content = NULL;
+   if(fp){
+      char fileList[50*1024];
+      int rev=fread(fileList,1,50*1024,fp);
+      fclose(fp);
+      fileList[rev]='\0';
+      content = readLocaFile(fileList);
+   }
+
    if(self->saveString){
       free(self->saveString);
       self->saveString=NULL;
@@ -708,11 +734,11 @@ void block_mgr_ready(BlockMgr *self)
       n_ptr_array_unref(genInfoArrayFromLocal);
    }
    if(genInfoArrayFromLib){
+      //printf("从库取内容 ---- %d\n",genInfoArrayFromLib->len);
       for(i=0;i<genInfoArrayFromLib->len;i++)
          n_ptr_array_add(self->outputArray,n_ptr_array_index(genInfoArrayFromLib,i));
       n_ptr_array_unref(genInfoArrayFromLib);
    }
-   //printf("block_mgr_ready--- \n%s\n",content);
 }
 
 char *block_mgr_get_save(BlockMgr *self)
@@ -723,6 +749,22 @@ char *block_mgr_get_save(BlockMgr *self)
 NPtrArray *block_mgr_get_output_generic_info(BlockMgr *self)
 {
    return self->outputArray;
+}
+
+GenericInfo   *block_mgr_get_info (BlockMgr *self,ClassName *className)
+{
+   if(className==NULL)
+      return NULL;
+   GenericInfo *genericInfos[20];
+   int infoCount;
+   int i;
+   for(i=0;i<self->infoCount;i++){
+      GenericInfo *f=self->genericInfos[i];
+      if(f!=NULL && !strcmp(f->className->sysName,className->sysName)){
+         return f;
+      }
+   }
+   return NULL;
 }
 
 

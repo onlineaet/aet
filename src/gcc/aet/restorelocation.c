@@ -59,7 +59,7 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 #include "aetparser.h"
 
 /**
- * 在编译时加入了一些源原代码还有新增的token。
+ * 在编译时加入了一些源代码还有新增的token。
  * 当这些代码或token编译完后，要恢复到文件原来的位置。
  */
 
@@ -110,7 +110,7 @@ static void restore(cpp_reader *pfile,RestoreInputLocaton *item)
 //    printf("RestoreInputLocaton --- item %u order:%d %u line_base:%p %p cur:%p\n",
 //      item->loc,item->order,input_location,item->line_base,pfile->buffer->line_base,pfile->buffer->cur);
    if(!pfile->buffer){
-      printf("pfile->buffer==NULL，编译完文件了。返回。\n");
+     //printf("pfile->buffer==NULL，编译完文件了。返回。\n");
       return;
    }
    input_location=item->loc;

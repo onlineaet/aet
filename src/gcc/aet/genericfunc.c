@@ -81,7 +81,6 @@ static char *getStringCst(tree type)
    return NULL;
 }
 
-
 /**
  * 获取引用的类和类中的域
  * A->B->C->func;

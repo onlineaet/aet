@@ -66,7 +66,7 @@ void           generic_block_create_call(GenericBlock *self,tree lhs,vec<tree, v
 tree           generic_block_get_call(GenericBlock *self);
 
 //新版 11-05
-NPtrArray *generic_block_create_block(char *content);
+NPtrArray     *generic_block_create_block(char *content);
 
 
 

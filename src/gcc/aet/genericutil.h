@@ -30,8 +30,8 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 nboolean  generic_util_is_generic_ident(char *name);
 nboolean  generic_util_is_generic_pointer(tree type);
 char     *generic_util_get_generic_str(tree type);
+char     *generic_util_get_type_str(tree arg,int *pointerCount);
 int       generic_util_get_generic_type(tree type);
-int       generic_util_get_generic_type_name(tree type,char *result);
 tree      generic_util_get_generic_type_by_str(const char *genericStr);
 
 
@@ -50,8 +50,10 @@ static   inline nboolean  generic_util_valid_by_str(char *str)
       return (v>=min && v<=max);
 }
 
-static   inline nboolean generic_util_valid_all_by_str(char *str)
+
+static   inline nboolean generic_util_valid_all(tree id)
 {
+   char *str=IDENTIFIER_POINTER(id);
    if(str==NULL || (strlen(str)!=1 && strlen(str)!=3))
      return FALSE;
    if(strlen(str)==3 && !strcmp(str,"all"))
@@ -60,12 +62,6 @@ static   inline nboolean generic_util_valid_all_by_str(char *str)
    char max='Z';
    char v=str[0];
    return (v>=min && v<=max);
-}
-
-static   inline nboolean generic_util_valid_all(tree id)
-{
-   char *str=IDENTIFIER_POINTER(id);
-   return generic_util_valid_all_by_str(str);
 }
 
 static   inline nboolean generic_util_valid_id(tree id)
@@ -89,8 +85,7 @@ void      generic_util_parameter_declaration ();//解析函数定义中的形参
  */
 char   *generic_util_sys_name_from_block_func(char *funcName);
 
-//新加11-10
-//新加 11-10
+//新加2025-11-10
 //用类型名和指针数创建块函数的前缀
 static inline void   generic_unit_create_block_func_prefix(char *typeName,int pointerCount,char *buffer)
 {
@@ -112,7 +107,13 @@ char * generic_util_get_start_with_generic(char *str);
 //如果参数是泛型类型，需要改变为新的名字
 char *generic_util_create_param_new_name(char *origName);
 //_aetGenNewParamPrefix_atcs取出原来的名字
-char *generic_util_get_orig_param_name(char *newName);
+char *generic_util_get_block_orig_param_name(char *newName);
+/**
+ * 判断是不是泛型块函数
+ */
+nboolean generic_util_is_block_func_name(char *funcName);
+/* 检查表达式中是否有引用aet_generic_E的变量，参数*/
+nboolean gneric_util_have_generic_type (tree expr);
 
 #endif
 

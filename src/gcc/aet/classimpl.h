@@ -84,9 +84,6 @@ struct _ClassImpl
    GenericModel *currentFuncModel;//当前泛型函数的泛型模型
 };
 
-
-
-
 ClassImpl    *class_impl_get();
 void          class_impl_parser(ClassImpl *self);
 nboolean      class_impl_add_self_to_param(ClassImpl *self);
@@ -112,7 +109,7 @@ void           class_impl_build_class_dot (ClassImpl *self, location_t loc,struc
 void           class_impl_build_enum_dot (ClassImpl *self, location_t loc,struct c_expr *expr);
 nboolean       class_impl_is_aet_class_component_ref_call(ClassImpl *self,struct c_expr expr);
 GenericModel * class_impl_get_func_generic_model(ClassImpl *self,tree id);
-void           class_impl_finish_function(ClassImpl *self,tree fndecl);
+void           class_impl_finish_function(ClassImpl *self,tree fndecl,location_t endLoc);
 //如果是对象变量加入到objectreturn中处理，如果是转化由objectreturn处理并返回
 tree           class_impl_add_return(ClassImpl *self,location_t loc,tree retExpr,tree exprOrigType);
 
@@ -163,6 +160,10 @@ void            class_impl_test_target(tree target);
  * 原 push_parm_decl 没有返回decl
  */
 tree class_impl_push_parm_decl(ClassImpl *self,const struct c_parm *parm, tree *expr);
+/**
+ * 是否需要必变类中的函数定义为全局函数
+ */
+nboolean class_impl_can_global(ClassImpl *self,tree fndecl);
 
 #endif
 

@@ -31,11 +31,13 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 #include "tree-core.h"
 #include "toplev.h"
 #include "c-family/c-pragma.h"
+#include "c-family/c-pretty-print.h"
 #include "c/c-tree.h"
 #include "c/c-parser.h"
 #include "opts.h"
 #include "tree-iterator.h"
 #include "c/c-lang.h"
+#include "tree-pretty-print.h"
 
 #include "aetinfo.h"
 #include "aetutils.h"
@@ -286,7 +288,6 @@ static tree findSelf(tree value)
       //此种情况(&(abc.ytx[0]))->getName(5);
       if(className){
          selfTree = build_unary_op (input_location, ADDR_EXPR, indirectRef, false);
-         aet_print_tree(selfTree);
       }
    }else  if(TREE_CODE(indirectRef)==CALL_EXPR){
       tree type=TREE_TYPE(indirectRef);
@@ -786,7 +787,6 @@ int class_util_get_type_name(tree type,char **result)
 	return 0;
 }
 
-
 tree class_util_define_var_decl(tree decl,nboolean initialized)
 {
    tree tem;
@@ -1041,4 +1041,113 @@ nboolean   class_util_have_error()
    return errors>0;
 }
 
+
+//////////////////////////返回类型名---------------------
+#include "config.h"
+#include "system.h"
+#include "coretypes.h"
+#include "tree.h"
+#include "c-family/c-pretty-print.h"
+
+/* 判断 type 是否是用户写的 typedef */
+static bool is_typedef_p (tree type)
+{
+  return (type
+          && TYPE_NAME (type)
+          && TREE_CODE (TYPE_NAME (type)) == TYPE_DECL
+          && DECL_ORIGINAL_TYPE (TYPE_NAME (type)) != NULL_TREE
+          && DECL_NAME (TYPE_NAME (type)) != NULL_TREE);
+}
+
+/* 获取 typedef 的名字（调用者不要 free） */
+static const char *typedef_name (tree type)
+{
+  return IDENTIFIER_POINTER (DECL_NAME (TYPE_NAME (type)));
+}
+
+/* 核心函数：把任意类型转成字符串
+ * 优先保留最外层 typedef 名字，否则用 pp.type_id 展开
+ * 返回的字符串需要调用者 free
+ */
+static char *c_type_to_string (tree type)
+{
+  if (type == NULL_TREE || type == error_mark_node)
+    return xstrdup ("<error>");
+
+  c_pretty_printer pp;
+
+  /* 1. 最外层是 typedef → 直接返回名字（如 test_func） */
+  if (is_typedef_p (type)){
+      pp_c_identifier (&pp, typedef_name (type));
+      return xstrdup (pp_formatted_text (&pp));
+  }
+  /* 2. 否则用 pp.type_id 完整打印（会展开内部的 typedef） */
+  pp.type_id (type);
+  return xstrdup (pp_formatted_text (&pp));
+}
+
+/* 专门给 FUNCTION_DECL 用的：返回「返回类型」的字符串
+ * 例如：
+ *   int foo();                    → "int"
+ *   test_func setData(char *);    → "test_func"
+ *   void (*fp)(int) bar();        → "void (*)(int)"
+ */
+char *class_util_get_return_type_name (tree fndecl)
+{
+   gcc_assert (TREE_CODE (fndecl) == FUNCTION_DECL);
+   tree fntype  = TREE_TYPE (fndecl);     /* FUNCTION_TYPE */
+   tree rettype = TREE_TYPE (fntype);     /* 返回类型 */
+   return c_type_to_string (rettype);
+}
+
+
+
+/* 可选：打印完整函数类型（返回类型 + 参数列表）
+ * 返回类型优先保留 typedef 名
+ */
+char *class_util_get_fndecl_type_name (tree fndecl)
+{
+   gcc_assert (TREE_CODE (fndecl) == FUNCTION_DECL);
+   tree fntype  = TREE_TYPE (fndecl);
+   tree rettype = TREE_TYPE (fntype);
+
+   c_pretty_printer pp;
+
+   /* 返回类型：优先 typedef 名 */
+   if (is_typedef_p (rettype))
+      pp_c_identifier (&pp, typedef_name (rettype));
+   else
+      pp.type_id (rettype);
+
+   /* 参数列表：用 type_id 打印整个函数类型再截取，或手动遍历 */
+   /* 简单可靠的做法：直接对 fntype 做 type_id，但会丢失返回类型的 typedef 名
+   * 所以这里手动拼参数部分
+   */
+   pp_c_left_paren (&pp);
+   tree arg = TYPE_ARG_TYPES (fntype);
+   bool first = true;
+   for (; arg && arg != void_list_node; arg = TREE_CHAIN (arg)){
+      if (!first){
+         pp_character (&pp, ',');
+         pp_c_whitespace (&pp);
+      }
+      first = false;
+
+      tree argtype = TREE_VALUE (arg);
+      if (is_typedef_p (argtype))
+         pp_c_identifier (&pp, typedef_name (argtype));
+      else
+         pp.type_id (argtype);
+   }
+   /* 可变参数 */
+   if (arg == NULL_TREE){
+      if (!first){
+         pp_character (&pp, ',');
+         pp_c_whitespace (&pp);
+      }
+      pp_string (&pp, "...");
+   }
+   pp_c_right_paren (&pp);
+   return xstrdup (pp_formatted_text (&pp));
+}
 

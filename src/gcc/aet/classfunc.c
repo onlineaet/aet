@@ -68,7 +68,7 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 
 static void classFuncInit(ClassFunc *self)
 {
-   self->haveGenericBlock=FALSE;
+   self->genBlockCount=0;
    self->isQueryGenFunc=FALSE;
    self->isGenericParmFunc=FALSE;
    self->allParmIsQuery=FALSE;
@@ -382,14 +382,14 @@ NPtrArray *class_func_get_generic_parm(ClassFunc *self,char *id)
 /**
  * 在函数中是否有泛型块
  */
-void   class_func_set_generic_block(ClassFunc *self,nboolean have)
+void   class_func_add_generic_block(ClassFunc *self)
 {
-   self->haveGenericBlock=have;
+   self->genBlockCount++;
 }
 
 nboolean  class_func_have_generic_block(ClassFunc *self)
 {
-   return self->haveGenericBlock;
+   return self->genBlockCount>0;
 }
 
 nboolean    class_func_have_query_param(ClassFunc *self)
@@ -620,7 +620,7 @@ ClassFunc  *class_func_clone(ClassFunc *self,tree newFieldDecl,char **names,tree
       dest->parmsGenModel[i]=generic_model_clone(self->parmsGenModel[i]);
    dest->parsmGenModeCount=self->parsmGenModeCount; //泛型参数个数，如果self也是泛型类也包括。
    dest->permission=self->permission;
-   dest->haveGenericBlock=self->haveGenericBlock;//是否有泛型块
+   dest->genBlockCount=self->genBlockCount;//是否有泛型块
    dest->isFinal=self->isFinal;
    dest->allParmIsQuery=self->allParmIsQuery;//是不是所有泛型类参数都是问号泛型的函数
    dest->serialNumber=self->serialNumber;//在class中的序号
@@ -649,6 +649,27 @@ ClassFunc *class_func_get_divide_src(ClassFunc *self)
 nboolean class_func_is_divide(ClassFunc *self)
 {
    return self->isDivide;
+}
+
+/**
+ * 是不是一个普通方法
+ */
+nboolean    class_func_is_normal(ClassFunc *self)
+{
+   if(!self)
+      return FALSE;
+   return (!self->isAbstract &&
+   !self->isCtor &&
+   !self->isFinalized &&
+   !self->isUnref &&
+   !self->isMtcsFunc);
+}
+
+void class_func_set_end_location(ClassFunc *self,location_t endLoc)
+{
+    if(!self)
+       return;
+    self->endLoc = endLoc;
 }
 
 ClassFunc *class_func_new()

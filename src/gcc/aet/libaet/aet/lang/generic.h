@@ -123,6 +123,11 @@ void add_generic_data(BlockFuncData *data,int len);
 void aet_generic_class_fill_address(aet_generic_info *info,int len,char *sysName,void **address);
 //aet_generic_func_get_address 函数名来自aetmicro.h中的定义
 void *aet_generic_func_get_address(int index,aet_generic_info *classInfo,int len);
+//加fwgb函数到指针数组
+void add_func_with_gb_data(BlockFuncData *data,int len);
+//获取fwgb函数地址
+void *aet_geneirc_get_func_with_gb_address(aet_generic_info *info,int len,char *sysName,char *mangleName);
+
 
 
 #endif /* ! GCC_C_AET_H */

@@ -481,7 +481,8 @@ tree class_access_build_field_ref(ClassAccess *self,location_t loc, tree datum, 
 {
 	if(TREE_CODE(datum)!=INDIRECT_REF && TREE_CODE(datum)!=VAR_DECL && TREE_CODE(datum)!=PARM_DECL &&
 	        TREE_CODE(datum)!=COMPONENT_REF	&& TREE_CODE(datum)!=ARRAY_REF && TREE_CODE(datum)!=CALL_EXPR){
-		n_warning("buildClassFieldRef ----不是 INDIRECT_REF VAR_DECL COMPONENT_REF ARRAY_REF 是:%s datum:%p",get_tree_code_name(TREE_CODE(datum)),datum);
+		n_warning("buildClassFieldRef ----不是 INDIRECT_REF VAR_DECL COMPONENT_REF ARRAY_REF 是:%s datum:%p",
+		      get_tree_code_name(TREE_CODE(datum)),datum);
 		return error_mark_node;
 	}
     tree type = TREE_TYPE (datum);

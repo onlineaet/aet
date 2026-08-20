@@ -45,7 +45,8 @@ public$ class$ AHashTable{
    public$ static aboolean directEqual(aconstpointer v1,aconstpointer v2);
    public$ static auint    directHash(aconstpointer v1);
    private$ AHashTablePriv *priv;
-   public$ AHashTable (AHashFunc hashFunc,AEqualFunc keyEqualFunc,ADestroyNotify keyDestroyFunc,ADestroyNotify valueDestroyFunc);
+   public$ AHashTable (AHashFunc hashFunc,AEqualFunc keyEqualFunc,
+         ADestroyNotify keyDestroyFunc,ADestroyNotify valueDestroyFunc);
    public$ AHashTable ();//key类型是string
    public$ AHashTable(AHashFunc hashFunc,AEqualFunc keyEqualFunc);
    public$ aboolean put(apointer key,apointer value);

@@ -46,6 +46,7 @@ struct _CheckParamCallback{
     ClassFunc *classFunc;
     int error;//生成函数调用时出现的错误数
     int warn;//生成函数调用时出现的警告数
+    int warnZeroAsNullPointerConst;//把零当作空指针
     int state;//运行类函数选择，生成implicitly函数
 };
 
@@ -75,6 +76,7 @@ typedef struct _CandidateFunc
     char *implSysName;//implSysName实现了接口的类。
     int error;
     int warn;
+    int warnZeroAsNullPointerConst;
     struct{
         int paramNum;
         tree actual;

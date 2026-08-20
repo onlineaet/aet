@@ -163,16 +163,23 @@ impl$ AKeyFile{
    }
 
    static void init(){
+      printf("init--00\n");
       currentGroup = a_slice_new0 (KeyFileGroup);
       currentGroup->keyValuePairList=new$ AList();
+      printf("init--11\n");
+
       groups = new$ AList();
       groups->add(currentGroup);
+      printf("init--22\n");
+
       groupHash =new$ AHashTable(AHashTable.strHash,AHashTable.strEqual,a_free,NULL);
       startGroup = NULL;
+      printf("init--33\n");
+
       strBuffer = new$ AString(128);
       list_separator = ';';
       flags = 0;
-      locales =NULL;//
+      locales =NULL;
    }
 
    static void parseComment (const char  *line,asize length){
@@ -779,7 +786,10 @@ impl$ AKeyFile{
       KeyFileGroup *group;
       KeyFileKeyValuePair *pair;
       ListNode *key_node, *comment_node, *tmp;
+      printf("group ---cccc\n");
+
       group = lookupGroup (groupName);
+      printf("group ---%p\n",group);
       if (!group){
          a_error_printf(error, ERROR_DOMAIN, KeyFileError.GROUP_NOT_FOUND,
                "Key file does not have group “%s”",groupName ? groupName:"(null)");

@@ -62,10 +62,10 @@ public$ abstract$ class$ EventSource implements$ EventOps{
     EventSourceCallback callback;
     ADestroyNotify  notify;
     EventSourceFuncs *funcs;
-    EventMgr *eventMgr;
+    public$ EventMgr *eventMgr;
     int priority;
     auint flags;
-    auint id;
+    public$ auint id;
     auint    memPos;//保存在数组的位置，为了加速移走
     auint    memPollPos;//保存在poll数组的位置，为了加速移走
     char    *name;

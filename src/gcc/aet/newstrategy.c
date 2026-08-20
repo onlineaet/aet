@@ -407,26 +407,26 @@ char *new_strategy_recursion_init_parent_generic_info(NewStrategy *self,char *re
 
 void new_strategy_add_close_brace(NewStrategy *self)
 {
-       c_parser *parser=self->parser->parser;
-       location_t  loc = c_parser_peek_token (parser)->location;
-       c_token *semicolon = c_parser_peek_token (parser);//
-       int tokenCount=parser->tokens_avail;
-       if(tokenCount+1>AET_MAX_TOKEN){
-            error("token太多了");
-            return;
-       }
-       int i;
-       for(i=tokenCount;i>1;i--){
-          aet_utils_copy_token(&parser->tokens[i-1],&parser->tokens[i-1+1]);
-       }
-       parser->tokens_avail=tokenCount+1;
-       aet_utils_create_token(&parser->tokens[1],CPP_CLOSE_BRACE,"}",1);
-       aet_print_token_in_parser("addCloseBrace -----");
+   c_parser *parser=self->parser->parser;
+   location_t  loc = c_parser_peek_token (parser)->location;
+   c_token *semicolon = c_parser_peek_token (parser);//
+   int tokenCount=parser->tokens_avail;
+   if(tokenCount+1>AET_MAX_TOKEN){
+      error("token太多了");
+      return;
+   }
+   int i;
+   for(i=tokenCount;i>1;i--){
+      aet_utils_copy_token(&parser->tokens[i-1],&parser->tokens[i-1+1]);
+   }
+   parser->tokens_avail=tokenCount+1;
+   aet_utils_create_token(&parser->tokens[1],CPP_CLOSE_BRACE,"}",1);
+   aet_print_token_in_parser("addCloseBrace -----");
 }
 
 
 static void addMiddleCodes(NewStrategy *self,char *varName,ClassName *className,
-        GenericModel *genericDefine,char *modifyGenericCodes, char *ctorStr,nboolean fromHeap,NString *codes)
+        char *modifyGenericCodes, char *ctorStr,nboolean fromHeap,NString *codes)
 {
     ClassInit *classInit=((NewStrategy *)self)->classInit;
     ClassInfo *info=class_mgr_get_class_info_by_class_name(class_mgr_get(),className);
@@ -513,7 +513,7 @@ static void new_strategy_create_common_heap_codes(NewStrategy *self,char *varNam
    n_string_append_printf(codes,"\t%s->objectSize=sizeof(%s);\n",varName,className->sysName);
    n_string_append_printf(codes,"\t%s->%s=_mtcsPlatType0;\n",varName,AET_MTCS_PLATFORM_TYPE_VAR_NAME);
    n_string_append_printf(codes,"\t%s->%s=%d;\n",varName,AET_MAGIC_NAME,AET_MAGIC_NAME_VALUE);
-   addMiddleCodes(self,varName,className,genericDefine,undefineImplCodes, ctorStr,TRUE,codes);
+   addMiddleCodes(self,varName,className,undefineImplCodes, ctorStr,TRUE,codes);
    n_string_append_printf(codes,"\t%s;\n",varName);
    n_string_append_printf(codes,"})%s\n",addSSemicolon?";":"");
 
@@ -529,11 +529,11 @@ static void modifyNewObjectGenericCodes(NString *codes,int i,char *varName,RunGe
    sprintf(name,"%s->%s[%d]",varName,AET_GENERIC_ARRAY,i);
    if(info->from==UNIT_FROM_NEW_OBJECT){ //来自对象本身的定义
       GenericUnit *genUnit = info->genUnit;
-      n_string_append_printf(codes,"strcpy(%s.typeName,\"%s\");\n",name,genUnit->name==NULL?"":genUnit->name);
-      n_string_append_printf(codes,"%s.genericName=-1;\n",name);
-      n_string_append_printf(codes,"%s.type=%d;\n",name,genUnit->genericType);
-      n_string_append_printf(codes,"%s.pointerCount=%d;\n",name,genUnit->pointerCount);
-      n_string_append_printf(codes,"%s.size=%d;\n",name,genUnit->size);
+      n_string_append_printf(codes,"\tstrcpy(%s.typeName,\"%s\");\n",name,genUnit->name==NULL?"":genUnit->name);
+      n_string_append_printf(codes,"\t%s.genericName=-1;\n",name);
+      n_string_append_printf(codes,"\t%s.type=%d;\n",name,genUnit->genericType);
+      n_string_append_printf(codes,"\t%s.pointerCount=%d;\n",name,genUnit->pointerCount);
+      n_string_append_printf(codes,"\t%s.size=%d;\n",name,genUnit->size);
    }else if(info->from==UNIT_FROM_GENERIC_FUNC){ //来自泛型函数
       n_string_append_printf(codes,"memcpy(&%s,&%s.%s[%d],sizeof(%s));\n",name,
       AET_GENERIC_FUNC_THREAD_BLOCK_ADDR,AET_GENERIC_ARRAY,info->fromPos,AET_GENERIC_INFO_STRUCT_NAME);
@@ -601,10 +601,11 @@ static RunGenericInfo **collectNewObjectGeneric(NewStrategy *self,GenericModel *
       return NULL;
 
    if(genericDefine==NULL){
-      error_at(input_location,"但没有输入泛型模型。",className->userName);
+      error_at(input_location,"%s没有输入泛型模型。",className->userName);
       return NULL;
    }
    int undefine=generic_model_get_undefine_count(genericDefine);
+   //printf("collectNewObjectGeneric -- %s undefine:%d\n",generic_model_tostring(genericDefine),undefine);
    if(undefine>0){ //有未定义的泛型
       if(!self->parser->isAet){
          error_at(input_location,"泛型未定的类%qs只能在类实现中创建。",className->userName);
@@ -637,15 +638,16 @@ static RunGenericInfo **collectNewObjectGeneric(NewStrategy *self,GenericModel *
       error_at(unit->loc,"未知的类型%qs。",unit->name);
    }
    return infos;
-
 }
 
 /**
  * 调用方法 aet_generic_class_fill_address 填充泛型类中的块函数地址 AET_GENERIC_BLOCK_ARRAY_VAR_NAME  "_gen_blocks_array_897"
+ * 生成代码如下:
+ * aet_generic_class_fill_address(_notv2_6TFirst0->_generic_1234_array,1,"TFirst",_notv2_6TFirst0->_gen_blocks_array_897);
  */
 static void modifyFuncAddress(NString *codes,int genUnitCount,char *tempVarName,ClassName *className)
 {
-   n_string_append_printf(codes,"%s(%s->%s,%d,\"%s\",%s->%s);\n",
+   n_string_append_printf(codes,"\t%s(%s->%s,%d,\"%s\",%s->%s);\n",
          AET_GENERIC_CLASS_FILL_ARRAY_ADDR,
          tempVarName,AET_GENERIC_ARRAY,genUnitCount,
          className->sysName,tempVarName,AET_GENERIC_BLOCK_ARRAY_VAR_NAME);
@@ -661,10 +663,13 @@ static void modifyParentFuncAddress(NString *codes,char *tempVarName,ClassName *
          int parentUnitCount=generic_model_get_count(parentInfo->genericModel);
          n_string_append_printf(codes,"%s(((%s*)%s)->%s,%d,\"%s\",((%s *)%s)->%s);\n",
                AET_GENERIC_CLASS_FILL_ARRAY_ADDR,
-               parentInfo->className.sysName, tempVarName,AET_GENERIC_ARRAY,
+               parentInfo->className.sysName,
+               tempVarName,AET_GENERIC_ARRAY,
                parentUnitCount,
                parentInfo->className.sysName,
-               parentInfo->className.sysName,tempVarName,AET_GENERIC_BLOCK_ARRAY_VAR_NAME);
+               parentInfo->className.sysName,
+               tempVarName,
+               AET_GENERIC_BLOCK_ARRAY_VAR_NAME);
       }
       //printf("collectNewObjectParentGeneric -- %s\n",parentInfo->className.sysName);
       childInfo=parentInfo;
@@ -672,7 +677,7 @@ static void modifyParentFuncAddress(NString *codes,char *tempVarName,ClassName *
 }
 
 
-//新版 不需要第二次编译所在文件，加入确定的泛型类型，未定义的从self或泛型函数中取并设到当前对象中。
+//新版 不需要第二次编译所在文件，加入确定的泛型类型，未定义的从self或泛型函数中取,并设到当前对象中。
 //1.未定泛型从当前所在函数或所在函数的self参数来
 //如果所在函数是泛型函数，找出与未定泛型相同的泛型声明
 static char *newObject(NewStrategy *self,char *tempVarName,GenericModel *genericDefine,ClassName *className)
@@ -687,7 +692,7 @@ static char *newObject(NewStrategy *self,char *tempVarName,GenericModel *generic
       ClassFunc *atFunc=NULL;
       if(current_function_decl)
          atFunc=func_mgr_get_entity(func_mgr_get(),atClassName, IDENTIFIER_POINTER(DECL_NAME(current_function_decl)));
-
+      //重要，收集new对象
       generic_graph_add_new_class(generic_graph_get(),infos,info,atFunc,atInfo,FALSE);
       int destCount=generic_model_get_count(genericDefine);
       int i;
@@ -727,7 +732,7 @@ void new_strategy_new_object_from_field_stack(NewStrategy *self,tree var,ClassNa
     }
     char *tempVarName=IDENTIFIER_POINTER(DECL_NAME(var));
     char *undefineImplCodes=newObject(self,tempVarName,genericDefine,className);
-    addMiddleCodes(self,tempVarName,className,genericDefine,undefineImplCodes, ctorStr,FALSE,codes);
+    addMiddleCodes(self,tempVarName,className,undefineImplCodes, ctorStr,FALSE,codes);
 }
 
 /**
@@ -763,7 +768,7 @@ void new_strategy_new_object_from_stack(NewStrategy *self,tree var,ClassName *cl
              RID_AET_GOTO_STR,GOTO_MTCS_CREATE_OBJ,(unsigned long)mtcsPlatType);
 
     n_string_append_printf(codes,"\t%s->%s=_mtcsPlatType0;\n",tempVarName,AET_MTCS_PLATFORM_TYPE_VAR_NAME);
-    addMiddleCodes(self,tempVarName,className,genericDefine,undefineImplCodes, ctorStr,FALSE,codes);
+    addMiddleCodes(self,tempVarName,className,undefineImplCodes, ctorStr,FALSE,codes);
 }
 
 /**
@@ -783,7 +788,7 @@ void new_strategy_new_object_from_stack_no_name(NewStrategy *self,char *varName,
              RID_AET_GOTO_STR,GOTO_MTCS_CREATE_OBJ,(unsigned long)mtcsPlatType);
 
     n_string_append_printf(codes,"\t%s->%s=_mtcsPlatType0;\n",tempVarName,AET_MTCS_PLATFORM_TYPE_VAR_NAME);
-    addMiddleCodes(self,tempVarName,className,genericDefine,undefineImplCodes, ctorStr,FALSE,codes);
+    addMiddleCodes(self,tempVarName,className,undefineImplCodes, ctorStr,FALSE,codes);
 }
 
 tree  new_strategy_get_mtcs_plat_and_dev(NewStrategy *self,unsigned long address)

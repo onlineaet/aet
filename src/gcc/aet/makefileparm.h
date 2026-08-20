@@ -31,7 +31,8 @@ struct _MakefileParm
 	NPtrArray *bufferFiles;
 	nboolean  isSecondCompile;
 	char     *objectFile;//.o文件
-	//11-08 加入要编译的文件
+	//2025-11-08 在本单元编译将结束时，编译加入的文件 compileFileName 取 compileFileName的内容
+	//加入到cpp_buffer中，追加编译，现在用在泛型块的编译上 compileFileName = _block_func__0.o
 	char *compileFileName;
 	nboolean insertBlockFunc;
    char *gccRootPath;
@@ -47,6 +48,7 @@ void           makefile_parm_append_d_file(MakefileParm *self);
 void           makefile_parm_insert_block_func_codes(MakefileParm *self);
 //获取aet include路径
 const char    *makefile_parm_get_aet_include_path(MakefileParm *self);
+char          *makefile_parm_get_aetprog(MakefileParm *self);
 
 #endif
 

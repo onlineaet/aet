@@ -51,7 +51,9 @@ struct _GenericInfo
 
 
 GenericInfo     *generic_info_new(ClassName *className);
-GenericBlock    *generic_info_add_block(GenericInfo *self,tree lhs,vec<tree, va_gc> *exprlist,char *body,char *belongFunc,nboolean isFuncGeneric);
+//加入泛型块
+GenericBlock    *generic_info_add_block(GenericInfo *self,tree lhs,vec<tree, va_gc> *exprlist,
+                           char *body,char *belongFunc,nboolean isFuncGeneric);
 int              generic_info_get_block_count(GenericInfo *self);
 
 GenericBlock    *generic_info_get_block(GenericInfo *self,char *name);
@@ -63,6 +65,9 @@ char            *generic_info_save(GenericInfo *self);
 
 //新版 11-05
 NPtrArray       *generic_info_create_info(char *content);
+//根据函数名取所属的块数量
+int              generic_info_get_block_count_by_belong(GenericInfo *self,char *managleFuncName);
+GenericBlock    *generic_info_get_first_block_by_belong(GenericInfo *self,char *managleFuncName);
 
 #endif
 

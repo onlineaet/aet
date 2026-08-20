@@ -80,6 +80,7 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 #include "genericgraph.h"
 #include "ifaceimpl.h"
 #include "genericinfo.h"
+#include "genericparser.h"
 
 #define LINE_SIZE 1024
 /**
@@ -165,7 +166,7 @@ static char *readContent(char *fileName,nint64 offset,int size,int *dataSize)
             appendData(ret,content,&dataLen);
          }
       }
-      fclose(fd);
+      pclose(fd);
    }
    if(dataLen==0)
       return NULL;
@@ -301,7 +302,7 @@ static NPtrArray *createSegmentFromFile(char *fileName)
          if(data!=NULL)
             n_ptr_array_add(array,data);
       }
-      fclose(fd);
+      pclose(fd);
    }
    return array;
 }
@@ -404,7 +405,7 @@ static VarInfo *createVarInfoFromFile(char *fileName,char *varName)
             }
          }
       }
-      fclose(fd);
+      pclose(fd);
    }
    return NULL;
 }
@@ -442,7 +443,7 @@ static char *readOffset(char *fileName,nint64 offset,int size,int *dataSize)
             appendData(ret,content,&dataLen);
          }
       }
-      fclose(fd);
+      pclose(fd);
    }
    //printf("readContent 数据多少:%d %s\n",dataLen,content);
    if(dataLen==0)
@@ -635,7 +636,7 @@ static NPtrArray *getMatchVar(AetLib *self,char *fileName,char *varName)
 			    n_ptr_array_add(array,trueVarName);
 		  }
 		}
-		fclose(fd);
+		pclose(fd);
 	}
 	return array;
 }
@@ -891,10 +892,12 @@ static void aetLibInit(AetLib *self)
    self->haveIfaceData=FALSE;
    self->haveGenericObjs=FALSE;
    self->haveClassIfaceImplInfo=FALSE;
+   self->haveFuncWithGb = FALSE;
    self->genObjArray=NULL;
+   self->funcWithGbArray = NULL;
    char *fileName = getenv("GCC_AET_LIB_PATH");
    if(fileName!=NULL){
-      printf("aetlib 初始化打开的文件:%s\n",fileName);
+     // printf("aetlib 初始化打开的文件:%s\n",fileName);
       readVarContent(self,fileName);
       varContentWrite(self);
    }else{
@@ -992,6 +995,16 @@ char  *aet_lib_get_class_iface_impl_info(AetLib *self)
       self->haveClassIfaceImplInfo=TRUE;
    }
    return self->classIfaceImplInfo;
+}
+
+NPtrArray *aet_lib_get_func_with_gb(AetLib *self)
+{
+   if(!self->haveFuncWithGb){
+      //printf("aet_lib_get_func_with_gb --- %s\n",self->buffer);
+      self->funcWithGbArray=generic_parser_create_fwg(self->buffer);
+      self->haveFuncWithGb=TRUE;
+   }
+   return self->funcWithGbArray;
 }
 
 

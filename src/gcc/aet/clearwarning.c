@@ -489,8 +489,6 @@ static int checktype(location_t loc,tree formulaType,tree actualType,int parmnum
       }
    }else if(formulaSysName==NULL || actualSysName==NULL){
       n_debug("clearwqrning.c 不是AET类之间的转化，由系统处理 %s %s\n",formulaSysName,actualSysName);
-      aet_print_tree(formulaType);
-      aet_print_tree(actualType);
       return 0;
    }else{
       if(!strcmp(formulaSysName,actualSysName)){

@@ -510,6 +510,9 @@ static void checkMethod(AccessControls *self,AccessEnv *env)
            return;
        }
        if(env->calleeFunc->permission==CLASS_PERMISSION_PRIVATE){
+          if(aet_parser_is_generic_state(self->parser)){
+             return;
+          }
            error_at(env->loc,"在%qs中调用类%qs的私有方法%qs被禁止。",
                    env->callSysName==NULL?"在文件":env->callSysName,calleeFuncSysName,env->calleeFunc->orgiName);
        }
@@ -791,7 +794,7 @@ nboolean access_controls_access_var(AccessControls *self,location_t loc,char *va
     }else{
         if(filter(self)) //过滤编译器内部创建的初始化代码
            return TRUE;
-        if(self->parser->isGenericState)
+        if(aet_parser_is_generic_state(self->parser))
            addVar(self,calleeSysName,entity,FALSE,TRUE,NULL,loc);
         else
            addVar(self,calleeSysName,entity,FALSE,FALSE,NULL,loc);

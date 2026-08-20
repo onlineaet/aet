@@ -64,6 +64,7 @@ impl$ ListIterator{
     }
 };
 
+
 impl$ AList{
 
   static ListNode *node(int index) {

@@ -213,8 +213,10 @@ static struct c_arg_info *createParam (c_parser *parser, char *className)
 static tree rebuildComponentRef(ClassCtor *self,tree componentref ,tree field)
 {
     tree datum=TREE_OPERAND(componentref,0);
-    if(TREE_CODE(datum)!=INDIRECT_REF && TREE_CODE(datum)!=VAR_DECL && TREE_CODE(datum)!=COMPONENT_REF && TREE_CODE(datum)!=ARRAY_REF){
-        n_warning("在classctor中 rebuildComponentRef所需要的类型不符,不是 INDIRECT_REF VAR_DECL COMPONENT_REF ！！！%s",get_tree_code_name(TREE_CODE(datum)));
+    if(TREE_CODE(datum)!=INDIRECT_REF && TREE_CODE(datum)!=VAR_DECL
+          && TREE_CODE(datum)!=COMPONENT_REF && TREE_CODE(datum)!=ARRAY_REF){
+        n_warning("在classctor中 rebuildComponentRef所需要的类型不符,不是 INDIRECT_REF VAR_DECL COMPONENT_REF ！！！%s",
+              get_tree_code_name(TREE_CODE(datum)));
         return error_mark_node;
     }
     tree type = TREE_TYPE (datum);

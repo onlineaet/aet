@@ -43,8 +43,10 @@ struct _ClassAccess
 
 
 char           *class_access_get_class_name(ClassAccess *self,tree exprValue);
-int             class_access_get_last_class_and_var(ClassAccess *self,location_t loc,tree component,tree exprValue,char **result);
-void            class_access_set_objects(ClassAccess *self, VarCall *varCall,SuperCall *superCall,FuncCall *funcCall);
+int             class_access_get_last_class_and_var(ClassAccess *self,location_t loc,
+                     tree component,tree exprValue,char **result);
+void            class_access_set_objects(ClassAccess *self, VarCall *varCall,
+                     SuperCall *superCall,FuncCall *funcCall);
 VarRefRelation *class_access_create_relation_ship(ClassAccess *self,location_t loc,tree component,tree exprValue);
 tree            class_access_build_field_ref(ClassAccess *self,location_t loc, tree datum, tree field);
 tree            class_access_create_temp_field(ClassAccess *self,char *className, tree component,location_t loc);

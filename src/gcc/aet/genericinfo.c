@@ -132,7 +132,9 @@ nboolean  generic_info_same(GenericInfo *self,ClassName *className)
 	return strcmp(self->className->sysName,className->sysName)==0;
 }
 
-
+/**参数 name:在创建genericblock时创建，用的方法是
+ * generic_util_create_block_func_name
+ */
 GenericBlock *generic_info_get_block(GenericInfo *self,char *name)
 {
 	int i;
@@ -160,26 +162,6 @@ tree  generic_info_get_field(GenericInfo *self,char *name)
  * 获取的字符串格式：
  * 类名+FIELD_SPERATOR+块数量+FIELD_SPERATOR+块1+FIELD_SPERATOR+...
  */
-char *generic_info_save00(GenericInfo *self)
-{
-    int i;
-    printf("generic_info_save ---- %d\n",self->blocksCount);
-    if(self->blocksCount==0)
-    	return NULL;
-    NString *codes=n_string_new("");
-	n_string_append_printf(codes,"%s%s%d%s",self->className->sysName,FIELD_SPERATOR,self->blocksCount,FIELD_SPERATOR);
-    for(i=0;i<self->blocksCount;i++){
-    	GenericBlock *item=self->blocks[i];
-    	char *bc=generic_block_create_save_codes(item);
-    	n_string_append(codes,bc);
-    	if(i<self->blocksCount-1)
-        	n_string_append(codes,FIELD_SPERATOR);
-    	n_free(bc);
-    }
-    char *result=n_strdup(codes->str);
-    n_string_free(codes,TRUE);
-    return result;
-}
 
 static char *toAbsolutePath(char *str)
 {
@@ -272,8 +254,6 @@ char *generic_info_save(GenericInfo *self)
    return n_string_free(codes,FALSE);
 }
 
-
-
 /**
  * 从字符串读出GenericInfo;
  */
@@ -337,6 +317,8 @@ static char *readInclude(char *buffer)
  */
 NPtrArray *generic_info_create_info(char *content)
 {
+   if(!content || strlen(content)==0)
+      return NULL;
    NPtrArray *infos=n_ptr_array_new();
    NPtrArray *array=readInfo(content);
    int i;
@@ -364,6 +346,30 @@ NPtrArray *generic_info_create_info(char *content)
    }
    n_ptr_array_unref(array);
    return infos;
+}
+
+//根据函数名取所属的块数量
+int  generic_info_get_block_count_by_belong(GenericInfo *self,char *managleFuncName)
+{
+   int i;
+   int count = 0;
+   for(i=0;i<self->blocksCount;i++){
+      GenericBlock *block=self->blocks[i];
+      if(strcmp(block->belongFunc,managleFuncName)==0)
+         count++;
+   }
+   return count;
+}
+
+GenericBlock *generic_info_get_first_block_by_belong(GenericInfo *self,char *managleFuncName)
+{
+   int i;
+   for(i=0;i<self->blocksCount;i++){
+      GenericBlock *block=self->blocks[i];
+      if(strcmp(block->belongFunc,managleFuncName)==0)
+         return block;
+   }
+   return NULL;
 }
 
 GenericInfo  *generic_info_new(ClassName *className)

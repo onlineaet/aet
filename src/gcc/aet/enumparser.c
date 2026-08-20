@@ -300,6 +300,7 @@ nboolean  enum_parser_set_enum_type(EnumParser *self,c_token *who)
    location_t loc=who->location;
    while (n_hash_table_iter_next(&iter, &key, &value)) {
       char *sysName = (char *)key;
+      n_debug("enum_parser_set_enum_type 00 %s %s\n",id,sysName);
       EnumData *item=getEnumDataByName(self,sysName,id,TRUE);
       if(item!=NULL){
          datas[count++]=item;
@@ -337,6 +338,8 @@ char *enum_parser_get_orig_name(EnumParser *self,char *mangle)
 	n_hash_table_iter_init(&iter, self->hashTable);
 	while (n_hash_table_iter_next(&iter, &key, &value)) {
 		char *sysName = (char *)key;
+      n_debug("enum_parser_get_orig_name 00 %s %s\n",mangle,sysName);
+
 		EnumData *item=getEnumDataByName(self,sysName,mangle,FALSE);
 		if(item!=NULL){
 			return item->origName;
@@ -352,6 +355,8 @@ EnumData *enum_parser_get_enum(EnumParser *self,char *mangle)
 	n_hash_table_iter_init(&iter, self->hashTable);
 	while (n_hash_table_iter_next(&iter, &key, &value)) {
 		char *sysName = (char *)key;
+      n_debug("enum_parser_get_enum 00 %s %s\n",mangle,sysName);
+
 		EnumData *item=getEnumDataByName(self,sysName,mangle,FALSE);
 		if(item!=NULL){
 			return item;
@@ -668,6 +673,8 @@ struct c_typespec  enum_parser_parser(EnumParser *self,location_t loc,ClassName 
 
 static EnumData *findEnumType(EnumParser *self,char *sysName,char *origNameOrTypeName,nboolean orig)
 {
+   n_debug("findEnumType 00 %s %s\n",origNameOrTypeName,sysName);
+
 	EnumData *item=getEnumDataByName(self,sysName,origNameOrTypeName,orig);
 	if(item!=NULL){
 		return item;

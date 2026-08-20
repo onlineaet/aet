@@ -58,7 +58,7 @@ struct _ClassFunc
 	GenericModel *parmsGenModel[50];//方法中的参数的泛型 因为field只有类型没有参数，所以从struct c_declarator *declarator取出参数保存在这里
 	int parsmGenModeCount; //泛型参数个数，如果self也是泛型类也包括。
 	ClassPermissionType permission;
-	nboolean haveGenericBlock;//是否有泛型块
+	int genBlockCount;//泛型块数量
 	nboolean isFinal;
 	nboolean allParmIsQuery;//是不是所有泛型类参数都是问号泛型的函数
    int serialNumber;//在class中的序号
@@ -68,6 +68,7 @@ struct _ClassFunc
    nboolean fromInterface;//是从接口clone来的
    nboolean isDivide;//是不是从host_device类型的ClassFunc分裂而来的。
    ClassFunc *divideSrc;//分裂的源头
+   location_t endLoc;//函数定义的结束位置
 };
 
 typedef struct _ParmGenInfo
@@ -83,10 +84,11 @@ ClassFunc  *class_func_new();
 nboolean    class_func_is_same_but_rtn(ClassFunc *self,ClassFunc *compare,tree readyDecl);
 nboolean    class_func_set_decl(ClassFunc *self,tree decl,enum func_from_code code);
 nboolean    class_func_is_same_generic(ClassFunc *self);
+//是还是泛型函数
 nboolean    class_func_is_func_generic(ClassFunc *self);
 GenericModel *class_func_get_func_generic(ClassFunc *self);
 NPtrArray  *class_func_get_generic_parm(ClassFunc *self,char *id);
-void        class_func_set_generic_block(ClassFunc *self,nboolean have);
+void        class_func_add_generic_block(ClassFunc *self);
 nboolean    class_func_have_generic_block(ClassFunc *self);
 nboolean    class_func_have_query_param(ClassFunc *self);//有没有问号参数
 nboolean    class_func_have_generic_class_parm(ClassFunc *self);//有没有泛型类参数
@@ -116,9 +118,11 @@ nboolean    class_func_have_class_name(ClassFunc *self);
 void        class_func_set_divide(ClassFunc *self,nboolean isDivide,ClassFunc *divideSrc);
 //是从host device函数分裂出来的
 nboolean    class_func_is_divide(ClassFunc *self);
-ClassFunc *class_func_get_divide_src(ClassFunc *self);
-
+ClassFunc  *class_func_get_divide_src(ClassFunc *self);
 ClassFunc  *class_func_clone(ClassFunc *self,tree newFieldDecl,char **names,tree classTree ,ClassName *className);
+//定义一个普通的方法
+nboolean    class_func_is_normal(ClassFunc *self);
+void        class_func_set_end_location(ClassFunc *self,location_t endLoc);
 
 #endif
 

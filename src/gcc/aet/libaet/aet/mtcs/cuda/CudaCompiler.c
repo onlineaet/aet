@@ -70,7 +70,7 @@ impl$  CudaCompiler {
         self->mtcsModule=new$ CudaModule(devNum);
    }
 
-   char *compile(AArray *ptxCodes,int *binSize){
+   char *compile(AArray<char *> *ptxCodes,int *binSize){
       CUdevice cuDevice;
       //设置设备 Runtime API 会自动管理上下文
       CUDA_DRIVER_CALL(cuDeviceGet(&cuDevice, devNum));
@@ -137,10 +137,13 @@ impl$  CudaCompiler {
       return TRUE;
    }
 
-   AArray *getPtxCode(char *fileName){
+   AArray<char*> *getPtxCode(char *fileName){
       a_debug("获取文件的ptx汇编代码 :%s\n",fileName);
       ElfFile *elfFile=new$ ElfFile(fileName);
-      AArray *ret =elfFile->getCode("cuda");
+      printf("getPtxCode 00 -- fileName:%s\n",fileName);
+
+      AArray<char*> *ret =elfFile->getCode("cuda");
+      printf("getPtxCode 11 -- fileName:%s array:%p\n",fileName,ret);
       elfFile->unref();
       return ret;
    }
@@ -149,7 +152,7 @@ impl$  CudaCompiler {
       if(cubin==NULL){
          char processDir[1024];
          getProcessFile(processDir,1024);
-         AArray *codes=getPtxCode(processDir);
+         AArray<char *> *codes=getPtxCode(processDir);
          cubin=compile(codes,&self->cubinSize);
          codes->unref();
          a_debug("编译后的 cuda bin 大小 size:%d %p\n",self->cubinSize,cubin);

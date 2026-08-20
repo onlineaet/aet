@@ -27,15 +27,17 @@
 
 package$ aet.mtcs;
 
+typedef struct _SegmentData SegmentData;
+
 /**
  * 解析当前正在运行的文件
  * 取出变量名是mtcs_
  */
 public$  class$ ElfFile{
      private$ char *fileName;
-     AArray *segmentArray;
+     AArray<SegmentData *> *segmentArray;
      public$ ElfFile(char *fileName);
-     public$ AArray *getCode(char *platform);
+     public$ AArray<char *> *getCode(char *platform);
 };
 
 

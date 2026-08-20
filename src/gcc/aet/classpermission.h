@@ -55,7 +55,6 @@ ClassPermission    *class_permission_new();
 ClassPermissionType class_permission_get_permission_type(ClassPermission *self,char *sysClassName,ClassType classType);
 void                class_permission_reset(ClassPermission *self);
 nboolean            class_permission_set_field(ClassPermission *self,tree decls,ClassName *className);
-void                class_permission_check_and_set(ClassPermission *self,ClassParserState state,ClassPermissionType type);
 
 FieldDecorate       class_permission_try_parser(ClassPermission *self,int classType);
 void                class_permission_set_decorate(ClassPermission *self,FieldDecorate *dr);

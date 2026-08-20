@@ -152,7 +152,7 @@ impl$ ABackTrace{
                   strs[count++]=a_strdup(ret);
               }
             }
-            fclose(fd);
+            pclose(fd);
         }
         return count;
     }
@@ -173,7 +173,7 @@ impl$ ABackTrace{
                  strs->append(ret);
              }
            }
-           fclose(fd);
+           pclose(fd);
         }
         return strs->unrefStr();
     }

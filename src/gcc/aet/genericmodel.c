@@ -58,6 +58,7 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 #include "classutil.h"
 #include "genericutil.h"
 #include "genericimpl.h"
+#include "aetprinttoken.h"
 
 
 static void genericModelInit(GenericModel *self)
@@ -163,6 +164,17 @@ static tree c_parser_parameter_declaration (GenericModel *self ,tree *expr,
       }
       error_at (token->location, "unknown type name %qE", token->value);
       return NULL_TREE;
+   }
+   c_token *token = c_parser_peek_token (parser);
+   if(token->id_kind==C_ID_TYPENAME){
+      tree value = token->value;
+      char *re= IDENTIFIER_POINTER(value);
+      //进入泛型块和fwgb的parser,原来的 E 在fwgb中被替换为aet_generic_E,在再这是还原
+      if(generic_util_is_generic_ident(re) && aet_parser_is_generic_state(aet_parser_get())){
+         char newstr[2]={re[strlen(re)-1],'\0'};
+         c_parser_consume_token(parser);
+         return get_identifier(newstr);
+      }
    }
    //不能出现具体类型extends$ class.
    location_t start_loc = c_parser_peek_token (parser)->location;
@@ -800,7 +812,8 @@ nboolean      generic_unit_equal(GenericUnit *self,GenericUnit *dest)
 
 nboolean      generic_unit_is_undefine(GenericUnit *self)
 {
-	return generic_util_valid_all_by_str(self->name);
+   gcc_assert(self);
+   return !self->isDefine;
 }
 
 nboolean  generic_unit_is_query(GenericUnit *self)

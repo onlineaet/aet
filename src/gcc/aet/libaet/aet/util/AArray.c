@@ -20,111 +20,34 @@
 
 #include <string.h>
 #include <stdlib.h>
-#include "AArray.h"
 #include "../lang/AQSort.h"
-#include "../lang/AAssert.h"
 
+#include <string.h>
+#include <stdlib.h>
+#include "AArray.h"
+
+//element_pos中必须转化成char * 应为array是void类型
 #define MIN_ARRAY_SIZE  16
-#define element_len(vector,i) ((vector)->elementSize * (i))
-#define element_pos(vector,i) ((vector)->data + element_len((vector),(i)))
-#define element_zero(vector, pos, len)  (memset (element_pos ((vector), pos), 0, element_len ((vector), len)))
+
+#define element_count()  (( (char*)finish - (char*)start ) / elementSize)
+
+static auint nearestPow (auint num)
+{
+   auint n = num - 1;
+   //a_assert (num > 0);
+   n |= n >> 1;
+   n |= n >> 2;
+   n |= n >> 4;
+   n |= n >> 8;
+   n |= n >> 16;
+   return n + 1;
+}
+
 
 impl$ AArray{
-
-   static auint nearestPow (auint num){
-      auint n = num - 1;
-      a_assert (num > 0);
-      n |= n >> 1;
-      n |= n >> 2;
-      n |= n >> 4;
-      n |= n >> 8;
-      n |= n >> 16;
-      return n + 1;
-   }
-
-   static inline auint getElementLen(int count){
-      return self->elementSize*count;
-   }
-
-   static inline void setZeroTerminate(){
-      if(zero_terminated){
-         int elementLen=getElementLen(self->len);
-         char *newData=(char*)(self->data+elementLen);
-         memset(newData,0,self->elementSize);
-      }
-   }
-
-
-   static void maybeExpand(auint eleCount){
-      auint want_alloc;
-      /* Detect potential overflow */
-      if A_UNLIKELY ((A_MAXUINT - self->elementCount) < eleCount)
-            a_error ("加 %u 到数组将溢出。", eleCount);
-      want_alloc = self->elementSize*(self->elementCount + eleCount);
-      if (want_alloc > self->alloc){
-         want_alloc = nearestPow (want_alloc);
-         want_alloc = MAX (want_alloc, MIN_ARRAY_SIZE);
-         self->data = a_realloc (self->data, want_alloc);//realloc 保留原来的数据返加扩大的内存
-         //  printf("maybeExpand %d %p\n",want_alloc,self->data);
-         memset (self->data + self->alloc, 0, want_alloc - self->alloc);
-         self->alloc = want_alloc;
-      }
-   }
-
-   static void clear(int index){
-      if (self->clearFunc != NULL){
-         void *data=element_pos (self, index);
-         if(isPointer){
-            unsigned long temp=((unsigned long*)data)[0];
-            data=(void*)temp;
-         }
-         self->clearFunc (data);
-      }
-   }
-
-   static void  removeRange (auint index_,auint removeCount){
-      a_return_if_fail (self);
-      a_return_if_fail (index_ <= self->elementCount);
-      a_return_if_fail (index_ + removeCount <= self->elementCount);
-      if (self->clearFunc != NULL){
-         auint i;
-         for (i = 0; i < removeCount; i++){
-            clear (index_ + i);
-         }
-      }
-      if (index_ + removeCount != self->elementCount)
-         memmove (element_pos (self, index_),element_pos (self, index_ + removeCount),
-               (self->elementCount - (index_ + removeCount)) * self->elementSize);
-      self->elementCount -= removeCount;
-      element_zero (self,self->elementCount, removeCount);
-   }
-
-   static void setSize(auint newEleCount){
-      a_return_if_fail (self);
-      if (newEleCount > self->elementCount){
-         maybeExpand (newEleCount - self->elementCount);
-         element_zero (self, self->elementCount, newEleCount - self->elementCount);
-      }else if (newEleCount < self->elementCount)
-         removeRange (newEleCount, self->elementCount - newEleCount);
-      self->elementCount = newEleCount;
-   }
-
-   static void init(auint capacity,ADestroyNotify clearFunc){
-      self->data            = NULL;
-      self->elementCount    = 0;
-      self->alloc           = 0;
-      self->elementSize     = sizeof(E);
-      self->isPointer       =generic_is_pointer(E);
-      self->clearFunc       = clearFunc;
-      if (capacity != 0){
-         maybeExpand (capacity);
-      }
-   }
-
    AArray(){
       init(5,NULL);
    }
-
 
    AArray(auint capacity){
       init(capacity,NULL);
@@ -134,137 +57,259 @@ impl$ AArray{
       init(capacity,clearFunc);
    }
 
-   static void addFirst(E value,auint addCount){
-      if(addCount == 0 || data==NULL)
-         return ;
-      maybeExpand (addCount);
-      void *data=value;
-      if(isPointer){
-         aulong add=(aulong)value;
-         data=&add;
+   void init(auint capacity,ADestroyNotify clearFunc){
+      self->elementSize     = sizeof(E);
+      self->isPointer       =generic_is_pointer(E);
+      self->clearFunc       = clearFunc;
+      self->start = finish = end_of_storage= NULL;
+      if (capacity != 0)
+         maybeExpand (capacity);
+   }
+
+   /**
+    * 扩大array到新的大小
+    */
+   void maybeExpand(auint eleCount) {
+       // 当前已有元素个数
+       auint currentCount = element_count();   // 即 (finish - start) / elementSize
+       // 检查溢出
+       if (A_UNLIKELY((A_MAXUINT - currentCount) < eleCount)) {
+           a_error("加 %u 到数组将溢出。\n", eleCount);
+           // 这里可以改成 a_error 或直接 return
+           return;
+       }
+       // 需要的总元素个数
+       auint needCount = currentCount + eleCount;
+       // 当前容量（元素个数）
+       auint currentCapacity = 0;
+       if (start != NULL)
+           currentCapacity = ((char*)end_of_storage - (char*)start) / elementSize;
+       // 如果容量足够，直接返回
+       if (needCount <= currentCapacity)
+           return;
+
+       // 计算新的容量（字节）
+       auint want_alloc = elementSize * needCount;
+       want_alloc = nearestPow(want_alloc);
+       want_alloc = MAX(want_alloc, MIN_ARRAY_SIZE);
+       // 重新分配
+       void *new_array = a_realloc(start, want_alloc);
+
+       // 更新三个指针
+       auint oldSizeBytes = (char*)finish - (char*)start;
+       start          = new_array;
+       finish         =(E *) ((char*)start + oldSizeBytes);
+       end_of_storage = (E *)((char*)start + want_alloc);
+   }
+
+   /**
+    * 释放元素index的内存
+    */
+   void clear(int index){
+      if (clearFunc != NULL){
+         clearFunc(isPointer?start[index]:(char*)start+index*elementSize);
       }
-      memmove (element_pos (self, addCount), element_pos (self, 0),element_len (self, self->elementCount));
-      memcpy (element_pos (self, 0), data, element_len (self, addCount));
-      self->elementCount += addCount;
    }
 
-   void addFirst(E data){
-      addFirst(data,1);
+   /**
+    * 从 index_ 开始移除 removeCount 个元素
+    */
+   void removeRange(auint index_, auint removeCount){
+
+       auint sz = element_count();
+       a_return_if_fail(index_ <= sz);
+       a_return_if_fail(index_ + removeCount <= sz);
+       // 调用销毁回调
+       if (clearFunc != NULL) {
+           for (auint i = 0; i < removeCount; ++i) {
+               clear(index_ + i);
+           }
+       }
+
+       // 把后面的元素前移
+       if (index_ + removeCount < sz) {
+           memmove((char*)start + index_ * elementSize,
+                   (char*)start + (index_ + removeCount) * elementSize,
+                   (sz - index_ - removeCount) * elementSize);
+       }
+
+       // 回退 finish 指针
+       finish = (E*)((char*)finish - removeCount * elementSize);
+       // 可选：把移出的区域清零（保持原行为）
+       if(haveZero)
+          memset((char*)finish, 0, removeCount * elementSize);
    }
 
-   auint getElementSize(){
-      a_return_val_if_fail (self, 0);
+   /**
+    * 设置数组大小
+    */
+   void setSize(auint newEleCount){
+      auint currentCount = element_count();   // 即 (finish - start) / elementSize
+      if (newEleCount > currentCount){
+         maybeExpand (newEleCount - currentCount);
+      }else if (newEleCount < currentCount)
+         removeRange (newEleCount, currentCount - newEleCount);
+   }
+
+   /**
+    * 加元素到数组的0号位置
+    */
+   void addFirst(E value){
+       // 容量不足时扩容（与 add 完全一致）
+       if (finish == end_of_storage)
+           maybeExpand(1);
+       // 把现有元素整体向后挪一个位置
+       // （空数组时 finish == start，memmove 长度为 0，安全）
+       memmove((char*)start + elementSize,start,(char*)finish - (char*)start);
+       // 在头部写入新值
+       genericblock$(value) {
+           start[0] = value;
+           finish = (void **)((char*)finish + sizeof(E));
+       };
+   }
+
+   /**
+    * 获取元素的大小 sizeof(E);
+    */
+   auint getESize(){
       return elementSize;
    }
 
    void removeAll(){
-      removeRange(0,elementCount);
+      removeRange(0,element_count());
    }
 
-   void remove(auint   index){
-      a_return_if_fail (self);
-      a_return_if_fail (index< self->elementCount);
-      clear(index);
-      if (index != self->elementCount - 1)
-         memmove (element_pos (self, index),element_pos (self, index + 1),
-               element_len (self, self->elementCount - index - 1));
-      self->elementCount -= 1;
-      element_zero (self, self->elementCount, 1);
-   }
 
    void remove(auint index,auint removeCount){
       removeRange(index,removeCount);
    }
 
-   aboolean   remove(E data){
-      auint i;
-      for (i = 0; i < self->elementCount; i += 1){
-         void *item=self->data+elementSize*i;
-         aboolean canRemove=FALSE;
-         if(isPointer){
-            aulong add=(aulong)item;
-            item=&add;
-            canRemove=(item == data);
-         }else{
-            canRemove=(memcmp(item,data,elementSize)==0);
-         }
-         if (canRemove){
-            self->remove (i);//与stdio.h中的remove冲突。所以加self->
-            return TRUE;
+   /**
+    * 清除 index 位置的元素，后面的元素前移
+    */
+   void remove(auint index){
+       auint sz =element_count();
+       //调用销毁回调（如果有）
+       clear(index);
+       // 把 index 后面的元素整体前移一位
+       if (index + 1 < sz) {
+           memmove((char*)start + index * elementSize,
+                   (char*)start + (index + 1) * elementSize,
+                   (sz - index - 1) * elementSize);
+       }
+       genericblock$(){
+          finish = (void**)((char*)finish-sizeof(E));
+       };
+       // 回退 finish 指针
+       //finish = (E*)((char*)finish - elementSize);
+       // 可选：把移出的那个位置清零（保持与原行为一致）
+       if(haveZero)
+          memset((char*)finish, 0, elementSize);
+   }
+
+   /**
+    * 比较是否相同，相同则移走（只删除第一个匹配的）
+    */
+   aboolean removeData(E data){
+      auint sz =element_count();
+      for (auint i = 0; i < sz; ++i) {
+         aboolean find = genericblock$(data, i) {
+            return start[i] == data;
+         };
+         if (find) {
+            remove(i);
+            return TRUE;          // 找到并删除后立即返回
          }
       }
       return FALSE;
    }
 
+   /**
+    * 进入内联
+    */
    auint size(){
-      return elementCount;
+      return  genericblock$() {
+         return (( (char*)finish - (char*)start ) / sizeof(E));
+      };
    }
-
 
    void add(E value){
-      maybeExpand (1);
-      int pos=self->elementSize*self->elementCount;
-      self->elementCount += 1;
-      void *addData=value;
-      if(isPointer){
-         unsigned long add=(unsigned long)addData;
-         memcpy (self->data+pos, &add, self->elementSize);
-      }else{
-         memcpy (self->data+pos, addData, self->elementSize);
-      }
+      // 判断是否需要扩容（finish 已经到达容量末尾）
+      if (finish == end_of_storage)
+         maybeExpand(1);
+      genericblock$(value){
+         finish = value;
+         finish = (void**)((char*)finish+sizeof(E));
+      };
+   }
+
+   void addFast(E value) {
+       genericblock$(value){
+          finish = value;
+          finish = (void **)((char*)finish + sizeof(E));
+       };
    }
 
 
-   E get(int index) {
-      if(index<0 || index>self->elementCount-1)
-         return NULL;
-      char *posData=(char *)(self->data+index*self->elementSize);
-      if(isPointer){
-         unsigned long temp=0;
-         memcpy(&temp,posData,self->elementSize);
-         posData=(void*)temp;
-      }
-      return posData;
+   E get(int index){
+       // 使用三指针计算当前元素个数
+       auint sz = element_count();
+       if (index < 0 || (auint)index >= sz)
+           return NULL;          // 保持原来的越界返回值风格
+
+       return genericblock$(index) {
+           return start[index];  // 直接通过 start 指针访问
+       };
    }
 
    void insert(E data, int index) {
-      if (index <-1 || index> (int)elementCount) {
-         a_error("插入位置越界 index:%d 大于 %d",index,elementCount);
-         return;
-      }
-      if (index < 0)
-         index =self->elementCount;
-      if (index == self->elementCount){
-         maybeExpand(1);
-         setSize (index);
-         add(data);
-         return;
-      }
-      maybeExpand (1);
-      memmove (element_pos (self, 1 + index),element_pos (self, index),element_len (self, self->elementCount - index));
-      void *addData=data;
-      if(isPointer){
-         aulong add=(aulong)data;
-         addData=&add;
-      }
-      memcpy (element_pos (self, index), addData, self->elementSize);
-      self->elementCount += 1;
+       auint sz = element_count();
+       if (index < -1 || index > (int)sz) {
+           a_error("插入位置越界 index:%d 大于 %d\n", index, sz);
+           return;
+       }
+
+       // -1表示尾插
+       if (index < 0)
+           index = sz;
+       // 尾部直接add
+       if (index == sz) {
+           add(data);
+           return;
+       }
+       if (finish == end_of_storage)
+          maybeExpand(1);
+       /*
+        * 后移 index 后面的元素
+        *
+        * 目标:
+        * [0 ... index-1][index ... finish]
+        *
+        * 变成:
+        * [0 ... index-1][空][index ... finish]
+        */
+       memmove(
+           (char*)start + (index + 1) * elementSize,
+           (char*)start + index * elementSize,
+           (sz - index) * elementSize
+       );
+
+       genericblock$(data,index){
+           start[index] = data;
+           finish = (void **)((char*)finish + sizeof(E));
+       };
    }
 
    aboolean isEmpty(){
-      return elementCount == 0;
+      return finish==start;
    }
 
    void foreach (AFunc func,apointer userData){
-      auint i;
-      for (i = 0; i < elementCount; i++){
-         void *data=element_pos (self, i);
-         if(isPointer){
-            unsigned long temp=((unsigned long*)data)[0];
-            data=(void*)temp;
-         }
-         (*func) (data, userData);
-      }
+       char *p=(char*)start;
+       while(p < (char*)finish){
+           (*func)( isPointer ? *(void**)p:p, userData);
+           p += elementSize;
+       }
    }
 
    void sort(ACompareFunc compareFunc){
@@ -272,19 +317,51 @@ impl$ AArray{
    }
 
    void sort(ACompareFunc compareFunc,apointer userData){
-      apointer src=self->data;
-      if(isPointer){
-         apointer *srcp=(apointer)src;
-         AQSort.sort(srcp,self->elementCount,self->elementSize,(ACompareDataFunc)compareFunc,userData);
-      }else{
-         AQSort.sort(src,self->elementCount,self->elementSize,(ACompareDataFunc)compareFunc,userData);
+      apointer src=(void*)start;
+      AQSort.sort(src,element_count(),self->elementSize,(ACompareDataFunc)compareFunc,userData);
+   }
+
+   /**
+    * 弹出最后一个数据，并且清除
+    */
+   void popBack(){
+      if ((char*)finish <= (char*)start)
+         return;
+      genericblock$(){
+         finish = (void **)((char*)finish - sizeof(E));
+      };
+      if(clearFunc != NULL){
+         clearFunc(finish);
       }
    }
 
+   /**
+    * 取最后一个数据，如果无数据返回空
+    */
+   E back(){
+       if (finish <= start){
+           // 空数组处理
+           return NULL;
+       }
+       return genericblock$(){
+         return (char*)finish-sizeof(E);
+       };
+   }
+
+   /**
+    * 当分配内存后是否需要清零
+    */
+   void setZero(aboolean zero){
+      haveZero = zero;
+   }
+
+
    ~AArray(){
-      if(data!=NULL){
-         a_free(data);
-         data=NULL;
+      if(start!=NULL){
+         a_free(start);
+         start=NULL;
+         finish=NULL;
+         end_of_storage = NULL;
       }
    }
 

@@ -30,8 +30,8 @@ package$ aet.main;
 
 
 public$  class$ DefaultSource extends$ EventSource {
-     DefaultSource(char *name);
-     DefaultSource(EventSourceFuncs *funcs);
+   public$ DefaultSource(char *name);
+   public$ DefaultSource(EventSourceFuncs *funcs);
 };
 
 

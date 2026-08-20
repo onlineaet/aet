@@ -62,11 +62,18 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 #include "classinit.h"
 #include "objectreturn.h"
 
+typedef struct _TlsData
+{
+   tree fndecl;//泛型块函数
+   tree tlsVar;//在泛型块函数声明的tls变量
+}TlsData;
 
 static void objectReturnlInit(ObjectReturn *self)
 {
    self->dataArray=n_ptr_array_new();
    self->classCast=class_cast_new();
+   //泛型块函数中播入的tls
+   self->tlsDataArray=n_ptr_array_new();
 }
 
 
@@ -891,29 +898,6 @@ static void finalize_add_cleanup(ObjectReturn *self,tree fndecl)
 }
 
 
-void  object_return_finish_function00(ObjectReturn *self,tree fndecl)
-{
-    if(!aet_utils_valid_tree(fndecl))
-    	return;
-    //获取返回值
-    DataReturn *dataReturn=getDataReturn(self,fndecl);
-//    if(dataReturn==NULL){
-//       // printf("函数定义没有返回值或返回值不是class\n");
-//        return;
-//    }
-    char *funcName=IDENTIFIER_POINTER(DECL_NAME(fndecl));
-    if(strcmp(funcName,"main")==0){
-       finalize_add_cleanup(self,fndecl);
-       printf("测试测试--------\n\n");
-       testStmt(self,fndecl);
-    }else if(strcmp(funcName,"getAbc")==0){
-       finalize_remove_cleanup(self,fndecl);
-    }
-    // printf("object_return_finish_function 00 。测试语句\n");
-   // testStmt(self,fndecl);
-    //removeDataReturn(self,fndecl);
-}
-
 void  object_return_finish_function(ObjectReturn *self,tree fndecl)
 {
    if(!aet_utils_valid_tree(fndecl)){
@@ -958,6 +942,226 @@ tree   object_return_convert(ObjectReturn *self,location_t loc,tree retExpr)
    }
    return retExpr;
 }
+
+//////////////泛型块返回值
+static bool expr_is_pointer_p (tree expr)
+{
+   if (!expr || expr == error_mark_node)
+      return false;
+
+   tree type = TREE_TYPE (expr);
+   if (!type || type == error_mark_node)
+      return false;
+
+   /* 去掉 typedef 糖衣 */
+   type = TYPE_MAIN_VARIANT (type);
+   n_debug("expr_is_pointer_p 00\n");
+   aet_print_tree(type);
+   return POINTER_TYPE_P (type);
+}
+
+/**
+ * 是否存在泛型块tls
+ */
+static nboolean existsTls(ObjectReturn *self,tree function)
+{
+   int i;
+   for(i=0;i<self->tlsDataArray->len;i++){
+      TlsData *item = n_ptr_array_index(self->tlsDataArray,i);
+      if(item->fndecl==function)
+         return TRUE;
+   }
+   return FALSE;
+}
+
+static void addTlsData(ObjectReturn *self,tree fndecl,tree tlsVar)
+{
+   TlsData *data=n_slice_new0(TlsData);
+   data->fndecl = fndecl;
+   data->tlsVar = tlsVar;
+   n_ptr_array_add(self->tlsDataArray,data);
+}
+
+static tree getTlsVar(ObjectReturn *self,tree fndecl)
+{
+   int i;
+   for(i=0;i<self->tlsDataArray->len;i++){
+      TlsData *item = n_ptr_array_index(self->tlsDataArray,i);
+      if(item->fndecl==fndecl)
+         return item->tlsVar;
+   }
+   return NULL_TREE;
+}
+
+/**
+ * 创建 static tls 变量
+ */
+static tree make_tls_var (tree fndecl, tree type, const char *name)
+{
+  tree id  = get_identifier (name);
+  tree var = build_decl (DECL_SOURCE_LOCATION (fndecl),
+                         VAR_DECL, id, type);
+
+  DECL_CONTEXT (var) = fndecl;
+  DECL_ARTIFICIAL (var) = 1;
+  TREE_USED (var) = 1;
+  /* static __thread */
+  TREE_STATIC (var) = 1;
+  TREE_PUBLIC (var) = 0;
+  DECL_EXTERNAL (var) = 0;
+  set_decl_tls_model (var, TLS_MODEL_GLOBAL_DYNAMIC);
+  tree init = build_zero_cst (type);
+  /* 登记到当前作用域（在函数体内时） */
+  var = pushdecl (var);
+  /* 完成声明：布局、初始化、纳入编译 */
+  finish_decl (var, DECL_SOURCE_LOCATION (fndecl),
+               init, NULL_TREE, NULL_TREE);
+
+  return var;
+}
+
+/**
+ * 函数体已有语句（当前正在处理 return）。
+ * 不创建 BIND_EXPR，只把 static __thread 声明插成第一条语句。
+ * 返回创建的 VAR_DECL，供后面写 TLS / 取地址使用。
+ */
+static tree insert_thread_local_at_fn_start(tree fndecl, char *typeName, const char *name)
+{
+  tree body = DECL_SAVED_TREE (fndecl);
+  gcc_assert (body != NULL_TREE);
+  /* 解析类型 */
+   tree type = lookup_name (get_identifier (typeName));
+   if (type == NULL_TREE)
+     type = integer_type_node; /* 或报错 */
+   if (TREE_CODE (type) == TYPE_DECL)
+     type = TREE_TYPE (type);
+   type = TYPE_MAIN_VARIANT (type);
+  tree var = make_tls_var (fndecl, type, name);
+  tree decl_expr = build1 (DECL_EXPR, void_type_node, var);
+
+  if (TREE_CODE (body) == STATEMENT_LIST){
+      /* 已有语句列表：插到最前面 */
+      tree_stmt_iterator i = tsi_start (body);
+      tsi_link_before (&i, decl_expr, TSI_SAME_STMT);
+    }else if (TREE_CODE (body) == BIND_EXPR){
+      /* 少数情况已经是 BIND：挂 vars，并插到 BIND 的 body 最前 */
+      TREE_CHAIN (var) = BIND_EXPR_VARS (body);
+      BIND_EXPR_VARS (body) = var;
+      if (BIND_EXPR_BLOCK (body) != NULL_TREE)
+        BLOCK_VARS (BIND_EXPR_BLOCK (body)) = BIND_EXPR_VARS (body);
+
+      tree *stmt_p = &BIND_EXPR_BODY (body);
+      gcc_assert (*stmt_p != NULL_TREE);
+      if (TREE_CODE (*stmt_p) == STATEMENT_LIST){
+          tree_stmt_iterator i = tsi_start (*stmt_p);
+          tsi_link_before (&i, decl_expr, TSI_SAME_STMT);
+        }else{
+          /* body 是单条语句：收成 list，声明在前 */
+          tree sl = alloc_stmt_list ();
+          append_to_statement_list (decl_expr, &sl);
+          append_to_statement_list (*stmt_p, &sl);
+          *stmt_p = sl;
+        }
+    }else{
+      /* 单条语句（例如目前只有一个 RETURN_EXPR）：收成 list，声明在前 */
+      tree sl = alloc_stmt_list ();
+      append_to_statement_list (decl_expr, &sl);
+      append_to_statement_list (body, &sl);
+      DECL_SAVED_TREE (fndecl) = sl;
+    }
+
+  return var;
+}
+
+/**
+ * 是否是正在编译泛型块函数
+ */
+static nboolean atCompileGenericBlock(ObjectReturn *self)
+{
+   return (current_function_decl
+      && aet_parser_is_generic_state(self->parser)
+      && generic_util_is_block_func_name(IDENTIFIER_POINTER(DECL_NAME(current_function_decl))));
+}
+
+/**
+ * 泛型块函数内
+ */
+tree object_return_convert_block(ObjectReturn *self,tree expr)
+{
+   return expr;
+   //是否进入编译泛型块函数
+   if(!atCompileGenericBlock(self))
+      return expr;
+   printf("object_return_convert_block 00 \n");
+
+   tree fndecl=current_function_decl;
+
+   //返回表达式的类型是不是指针
+   if(expr_is_pointer_p(expr))
+      return expr;
+   printf("object_return_convert_block 22 \n");
+
+   //泛型块函数的返回值是不是指针
+   tree type TREE_TYPE(TREE_TYPE(fndecl));
+   if(!POINTER_TYPE_P (type))
+      return expr;
+   printf("object_return_convert_block 33 \n");
+
+   //插入 __thread 根据泛型的定义，如果有多个泛型如何选择，判断返回值 如果是 E ，就用 E ， 如果用户返回的类型是 void *应报错。
+   int pointerCount = 0;
+   char *re = generic_util_get_type_str(type ,&pointerCount);
+   char *genericDeclStr=  generic_util_get_generic_str(type);
+   if(genericDeclStr==NULL){
+      n_error("泛型块函数返回的不是泛型声明类型\n");
+   }
+   pointerCount= 0 ;
+   char *trueTypeName = generic_parser_get_true_type(generic_parser_get(),genericDeclStr,&pointerCount);
+   if(!trueTypeName)
+      n_error("泛型声明没有定义 %s\n",genericDeclStr);
+   //泛型真实类型是指针，不需要处理。
+   if(pointerCount >0)
+      return expr;
+   tree tlsvar = NULL_TREE;
+   if(!existsTls(self,fndecl)){
+      char *fname = IDENTIFIER_POINTER(DECL_NAME(fndecl));
+      unsigned int hash=aet_utils_create_hash(fname,strlen(fname));
+      struct timeval tv;
+      gettimeofday (&tv, NULL);
+      long local_tick = (unsigned) tv.tv_sec * 1000 + tv.tv_usec / 1000;
+      long randNumber=local_tick+rand ()+hash;
+      char name[255];
+      sprintf(name,"aet_tls_%ld",randNumber);
+      tlsvar  = insert_thread_local_at_fn_start(fndecl,trueTypeName,name);
+      addTlsData(self,fndecl,tlsvar);
+   }else{
+      tlsvar = getTlsVar(self,fndecl);
+      gcc_assert(tlsvar);
+   }
+
+   /* 在 c_finish_return 之前 */
+   tree store = build2 (MODIFY_EXPR, void_type_node, tlsvar, expr);
+   printf("object_return_convert_block 44 %s %d %s trueTypeName:%s\n",re,pointerCount,genericDeclStr,trueTypeName);
+
+   aet_print_tree(expr);
+
+   add_stmt (store);   /* 追加到当前 stmt list（if 体、复合语句体等） */
+
+   /* 再正常结束 return，返回 &tls_var */
+   tree addr = build_fold_addr_expr (tlsvar);
+   tree trueType = lookup_name (get_identifier (trueTypeName));
+   aet_print_tree(trueType);
+   if (trueType == NULL_TREE)
+      trueType = integer_type_node; /* 或报错 */
+   if (TREE_CODE (trueType) == TYPE_DECL)
+      trueType = TREE_TYPE (trueType);
+   trueType=build_pointer_type(trueType);
+   addr = fold_convert (trueType, addr);  /* 按E 类型转 */
+   printf("object_return_convert_block 55 %s %d %s\n",re,pointerCount,genericDeclStr);
+   aet_print_tree(addr);
+   aet_print_tree(trueType);
+   return addr;
+}
+
 
 
 ObjectReturn *object_return_get()

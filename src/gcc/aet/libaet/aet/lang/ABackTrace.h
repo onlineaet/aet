@@ -37,10 +37,10 @@ package$ aet.lang;
  */
 
 public$ class$ ABackTrace{
-      auint64 *mapsAddress;
-      auint len;
-      void backtrace();
-      private$ ABackTrace();
+   auint64 *mapsAddress;
+   auint len;
+   public$ void backtrace();
+   public$ ABackTrace();
 };
 
 

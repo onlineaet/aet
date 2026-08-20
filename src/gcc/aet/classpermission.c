@@ -46,11 +46,11 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 
 /**
  * 方法的访问控制：
-            public protected default private
-同类         T        T        T      T
-同包         T        T
+           public protected default private
+同类           T        T        T      T
+同包           T        T
 子类(不同包)  T        T
-不同包中无继  T
+不同包中无继   T
 承关系的类
  */
 
@@ -71,24 +71,6 @@ static nboolean  inHFile(ClassPermission *self)
    nboolean in=endswith(fileName,".h");
    n_debug("class_permission_in_h_file 00 在头文件中：%d %s %s %s\n",in,fileName,dir->name,dir->canonical_name);
    return in;
-}
-
-/**
- * 只能是在class 或 interface的域里调用
- */
-void class_permission_check_and_set(ClassPermission *self,ClassParserState state,ClassPermissionType type)
-{
-	  c_parser *parser=self->parser->parser;
-	  location_t  loc = c_parser_peek_token (parser)->location;
-	  self->loc=loc;//把错误信息时需要用到位置
-	  if(state!=CLASS_STATE_STOP && state!=CLASS_STATE_FIELD){
-		  if(state!=CLASS_STATE_FIELD)
-		    error_at(loc,"访问权限关键字只能出现在类的第一个字符！");
-		  else
-			error_at(loc,"访问权限关键字只能出现在方法或变量的第一个字符！");
-		  return;
-	 }
-     self->permission=type;
 }
 
 
@@ -343,6 +325,7 @@ void  class_permission_set_decorate(ClassPermission *self,FieldDecorate *dr)
    }
    memcpy(&self->currentDecorate,dr,sizeof(FieldDecorate));
    self->running=TRUE;
+   self->loc = c_parser_peek_token (parser)->location;
 }
 
 /**
@@ -379,10 +362,7 @@ FieldDecorate class_permission_get_decorate_by_class(ClassPermission *self,char 
 		  }
 	   }
    }else{
-	  // if(!inHFile(self)){
-		//  error_at(self->loc,"接口%qs只能声明在h文件中。",className->userName);
-		//  return dr;
-	//   }else{
+
 		   if(!self->running){
 		   	  //说明没有public final static 修饰
 		   	  return dr;
@@ -395,7 +375,6 @@ FieldDecorate class_permission_get_decorate_by_class(ClassPermission *self,char 
 			   }
 			   return self->currentDecorate;
 		   }
-	   //}
    }
 }
 
@@ -404,33 +383,32 @@ void class_permission_stop(ClassPermission *self)
 	self->running=FALSE;
 }
 
-
 /**
  * 找父类中相同的方法是不是设定了final
  * 如果是，报错。
  */
-static nboolean findParentFinalField(ClassPermission *self,ClassName *className,ClassFunc *dest)
-{
-	ClassInfo *classInfo=class_mgr_get_class_info_by_class_name(class_mgr_get(),className);
-	if(classInfo->parentName.sysName){
-		NPtrArray  *funcs=func_mgr_get_funcs(func_mgr_get(), &classInfo->parentName);
-		if(funcs!=NULL){
-			int i;
-			for(i=0;i<funcs->len;i++){
-				ClassFunc *item=(ClassFunc *)n_ptr_array_index(funcs,i);
-				if(strcmp(item->rawMangleName,dest->rawMangleName)==0){
-					if(class_func_is_final(item)){
-						  error_at(self->loc,"类%qs的父类%qs已经声明方法%qs为final$,子类不能继承。",
-								  className->userName,classInfo->parentName.userName,item->orgiName);
-						  return FALSE;
-					}
-				}
-			}
-		}
-		return findParentFinalField(self,&classInfo->parentName,dest);
-	}
-	return TRUE;
-}
+//static nboolean findParentFinalField(ClassPermission *self,ClassName *className,ClassFunc *dest)
+//{
+//	ClassInfo *classInfo=class_mgr_get_class_info_by_class_name(class_mgr_get(),className);
+//	if(classInfo->parentName.sysName){
+//		NPtrArray  *funcs=func_mgr_get_funcs(func_mgr_get(), &classInfo->parentName);
+//		if(funcs!=NULL){
+//			int i;
+//			for(i=0;i<funcs->len;i++){
+//				ClassFunc *item=(ClassFunc *)n_ptr_array_index(funcs,i);
+//				if(strcmp(item->rawMangleName,dest->rawMangleName)==0){
+//					if(class_func_is_final(item)){
+//						  error_at(self->loc,"类%qs的父类%qs已经声明方法%qs为final$,子类不能继承。",
+//								  className->userName,classInfo->parentName.userName,item->orgiName);
+//						  return FALSE;
+//					}
+//				}
+//			}
+//		}
+//		return findParentFinalField(self,&classInfo->parentName,dest);
+//	}
+//	return TRUE;
+//}
 
 /**
  * 检查父类与dest相同的方法权限，如果dest的权限比父类低报锚。
@@ -501,7 +479,8 @@ void class_permission_set_field_decorate(ClassPermission *self,tree decls,ClassN
          error_at(self->loc,"类:%qs中的抽象方法:%qs不能用final$修饰。",className->userName,entity->orgiName);
          return;
       }
-      if(findParentFinalField(self,className,entity)){
+
+      if(!func_mgr_parent_have_final(func_mgr_get(),self->loc,entity)){
          class_func_set_final(entity,dr->isFinal);
       }
       //检查方法权限

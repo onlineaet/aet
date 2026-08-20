@@ -83,5 +83,9 @@ nboolean   class_mgr_check(ClassMgr *self,ClassName *className);
 //保存实现接口的信息。
 void       class_mgr_save_func_check_info(ClassMgr *self,ClassName *className);
 nboolean   class_mgr_have_indirect_relationship(ClassMgr *self,ClassInfo *ifaceInfo,ClassInfo *classInfo);
+/**
+ * 获取有泛型块的函数
+ */
+NPtrArray *class_mgr_get_func_with_generic_block(ClassMgr *self);
 
 #endif

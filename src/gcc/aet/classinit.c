@@ -59,6 +59,7 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
  */
 
 static char *modifyParentMethod(ClassInit *self,ClassName *childName);
+static void optimizeGenericCall(ClassInit *self,ClassName *className,NString *codes);
 
 static void classInitInit(ClassInit *self)
 {
@@ -470,7 +471,6 @@ void  class_init_create_init_decl(ClassInit *self,location_t loc,ClassName *clas
 
    //tree objId = aet_utils_create_ident (className->sysName);
    tree objectDecl=lookup_name(aet_utils_create_ident(className->sysName));
-   aet_print_tree(objectDecl);
    tree param_type_list = NULL;
    //第一个参数 类型是 AObject *
    tree parm1=build_pointer_type(TREE_TYPE(objectDecl));
@@ -1196,12 +1196,49 @@ char *class_init_create_init_func(ClassInit *self,ClassName *className)
 //      }
 //   }
 
-
+   optimizeGenericCall(self,className,buf);
    n_string_append(buf,"\treturn (void*)self;\n");
    n_string_append(buf,"}\n");
    return n_string_free(buf,FALSE);
 }
 
+/**
+ * 优化带泛型块的函数的调用，主要是函数被复制一份，内部原泛型块的调用点（函数指针）
+ * 被替换成了泛型块函数调用
+ */
+static void optimizeGenericCall(ClassInit *self,ClassName *className,NString *codes)
+{
+   //return;
+   if(!className)
+      return;
+   ClassInfo *info=class_mgr_get_class_info_by_class_name(class_mgr_get(),className);
+   if(!class_info_is_generic_class(info))
+      return;
+   NPtrArray    *array = func_mgr_get_funcs(func_mgr_get(),className);
+   if(!array || array->len==0)
+      return;
+   int modelCount = generic_model_get_count(info->genericModel);
+   int i;
+   int count = 0;
+   for(i=0;i<array->len;i++){
+      ClassFunc *func=n_ptr_array_index(array,i);
+      if(!class_func_is_normal(func)
+            || !class_func_have_generic_block(func)
+            || !func->fromImplDefine || !func->fieldDecl)
+         continue;
+      //生成代码
+      if(count == 0)
+         n_string_append_printf(codes,"\tvoid *funcWithGbAdd = %s",AET_GENERIC_FUNC_WITH_GB_ADDRESS);
+      else
+         n_string_append_printf(codes,"\tfuncWithGbAdd = %s",AET_GENERIC_FUNC_WITH_GB_ADDRESS);
+
+      n_string_append_printf(codes,"(self->_generic_1234_array,%d,\"%s\",\"%s\");\n",
+            modelCount,className->sysName,func->mangleFunName);
+      n_string_append(codes,"\tif(funcWithGbAdd)\n");
+      n_string_append_printf(codes,"\t\tself->%s = funcWithGbAdd;\n",func->mangleFunName);
+      count++;
+   }
+}
 
 ClassInit *class_init_new()
 {

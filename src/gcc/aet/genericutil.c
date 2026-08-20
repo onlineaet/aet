@@ -140,7 +140,7 @@ char *generic_util_create_param_new_name(char *origName)
 }
 
 //_aetGenNewParamPrefix_atcs取出原来的名字
-char *generic_util_get_orig_param_name(char *newName)
+char *generic_util_get_block_orig_param_name(char *newName)
 {
    if(newName==NULL)
       return NULL;
@@ -226,6 +226,7 @@ char *generic_util_get_generic_str(tree type0)
    char *name=IDENTIFIER_POINTER(declName);
    if(!generic_util_is_generic_ident(name))
       return NULL;
+   //取 aet_generic_E 中的最后一个字母 E
    char ax=name[strlen(name)-1];
    char *re=(char*)n_malloc(2);
    re[0]=ax;
@@ -309,50 +310,18 @@ int generic_util_get_generic_type(tree type)
 	return gt;
 }
 
-int generic_util_get_generic_type_name(tree type,char *result)
-{
-	if(TREE_CODE(type)==POINTER_TYPE)
-		type=TREE_TYPE(type);
-	if(TREE_CODE(type)==POINTER_TYPE)
-		type=TREE_TYPE(type);
-	if(TREE_CODE(type)==POINTER_TYPE)
-		type=TREE_TYPE(type);
-    if(TREE_CODE(type)==RECORD_TYPE){
-		tree next=TYPE_NAME(type);
-		if(TREE_CODE(next)!=TYPE_DECL){
-			return 0;
-		}
-		char *declClassName=IDENTIFIER_POINTER(DECL_NAME (next));
-		sprintf(result,"%s",declClassName);
-		return strlen(declClassName);
-	}else{
-		tree typeName=TYPE_NAME(type);
-		if(aet_utils_valid_tree(typeName) && TREE_CODE(typeName)==IDENTIFIER_NODE){
-			char *typeNameStr=IDENTIFIER_POINTER(typeName);
-			sprintf(result,"%s",typeNameStr);
-			return strlen(typeNameStr);
-		}else if(aet_utils_valid_tree(typeName) && TREE_CODE(typeName)==TYPE_DECL){
-			char *typeNameStr=IDENTIFIER_POINTER(DECL_NAME(typeName));
-			sprintf(result,"%s",typeNameStr);
-			return strlen(typeNameStr);
-		}
-	}
-	return 0;
-}
-
-
 /**
  * 通过泛型声明E 获取 aet_generic_E 类型
  */
 tree generic_util_get_generic_type_by_str(const char *genericStr)
 {
-	  char temp[255];
-	  sprintf(temp,"%s%s",AET_GENERIC_TYPE_NAME_PREFIX,genericStr);
-	  tree id=aet_utils_create_ident(temp);
-	  tree type=lookup_name(id);
-	  if(!type || type==NULL_TREE || type==error_mark_node)
-		  return NULL_TREE;
-	  return type;
+   char temp[255];
+   sprintf(temp,"%s%s",AET_GENERIC_TYPE_NAME_PREFIX,genericStr);
+   tree id=aet_utils_create_ident(temp);
+   tree type=lookup_name(id);
+   if(!type || type==NULL_TREE || type==error_mark_node)
+      return NULL_TREE;
+   return type;
 }
 
 /**
@@ -405,34 +374,32 @@ static inline void c_parser_check_literal_zero (c_parser *parser, unsigned *lite
 
 static int backupToken(c_parser *parser,c_token *backups)
 {
-	  int tokenCount=parser->tokens_avail;
-	  int i;
-	  c_token *token;
-	  for(i=0;i<tokenCount;i++){
-	     token=c_parser_peek_token (parser);
-	     aet_utils_copy_token(token,&backups[i]);
-		  aet_print_token(token);
-
-		 c_parser_consume_token (parser);
-	  }
-	  return tokenCount;
+   int tokenCount=parser->tokens_avail;
+   int i;
+   c_token *token;
+   for(i=0;i<tokenCount;i++){
+      token=c_parser_peek_token (parser);
+      aet_utils_copy_token(token,&backups[i]);
+      c_parser_consume_token (parser);
+   }
+   return tokenCount;
 }
 
 static void restore(c_parser *parser,c_token *backups,int count)
 {
-	  if(count==0)
-		   return;
-	  int tokenCount=parser->tokens_avail;
-	  if(tokenCount+count>AET_MAX_TOKEN){
-			error("token太多了");
-			return;
-	  }
-	  int i;
-      for(i=0;i<count;i++){
-		   aet_utils_copy_token(&backups[i],&parser->tokens[i+tokenCount]);
-	  }
-	  parser->tokens_avail=tokenCount+count;
-	  aet_print_token_in_parser("generic_call restore ------");
+   if(count==0)
+      return;
+   int tokenCount=parser->tokens_avail;
+   if(tokenCount+count>AET_MAX_TOKEN){
+      error("token太多了");
+      return;
+   }
+   int i;
+   for(i=0;i<count;i++){
+      aet_utils_copy_token(&backups[i],&parser->tokens[i+tokenCount]);
+   }
+   parser->tokens_avail=tokenCount+count;
+   aet_print_token_in_parser("generic_call restore ------");
 }
 
 static tree createTarget(c_parser *parser,char *codes)
@@ -516,6 +483,8 @@ static char *getId(tree arg,int *pointer)
          return genericA_Z;
       }
       return getId(type,pointer);
+   }else if(TREE_CODE(type)==ARRAY_TYPE){
+      return getId(type,pointer);
    }else{
       tree typeName=TYPE_NAME(type);
       if(!aet_utils_valid_tree(typeName))
@@ -575,21 +544,39 @@ char *generic_util_get_type_str(tree arg)
 }
 
 /**
+ * 获取泛型声明的字符串和指针数
+ * 返回像aet_generic_E这梓的字符串
+ * 泛型没有 E *这种概念。
+ */
+char *generic_util_get_type_str(tree arg,int *pointerCount)
+{
+   if(arg==NULL)
+      return NULL;
+   int pointer=0;
+   char *n=getId(arg,&pointer);
+   if(n==NULL)
+      return NULL;
+   *pointerCount = pointer;
+   return n;
+}
+
+
+/**
  * 是不是变量
  * T abc或E abc等form
  */
 nboolean generic_util_is_generic_var_or_parm(tree decl)
 {
-    if(!aet_utils_valid_tree(decl))
-    	return FALSE;
-    if(TREE_CODE(decl)!=VAR_DECL && TREE_CODE(decl)!=PARM_DECL)
-    	return FALSE;
-    char *str=generic_util_get_type_str(decl);
-    if(str==NULL)
-    	return FALSE;
-    nboolean re= generic_util_is_generic_ident(str);
-    n_free(str);
-    return re;
+   if(!aet_utils_valid_tree(decl))
+      return FALSE;
+   if(TREE_CODE(decl)!=VAR_DECL && TREE_CODE(decl)!=PARM_DECL)
+      return FALSE;
+   char *str=generic_util_get_type_str(decl);
+   if(str==NULL)
+      return FALSE;
+   nboolean re= generic_util_is_generic_ident(str);
+   n_free(str);
+   return re;
 }
 
 
@@ -695,25 +682,101 @@ void generic_util_parameter_declaration ()
  */
 char   *generic_util_sys_name_from_block_func(char *funcName)
 {
-       char temp[255];
-       sprintf(temp,"_%s_",GENERIC_BLOCK_TO_FUNC_PREFIX);
-       if(!strstr(funcName,temp))
-           return NULL;
-       NString *cn=n_string_new(funcName);
-       int index=n_string_indexof(cn,temp);
-       NString *sysNameStr=n_string_substring_from(cn,0,index);
-       //再检查最后是不是也是类名
-       nboolean ok=n_string_ends_with(cn,sysNameStr->str);
-       n_string_free(cn,TRUE);
-       if(!ok){
-           n_string_free(sysNameStr,TRUE);
-           return NULL;
-       }
-       ClassInfo *info=class_mgr_get_class_info(class_mgr_get(),sysNameStr->str);
-       if(info!=NULL)
-           return n_string_free(sysNameStr,FALSE);
-       n_string_free(sysNameStr,TRUE);
-       return NULL;
+   char temp[255];
+   sprintf(temp,"_%s_",GENERIC_BLOCK_TO_FUNC_PREFIX);
+   if(!strstr(funcName,temp))
+      return NULL;
+   NString *cn=n_string_new(funcName);
+   int index=n_string_indexof(cn,temp);
+   NString *sysNameStr=n_string_substring_from(cn,0,index);
+   //再检查最后是不是也是类名
+   nboolean ok=n_string_ends_with(cn,sysNameStr->str);
+   n_string_free(cn,TRUE);
+   if(!ok){
+      n_string_free(sysNameStr,TRUE);
+      return NULL;
+   }
+   ClassInfo *info=class_mgr_get_class_info(class_mgr_get(),sysNameStr->str);
+   if(info!=NULL)
+      return n_string_free(sysNameStr,FALSE);
+   n_string_free(sysNameStr,TRUE);
+   return NULL;
+}
+
+/**
+ * 判断是不是泛型块函数
+ */
+nboolean generic_util_is_block_func_name(char *funcName)
+{
+   if(!funcName)
+      return FALSE;
+   return strstr(funcName,GENERIC_BLOCK_TO_FUNC_PREFIX);
 }
 
 
+static bool is_aet_generic_E (tree type)
+{
+  type = TYPE_MAIN_VARIANT (type);
+  /* 先看是不是指针 */
+  if (TREE_CODE (type) != POINTER_TYPE)
+    return false;
+  tree lastPointer = type;
+  while(1){
+     tree sub = TREE_TYPE(lastPointer);
+     if(TREE_CODE (sub) != POINTER_TYPE){
+        break;
+     }
+     lastPointer = sub;
+  }
+  type  = lastPointer;
+
+  /* 再看 TYPE_NAME 是不是 typedef aet_generic_E */
+  tree name = TYPE_NAME (type);
+  if (name && TREE_CODE (name) == TYPE_DECL){
+      tree id = DECL_NAME (name);
+      if (id && generic_util_is_generic_ident (IDENTIFIER_POINTER (id)))
+        return true;
+  }
+  /* 兜底：直接比较指针目标类型是否是 void */
+  return false;
+}
+
+/*源代码如下：
+ *queue = (void **)((char*)queue + sizeof(E));
+ *rhs 中包含有 queue，queue声明为 E *queue, 擦除后变成了 aet_generic_E *
+ *aet_generic_E 定义如下：
+ *typedef  void * aet_generic_E
+ *偏历rhs树找到引用了类型aet_generic_E的变量。
+ *回调函数：每当 walk_tree 遇到一个节点就调用
+*/
+static tree find_aet_generic_vars (tree *tp, int *walk_subtrees, void *data)
+{
+   tree t = *tp;
+   vec<tree> *result = (vec<tree> *) data;
+   /* 只关心变量声明 */
+   if ((TREE_CODE (t) == VAR_DECL || TREE_CODE (t) == PARM_DECL || TREE_CODE (t) == COMPONENT_REF)){
+      bool ret =  is_aet_generic_E (TREE_TYPE (t));
+      //printf("查找引用aet_generic_E的变量 ok:%d\n",ret);
+      if(ret)
+         result->safe_push (t);   /* 找到了，收集起来 */
+   }
+   /* 继续向下遍历子树 */
+   *walk_subtrees = 1;
+   return NULL_TREE;   /* 返回非 NULL 会提前终止遍历 */
+}
+
+/* 检查表达式中是否有引用aet_generic_E的变量，参数*/
+nboolean gneric_util_have_generic_type (tree expr)
+{
+   vec<tree> out = vNULL;
+   walk_tree (&expr, find_aet_generic_vars, &out, NULL);
+   int len = out.length ();
+   /* 现在 vars 里就是所有类型为 aet_generic_E 的变量 */
+   for (unsigned i = 0; i < out.length (); i++){
+       tree v = out[i];
+       aet_print_tree(v);
+       /* 对 v 做你需要的处理 */
+   }
+   out.release ();
+   return len>0;
+}

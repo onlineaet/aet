@@ -41,6 +41,7 @@ struct _ObjectReturn
 	AetParser *parser;
 	ClassCast *classCast;
 	NPtrArray *dataArray;
+	NPtrArray *tlsDataArray;//泛型块函数中播入的tls
 
 };
 
@@ -55,6 +56,7 @@ void             object_return_add_return(ObjectReturn *self,tree retExpr);
  * 只有对象指针才能根据函数返回值声明转化
  */
 tree             object_return_convert(ObjectReturn *self,location_t loc,tree retExpr);
+tree             object_return_convert_block(ObjectReturn *self,tree expr);
 
 
 

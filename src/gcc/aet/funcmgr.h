@@ -106,5 +106,13 @@ void          func_mgr_create_mangle_name(FuncMgr *self,tree fieldDecl,ClassName
 tree          func_mgr_divide_host_device_func(FuncMgr *self,location_t loc,ClassInfo *info,tree decls);
 //根据主机函数获取对应的分裂函数
 ClassFunc    *func_mgr_get_divide(FuncMgr *self,ClassFunc *host);
+/**
+ * 查找dest的父类方法是否声明为final,如果是返回true,否则false
+ */
+nboolean      func_mgr_parent_have_final(FuncMgr *self,location_t loc,ClassFunc *dest);
+/**
+ * 引用的对象方法可以在外部使用吗
+ */
+nboolean func_mgr_can_use_outside(FuncMgr *self,tree decl);
 
 #endif

@@ -76,102 +76,99 @@ static void makefileParmInit(MakefileParm *self)
 
 static char *getRootObjectPathOrObjectFile(char *src,char *dest,nboolean needRootPath)
 {
-	if(dest==NULL)
-		return NULL;
-	int len=strlen(dest);
-	if(len<=2){
-		//printf("长度小于2 %s\n",dest);
-		return NULL;
-	}
-	if(dest[len-1]!='o' || dest[len-2]!='.'){
-		return NULL;
-	}
-	if(dest[0]=='-'){
-		printf("第一个字符是- %s\n",dest);
-		return NULL;
-    }
-	NFile *sfile=n_file_new(src);
-	NFile *dfile=n_file_new(dest);
-	if(sfile==NULL){
-		printf("严重错误:没有源文件:%s\n",src);
-		return NULL;
-	}
-	if(dfile==NULL){
-		printf("目标不能生成文件:%s\n",src);
-		return NULL;
-	}
-	char *sname=n_file_get_name(sfile);
-	char *dname=n_file_get_name(dfile);
-	nboolean re=strncmp(sname,dname,strlen(dname)-1);
-	if(re){
-		printf("文件名不同:%s %s\n",sname,dname);
-		return NULL;
-	}
-	NFile *sroot=sfile;
-	NFile *droot=dfile;
-	char *p1=n_file_get_absolute_path(n_file_get_parent_file(sroot));
-	char *p2=n_file_get_absolute_path(n_file_get_parent_file(dfile));
-	if(!strcmp(p1,p2)){
-	  n_debug("源文件与.o中同一个目录下:p1:%s sname:%s\n",p1,sname);
-	  if(needRootPath){
-		 return n_strdup(p1);
-	  }else{
-		 return n_strdup(n_file_get_absolute_path(dfile));
-	  }
-	}
-	char *objectFile=n_strdup(n_file_get_absolute_path(dfile));
-    while(TRUE){
-	  NFile *sp=n_file_get_parent_file(sroot);
-	  NFile *dp=n_file_get_parent_file(droot);
-	  if(sp==NULL || dp==NULL){
-		  printf("parent is null:%p %p %s %s\n",sp,dp,n_file_get_absolute_path(sroot),n_file_get_absolute_path(droot));
-		  if(sp!=NULL){
-			  printf("parent sp:%s\n",n_file_get_absolute_path(sp));
-			  n_file_unref(sp);
-		  }
-		  if(dp!=NULL){
-		 	 printf("parent dp:%s\n",n_file_get_absolute_path(dp));
-			  n_file_unref(dp);
-		  }
-		  break;
-	  }
+   if(dest==NULL)
+      return NULL;
+   int len=strlen(dest);
+   if(len<=2){
+      //printf("长度小于2 %s\n",dest);
+      return NULL;
+   }
+   if(dest[len-1]!='o' || dest[len-2]!='.'){
+      return NULL;
+   }
+   if(dest[0]=='-'){
+      //printf("第一个字符是- %s\n",dest);
+      return NULL;
+   }
+   NFile *sfile=n_file_new(src);
+   NFile *dfile=n_file_new(dest);
+   if(sfile==NULL){
+      //printf("严重错误:没有源文件:%s\n",src);
+      return NULL;
+   }
+   if(dfile==NULL){
+      //printf("目标不能生成文件:%s\n",src);
+      return NULL;
+   }
+   char *sname=n_file_get_name(sfile);
+   char *dname=n_file_get_name(dfile);
+   nboolean re=strncmp(sname,dname,strlen(dname)-1);
+   if(re){
+      //printf("文件名不同:%s %s\n",sname,dname);
+      return NULL;
+   }
+   NFile *sroot=sfile;
+   NFile *droot=dfile;
+   char *p1=n_file_get_absolute_path(n_file_get_parent_file(sroot));
+   char *p2=n_file_get_absolute_path(n_file_get_parent_file(dfile));
+   if(!strcmp(p1,p2)){
+      n_debug("源文件与.o中同一个目录下:p1:%s sname:%s\n",p1,sname);
+      if(needRootPath){
+         return n_strdup(p1);
+      }else{
+         return n_strdup(n_file_get_absolute_path(dfile));
+      }
+   }
+   char *objectFile=n_strdup(n_file_get_absolute_path(dfile));
+   while(TRUE){
+      NFile *sp=n_file_get_parent_file(sroot);
+      NFile *dp=n_file_get_parent_file(droot);
+      if(sp==NULL || dp==NULL){
+         // printf("parent is null:%p %p %s %s\n",sp,dp,n_file_get_absolute_path(sroot),n_file_get_absolute_path(droot));
+         if(sp!=NULL){
+            //printf("parent sp:%s\n",n_file_get_absolute_path(sp));
+            n_file_unref(sp);
+         }
+         if(dp!=NULL){
+            // printf("parent dp:%s\n",n_file_get_absolute_path(dp));
+            n_file_unref(dp);
+         }
+         break;
+      }
 
-
-	  char *sn=n_file_get_name(sp);
-	  char *dn=n_file_get_name(dp);
-	  if(strcmp(sn,dn)){
-//		  printf("文件不相同了:%s %s\n",sn,dn);
-//		  printf("文件不相同了 is :%p %p %s %s\n",sp,dp,n_file_get_absolute_path(sroot),n_file_get_absolute_path(droot));
-//		  printf("文件不相同了 xx is :%p %p %s %s\n",sp,dp,n_file_get_absolute_path(sp),n_file_get_absolute_path(dp));
-		  char *objectRootPath=n_strdup(n_file_get_absolute_path(dp));
-		  n_file_unref(sp);
-		  n_file_unref(dp);
-		  if(needRootPath){
-			 n_free(objectFile);
-		     return objectRootPath;
-		  }else{
-			 n_free(objectRootPath);
-			 return objectFile;
-		  }
-
-	  }else{
-//		  printf("文件相同了:%s %s\n",sn,dn);
-//		  printf("文件相同了 is :%p %p %s %s\n",sp,dp,n_file_get_absolute_path(sroot),n_file_get_absolute_path(droot));
-//		  printf("文件相同了 xx is :%p %p %s %s\n",sp,dp,n_file_get_absolute_path(sp),n_file_get_absolute_path(dp));
-	      ;
-
-	  }
-	  if(sroot){
-		  n_file_unref(sroot);
-	  }
-	  if(sroot){
-	 	  n_file_unref(droot);
-	  }
-	  sroot=sp;
-	  droot=dp;
-    }
-    n_free(objectFile);
-	return NULL;
+      char *sn=n_file_get_name(sp);
+      char *dn=n_file_get_name(dp);
+      if(strcmp(sn,dn)){
+         //		  printf("文件不相同了:%s %s\n",sn,dn);
+         //		  printf("文件不相同了 is :%p %p %s %s\n",sp,dp,n_file_get_absolute_path(sroot),n_file_get_absolute_path(droot));
+         //		  printf("文件不相同了 xx is :%p %p %s %s\n",sp,dp,n_file_get_absolute_path(sp),n_file_get_absolute_path(dp));
+         char *objectRootPath=n_strdup(n_file_get_absolute_path(dp));
+         n_file_unref(sp);
+         n_file_unref(dp);
+         if(needRootPath){
+            n_free(objectFile);
+            return objectRootPath;
+         }else{
+            n_free(objectRootPath);
+            return objectFile;
+         }
+      }else{
+         //		  printf("文件相同了:%s %s\n",sn,dn);
+         //		  printf("文件相同了 is :%p %p %s %s\n",sp,dp,n_file_get_absolute_path(sroot),n_file_get_absolute_path(droot));
+         //		  printf("文件相同了 xx is :%p %p %s %s\n",sp,dp,n_file_get_absolute_path(sp),n_file_get_absolute_path(dp));
+         ;
+      }
+      if(sroot){
+         n_file_unref(sroot);
+      }
+      if(sroot){
+         n_file_unref(droot);
+      }
+      sroot=sp;
+      droot=dp;
+   }
+   n_free(objectFile);
+   return NULL;
 }
 
 
@@ -184,61 +181,26 @@ nboolean makefile_parm_is_second_compile(MakefileParm *self)
 
 #define SEPARATION "#$%"
 
-
 /**
  * 获得编译文件的cpp_buffer
  */
 static cpp_buffer* getCompileFileBuffer(cpp_buffer *buffer)
 {
-       if(buffer==NULL){
-           printf("getCompileFileBuffer 00 buffer:%p %s\n",buffer,in_fnames[0]);
-           return NULL;
-       }
-       struct _cpp_file *file=buffer->file;
-       if(file==NULL){
-           cpp_buffer *prev=buffer->prev;
-           return getCompileFileBuffer(prev);
-       }
-       const char *fileName=_cpp_get_file_name (file);
-       if(!strcmp(fileName,in_fnames[0])){
-           return buffer;
-       }
-       cpp_buffer *prev=buffer->prev;
-       return getCompileFileBuffer(prev);
-}
-
-/**
- * 在files.c把read_file_guts函数中的16改成64,留出空间，追加字符串
- * RID_AET_GOTO_STR,GOTO_READY_COMPILE_GENERIC_BLOCK_FUNC
- * 不需再存在prev里。
- */
-static nboolean addToCppBuffer(c_parser *parser,char *tag)
-{
-   cpp_buffer* buffer=getCompileFileBuffer(parse_in->buffer);
-   if(buffer!=NULL){
-      nboolean ok=(endswith(in_fnames[0],".c") || endswith(in_fnames[0],".cpp"));
-      n_debug("addToCppBuffer --xxx-- 00 %s ok:%d tag:%s len:%d\n",in_fnames[0],ok,tag,strlen(tag));
-      if(ok){
-         strncat(buffer->buf,tag,strlen(tag));
-         buffer->rlimit=buffer->rlimit+strlen(tag);
-         return TRUE;
-      }
-   }else{
-      n_error("当前编译的内容来自缓存，不是来自文件%s。",in_fnames[0]);
+   if(buffer==NULL){
+      printf("getCompileFileBuffer 00 buffer:%p %s\n",buffer,in_fnames[0]);
+      return NULL;
    }
-   return FALSE;
-}
-
-/**
- * 当编译到.c的最后，继续编块
- */
-static void add_eof_tag(MakefileParm *self)
-{
-   c_parser *parser=aet_parser_get()->parser;
-   char tag[256];
-   sprintf(tag,"%s %d \n",RID_AET_GOTO_STR,GOTO_READY_COMPILE_GENERIC_BLOCK_FUNC);
-   n_debug("add_eof_tag %s pid:%d %s\n",tag,getpid(),in_fnames[0]);
-   addToCppBuffer(parser,tag);
+   struct _cpp_file *file=buffer->file;
+   if(file==NULL){
+      cpp_buffer *prev=buffer->prev;
+      return getCompileFileBuffer(prev);
+   }
+   const char *fileName=_cpp_get_file_name (file);
+   if(!strcmp(fileName,in_fnames[0])){
+      return buffer;
+   }
+   cpp_buffer *prev=buffer->prev;
+   return getCompileFileBuffer(prev);
 }
 
 /**
@@ -262,22 +224,71 @@ static void initSecondCompileParm(MakefileParm *self)
 			if(strlen(argv)>strlen(MAKEFILE_PREFIX) && argv[0]=='-' && argv[1]=='D' && strstr(argv,MAKEFILE_PREFIX)){
 		    	if(strstr(argv,"nclcompilefile")){ //aetcollect.c中加入的块函数文件。
 	            char *file=strstr(argv,"nclcompilefile")+strlen("nclcompilefile");
+	            n_debug("makefileparm.c 加入要编译的泛型文件 %s\n",file);
                self->compileFileName=n_strdup(file);
 		    	}
 		    	self->isSecondCompile=TRUE;
+		    	makefile_parm_insert_block_func_codes(self);
 			   break;
 			}
 		}
 	}
 }
 
+#define AETPROG_PREFIX "-Faetprog"
+
+char *makefile_parm_get_aetprog(MakefileParm *self)
+{
+   int i;
+   for(i=0;i<save_decoded_options_count;i++){
+      struct cl_decoded_option item=save_decoded_options[i];
+      if(item.arg){
+         char *argv=item.arg;
+         if(startswith(argv,AETPROG_PREFIX)){
+            char *content=strstr(argv,"aetprog")+strlen("aetprog");
+            return content;
+         }
+      }
+      if(item.orig_option_with_args_text){
+         char *argv=item.orig_option_with_args_text;
+          if(startswith(argv,AETPROG_PREFIX)){
+             char *content=strstr(argv,"aetprog")+strlen("aetprog");
+             return content;
+          }
+      }
+   }
+   return NULL;
+}
+
+
 /**
- * 在文件尾插入块函数代码。
+ * 当编译完每个类实现时，调用该方法在文件尾插入块函数代码。
+ * 需要满足是第二次编译 nclcompilefile参数存在。
+ *  当编译到.c的最后，继续编块
+ * 在files.c把read_file_guts函数中的16改成64,留出空间，追加字符串
+ * RID_AET_GOTO_STR,GOTO_READY_COMPILE_GENERIC_BLOCK_FUNC
+ * 不需再存在prev里。
  */
 void    makefile_parm_insert_block_func_codes(MakefileParm *self)
 {
    if(self->isSecondCompile && self->compileFileName && !self->insertBlockFunc)  {
-      add_eof_tag(self);
+      c_parser *parser=aet_parser_get()->parser;
+      char tag[256];
+      sprintf(tag,"%s %d \n",RID_AET_GOTO_STR,GOTO_READY_COMPILE_GENERIC_BLOCK_FUNC);
+      n_debug("makefile_parm_insert_block_func_codes 00 tag:%s pid:%d in_fnames:%s compileFileName:%s\n",
+            tag,getpid(),in_fnames[0],self->compileFileName);
+      cpp_buffer* buffer=getCompileFileBuffer(parse_in->buffer);
+      if(buffer!=NULL){
+         nboolean ok=(endswith(in_fnames[0],".c") || endswith(in_fnames[0],".cpp"));
+         n_debug("makefile_parm_insert_block_func_codes 11 in_fnames:%s ok:%d tag:%s len:%d\n",
+                     in_fnames[0],ok,tag,strlen(tag));
+         if(ok){
+            strncat(buffer->buf,tag,strlen(tag));
+            buffer->rlimit=buffer->rlimit+strlen(tag);
+         }
+      }else{
+         n_error("当前编译的内容来自缓存，不是来自文件%s。",in_fnames[0]);
+      }
       self->insertBlockFunc = TRUE;
    }
 }
@@ -322,20 +333,6 @@ const char *getDotFileByDump(struct cl_decoded_option *opts,unsigned int argc) {
 }
 
 /**
- * 初始化两个参数参数
- * 1.编译器可执行文件
- * 2..o文件存放的根目录。
- * 例如:
- * /home/sns/gcc-10.4.0/bin/gcc
- * /home/sns/workspace/ai/pc-build
- * 并把这两个参数存入文件aet_object_path.tmp
- */
-static void makefile_parm_init_argv (MakefileParm *self)
-{
-   initSecondCompileParm(self);
-}
-
-/**
  * 获取编译文件的输出.o文件。
  */
 char  *makefile_parm_get_object_file(MakefileParm *self)
@@ -353,6 +350,7 @@ char  *makefile_parm_get_object_file(MakefileParm *self)
          if(dotOFile)
             break;
       }
+     // printf("makefile_parm_get_object_file 00 %s\n",dotOFile);
       if(dotOFile!=NULL)
          self->objectFile= dotOFile;
       else{
@@ -371,6 +369,8 @@ char  *makefile_parm_get_object_file(MakefileParm *self)
                snprintf(dotOFile, 512, "%s.o", base);
             }
             self->objectFile= dotOFile;
+            //printf("makefile_parm_get_object_file 11 %s\n",dotOFile);
+
          }else
             n_error("没有找到编译文件的输出.o文件,报告此错误。 %s\n",fileName);
       }
@@ -488,7 +488,7 @@ MakefileParm *makefile_parm_get()
    if (!singleton){
       singleton =n_slice_alloc0 (sizeof(MakefileParm));
       makefileParmInit(singleton);
-      makefile_parm_init_argv(singleton);
+      initSecondCompileParm(singleton);
    }
    return singleton;
 }

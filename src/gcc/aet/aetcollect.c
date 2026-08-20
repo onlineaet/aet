@@ -40,6 +40,7 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 #include <condition_variable>
 #include <iostream>
 #include "simple-object.h"
+#include <utime.h>
 
 #include "collect2.h"
 #include "collect2-aix.h"
@@ -66,7 +67,8 @@ static void   collectUseLibFile(const char *prog,char **ld_argv,
 static int    getGccInstallPath(char *path);
 static char  *compileSingleFile(char *gcc,char *objectRootPath,
                   char *src,char *dest,char *cfile,char **argv,int count);
-static char  *compileMiddleFile(char *gcc,char *objectRootPath,int compileType,char **argv,int argc);
+static char  *compileMiddleFile(char *gcc,char *objectRootPath,
+      int compileType,char **argv,int argc,unsigned long long lastTime);
 /**
  * 编译泛型有关的文件
  */
@@ -151,6 +153,9 @@ static int  gsplit (const char *string,const char *delimiter,char **buffers,int 
    return count;
 }
 
+/**
+ * 获取文件最后的修改时间
+ */
 static unsigned long long  getLastModified(char *file)
 {
    struct stat64 sb;
@@ -289,32 +294,6 @@ static int getOuputFile(char *basePath,char **objs,char *match)
    return count;
 }
 
-static void compileBlockFunc(char *cFile,char *oFile,char *compileParm,struct command *cmds,int index)
-{
-    static char * SEPARATION ="#$%"; //与gcc.c中的一样
-    char *items[1024];
-    int argc=  gsplit (compileParm,SEPARATION,items,1024);
-    if(items[argc-1]==NULL || !strcmp(items[argc-1],"")){
-        //printf("从compileParm取出的最后一个参数是空的或长度是0 %s 参数个数:%d\n",items[argc-1],argc);
-        argc--;
-    }
-    char **real_argv = XCNEWVEC (char *, argc+2);
-    const char ** argv = CONST_CAST2 (const char **, char **,real_argv);
-    int i;
-    for(i=0;i<argc;i++){
-        argv[i] = items[i];
-    }
-    argv[argc-3] =xstrdup(oFile);//这里可能有问题 跳过-c参数， 如果没有-c,赋值是错的。
-    argv[argc-1] =xstrdup(cFile);
-    argv[argc] = xstrdup("-Dnclcompileyes");
-    argv[argc+1] = (char *) 0;
-
-    cmds[index].prog=items[0];
-    cmds[index].argv=argv;
-    //for(i=0;i<argc;i++)
-      // printf("compileBlockFunc data i:%d %s\n",i,argv[i]);
-}
-
 /**
  * 加入节到生成的目标中。原方案是:改elf头中的9-16字节，但加载时出错。
  */
@@ -419,6 +398,7 @@ struct AetResult {
     std::string file_path;
     std::string content;
     bool found = false;
+    unsigned long long modifyTime = 0;
 };
 
 static char **batch_process_aet_with_pool(const char *prog,char **ld_argv, const char *atsuffix,
@@ -466,7 +446,9 @@ static AetResult extract_aet_content_safe (const std::string& obj_file_path)
 
    if (!result.content.empty())
       result.found = true;
-
+   //重要，决定是否需要编译 temp_func_track_45.c
+   unsigned long long modifyTime = getLastModified(obj_file_path.c_str ());
+   result.modifyTime = modifyTime;
    simple_object_release_read (sobj);
    close (fd);
    return result;
@@ -522,7 +504,7 @@ public:
         return res;
     }
 
-    // 析构函数：优雅停止所有线程
+    // 析构函数：停止所有线程
     ~LightThreadPool() {
         {
             std::unique_lock<std::mutex> lock(queue_mutex);
@@ -535,7 +517,6 @@ public:
         }
     }
 };
-
 
 static char *getObjRootPath(char *oFile)
 {
@@ -553,6 +534,9 @@ static char *getObjRootPath(char *oFile)
    return path;
 }
 
+/**
+ * 创建o文件的全路径文件名。
+ */
 static char *createRealPath(char *origName)
 {
    char *realName = xmalloc(PATH_MAX);
@@ -625,11 +609,13 @@ static void getCompileType(char *content,int *types,int *onlyEnterAet)
 #define CHECK_FILE_LIST_NAME_NEW                "aet_iface_check_list.o"
 #define IFACE_IMPL_FILE_LIST_NAME_NEW           "aet_iface_impl_list.o"
 #define SAVE_LIB_PARM_FILE_NEW                  "aet_collect2_lib_name.o"
-#define GENERIC_BLOCK_FILE_LIST_NAME_NEW        "generic_block_index_NEW.o"  //泛型块的文件名列表
-#define GENERIC_MODEL_INDEX_FILE_LIST_NAME_NEW  "generic_model_index_NEW.o"  //新建泛型对象，调用泛型函数的文件名列表
-#define AET_MTCS_LINK_FILE_LIST_NAME_NEW        "mtcs_link_func_index_file_NEW.o" //保存需要链接的mtcs函数文件名
+#define GENERIC_BLOCK_FILE_LIST_NAME_NEW        "generic_block_index.o"  //泛型块的文件名列表
+#define AET_FUNC_WITH_GB_FILE_LIST_NAME_NEW     "func_with_gb_list_file.o"   //泛型块函数文件殂表
+#define GENERIC_MODEL_INDEX_FILE_LIST_NAME_NEW  "generic_model_index.o"  //新建泛型对象，调用泛型函数的文件名列表
+#define AET_MTCS_LINK_FILE_LIST_NAME_NEW        "mtcs_link_func_index_file.o" //保存需要链接的mtcs函数文件名
 
-static int runThread( const std::vector<std::string>& obj_files,char **objfs,char **objvalues)
+static int runThread( const std::vector<std::string>& obj_files,
+      char **objfs,char **objvalues,unsigned long long *lastTime)
 {
    LightThreadPool pool;
    std::vector<std::future<AetResult>> futures;
@@ -652,29 +638,72 @@ static int runThread( const std::vector<std::string>& obj_files,char **objfs,cha
    if(final_results.size() ==0)
       return 0;
    int count=0;
+   unsigned long long lastModifyed=0;
    for (const auto& res : final_results) {
-      objfs[count] = createRealPath(res.file_path.c_str());
-      objvalues[count]=xstrdup(res.content.c_str());
-      count++;
+      if(res.found){
+         objfs[count] = createRealPath(res.file_path.c_str());
+         objvalues[count]=xstrdup(res.content.c_str());
+         if(res.modifyTime>lastModifyed)
+            lastModifyed=res.modifyTime;
+         count++;
+      }
    }
+   *lastTime = lastModifyed;
    return count;
 }
 
 /**
  * 单线程读.o文件的section .aetprog
+ * lastTime 最晚的.o文件的时间
  */
-static int singleThread( const std::vector<std::string>& obj_files,char **objfs,char **objvalues)
+static int singleThread( const std::vector<std::string>& obj_files,char **objfs,
+      char **objvalues,unsigned long long *lastTime)
 {
    int count=0;
+   unsigned long long lastModifyed=0;
    for (const auto& file : obj_files) {
       AetResult res = extract_aet_content_safe (file);
       if(res.found){
          objfs[count] = createRealPath(res.file_path.c_str());
          objvalues[count]=xstrdup(res.content.c_str());
+         if(res.modifyTime>lastModifyed)
+            lastModifyed=res.modifyTime;
          count++;
       }
    }
+   *lastTime = lastModifyed;
    return count;
+}
+
+/**
+ * 获取o文件中的内容,然后复制到dest
+ */
+static void copyToDest(char *content,char *key,char *dest)
+{
+   char* sub=getContentValue(content,key,false);
+   //printf("取接口检查文件名 %s\n",ifaceofile);
+   if(sub!=NULL){
+      strcat(dest,sub);
+      strcat(dest,"\n");
+      free(sub);
+   }
+}
+
+/**
+ * 单个.o文件中内容收集完后，统一写入文件
+ */
+static char *allDataWrite(char *objectRootPath,char *fileName,char *data)
+{
+   char *file = xmalloc(512);
+   sprintf(file,"%s/%s",objectRootPath,fileName);
+   if(data && strlen(data)>0){
+     FILE *f=fopen(file,"w");
+     fwrite(data,1,strlen(data),f);
+     fclose(f);
+   }else{
+      remove(file);
+   }
+   return file;
 }
 
 //中间过程的核心功能
@@ -684,16 +713,16 @@ static char **batch_process_aet_with_pool(const char *prog,char **ld_argv, const
    int i;
    char *objfs[2000];
    char *objvalues[2000];
+   unsigned long long lastTime=0;
    int count = 0;
    if(obj_files.size()>30)
-     count = runThread(obj_files,objfs,objvalues);
+     count = runThread(obj_files,objfs,objvalues,&lastTime);
    else
-     count = singleThread(obj_files,objfs,objvalues);
-   //fprintf(stderr,"batch_process_aet_with_pool 00 %d\n",count);
+     count = singleThread(obj_files,objfs,objvalues,&lastTime);
    if(count==0)
       return ld_argv;
 
-   //取第一个.o的路径作用对象路径。
+   //取第一个.o的路径作为对象路径。
    char *objectRootPath=NULL;
    for (i=0;i<count;++i) {
       objectRootPath =  getObjRootPath(objfs[i]);
@@ -703,7 +732,6 @@ static char **batch_process_aet_with_pool(const char *prog,char **ld_argv, const
    if(objectRootPath==NULL)
       objectRootPath=xstrdup("/temp/");
    char *gcc=c_file_name;
-
 
    //第一个业务 是否编译middlefile
    int compileType = 0;
@@ -748,6 +776,10 @@ static char **batch_process_aet_with_pool(const char *prog,char **ld_argv, const
    char blockfiles[10*1024];
    memset(blockfiles,0,10*1024);
 
+   //带泛型块函数的源代码所在的文件名
+   char funcWithGbFiles[10*1024];
+   memset(funcWithGbFiles,0,10*1024);
+
    //新建泛型对象的文件 接口实现的字符串保存的文件名xxx.genobj_new.o (generic_graph_save)
    char newgenfiles[10*1024];
    memset(newgenfiles,0,10*1024);
@@ -757,102 +789,27 @@ static char **batch_process_aet_with_pool(const char *prog,char **ld_argv, const
 
    for (i=0;i<count;++i) {
       const char *content = objvalues[i];
-      char* ifaceofile=getContentValue(content,"ifaceofile=",false);
-      //printf("取接口检查文件名 %s\n",ifaceofile);
-      if(ifaceofile!=NULL){
-         strcat(ifacecheck,ifaceofile);
-         strcat(ifacecheck,"\n");
-         free(ifaceofile);
-      }
-      char* ifaceimplfile=getContentValue(content,"ifaceimplfile=",false);
-      //printf("取接口实现文件名 %s\n",ifaceimplfile);
-      if(ifaceimplfile!=NULL){
-         strcat(ifaceimpl,ifaceimplfile);
-         strcat(ifaceimpl,"\n");
-         free(ifaceimplfile);
-      }
-
-      char* blockf=getContentValue(content,"blockfile=",false);
-      //printf("取泛型块实现文件名 %s\n",blockf);
-      if(blockf!=NULL){
-         strcat(blockfiles,blockf);
-         strcat(blockfiles,"\n");
-         free(blockf);
-      }
-
-      char* newgenericfile=getContentValue(content,"newgenfile=",false);
-      //printf("取新建泛型对象文件名 %s\n",newgenericfile);
-      if(newgenericfile!=NULL){
-         strcat(newgenfiles,newgenericfile);
-         strcat(newgenfiles,"\n");
-         free(newgenericfile);
-      }
-
-      char* mtcslinkfile=getContentValue(content,"mtcslinkfile=",false);
-      //printf("取mtcslink对象文件名 %s\n",mtcslinkfile);
-      if(mtcslinkfile!=NULL){
-         strcat(mtcslinkfiles,mtcslinkfile);
-         strcat(mtcslinkfiles,"\n");
-         free(mtcslinkfile);
-      }
-
+      copyToDest(content,"ifaceofile=",ifacecheck);
+      copyToDest(content,"ifaceimplfile=",ifaceimpl);
+      copyToDest(content,"blockfile=",blockfiles);
+      copyToDest(content,"funcwithgbfile=",funcWithGbFiles);
+      copyToDest(content,"newgenfile=",newgenfiles);
+      copyToDest(content,"mtcslinkfile=",mtcslinkfiles);
    }
 
 //   printf("batch_process_aet_with_pool 接口检查 data:%s\n",ifacecheck);
 //   printf("batch_process_aet_with_pool 接口实现 data:%s\n",ifaceimpl);
 //   printf("batch_process_aet_with_pool 泛型块实现  data:%s\n",blockfiles);
+//   printf("batch_process_aet_with_pool 带泛型块函数实现  data:%s\n",blockfiles);
 //   printf("batch_process_aet_with_pool 新建泛型块实现  data:%s\n",newgenfiles);
 //   printf("batch_process_aet_with_pool MTCSLINK实现  data:%s\n",mtcslinkfiles);
 
-   char checkListFileName[512];
-   sprintf(checkListFileName,"%s/%s",objectRootPath,CHECK_FILE_LIST_NAME_NEW);
-   if(strlen(ifacecheck)>0){
-     FILE *f=fopen(checkListFileName,"w");
-     fwrite(ifacecheck,1,strlen(ifacecheck),f);
-     fclose(f);
-   }else{
-      remove(checkListFileName);
-   }
-
-   char ifaceImplListFileName[512];
-   sprintf(ifaceImplListFileName,"%s/%s",objectRootPath,IFACE_IMPL_FILE_LIST_NAME_NEW);
-   if(strlen(ifaceimpl)>0){
-     FILE *f=fopen(ifaceImplListFileName,"w");
-     fwrite(ifaceimpl,1,strlen(ifaceimpl),f);
-     fclose(f);
-   }else{
-      remove(ifaceImplListFileName);
-   }
-
-   char blockListFileName[512];
-   sprintf(blockListFileName,"%s/%s",objectRootPath,GENERIC_BLOCK_FILE_LIST_NAME_NEW);
-   if(strlen(blockfiles)>0){
-      FILE *f=fopen(blockListFileName,"w");
-      fwrite(blockfiles,1,strlen(blockfiles),f);
-      fclose(f);
-   }else{
-      remove(blockListFileName);
-   }
-
-   char newgenListFileName[512];
-   sprintf(newgenListFileName,"%s/%s",objectRootPath,GENERIC_MODEL_INDEX_FILE_LIST_NAME_NEW);
-   if(strlen(newgenfiles)>0){
-      FILE *f=fopen(newgenListFileName,"w");
-      fwrite(newgenfiles,1,strlen(newgenfiles),f);
-      fclose(f);
-   }else{
-      remove(newgenListFileName);
-   }
-
-   char mtcslinkListFileName[512];
-   sprintf(mtcslinkListFileName,"%s/%s",objectRootPath,AET_MTCS_LINK_FILE_LIST_NAME_NEW);
-   if(strlen(mtcslinkfiles)>0){
-      FILE *f=fopen(mtcslinkListFileName,"w");
-      fwrite(mtcslinkfiles,1,strlen(mtcslinkfiles),f);
-      fclose(f);
-   }else{
-      remove(mtcslinkListFileName);
-   }
+   char *checkListFileName = allDataWrite(objectRootPath,CHECK_FILE_LIST_NAME_NEW,ifacecheck);
+   char *ifaceImplListFileName = allDataWrite(objectRootPath,IFACE_IMPL_FILE_LIST_NAME_NEW,ifaceimpl);
+   char *blockListFileName = allDataWrite(objectRootPath,GENERIC_BLOCK_FILE_LIST_NAME_NEW,blockfiles);
+   char *funWithGbFileName = allDataWrite(objectRootPath,AET_FUNC_WITH_GB_FILE_LIST_NAME_NEW,funcWithGbFiles);
+   char *newgenListFileName = allDataWrite(objectRootPath,GENERIC_MODEL_INDEX_FILE_LIST_NAME_NEW,newgenfiles);
+   char *mtcslinkListFileName = allDataWrite(objectRootPath,AET_MTCS_LINK_FILE_LIST_NAME_NEW,mtcslinkfiles);
 
    //-Daetlib -Daetchecklist -Daetifaceimpllist -Daetblocklist -Daetnewgenlist。-Daetmtcslinklis 只有gcc.cc使用
    //-Daetlib = GCC_AET_LIB_PATH (aetlib.c)
@@ -864,35 +821,41 @@ static char **batch_process_aet_with_pool(const char *prog,char **ld_argv, const
    char ifaceImplListFileParam[255];
    sprintf(ifaceImplListFileParam,"-Daetifaceimpllist%s",strlen(ifaceimpl)>0?ifaceImplListFileName:"");
    char blockListFileParam[255];
-   sprintf(blockListFileParam,"-Daetblocklist%s",strlen(blockfiles)>0?blockListFileName:"");
+   sprintf(blockListFileParam,"-Daetblocklist%s",blockListFileName);
+   char funWithGbFileParam[255];
+   sprintf(funWithGbFileParam,"-Daetfuncwithgblist%s",funWithGbFileName);
    char newgenListFileParam[255];
    sprintf(newgenListFileParam,"-Daetnewgenlist%s",strlen(newgenfiles)>0?newgenListFileName:"");
    char mtcslinkListFileParam[255];
    sprintf(mtcslinkListFileParam,"-Daetmtcslinklist%s",strlen(mtcslinkfiles)>0?mtcslinkListFileName:"");
 
-   char *argv[6];
+   char *argv[7];
    argv[0]=libparams;
    argv[1]=checkListFileParam;
    argv[2]=ifaceImplListFileParam;
    argv[3]=blockListFileParam;
-   argv[4]=newgenListFileParam;
-   argv[5]=mtcslinkListFileParam;
-   //编译1.temp_func_track_45_NEW.c
-   char *middleFileObj=compileMiddleFile(gcc,objectRootPath,compileType,argv,6);
+   argv[4]=funWithGbFileParam;
+   argv[5]=newgenListFileParam;
+   argv[6]=mtcslinkListFileParam;
+
+   //编译1.temp_func_track_45.c
+   char *middleFileObj=compileMiddleFile(gcc,objectRootPath,compileType,argv,7,lastTime);
    int genericOutputCount=0;
-   //在编译temp_func_track_45时，处理泛型类时，会保存块信息到文件blockListFileName+.o中
+   //在编译temp_func_track_45时，处理泛型类时，会保存块信息到文件blockListFileName.o中
    //在这里传给temp_func_track_45.c的有泛型信息的文件名列表是通过
    //-Daetblocklistxxx
    //  -->setAetArgv(gcc.cc)
    //     -->block_mgr_ready(blockmgr.c)
    //        -->generic_code_create_block_codes(genericcode.h)
-   //         重点在generic_code_create_block_codes会把blockListFileName变成blockListFileName+.0用
+   //         重点在generic_code_create_block_codes会把blockListFileName变成blockListFileName.o用
    //         来保存块信息
-   //编译2.temp_func_track_45_NEW.c
+   //编译2.泛型块函数文件 _block_func__0.c,还有第二次需要编译的文件
+   //2026-08-06 新版泛型设计改 _block_func__0.c为_block_func__0.o,并且不需要单独编译，它被作用参数传给源文件
+   //在编译器编完前，加载_block_func__0.o的内容到cpp_buffer最后和原文件编译。
    char **genericOutputFiles=compileGeneric(gcc,objectRootPath,blockListFileName,&genericOutputCount,
          objfs,objvalues,count);
 
-   //编译3.接口文件，在编译temp_func_track_45_NEW.c时，调用
+   //编译3.接口文件，在编译temp_func_track_45.c时，调用
    //class_parser_goto(classparser.c)
    //  -->iface_impl_compile_ready(ifaceimpl.c)
    //      -->createCFileSource_new(ifaceimpl.c) 生成接口实现的.c代码并保存来自.o文件
@@ -910,6 +873,10 @@ static char **batch_process_aet_with_pool(const char *prog,char **ld_argv, const
    //最后一步是生成新的链接参数列表。
    char **aetargv=createNewArgv(ld_argv,middleFileObj,mtcsLinkObj,
          ifaceImplCount,ifaceimplsObjs,genericOutputCount,genericOutputFiles,noteAet,usemtcs);
+   //把 temp_func_track_45.o改成最新的。下次make，如果没改变.o的时间就不用再编译了
+   if(file_exists(middleFileObj)){
+      utime(middleFileObj,NULL);
+   }
    //printf("链接准备工作完成 -- 55\n");
    return aetargv;
 }
@@ -1095,15 +1062,17 @@ static int getGccInstallPath(char *path)
    return 0;
 }
 
-#define ADDITIONAL_MIDDLE_AET_FILE_NEW  "temp_func_track_45_NEW.c"
+#define ADDITIONAL_MIDDLE_AET_FILE_NEW  "temp_func_track_45.c"
 
 /**
  * 编译中间文件 temp_func_track_45.c
- * 在编译源件期间，调用middle_file_modify方法，会改变文件 temp_func_track_45.c
+ * 在编译源件期间，调用middle_file_modify方法，记录需要二次编译的note
  * 改变原因目前有3个原因:源文件中(1)引用接口,(2)创建泛型类对象或调用泛型函数 (3)泛型类或泛型函数中有泛型块。
  * 编译该文件的过程中 1.生成全局变量 LIB_GLOBAL_VAR_NAME_PREFIX的内容。2.生成接口实现文件.c 3.生成函数块文件.c
+ * 如果包含有.section .aetprog最后的.o文件的时间大于 temp_func_track_45.o,需要重新编译
  */
-static char *compileMiddleFile(char *gcc,char *objectRootPath,int compileType,char **argv,int argc)
+static char *compileMiddleFile(char *gcc,char *objectRootPath,int compileType,
+      char **argv,int argc,unsigned long long lastTime)
 {
    char src[255];
    sprintf(src,"%s/%s",objectRootPath,ADDITIONAL_MIDDLE_AET_FILE_NEW);
@@ -1114,7 +1083,7 @@ static char *compileMiddleFile(char *gcc,char *objectRootPath,int compileType,ch
    char writeContent[1024];
    sprintf(writeContent,"%s %d %d\n",RID_AET_GOTO_STR,GOTO_CHECK_FUNC_DEFINE,compileType);
    fprintf(stderr,"编译 middle file:%s %s %d arg1:%s arg2:%s\n",src,dest,compileType,argv[0],argv[1]);
-   //检查ADDITIONAL_MIDDLE_AET_FILE_NEW中的内容与要写入的内容是否相同，相同不写入。
+   //检查ADDITIONAL_MIDDLE_AET_FILE中的内容与要写入的内容是否相同，相同不写入。
    FILE *f=fopen(src,"r");
    if(f){
       char buffer[4096];
@@ -1131,6 +1100,15 @@ static char *compileMiddleFile(char *gcc,char *objectRootPath,int compileType,ch
       fwrite(writeContent,1,strlen(writeContent),fw);
       fclose(fw);
    }
+   if(file_exists(dest)){
+      unsigned long long st= getLastModified(dest);
+      //项目中.o的时间比 temp_func_track_45.o 新，重新编译 temp_func_track_45.o
+      if(lastTime>st){
+         //printf("最后的.o文件的修改时间大于 temp_func_track_45.o 的时间，移走\n");
+         remove(dest);
+      }
+   }
+
    char *objectFile= compileSingleFile(gcc,objectRootPath,src,dest,NULL,argv,argc);
    return objectFile;
 }
@@ -1222,13 +1200,13 @@ static char * compileSingleFile(char *gcc,char *objectRootPath,char *src,
 }
 
 /**
- * blockFileName 泛型块.c文件
+ * blockFileName 泛型块.c文件 不是直接编译，是在编译srcFile时加入到cpp_buffer最后
  * srcFile 源.c文件
  * oFile 源.c文件的输出文件
  * srcFile对应的编译参数存在文件 oFile+parm.o文件中。在genericinfo.c generic_info_save中写入参数
  */
 static void secondCompileGeneric(char *blockFileName,char *srcFile,char *oFile,
-      char *params,struct command *cmds,int index)
+      char *params,char *aetprog,struct command *cmds,int index)
 {
    static char * SEPARATION ="#$%"; //与gcc.c中的一样
    char *items[1024];
@@ -1237,52 +1215,75 @@ static void secondCompileGeneric(char *blockFileName,char *srcFile,char *oFile,
       printf("取出的最后一个参数是空的或长度是0 %s 参数个数:%d\n",srcFile,items[argc-1],argc);
       argc--;
    }
-   char **real_argv = XCNEWVEC (char *, argc+2);
+   char **real_argv = XCNEWVEC (char *, argc+3);
    const char ** argv = CONST_CAST2 (const char **, char **,real_argv);
    int i;
    for(i=0;i<argc;i++){
       argv[i] = items[i];
    }
-   printf("items[argc-1] %d %s %s items[0]:%s\n",argc,items[argc-1],srcFile,items[0]);
    gcc_assert(strcmp(items[argc-1],srcFile)==0);
-   printf("items[argc-1] vvvv%d %s %s\n",argc,items[argc-1],srcFile);
 
    char dcl[512];
    sprintf(dcl,"-Dnclcompilefile%s",blockFileName);
+   char restoreaetprog[2048];
+   sprintf(restoreaetprog,"-Faetprog%s",aetprog);
    argv[argc] = xstrdup(dcl);
-   argv[argc+1] = (char *) 0;
+   argv[argc+1] = xstrdup(restoreaetprog);
+   argv[argc+2] = (char *) 0;
    cmds[index].prog=items[0];
    cmds[index].argv=argv;
    //for(i=0;i<argc;i++)
      // printf("secondCompileGeneric data i:%d %s\n",i,argv[i]);
 }
 
+/**
+ * objfiles是在aetcollect.c中根据保存在节aetporg中的o文件创建的全路径名。
+ * objfile可能不是全路径名，所以加入 endswith比较。
+ */
 static char *getParams(char **objfiles,char **objcontents,int ofileCount,char *objfile)
 {
    int i;
    for(i=0;i<ofileCount;i++){
-      if(strcmp(objfiles[i],objfile)==0){
-         //printf("getParams --- i:%d %s\n",i,objfile);
-         char*params= getContentValue(objcontents[i],"params=",false);
+      if(strcmp(objfiles[i],objfile)==0 || endswith(objfiles[i],objfile)){
+         char *params= getContentValue(objcontents[i],"params=",false);
          return params;
       }
    }
    return NULL;
 }
+
+/**
+ * 获取.o文件中的aetprog节的内容
+ */
+static char *get_section_aetprog(char **objfiles,char **objcontents,int ofileCount,char *objfile)
+{
+   int i;
+   for(i=0;i<ofileCount;i++){
+      if(strcmp(objfiles[i],objfile)==0 || endswith(objfiles[i],objfile)){
+         return objcontents[i];
+      }
+   }
+   return NULL;
+}
+
+
 /**
  * 编译泛型有关的文件
+ * fileName的内容如下：用逗号分开
+ * .../_block_func__0.c,../ai0.c,.../ai0.o
+ * 原_block_func__0.c不再单独编译，_block_func__0.c也被改名为_block_func__0.o
  */
 static char **compileGeneric(char *gcc,char *objectRootPath,char *blockListFileName,int *objCount,
       char **objfiles,char **objcontents,int ofileCount)
 {
    //与genericcode.c中的generic_code_create_block_codes
-   //创建保存块信息的文件名方法一个，在blockListFileName追加.o
+   //创建保存块信息的文件名方法一样，在blockListFileName追加.o
    char fileName[512];
    sprintf(fileName,"%s.o",blockListFileName);
-   //printf("compileGeneric 00 %s exists:%d\n",fileName,file_exists(fileName));
-   if(!file_exists(fileName))
+   if(!file_exists(fileName)){
+      printf("compileGeneric 第二次编译的文件不存在 %s\n",fileName);
       return NULL;
-
+   }
    char fileList[1024*10];
    fileList[0]='\0';//必须加否则buffer内存不可知
    readFile(fileName,fileList,1024*10);
@@ -1297,7 +1298,6 @@ static char **compileGeneric(char *gcc,char *objectRootPath,char *blockListFileN
    commands = (struct command *) alloca (compileFileCount * sizeof (struct command));
    int n_commands =0;      /* # of command.  */
    int i;
-
    for(i=0;i<compileFileCount;i++){
       char *fileName=cFiles[i];
       //有逗号说明要编译的文件由源文件来编，逗号来自middlefile.c的方法 createCompileUnitFile
@@ -1307,32 +1307,13 @@ static char **compileGeneric(char *gcc,char *objectRootPath,char *blockListFileN
          //0 泛型块文件的文件名 1 源文件 2 源文件对应的输出o文件
          gcc_assert(length==3);
          int ret=remove((const char *)items[2]); //移走源文件的输出o文件
-         printf("compileGeneric 00 -- items[2]:%s\n",items[2]);
          char *params = getParams(objfiles,objcontents,ofileCount,items[2]);
-         printf("compileGeneric 00 编译泛型文件 源文件是--- %s %s 删除文件:%s ok:%d params:%s\n",
-               items[0],items[1],items[2],ret,params);
-         secondCompileGeneric(items[0],items[1],items[2],params,commands,n_commands++);
+         printf("compileGeneric 00 第二次编译的泛型文件:\n1.源文件:%s\n2.依赖的泛型块文件:\
+               %s\n3.输出文件:%s\n移走.o文件ok:%d\n编译参数据：%s\n",
+               items[1],items[0],items[2],ret,params);
+         char *aegprog = get_section_aetprog(objfiles,objcontents,ofileCount,items[2]);
+         secondCompileGeneric(items[0],items[1],items[2],params,aegprog,commands,n_commands++);
          oFiles[i]=items[2];
-         free(params);
-      }else{
-         char *cFile=cFiles[i];
-         char oFile[512];
-         getOFileName(cFile,oFile);
-         printf("compileGeneric 11 -- items[2]:%s\n",oFile);
-
-         char *params = getParams(objfiles,objcontents,ofileCount,oFile);
-         if(params==NULL){
-            //对应的oFile对应的参数没有，找第一个
-            int j;
-            for(j=0;j<ofileCount;j++){
-               params= getContentValue(objcontents[j],"params=",false);
-               if(params!=NULL)
-                  break;
-            }
-         }
-         printf("compileGeneric 11 -取参数- cfile:%s ofile:%s params:%s\n",cFile,oFile,params);
-         compileBlockFunc(cFile,oFile,params,commands,n_commands++);
-         oFiles[i]=xstrdup(oFile);
          free(params);
       }
    }
@@ -1348,7 +1329,8 @@ static char **compileGeneric(char *gcc,char *objectRootPath,char *blockListFileN
       const char *errmsg;
       int err;
       const char *string = commands[i].argv[0];
-      errmsg = pex_run (pexes[i], PEX_LAST | PEX_SEARCH,string, CONST_CAST (char **, commands[i].argv),NULL, NULL, &err);
+      errmsg = pex_run (pexes[i], PEX_LAST | PEX_SEARCH,string,
+            CONST_CAST (char **, commands[i].argv),NULL, NULL, &err);
       if (errmsg != NULL){
          errno = err;
          fatal_error (input_location,err ? "cannot execute %qs: %s: %m": "cannot execute %qs: %s",string, errmsg);
@@ -1372,11 +1354,7 @@ static char **compileGeneric(char *gcc,char *objectRootPath,char *blockListFileN
    if(ok>=0){
       fatal_error (input_location, "编译泛型文件第二次失败:%qs",oFiles[ok]);
    }
-   char suffix[256];
-   sprintf(suffix,"%s",GENERIC_BLOCK_FILE_NAME);
-   char **objects=(char **)xmalloc(sizeof(char *)*100);
-   *objCount=getOuputFile(objectRootPath,objects,suffix);
-   return objects;
+   return NULL;
 }
 
 /**
@@ -1433,7 +1411,8 @@ static char **compileIface(char *gcc,char *objectRootPath,int *objCount,char *im
       const char *errmsg;
       int err;
       const char *string = commands[i].argv[0];
-      errmsg = pex_run (pexes[i], PEX_LAST | PEX_SEARCH,string, CONST_CAST (char **, commands[i].argv),NULL, NULL, &err);
+      errmsg = pex_run (pexes[i], PEX_LAST | PEX_SEARCH,string,
+            CONST_CAST (char **, commands[i].argv),NULL, NULL, &err);
       if (errmsg != NULL){
          remove(indexFileName);
          errno = err;

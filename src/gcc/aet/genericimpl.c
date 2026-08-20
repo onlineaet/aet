@@ -150,8 +150,38 @@ static void createSizeofToken(GenericImpl *self,int index,nboolean fromFuncGen)
    aet_print_token_in_parser("计算泛型的 sizeof-------");
 }
 
+static void createSizeofToken(GenericImpl *self,int size)
+{
+   c_parser *parser=self->parser->parser;
+   c_parser_consume_token (parser);
+   c_parser_consume_token (parser);
+   c_parser_consume_token (parser);
+   int tokenCount=parser->tokens_avail;
+   if(tokenCount+1>AET_MAX_TOKEN){
+      error("token太多了");
+      return FALSE;
+   }
+   int i;
+   for(i=tokenCount;i>0;i--){
+      aet_utils_copy_token(&parser->tokens[i-1],&parser->tokens[i-1+1]);
+   }
+   parser->tokens_avail=tokenCount+1;
+   aet_utils_create_number_token(&parser->tokens[0],size);
+   aet_print_token_in_parser("计算泛型的 sizeof 有真实大小 %d",size);
+}
+
 /**
- * sizeof(T)代码只能出现在类定义中
+ * 是否是正在编译泛型块函数
+ */
+static nboolean atCompileGenericBlock(GenericImpl *self)
+{
+   return (current_function_decl
+      && aet_parser_is_generic_state(self->parser)
+      && generic_util_is_block_func_name(IDENTIFIER_POINTER(DECL_NAME(current_function_decl))));
+}
+
+/**
+ * sizeof(T)代码只能出现在类定义中和泛型块函数中
  * 如 impl Abc{};
  * self->genericAObject983478[self->genericAObject983478[0]+1+index]
  */
@@ -202,7 +232,13 @@ nboolean  generic_impl_calc_sizeof(GenericImpl *self,ClassName *className)
          n_warning("在类%s中的泛型声明没有包括泛型%s。\n",className->sysName,IDENTIFIER_POINTER(id));
          return FALSE;
       }
-      createSizeofToken(self,index,FALSE);
+      if(atCompileGenericBlock(self)){
+         int size = generic_parser_get_true_type_size(generic_parser_get(),index);
+         n_debug("创建常数的 在编译泛型块函数时调用这里 sizeof(E) :%d\n",size);
+         createSizeofToken(self,size);
+      }else{
+         createSizeofToken(self,index,FALSE);
+      }
    }
    return TRUE;
 }
@@ -554,32 +590,34 @@ static tree getParmsFromDeclarator(struct c_declarator *declarator)
  */
 tree generic_impl_cast(GenericImpl *self,struct c_type_name *type_name,tree expr)
 {
-	nboolean isGenericType=generic_util_is_generic_pointer(TREE_TYPE(expr));
-	if(!isGenericType)
-		return expr;
-	tree realGen;
-    tree type_expr = NULL_TREE;
-    bool type_expr_const = true;
-    tree ret;
-    realGen = groktypename (type_name, &type_expr, &type_expr_const);
-   /// printf("generic_impl_cast 00-----\n");
-   // aet_print_tree(realGen);
-	if(TREE_CODE(realGen)==POINTER_TYPE){
-		printf("generic_impl_cast 11 转指针 expr是泛型void_geneirc_E类型 要转的也是指针\n");
-//		tree pointer=build_pointer_type(long_unsigned_type_node);
-//		tree ret = build1 (NOP_EXPR, pointer,expr);
-//		ret = build1 (INDIRECT_REF, long_unsigned_type_node, ret);
-//		ret = build1 (CONVERT_EXPR, realGen, ret);
-//		return ret;
-		return expr;
-	}else{
-		n_debug("generic_impl_cast 22 转非指针。");
-	   tree realType=realGen;
-	   tree pointer=build_pointer_type(realType);
-	   tree ret = build1 (NOP_EXPR, pointer,expr);
-	   ret = build1 (INDIRECT_REF, realType, ret);
-	   return ret;
-	}
+   nboolean isGenericType=generic_util_is_generic_pointer(TREE_TYPE(expr));
+   if(!isGenericType)
+      return expr;
+   tree realGen;
+   tree type_expr = NULL_TREE;
+   bool type_expr_const = true;
+   tree ret;
+   realGen = groktypename (type_name, &type_expr, &type_expr_const);
+   n_debug("generic_impl_cast 00-----\n");
+   aet_print_tree(realGen);
+   if(TREE_CODE(realGen)==POINTER_TYPE){
+      n_debug("generic_impl_cast 11 转指针 expr是泛型void_geneirc_E类型 要转的也是指针\n");
+      aet_print_tree(expr);
+
+      //		tree pointer=build_pointer_type(long_unsigned_type_node);
+      //		tree ret = build1 (NOP_EXPR, pointer,expr);
+      //		ret = build1 (INDIRECT_REF, long_unsigned_type_node, ret);
+      //		ret = build1 (CONVERT_EXPR, realGen, ret);
+      //		return ret;
+      return expr;
+   }else{
+      n_debug("generic_impl_cast 22 转非指针。");
+      tree realType=realGen;
+      tree pointer=build_pointer_type(realType);
+      tree ret = build1 (NOP_EXPR, pointer,expr);
+      ret = build1 (INDIRECT_REF, realType, ret);
+      return ret;
+   }
 }
 
 /**
@@ -729,6 +767,10 @@ nboolean  generic_impl_check_var(GenericImpl *self,tree decl,GenericModel *varGe
                re=generic_model_include_decl(belongGen,varGen);
             }
             if(!re){
+               //进入泛型块和fwgb的parser,原来的 E 在fwgb中被替换为aet_generic_E,在再这是还原
+               if(aet_parser_is_generic_state(aet_parser_get())){
+                  return TRUE;
+               }
                error_at(loc,"变量%qs定义的泛型中还包含有未定义的泛型单元，在当前上下文中并没有之与匹配的声明。",varName);
                return FALSE;
             }
@@ -740,6 +782,9 @@ nboolean  generic_impl_check_var(GenericImpl *self,tree decl,GenericModel *varGe
          if(generic_model_get_undefine_count(varGen)!=0){
             nboolean re=generic_model_include_decl(belongGen,varGen);
             if(!re){
+               if(aet_parser_is_generic_state(aet_parser_get())){
+                  return TRUE;
+               }
                error_at(loc,"变量%qs定义的泛型中还包含有未定义的泛型单元，在当前上下文中并没有之与匹配的声明。",varName);
                return FALSE;
             }
@@ -1181,8 +1226,6 @@ RunGenericInfo **generic_impl_collect_parent_info(GenericImpl *self,ClassInfo *c
    }
    return infos;
 }
-
-
 
 GenericImpl *generic_impl_get()
 {

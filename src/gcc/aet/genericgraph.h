@@ -41,6 +41,9 @@ struct _GenericGraph
    char *saveContent;//保存到全局变量 LIB_GLOBAL_GENERIC_VAR_NAME_PREFIX 的内容
    NPtrArray *outputArray;//本项目输出的所有定义泛型对象。
    char *collectFileName;//保存new信息的文件，每个编译文件一个
+   NPtrArray *origRootArray;//原始的root,现生成代码时作为文件代码级的起点
+
+   NPtrArray *graphArray;//一个文件一个图
 
 };
 
@@ -53,9 +56,11 @@ typedef enum
 
 typedef struct _GenericObj
 {
-   GenericObjType type;//0 新建对象 1 调用泛型  2 新建对象为父类设置的泛型
+   GenericObjType type;//0 新建对象 1 调用泛型函数  2 新建对象为父类设置的泛型
    RunGenericInfo **infos;
    int infoLen;
+   char *cFile;//正在编译的文件 in_fnames[0];
+   char *oFile ;//输出的.o文件
    ClassFunc *callee;   //被调用的泛型函数;
    ClassInfo *newObject;//新建的class;
    ClassFunc *atFunc;   //调用泛型函数或新建对象时所在的类函数 可以是空的，但如果不为空atClass也应该不为空。
@@ -67,6 +72,18 @@ typedef struct _GenericObj
 }GenericObj;
 
 
+typedef struct _GraphData
+{
+   char *cFile;
+   char *oFile;
+   NPtrArray *root;
+   NPtrArray *child;
+   //存结果
+   char *str;
+   NPtrArray *out;
+}GraphData;
+
+
 GenericGraph  *generic_graph_get();
 //加入调用泛型函数
 void           generic_graph_add_func_call(GenericGraph *self,RunGenericInfo **infos,
@@ -76,14 +93,17 @@ void           generic_graph_add_new_class(GenericGraph *self,RunGenericInfo **i
                            ClassInfo *info,ClassFunc* atFunc,ClassInfo *atClass,nboolean isParent);
 void           generic_graph_print(GenericGraph *self);
 void           generic_graph_save(GenericGraph *self);
-void           generic_graph_ready(GenericGraph *self);
 char          *generic_graph_get_output_string(GenericGraph *self);
 NPtrArray     *generic_graph_get_output_generic_obj(GenericGraph *self);
 NPtrArray     *generic_graph_read(char *content);
 
 void           generic_obj_free(GenericObj *self);
 void           generic_obj_print(GenericObj *self);
-
+//从文件列表中取出本项目的所有泛型对象
+nboolean       generic_graph_create_obj(GenericGraph *self,NPtrArray **root,NPtrArray **child);
+NPtrArray     *generic_graph_get_orig_root_array(GenericGraph *self);
+void           generic_graph_ready(GenericGraph *self);
+NPtrArray     *generic_graph_files_graph(GenericGraph *self);
 
 #endif
 

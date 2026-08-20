@@ -80,6 +80,9 @@ static void genericGraphInit(GenericGraph *self)
    self->collectGenArray=n_ptr_array_new();
    self->saveContent=NULL;
    self->outputArray=NULL;
+   self->origRootArray = NULL;
+   self->graphArray=n_ptr_array_new();
+
 }
 
 /**
@@ -88,10 +91,11 @@ static void genericGraphInit(GenericGraph *self)
 static nboolean fullDefine(GenericObj *obj)
 {
    int i;
-   for(i=0;i<obj->infoLen;i++)
-      if(generic_unit_is_undefine(obj->infos[i]->genUnit))
+   for(i=0;i<obj->infoLen;i++){
+      if(generic_unit_is_undefine(obj->infos[i]->genUnit)){
          return FALSE;
-
+      }
+   }
    return TRUE;
 }
 
@@ -111,6 +115,8 @@ void generic_graph_add_func_call(GenericGraph *self,RunGenericInfo **infos,
    obj->type=GEN_FUNC;
    obj->infos=infos;
    obj->infoLen=generic_model_get_count(class_func_get_func_generic(callee));
+   obj->cFile = n_strdup(in_fnames[0]);
+   obj->oFile = n_strdup(makefile_parm_get_object_file(makefile_parm_get()));
    obj->callee=callee;
    obj->atFunc=atFunc;
    obj->atClass=atClass;
@@ -135,6 +141,8 @@ void generic_graph_add_new_class(GenericGraph *self,RunGenericInfo **infos,
    obj->type=isParent?PARENT_FROM_OBJECT:NEW_OBJECT;
    obj->infos=infos;
    obj->infoLen=generic_model_get_count(newObject->genericModel);
+   obj->cFile = n_strdup(in_fnames[0]);
+   obj->oFile = n_strdup(makefile_parm_get_object_file(makefile_parm_get()));
    obj->newObject=newObject;
    obj->atFunc=atFunc;
    obj->atClass=atClass;
@@ -162,7 +170,8 @@ static void printRunGenInfo(RunGenericInfo *info,int index)
       from="子类";
       detail=info->fromClass->className.sysName;
    }
-   printf("序号:%d 位置:%d %s  %s unit:%s\n",index,info->fromPos,from,detail,generic_unit_tostring(info->genUnit));
+   printf("序号:%d 位置:%d %s  %s unit:%s file:%s\n",
+         index,info->fromPos,from,detail,generic_unit_tostring(info->genUnit),info->file);
 }
 
 static void printGenericObj(GenericObj *info)
@@ -182,6 +191,8 @@ static void printGenericObj(GenericObj *info)
       if(info->atFunc==NULL && info->atClass==NULL)
          printf("在外部创建的对象\n");
    }
+   printf("源文件：%\n",info->cFile);
+   printf("输出文件：%\n",info->oFile);
    int i;
    for(i=0;i<info->infoLen;i++){
       RunGenericInfo *item=info->infos[i];
@@ -231,6 +242,8 @@ static void printGenericObj(GenericObj *info,int tab)
       if(info->atFunc==NULL && info->atClass==NULL)
          printf("%s在外部创建的对象\n",tabs);
    }
+   printf("源文件：%\n",info->cFile);
+   printf("输出文件：%\n",info->oFile);
    for(i=0;i<info->infoLen;i++){
       RunGenericInfo *item=info->infos[i];
       printRunGenInfo(item,i,tabs);
@@ -248,6 +261,8 @@ static void printSimpleGenericObj(GenericObj *info)
    }else{
       printf("新建对象:%s\n",info->newObject->className.sysName);
    }
+   printf("源文件：%\n",info->cFile);
+   printf("输出文件：%\n",info->oFile);
    for(i=0;i<info->infoLen;i++){
       RunGenericInfo *item=info->infos[i];
       printf("泛型单元:%d %s\n",i,generic_unit_tostring(item->genUnit));
@@ -416,6 +431,8 @@ static GenericObj *cloneGenericObj(GenericObj *src)
       infos[i]=cloneRunGenericInfo(src->infos[i]);
    }
    n->infos=infos;
+   n->cFile = n_strdup(src->cFile);
+   n->oFile = n_strdup(src->oFile);
    n->infoLen=src->infoLen;
    n->callee=src->callee;
    n->newObject=src->newObject;
@@ -531,6 +548,8 @@ static void genericObjToString(GenericObj *obj,NString *strs)
 {
     n_string_append_printf(strs,"type=%d\n",obj->type);
     n_string_append_printf(strs,"infoLen=%d\n",obj->infoLen);
+    n_string_append_printf(strs,"cFile=%s\n",obj->cFile);
+    n_string_append_printf(strs,"oFile=%s\n",obj->oFile);
 
     int i;
     for(i=0;i<obj->infoLen;i++){
@@ -562,13 +581,14 @@ static void writeObject(GenericObj *obj,NString *strs,SaveType saveType)
 }
 
 /**
- * 把泛型对象写入文件 xxx.genobj.o中，最后把 xxx.genobj.o 文件名写入索引文件GENERIC_MODEL_INDEX_FILE generic_model_index.o
+ * 把泛型对象写入文件 xxx.genobj.o中，最后把 xxx.genobj.o 文件名写入索引文件
+ * GENERIC_MODEL_INDEX_FILE generic_model_index.o
  * 在编译完文件调用该方法。每个编译单元都会调用，
 */
 void generic_graph_save(GenericGraph *self)
 {
    if(makefile_parm_is_second_compile(makefile_parm_get())){
-      n_debug("genericgraph.c 是第二次编译 %s 不需要写入任何接口信息。\n",in_fnames[0]);
+      n_debug("genericgraph.c generic_graph_save 是第二次编译 %s 不需要写入任何信息。\n",in_fnames[0]);
       return;
    }
    char  *objfile=makefile_parm_get_object_file(makefile_parm_get());
@@ -721,9 +741,11 @@ static GenericObj *createGenObj(char *content,int *saveType)
    *saveType=atoi(STR(0));
    item->type=atoi(STR(1));
    item->infoLen=atoi(STR(2));
+   item->cFile=STR(3);
+   item->oFile=STR(4);
    RunGenericInfo **infos=(RunGenericInfo **)xmalloc(item->infoLen*sizeof(unsigned long));
    int i;
-   int offset=3;
+   int offset=5;
    for(i=0;i<item->infoLen;i++){
       RunGenericInfo *info=n_slice_new0(RunGenericInfo);
       info->genUnit=n_slice_new0(GenericUnit);
@@ -804,62 +826,168 @@ static char * readLocaFile(char *localFileList)
 }
 
 /**
- * 泛型模型可达性算法。
- * 正在编译temp_func_track_45.c时调用这里
- * 1.从文件GENERIC_MODEL_INDEX_FILE读入文件列表，这些文件保存字符串化的泛型对象GenericObj
- * 2.从 rootArray和 childArray 中排除重复对象后，GenericObj字符串化，供保存到本项目的全局变量 LIB_GLOBAL_GENERIC_VAR_NAME_PREFIX
- * 3.从库中取出所有的GenericObj,把非root类型的GenericObj加入到 childArray;
- * 4.从rootArray生成泛型对象关系图，用根创建一棵树型结构的树。每个节点都变成了定义的泛型对象
- * 5.输出每棵树的节点到一维数组，并删除重复的节点。
+ * 获取项目的泛型对象
  */
-void generic_graph_ready(GenericGraph *self)
+nboolean generic_graph_create_obj(GenericGraph *self,NPtrArray **root,NPtrArray **child)
 {
    char *fileName = getenv("GCC_AET_NEW_GENERIC_LIST_PATH");
-   if(fileName==NULL ||strlen(fileName)==0){
-      return;
-   }
+   if(fileName==NULL ||strlen(fileName)==0)
+      return FALSE;
    //1.从文件GENERIC_MODEL_COLLECT_FILE读入文件列表，这些文件保存字符串化的泛型对象GenericObj
    FILE *fp=fopen(fileName,"r");
    char fileList[10*1024];
    int rev=fread(fileList,1,10*1024,fp);
    fclose(fp);
    if(rev<=0)
-      return;
+      return FALSE;
    fileList[rev]='\0';
    char *content = readLocaFile(fileList);
    if(content==NULL || strlen(content)==0)
-      return;
-   //清除保存内容
-   if(self->saveContent){
-      free(self->saveContent);
-      self->saveContent=NULL;
+      return FALSE;
+   NPtrArray *local=generic_graph_read(content);
+   n_free(content);
+   if(!local)
+      return FALSE;
+   if(local->len==0){
+      n_ptr_array_unref(local);
+      return FALSE;
    }
-   if(self->outputArray){
-      n_ptr_array_unref(self->outputArray);
-      self->outputArray=NULL;
-   }
-   //2.从 rootArray和 childArray 中排除重复对象后，GenericObj字符串化，供保存到本项目的全局变量 LIB_GLOBAL_GENERIC_VAR_NAME_PREFIX 使用
    NPtrArray *rootArray=n_ptr_array_new();
    NPtrArray *childArray=n_ptr_array_new();
 
-   NPtrArray *local=generic_graph_read(content);
-   n_free(content);
    int i;
    for(i=0;i<local->len;i++){
       char *item=n_ptr_array_index(local,i);
       int isRoot=0;
       GenericObj *obj=createGenObj(item,&isRoot);
-      n_debug("genericgraph.c generic_graph_ready 00 从字符串中生成root和child两类泛型对象 i:%d isRoot:%d str:%s\n",
-            i,isRoot,item);
+      n_debug("genericgraph.c generic_graph_create_obj 00 从字符串中生成root和child两类泛型对象 i:%d isRoot:%d str:\n%s\n",
+               i,isRoot,item);
+      //generic_obj_print(obj);
       if(isRoot==SAVE_ROOT)
          n_ptr_array_add(rootArray,obj);
       else
          n_ptr_array_add(childArray,obj);
    }
    n_ptr_array_unref(local);
+   if(root)
+      *root = rootArray;
+   else
+      n_ptr_array_unref(rootArray);
+   if(child)
+      *child = childArray;
+   else
+      n_ptr_array_unref(childArray);
+   return TRUE;
+}
 
-   if(rootArray->len==0 && childArray->len==0)
+static nboolean makeGraph(char *content,NPtrArray **root,NPtrArray **child)
+{
+   NPtrArray *local=generic_graph_read(content);
+   if(!local)
+      return FALSE;
+   if(local->len==0){
+      n_ptr_array_unref(local);
+      return FALSE;
+   }
+   NPtrArray *rootArray=n_ptr_array_new();
+   NPtrArray *childArray=n_ptr_array_new();
+
+   int i;
+   for(i=0;i<local->len;i++){
+      char *item=n_ptr_array_index(local,i);
+      int isRoot=0;
+      GenericObj *obj=createGenObj(item,&isRoot);
+      n_debug("genericgraph.c makeGraph 00 从字符串中生成root和child两类泛型对象 i:%d isRoot:%d str:\n%s\n",
+               i,isRoot==SAVE_ROOT,item);
+      //generic_obj_print(obj);
+      if(isRoot==SAVE_ROOT)
+         n_ptr_array_add(rootArray,obj);
+      else
+         n_ptr_array_add(childArray,obj);
+   }
+   n_ptr_array_unref(local);
+   *root = rootArray;
+   *child = childArray;
+   return TRUE;
+}
+
+
+
+static nboolean createGraph(GenericGraph *self)
+{
+   char *fileName = getenv("GCC_AET_NEW_GENERIC_LIST_PATH");
+   if(fileName==NULL ||strlen(fileName)==0)
+      return FALSE;
+   //1.从文件GENERIC_MODEL_COLLECT_FILE读入文件列表，这些文件保存字符串化的泛型对象GenericObj
+   FILE *fp=fopen(fileName,"r");
+   char fileList[10*1024];
+   int rev=fread(fileList,1,10*1024,fp);
+   fclose(fp);
+   if(rev<=0)
+      return FALSE;
+   fileList[rev]='\0';
+
+   nchar **fileItems=n_strsplit(fileList,"\n",-1);
+   if(fileItems==NULL)
+      return FALSE;
+     int length= n_strv_length(fileItems);
+     if(length==0)
+        return FALSE;
+     int i;
+   //核心功能：一个文件生成一个源代码
+   for(i=0;i<length;i++){
+      char *fn=fileItems[i];
+      FILE *fp=fopen(fn,"r");
+      if(fp){
+         char buffer[1024*150];
+         int rev=fread(buffer,1,1024*150,fp);
+         if(rev>0){
+            buffer[rev]='\0';
+         }
+         fclose(fp);
+         NPtrArray *root,*child;
+         n_debug("createGraph -- file:i:%d %s\n",i,fn);
+         if(makeGraph(buffer,&root,&child)){
+            GraphData *data=n_slice_new0(GraphData);
+            GenericObj *obj=NULL;
+            if(root->len>0)
+               obj=n_ptr_array_index(root,0);
+            if(!obj)
+               obj=n_ptr_array_index(child,0);
+
+            data->root = root;
+            data->child = child;
+            data->cFile=n_strdup(obj->cFile);
+            data->oFile=n_strdup(obj->oFile);
+
+            n_ptr_array_add(self->graphArray,data);
+         }
+      }
+   }
+   return TRUE;
+}
+
+static void copyRootArray(GenericGraph *self,NPtrArray *rootArray)
+{
+   if(!rootArray || rootArray->len==0)
       return;
+   gcc_assert(!self->origRootArray);
+   self->origRootArray = n_ptr_array_new();
+   int i;
+   for(i=0;i<rootArray->len;i++)
+      n_ptr_array_add(self->origRootArray,n_ptr_array_index(rootArray,i));
+}
+
+
+/**
+ * 一个文件生成一个graph
+ */
+static nboolean genGraph(GraphData *data)
+{
+   NPtrArray *rootArray = data->root;
+   NPtrArray *childArray = data->child;
+
+   int i;
    removeRepeat(rootArray,TRUE);
    removeRepeat(childArray,FALSE);
    NString *saveStr=n_string_new("");
@@ -879,18 +1007,21 @@ void generic_graph_ready(GenericGraph *self)
          writeObject(item,saveStr,SAVE_CHILD);
       }
    }
+
+
    //只有未定义的泛型，保存这些未定义的对象到全局变量LIB_GLOBAL_GENERIC_VAR_NAME_PREFIX，并返回
    if(rootArray->len==0 && childArray->len>0){
-      self->saveContent=n_string_free(saveStr,FALSE);
-      return;
+      n_debug("genericgraph.c genGraph 00 root child都是零 %s\n",data->cFile);
+      return FALSE;
    }
-   n_debug("genericgraph.c generic_graph_ready 11 root 和 child的内容：\n%s\n",saveStr->str);
+   n_debug("genericgraph.c genGraph 11 root 和 child的内容：file:%s root:%d child:%d\n%s\n",
+        data->cFile, rootArray->len,childArray->len,saveStr->str);
    //3.从库中取出所有的三类GenericObj,（1）.root 不需要参与计算，（2）.child类型的泛型对象合并到当前项目childArray中。
    //（3）output类型的泛型对象，用来判断与本项目中的output类型的泛型对象是否重复。
    NPtrArray *libArray=aet_lib_get_generic_objs(aet_lib_get());
    //库中输出的泛型对象。
    NPtrArray *outArrayFromLib=n_ptr_array_new();
-   n_debug("genericgraph.c generic_graph_ready 22 从库中取泛型对象\n");
+   n_debug("genericgraph.c genGraph 22 从库中取泛型对象 %s\n",data->cFile);
 
    if(libArray!=NULL){
       for(i=0;i<libArray->len;i++){
@@ -926,7 +1057,7 @@ void generic_graph_ready(GenericGraph *self)
       GenericNode *rootNode=n_slice_new0(GenericNode);
       rootNode->obj=item;
       rootNodes[i] = rootNode;
-      n_debug("genericgraph.c generic_graph_ready 33 i:%d %d %d\n",i,rootArray->len,childArray->len);
+      n_debug("genericgraph.c genGraph 33 i:%d %d %d\n",i,rootArray->len,childArray->len);
       reference(rootNode,childArray);
       int j;
       for(j=0;j<childArray->len;j++){
@@ -935,7 +1066,7 @@ void generic_graph_ready(GenericGraph *self)
       }
    }
    if(n_log_is_debug_file(NULL,NULL)){
-      n_debug("genericgraph.c generic_graph_ready 44 打印泛型对象关系图:\n");
+      n_debug("genericgraph.c genGraph 44 打印泛型对象关系图:\n");
       for(i=0;i<rootArray->len;i++){
          GenericNode *node=rootNodes[i];
          printf("第%d个根节点:\n",i);
@@ -966,18 +1097,87 @@ void generic_graph_ready(GenericGraph *self)
          }
       }
    }
-   n_debug("genericgraph.c generic_graph_ready 55 打印最后输出结果:outArray:%p %d\n",outArray,outArray->len);
+   n_debug("genericgraph.c genGraph 55 打印最后输出结果:outArray:%p %d\n",outArray,outArray->len);
    for(i=0;i<outArray->len;i++){
       GenericObj *item=n_ptr_array_index(outArray,i);
-      n_debug("genericgraph.c 最终的泛型对象:%d\n",i);
+      n_debug("genericgraph.c genGraph 最终的泛型对象:i：%d\n",i);
       printSimpleGenericObj(item);
       writeObject(item,saveStr,SAVE_OUTPUT);
    }
-   self->saveContent=n_string_free(saveStr,FALSE);
-   self->outputArray=outArray;
+   data->str=n_string_free(saveStr,FALSE);
+   data->out=outArray;
+   return TRUE;
 }
 
+static void freeGraphCata(GraphData *data)
+{
+   free(data->cFile);
+   free(data->oFile);
+   n_ptr_array_unref(data->root);
+   n_ptr_array_unref(data->child);
+   n_slice_free(GraphData,data);
+}
 
+/**
+ * 泛型模型可达性算法。
+ * 正在编译temp_func_track_45.c时调用这里
+ * 1.从文件GENERIC_MODEL_INDEX_FILE读入文件列表，这些文件保存字符串化的泛型对象GenericObj
+ * 2.从 rootArray和 childArray 中排除重复对象后，GenericObj字符串化，供保存到本项目的全局变量 LIB_GLOBAL_GENERIC_VAR_NAME_PREFIX
+ * 3.从库中取出所有的GenericObj,把非root类型的GenericObj加入到 childArray;
+ * 4.从rootArray生成泛型对象关系图，用根创建一棵树型结构的树。每个节点都变成了定义的泛型对象
+ * 5.输出每棵树的节点到一维数组，并删除重复的节点。
+ */
+void generic_graph_ready(GenericGraph *self)
+{
+   //2.从 rootArray和 childArray 中排除重复对象后，GenericObj字符串化，
+   //供保存到本项目的全局变量 LIB_GLOBAL_GENERIC_VAR_NAME_PREFIX 使用
+   if(!createGraph(self))
+      return;
+   if(self->graphArray->len==0)
+      return;
+   int i,j,z;
+   //一个文件对应一个GraphData *data;/把其它child加到一个文件中
+   for(i=0;i<self->graphArray->len;i++){
+       GraphData *data=(GraphData *)n_ptr_array_index(self->graphArray,i);
+       if(data->root->len==0){
+          n_debug("该文件的root=0,不进入生成代码 child:%d %s\n",data->child->len,data->cFile);
+          continue;
+       }
+       //printf("为文件加入其它child：root:%d child:%d %s\n",data->root->len,data->child->len,data->cFile);
+       for(j=0;j<self->graphArray->len;j++){
+          GraphData *item=(GraphData *)n_ptr_array_index(self->graphArray,j);
+          if(item!=data){
+             for(z=0;z<item->child->len;z++){
+                //printf("为文件加入其它child具体内容如下 ：child:%d %s\n",item->child->len,item->cFile);
+                n_ptr_array_add(data->child,n_ptr_array_index(item->child,z));
+             }
+          }
+       }
+
+       if(!genGraph(data)){
+           printf("没有生成 gengraph root:%d %s\n",data->root->len,data->cFile);
+//            n_ptr_array_remove(self->graphArray,data);
+//            freeGraphCata(data);
+//            data=NULL;
+//            i--;
+        }
+   }
+
+   for(i=0;i<self->graphArray->len;i++){
+      GraphData *data=(GraphData *)n_ptr_array_index(self->graphArray,i);
+      if(data->root->len==0){
+         n_debug("移走没有root的泛型文件 child:%d %s\n",data->child->len,data->cFile);
+         n_ptr_array_remove(self->graphArray,data);
+         freeGraphCata(data);
+         data=NULL;
+         i--;
+      }
+   }
+}
+
+/**
+ * 返回对象可达图
+ */
 char *generic_graph_get_output_string(GenericGraph *self)
 {
    return self->saveContent;
@@ -992,6 +1192,16 @@ void generic_obj_free(GenericObj *self)
 {
    if(!self)
       return;
+}
+
+NPtrArray     *generic_graph_get_orig_root_array(GenericGraph *self)
+{
+   return self->origRootArray;
+}
+
+NPtrArray  *generic_graph_files_graph(GenericGraph *self)
+{
+   return self->graphArray;
 }
 
 GenericGraph *generic_graph_get()

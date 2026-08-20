@@ -58,7 +58,7 @@ public$ class$ ASList{
     public$ aboolean find(aconstpointer data);
     public$ aboolean find(aconstpointer data,ACompareFunc func);
     public$ void     setDestroyFunc(ADestroyNotify func);
-
+    public$ SListNode *getHead();
 };
 
 

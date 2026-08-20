@@ -128,7 +128,7 @@ static int getFuncAddress(FuncInfo **infos)
             }
          }
       }
-      fclose(fd);
+      pclose(fd);
    }
    return count;
 }
@@ -174,7 +174,7 @@ static int readmaps(unsigned long *values)
                values[count++]=rev;
          }
       }
-      fclose(fd);
+      pclose(fd);
    }
    return count;
 }

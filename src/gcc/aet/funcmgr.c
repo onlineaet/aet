@@ -943,11 +943,7 @@ nboolean  func_mgr_is_generic_func(FuncMgr *self,ClassName *className,char *mang
 	    for(i=0;i<array->len;i++){
 	  	   ClassFunc *item=(ClassFunc *)n_ptr_array_index(array,i);
 	  	   if(!strcmp(item->mangleFunName,mangleFuncName)){
-	  	      if(aet_utils_valid_tree(item->fieldDecl)){
-	  		     GenericModel *gen=c_aet_get_func_generics_model(item->fieldDecl);
-	  		     if(gen)
-	  		   	   return TRUE;
-	  	      }
+	  	     return class_func_is_func_generic(item);
 	  	   }
 	    }
 	    return FALSE;
@@ -1494,6 +1490,61 @@ ClassFunc    *func_mgr_get_divide(FuncMgr *self,ClassFunc *host)
            return item;
    }
    return NULL;
+}
+
+/**
+ * 查找dest的父类方法是否声明为final,如果是返回true,否则false
+ */
+static nboolean parentHaveFinal(FuncMgr *self,location_t loc,ClassName *className,ClassFunc *dest)
+{
+   ClassInfo *classInfo=class_mgr_get_class_info_by_class_name(class_mgr_get(),className);
+   if(classInfo->parentName.sysName){
+      NPtrArray  *funcs=func_mgr_get_funcs(func_mgr_get(), &classInfo->parentName);
+      if(funcs!=NULL){
+         int i;
+         for(i=0;i<funcs->len;i++){
+            ClassFunc *item=(ClassFunc *)n_ptr_array_index(funcs,i);
+            if(strcmp(item->rawMangleName,dest->rawMangleName)==0){
+               if(class_func_is_final(item)){
+                    error_at(loc,"类%qs的父类%qs已经声明方法%qs为final$,子类不能覆盖。",
+                          className->userName,classInfo->parentName.userName,item->orgiName);
+                    return TRUE;
+               }
+            }
+         }
+      }
+      return parentHaveFinal(self,loc,&classInfo->parentName,dest);
+   }
+   return FALSE;
+}
+
+/**
+ * 检查dest是否覆盖父类的final方法。
+ */
+nboolean func_mgr_parent_have_final(FuncMgr *self,location_t loc,ClassFunc *dest)
+{
+   return parentHaveFinal(self,loc,dest->className,dest);
+}
+
+/**
+ * 引用的对象方法可以在外部使用吗
+ */
+nboolean func_mgr_can_use_outside(FuncMgr *self,tree decl)
+{
+   if(!decl)
+      return FALSE;
+   ClassFunc  *ret = func_mgr_get_func(func_mgr_get(),decl);
+   if(ret==NULL)
+      ret = func_mgr_get_static_func(func_mgr_get(),decl);
+   if(!ret)
+      return FALSE;
+
+   return (ret->fieldDecl &&
+   !ret->isCtor &&
+   !ret->isFinalized &&
+   !ret->isUnref &&
+   !ret->isMtcsFunc);
+
 }
 
 FuncMgr *func_mgr_get()

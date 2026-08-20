@@ -31,7 +31,7 @@ package$ aet.main;
 
 public$  class$ TimeoutSource extends$ EventSource {
     auint       interval;
-    TimeoutSource(auint interval);//毫秒
+    public$ TimeoutSource(auint interval);//毫秒
 };
 
 

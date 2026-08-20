@@ -602,7 +602,8 @@ static tree  c_parser_class_declaration (ClassParser *self,ClassInfo *classInfo,
    return decls;
 }
 
-static void parserExentdsAndImplements(ClassParser *self,ClassInfo *classInfo,char **parent,char **impls,int *implCount)
+static void parserExentdsAndImplements(ClassParser *self,ClassInfo *classInfo,
+      char **parent,char **impls,int *implCount)
 {
    c_parser *parser=self->parser->parser;
    location_t start_loc = c_parser_peek_token (parser)->location;
@@ -777,20 +778,22 @@ static void addExentdsAndImplements(ClassParser *self,ClassInfo *classInfo)
          error_at(start_loc,"类名与父类重名%qs",parent);
          return;
       }
+      n_debug("父类检查---%s\n",parent);
       ClassName *parentClass=class_mgr_get_class_name_by_user(class_mgr_get(),parent);
-      if(parentClass==NULL){
+      if(parentClass==NULL)
          parentClass=class_mgr_get_class_name_by_sys(class_mgr_get(),parent);
-         if(parentClass==NULL){
-            error_at(start_loc,"没有引入父类%qs所在的头文件",parent);
-            return;
-         }
-         //检查是不是final$
-         ClassInfo *parentInfo=class_mgr_get_class_info_by_class_name(class_mgr_get(),parentClass);
-         if(class_info_is_final(parentInfo)){
-            error_at(start_loc,"类%qs不能继承父类%qs，因为父类被final$修饰。",userClassName,parentClass->userName);
-            return;
-         }
+      if(parentClass==NULL){
+         error_at(start_loc,"没有引入父类%qs所在的头文件",parent);
+         return;
       }
+      //检查是不是final$
+      ClassInfo *parentInfo=class_mgr_get_class_info_by_class_name(class_mgr_get(),parentClass);
+      n_debug("父类是不是final ---%s\n",parentInfo->className.sysName);
+      if(class_info_is_final(parentInfo)){
+         error_at(start_loc,"类%qs不能是final父类%qs的子类。",userClassName,parentClass->userName);
+         return;
+      }
+
       ClassName *ifaces[20];
       int i;
       for(i=0;i<ifaceCount;i++){
@@ -943,7 +946,8 @@ struct c_typespec class_parser_parser_class_specifier (ClassParser *self)
    attrs =aet_parser_c_parser_gnu_attributes/*!c_c_parser_gnu_attributes*/(self->parser);//设计 返回是NULL_TREE
    n_debug("新 ---分析struct 00  have_std_attrs:%d---attrs==NULL_TREE:%d ",have_std_attrs,attrs==NULL_TREE);
    /* Set the location in case we create a decl now.  */
-   aet_parser_c_parser_set_source_position_from_token/*!c_parser_set_source_position_from_token*/(c_parser_peek_token (parser));
+   aet_parser_c_parser_set_source_position_from_token/*!c_parser_set_source_position_from_token*/
+   (c_parser_peek_token (parser));
 
    if (c_parser_next_token_is (parser, CPP_NAME)){
       ident = c_parser_peek_token (parser)->value;
@@ -952,7 +956,8 @@ struct c_typespec class_parser_parser_class_specifier (ClassParser *self)
       sysClassName[IDENTIFIER_LENGTH(ident)-1]='\0';
       c_parser_consume_token (parser);
       FieldDecorate dr= class_permission_get_decorate_by_class(self->classPermission,sysClassName,classType);
-      n_debug("class_permission_stop 00 sysClassName:%s classType:%d isFinal:%d %d\n",sysClassName,classType,dr.isFinal,dr.permission);
+      n_debug("class_permission_stop 00 sysClassName:%s classType:%d isFinal:%d %d\n",
+            sysClassName,classType,dr.isFinal,dr.permission);
       //printf("print indec-----22 \n");
      // aet_print_location(ident_loc);
       class_mgr_set_type(class_mgr_get(),ident_loc,sysClassName,classType,dr.permission,dr.isFinal);
@@ -1326,12 +1331,10 @@ void   class_parser_decorate(ClassParser *self)
    class_permission_set_decorate(self->classPermission,&dr);
 }
 
-
 nboolean  class_parser_is_parsering(ClassParser *self)
 {
 	return self->state!=CLASS_STATE_STOP;
 }
-
 
 /**
  * 解析关键字 RID_AET_GOTO
@@ -1388,9 +1391,12 @@ nboolean  class_parser_goto(ClassParser *self,nboolean start_attr_ok,int *action
       if((compileType & COMPILE_BLOCK) || (compileType & COMPILE_NEW)){
           generic_graph_ready(generic_graph_get());//通过对象可达性算法，生成输入泛型对象
           block_mgr_ready(block_mgr_get());
+          generic_parser_ready(generic_parser_get()); //必须在generic_code_create_block_codes之前调用
           generic_code_create_block_codes(generic_code_get());
           //创建的全局变量 LIB_GLOBAL_GENERIC_VAR_NAME_PREFIX 变量的初始值是泛型相关的数据
           middle_file_create_global_var(middle_file_get());
+          middle_file_test(middle_file_get(),"");
+
       }
       if(compileType&COMPILE_MTCS_LINK)
          mtcs_parser_link_func(mtcs_parser_get());

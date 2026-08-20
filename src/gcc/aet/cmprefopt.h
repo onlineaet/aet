@@ -34,13 +34,19 @@ struct _CmpRefOpt
 {
 	 AetParser *parser;
     NHashTable *hashTable;
+    //不在aet类中调用类方法，存储所在的函数
+    NHashTable *noAtAetCallTable;
+
 };
 
 
 CmpRefOpt *cmp_ref_opt_new();
 void       cmp_ref_opt_add(CmpRefOpt *self,tree func);
 void       cmp_ref_opt_opt(CmpRefOpt *self);
-void  cmp_ref_opt_print(CmpRefOpt *self,tree func);
+void       cmp_ref_opt_print(CmpRefOpt *self,tree func);
+//不在isAet中调用类方法，是否可以优化为函数调用
+tree       cmp_ref_opt_outside(CmpRefOpt *self,tree compref,
+                       ClassFunc *classFunc,vec<tree, va_gc> *exprlist,location_t loc);
 
 #endif
 

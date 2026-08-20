@@ -74,25 +74,26 @@ static void classFinalFinal(ClassFinal *self)
 
 void class_final_parser(ClassFinal *self,ClassParserState state,struct c_declspecs *specs)
 {
-	  c_parser *parser=self->parser;
-      enum rid keyword=c_parser_peek_token (parser)->keyword;
-	  location_t  loc = c_parser_peek_token (parser)->location;
-	  self->loc=loc;//错误信息时需要用到位置
-	  c_parser_consume_token (parser); //
-	  if(state!=CLASS_STATE_STOP && state!=CLASS_STATE_FIELD){
-		  if(state!=CLASS_STATE_FIELD)
-		    error_at(loc,"访问final$关键字只能出现在类的第一个字符！");
-		  else
-			error_at(loc,"访问final$关键字只能出现在方法或变量的第一个字符！");
-		  return;
-	 }
-	 if(state==CLASS_STATE_FIELD){
-	   if(specs!=NULL && (specs->typespec_word!=cts_none || specs->storage_class!=csc_none || specs->typespec_kind != ctsk_none)){
-		  error_at(loc,"访问final$关键字只能出现在方法或变量的第一个字符!!！");
-		 return;
-	   }
-	 }
-	 self->isFinal=TRUE;
+   c_parser *parser=self->parser;
+   enum rid keyword=c_parser_peek_token (parser)->keyword;
+   location_t  loc = c_parser_peek_token (parser)->location;
+   self->loc=loc;//错误信息时需要用到位置
+   c_parser_consume_token (parser); //
+   if(state!=CLASS_STATE_STOP && state!=CLASS_STATE_FIELD){
+      if(state!=CLASS_STATE_FIELD)
+         error_at(loc,"访问final$关键字只能出现在类的第一个字符！");
+      else
+         error_at(loc,"访问final$关键字只能出现在方法或变量的第一个字符！");
+      return;
+      }
+   if(state==CLASS_STATE_FIELD){
+      if(specs!=NULL && (specs->typespec_word!=cts_none
+            || specs->storage_class!=csc_none || specs->typespec_kind != ctsk_none)){
+         error_at(loc,"访问final$关键字只能出现在方法或变量的第一个字符!!！");
+         return;
+      }
+   }
+   self->isFinal=TRUE;
 }
 
 static nboolean isFieldFunc(ClassFinal *self,tree field)
@@ -111,64 +112,6 @@ static nboolean isFieldFunc(ClassFinal *self,tree field)
 	if(TREE_CODE(funtype)!=FUNCTION_TYPE)
 		return FALSE;
     return TRUE;
-}
-
-static nboolean findParentFinalField(ClassFinal *self,ClassName *className,ClassFunc *dest)
-{
-	ClassInfo *classInfo=class_mgr_get_class_info_by_class_name(class_mgr_get(),className);
-	if(classInfo->parentName.sysName){
-		NPtrArray  *funcs=func_mgr_get_funcs(func_mgr_get(), &classInfo->parentName);
-		if(funcs!=NULL){
-			int i;
-			for(i=0;i<funcs->len;i++){
-				ClassFunc *item=(ClassFunc *)n_ptr_array_index(funcs,i);
-				if(strcmp(item->rawMangleName,dest->rawMangleName)==0){
-					if(class_func_is_final(item)){
-						  error_at(self->loc,"类%qs的父类%qs已经声明方法%qs为final$,子类不能继承。",
-								  className->userName,classInfo->parentName.userName,item->orgiName);
-						  return FALSE;
-					}
-				}
-			}
-		}
-		return findParentFinalField(self,&classInfo->parentName,dest);
-	}
-	return TRUE;
-}
-
-/**
- * 在类声明中调用，并检查父类有没有final声明的函数
- */
-nboolean class_final_set_field(ClassFinal *self,tree decls,ClassName *className)
-{
-	nboolean ok=FALSE;
-	nboolean is=isFieldFunc(self,decls);
-	if(!is){
-		var_mgr_set_final(var_mgr_get(),className,decls,self->isFinal);
-	}else{
-		ClassInfo *classInfo=class_mgr_get_class_info_by_class_name(class_mgr_get(),className);
-		ClassType classType=classInfo->type;
-	   char *id=IDENTIFIER_POINTER(DECL_NAME(decls));
-	   ClassFunc *entity=func_mgr_get_entity(func_mgr_get(), className,id);
-	   if(entity==NULL){
-		   error_at(self->loc,"在类:%qs，找不到mangle函数名。",className->userName);
-		  goto out;
-	   }
-	   if(class_func_is_abstract(entity) && self->isFinal){
-		   error_at(self->loc,"类:%qs中的抽象方法:%qs不能用final$修饰。",className->userName,entity->orgiName);
-		   goto out;
-	   }
-	   if(findParentFinalField(self,className,entity)){
-	      class_func_set_final(entity,self->isFinal);
-		  ok=TRUE;
-	   }else{
-		  ok=FALSE;
-  	   }
-
-    }
-out:
-    class_final_set_final(self,FALSE);
-	return ok;
 }
 
 nboolean class_final_is_final(ClassFinal *self)

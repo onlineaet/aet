@@ -959,9 +959,34 @@ char   *class_mgr_get_user_name(ClassMgr *self,char *sysName)
 {
    ClassName *className=class_mgr_get_class_name_by_sys(self,sysName);
    return className->userName;
-
 }
 
+/**
+ * 获取有泛型块的函数
+ */
+NPtrArray *class_mgr_get_func_with_generic_block(ClassMgr *self)
+{
+   NHashTableIter iter;
+   npointer key, value;
+   n_hash_table_iter_init(&iter, self->mgrHash);
+   NPtrArray *array=n_ptr_array_new();
+   while (n_hash_table_iter_next(&iter, &key, &value)) {
+      ClassInfo *info = (ClassInfo *)value;
+      if(!class_info_is_generic_class(info))
+         continue;
+      NPtrArray *funcArray = func_mgr_get_funcs(func_mgr_get(),&info->className);
+      int i;
+      for(i=0;i<funcArray->len;i++){
+         ClassFunc *f=n_ptr_array_index(funcArray,i);
+         printf("classmgr.c class_mgr_get_func_with_generic_block %s define:%p %d\n",
+               f->orgiName,f->fromImplDefine,class_func_have_generic_block(f));
+         if(f->fromImplDefine && class_func_have_generic_block(f)){
+            n_ptr_array_add(array,f);
+         }
+      }
+   }
+   return array;
+}
 
 ClassMgr *class_mgr_get()
 {

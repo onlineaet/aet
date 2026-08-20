@@ -40,7 +40,6 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 #include "gcc-rich-location.h"
 #include "opts.h"
 #include "zlib.h"
-
 #include "c/c-tree.h"
 #include "c-family/name-hint.h"
 #include "c-family/known-headers.h"
@@ -49,8 +48,6 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 #include "c/c-parser.h"
 #include "../libcpp/include/cpplib.h"
 #include <utime.h>
-
-
 #include "aetutils.h"
 #include "aetprinttree.h"
 #include "aetinfo.h"
@@ -79,14 +76,18 @@ static void middleFileInit(MiddleFile *self)
 }
 
 /**
+ * 第一次编译时，编译每个单元，当有如下情況时，会调用该方法，写入编译类型
  * 编译有接口的类
  * 编译有泛型块的类
  * 编译new 泛型类或调用泛型函数的文件
  * 写入标记到temp_func_track_45.c
+ * 这是触发第二次编译的条件和编译第二次的内容导航
+ * 保存在每个.o文件的最后 .aetprog section
  */
 void middle_file_modify(MiddleFile *self,CompileType type)
 {
    int compileType=self->action;
+   n_debug("middle_file_modify --- %s type:%d\n",in_fnames[0],type);
    if(!(compileType&type)){
       compileType+=type;
    }
@@ -169,7 +170,7 @@ static void createGlobalGenericVar(char *varName,char *data,size_t length)
 
 /**
  * 创建全局变量 LIB_GLOBAL_GENERIC_VAR_NAME_PREFIX 内容是泛型类的genericinfo,泛型类的genericobj
- * 当前所在的.c文件是temp_func_track_45.c
+ * 当前所在的.c文件是 temp_func_track_45.c
  */
 void middle_file_create_global_var(MiddleFile *self)
 {
@@ -188,10 +189,18 @@ void middle_file_create_global_var(MiddleFile *self)
        n_string_append(codes,block);
        n_string_append(codes,"\n");
     }
+    //块所在函数
+    char *funcWithGb=generic_parser_get_fwg_source(generic_parser_get());
+    if(funcWithGb && strlen(funcWithGb)>0){
+       n_debug("middle_file_create_global_var 33 带泛型块的函数。\n%s\n",funcWithGb);
+       n_string_append(codes,funcWithGb);
+       n_string_append(codes,"\n");
+       n_free(funcWithGb);
+    }
 
     char *ifaceImpl= getIfaceImplInfoSavedInLib(self);
     if(ifaceImpl && strlen(ifaceImpl)>0){
-       n_debug("middle_file_create_global_var 33 接口实现。\n%s\n",ifaceImpl);
+       n_debug("middle_file_create_global_var 44 接口实现。\n%s\n",ifaceImpl);
        n_string_append(codes,ifaceImpl);
        n_string_append(codes,"\n");
     }
@@ -200,7 +209,7 @@ void middle_file_create_global_var(MiddleFile *self)
         n_string_free(codes,TRUE);
         return;
     }
-    n_debug("middlefile.c middle_file_create_global_var 33 全部保存的内容。\n%s\n",codes->str);
+    n_debug("middlefile.c middle_file_create_global_var 55 全部保存的内容。\n%s\n",codes->str);
     int newDataLen=0;
     char *newData=compressData(codes->str,&newDataLen);
     char varName[255];
@@ -531,6 +540,14 @@ static void writeNote (const char *content)
  */
 void middle_file_save_note(MiddleFile *self)
 {
+   if(makefile_parm_is_second_compile(makefile_parm_get())){
+      n_debug("middle_file_save_note 是第二次编译 %s,写入原aetprog。time:%llu\n",in_fnames[0]);
+      char *aetprog = makefile_parm_get_aetprog(makefile_parm_get());
+      if(aetprog!=NULL){
+         writeNote(aetprog);
+         return;
+      }
+   }
    if(self->action==0 && !enter_aet)
       return;
    //没有 COMPILE_IFACE COMPILE_BLOCK、...、COMPILE_IFACE_IMPL_CHECK,但引用AET对象系统。
@@ -546,7 +563,7 @@ void middle_file_save_note(MiddleFile *self)
       n_string_free(content,TRUE);
       return;
    }
-   //printf("middlefile.c middle_file_save_note 11 %d %s\n",self->action,self->compileParam,self->ifaceOFile);
+   n_debug("middlefile.c middle_file_save_note 11 %d %s\n",self->action,self->compileParam,self->ifaceOFile);
    NString *content=n_string_new("");
    n_string_append(content,"type=1\n");
    n_string_append_printf(content,"action=%d\n",self->action);
@@ -562,6 +579,10 @@ void middle_file_save_note(MiddleFile *self)
    if(blockMgr->blockFileName)
        n_string_append_printf(content,"blockfile=%s\n",blockMgr->blockFileName);
 
+   GenericParser *genericParser = generic_parser_get();
+   if(genericParser->funcWithGBFileName!=NULL)
+      n_string_append_printf(content,"funcwithgbfile=%s\n",genericParser->funcWithGBFileName);
+
    GenericGraph *genericGraph=generic_graph_get();
    if(genericGraph->collectFileName)
        n_string_append_printf(content,"newgenfile=%s\n",genericGraph->collectFileName);
@@ -569,6 +590,7 @@ void middle_file_save_note(MiddleFile *self)
    MtcsLink *mtcsLink=mtcs_parser_get()->mtcsLink;
    if(mtcsLink->collectMtcsLinkFile)
        n_string_append_printf(content,"mtcslinkfile=%s\n",mtcsLink->collectMtcsLinkFile);
+
    if(mtcs_parser_have_mtcs(mtcs_parser_get())){
       n_string_append(content,"usemtcs=1\n");
    }
@@ -600,7 +622,7 @@ void middle_file_func_check(MiddleFile *self)
    NPtrArray *needCheckInfo=readClassFuncInfoOrNeedCheckInfo(content,
          CLASS_IFACE_NEED_CHECK_START,CLASS_IFACE_NEED_CHECK_END);
    if(needCheckInfo==NULL || needCheckInfo->len==0){
-      printf("本次编译不需要检查类接口实现 middle_file_func_check。\n");
+      //printf("本次编译不需要检查类接口实现 middle_file_func_check。\n");
       if(needCheckInfo)
          n_ptr_array_unref(needCheckInfo);
       n_free(content);
@@ -623,6 +645,14 @@ void middle_file_func_check(MiddleFile *self)
    n_ptr_array_unref(locaIfaceInfo);
    n_ptr_array_unref(needCheckInfo);
    n_free(content);
+}
+
+void middle_file_test(MiddleFile *self,char *codes)
+{
+//   char *ca="i love you\n";
+//   printf("middle_file_test ---\n");
+//   aet_utils_add_token(parse_in,ca,strlen(ca));
+
 }
 
 MiddleFile *middle_file_get()

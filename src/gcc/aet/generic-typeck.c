@@ -204,49 +204,84 @@ static tree convertComponentRefToPointer(location_t loc,tree componetRef)
    return NULL_TREE;
 }
 
+/**
+ * 转化数组到指针
+ */
+static tree convertArrayRefToPointer(location_t loc,tree arrayRef)
+{
+   tree type=TREE_TYPE(arrayRef);
+   if(TREE_CODE(type)==INTEGER_TYPE || TREE_CODE(type)==REAL_TYPE){
+      tree pointerType=build_pointer_type(type);
+      tree addExpr= build1 (ADDR_EXPR, pointerType, arrayRef);
+      return addExpr;
+   }else{
+      error_at(loc,"不能处理 ARRAY_REF 的类型。%qs",get_tree_code_name(TREE_CODE(type)));
+   }
+   return NULL_TREE;
+}
 
-tree generic_convert(location_t location,tree type,tree rhs,nboolean replace)
+static inline bool div_or_mod_p (enum tree_code code)
+{
+  switch (code)
+    {
+    case TRUNC_DIV_EXPR:
+    case FLOOR_DIV_EXPR:
+    case CEIL_DIV_EXPR:
+    case ROUND_DIV_EXPR:
+    case EXACT_DIV_EXPR:
+    case TRUNC_MOD_EXPR:
+    case FLOOR_MOD_EXPR:
+    case CEIL_MOD_EXPR:
+    case ROUND_MOD_EXPR:
+      return true;
+    default:
+      return false;
+    }
+}
+
+tree generic_convert(location_t loc,tree type,tree rhs,nboolean replace)
 {
    enum tree_code codel = TREE_CODE (type);
    tree rhstype = TREE_TYPE (rhs);
    enum tree_code  coder = TREE_CODE (rhstype);
    tree ret=NULL_TREE;
-   if (codel == POINTER_TYPE && coder == INTEGER_TYPE){
-      n_debug("convertForAssignment 110 泛型 从 INTEGER_TYPE 转指针 替换吗:%d",replace);
-      aet_print_tree(rhs);
-      if(TREE_CODE(rhs)==INTEGER_CST){
-         n_debug("convertForAssignment 110 --XXX00 泛型 从常数转integer_type的指针");
-         return convertRealOrIntegerCstToPointer(location,rhs,replace);
-      }else if(TREE_CODE(rhs)==VAR_DECL){
-         n_debug("convertForAssignment 110 --XXX11 从int类型的变量转integer_type的指针");
-         return convertRealorIntVarToPointer(location,rhs);
+   if (codel == POINTER_TYPE && (coder == INTEGER_TYPE || coder == REAL_TYPE)){
+      n_debug("convertForAssignment 00 泛型 从 %s 转指针 替换吗:%d",get_tree_code_name(coder),replace);
+      if(TREE_CODE(rhs)==INTEGER_CST || coder == REAL_TYPE){
+         n_debug("convertForAssignment 00-11  从%s常数转指针",get_tree_code_name(TREE_CODE(rhs)));
+         return convertRealOrIntegerCstToPointer(loc,rhs,replace);
+      }else if(TREE_CODE(rhs)==VAR_DECL || TREE_CODE(rhs)==PARM_DECL){
+         n_debug("convertForAssignment 00-22 从VAR_DECL类型的变量转指针",get_tree_code_name(TREE_CODE(rhs)));
+         return convertRealorIntVarToPointer(loc,rhs);
       }else if(TREE_CODE(rhs)==NOP_EXPR){
-         n_debug("convertForAssignment 111 --XXX11 从char short类型的变量转char short的指针");
-         return convertNopExprToPointer(location,rhs);
+         n_debug("convertForAssignment 00-33 从NOP_EXPR类型的变量转指针");
+         return convertNopExprToPointer(loc,rhs);
       }else if(TREE_CODE(rhs)==COMPONENT_REF){
-         n_debug("convertForAssignment 112 --XXX11 从component_ref类型的变量转char short的指针");
-         return convertComponentRefToPointer(location,rhs);
+         n_debug("convertForAssignment 00-44 从component_ref类型的变量转指针");
+         return convertComponentRefToPointer(loc,rhs);
+      }else if(TREE_CODE(rhs)==ARRAY_REF){
+         n_debug("convertForAssignment 00-55 从array_ref类型的变量转指针");
+         return convertArrayRefToPointer(loc,rhs);
+      }else if (TREE_CODE(rhs)==MULT_EXPR ||TREE_CODE(rhs)==PLUS_EXPR ||
+            TREE_CODE(rhs)==MINUS_EXPR || div_or_mod_p(TREE_CODE(rhs))
+            || TREE_CODE(rhs)==BIT_NOT_EXPR){
+        // printf("出现了乘法 %s\n",get_tree_code_name(coder));
+         //aet_print_tree(rhs);
+         tree type=TREE_TYPE(rhs);
+         tree pointerType=build_pointer_type(type);
+         tree addExpr= build1 (ADDR_EXPR, pointerType, rhs);
+         return addExpr;
       }else{
+         aet_print_tree_skip_debug(rhs);
          error("不能从%qs转到整形指针",rhs);
-         aet_print_tree(rhs);
          ret=error_mark_node;
       }
-   }else if (codel == POINTER_TYPE && coder == REAL_TYPE){
-      n_debug("convertForAssignment 112从 real_type转指针 替换吗:%d",replace);
-      if(TREE_CODE(rhs)==REAL_CST){
-         n_debug("convertForAssignment 112 --XXX00 从常数转real_type的指针");
-         return convertRealOrIntegerCstToPointer(location,rhs,replace);
-      }else if(TREE_CODE(rhs)==VAR_DECL){
-         n_debug("convertForAssignment 112 --XXX11 从real类型的变量转 real_type 的指针");
-         return convertRealorIntVarToPointer(location,rhs);
-      }else if(TREE_CODE(rhs)==COMPONENT_REF){
-         n_debug("convertForAssignment 113 --XXX11 从component_ref类型的变量转 real_type 的指针");
-         return convertComponentRefToPointer(location,rhs);
-      }else{
-         error("不能从%qs转到浮点指针",rhs);
-         aet_print_tree(rhs);
-         ret=error_mark_node;
-      }
+   }else if(codel == POINTER_TYPE && coder == RECORD_TYPE){
+       n_debug("convertForAssignment  RECORD_TYPE 替换吗:%d",replace);
+       if(TREE_CODE(rhs)==VAR_DECL){
+           n_debug("convertForAssignment RECORD_TYPE 变量");
+           return convertRealorIntVarToPointer(loc,rhs);
+       }
    }
    return ret;
 }

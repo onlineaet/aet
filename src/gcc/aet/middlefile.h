@@ -49,6 +49,7 @@ char        *middle_file_decode(char *value,int size);
 void         middle_file_iface_impl_check(MiddleFile *self);
 void         middle_file_func_check(MiddleFile *self);
 void         middle_file_save_note(MiddleFile *self);
+void         middle_file_test(MiddleFile *self,char *codes);
 
 
 #endif

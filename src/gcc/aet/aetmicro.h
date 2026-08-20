@@ -35,13 +35,15 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 
 
 #define AET_GENERIC_ARRAY                  "_generic_1234_array" //类中的泛型模型数组变量名
-#define AET_GENERIC_BLOCK_ARRAY_VAR_NAME  "_gen_blocks_array_897" //类中的泛型块函数指针数组变量名 void *_gen_blocks_array_897[xx];
+//类中的泛型块函数指针数组变量名 void *_gen_blocks_array_897[xx];
+#define AET_GENERIC_BLOCK_ARRAY_VAR_NAME  "_gen_blocks_array_897"
 #define AET_MAX_GENERIC_BLOCKS             30  //类中最大块数
 
 #define AET_GENERIC_TYPE_NAME_PREFIX       "aet_generic_" //泛型类型名的前缀，后缀是A-Z
 #define AET_GET_GENERIC_INFO_FUNC_NAME     "generic_info$" //该方法定义在aobject.h头文件中
 #define AET_GENERIC_INFO_STRUCT_NAME       "aet_generic_info"
-#define AET_GENERIC_FUNC_THREAD_BLOCK_ADDR  "_gen_func_block_addr_128347" //泛型函数中块函数的地址 __thread _gen_func_block_add_128347
+//泛型函数中块函数的地址 __thread _gen_func_block_add_128347
+#define AET_GENERIC_FUNC_THREAD_BLOCK_ADDR  "_gen_func_block_addr_128347"
 //新加 11-20
 //填充泛型类中的泛型块变量地址 AET_GENERIC_BLOCK_ARRAY_VAR_NAME 在generic.c中定义
 #define AET_GENERIC_CLASS_FILL_ARRAY_ADDR   "aet_generic_class_fill_address"

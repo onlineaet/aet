@@ -100,6 +100,9 @@ impl$ AArray{
        start          = new_array;
        finish         =(E *) ((char*)start + oldSizeBytes);
        end_of_storage = (E *)((char*)start + want_alloc);
+       if(haveZero)
+          memset((char*)finish, 0, (char*)end_of_storage-(char*)finish);
+
    }
 
    /**
@@ -178,7 +181,6 @@ impl$ AArray{
    void removeAll(){
       removeRange(0,element_count());
    }
-
 
    void remove(auint index,auint removeCount){
       removeRange(index,removeCount);
@@ -351,10 +353,9 @@ impl$ AArray{
    /**
     * 当分配内存后是否需要清零
     */
-   void setZero(aboolean zero){
-      haveZero = zero;
+   void setClearZero(aboolean need){
+      haveZero = need;
    }
-
 
    ~AArray(){
       if(start!=NULL){

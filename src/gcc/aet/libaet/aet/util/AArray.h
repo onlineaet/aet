@@ -28,7 +28,6 @@ package$ aet.util;
 
 /**
  * elementSize 每个元素的大小 比如：int的大小是sizeof(int)
- * data 保存元素的内存
  * capacity 预分配多少个元素的空间
  * 如果元素是指针，保存的是指针地址，而不是指针指向地址的内容。
  */
@@ -69,7 +68,8 @@ public$ class$ AArray<E>{
     public$ void popBack();
     public$ E back();
     private$ void clear(int index);
-    public$ void setZero(aboolean zero);
+    //新分配的内存是否清零
+    public$ void setClearZero(aboolean need);
 
     public$ ~AArray();
 

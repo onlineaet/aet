@@ -557,7 +557,6 @@ static void replaceCallFndecl(MtcsClones *self,struct cgraph_node *newNode)
          if(fndecl_built_in_p (origDecl)){
             nboolean convert= mtcs_builtins_replace_call(mtcsBuiltins,stmt);
             if(!convert){
-               //aet_print_location(loc);
                //判断是否支持内置函数 例如 strstr 转成了 __builtin_strchr 在这里判断平台是否支持 __builtin_strchr
                n_debug("mtcsclones.c replaceCallFndecl 11 不成功 nodeFun:%p newNode:%s\n",nodeFun,newNode->name());
                if(!mtcs_builtins_support_builtin_fn(mtcsBuiltins,origDecl)){

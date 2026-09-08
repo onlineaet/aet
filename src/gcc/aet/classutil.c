@@ -140,6 +140,9 @@ static int generatorCallLink(tree value,NPtrArray *callLink)
    return 0;
 }
 
+/**
+ * linkStr只是为了调试。
+ */
 static int fillLink(tree call,NString *linkStr,nboolean tailed)
 {
    int result=0;
@@ -179,21 +182,25 @@ static int fillLink(tree call,NString *linkStr,nboolean tailed)
    }
    char *sysName=class_util_get_class_name(type);
    nboolean isPointer=TREE_CODE(type)==POINTER_TYPE;
-   if(sysName!=NULL && isFunc){
+   if(sysName!=NULL && isFunc)
       result=isPointer?1:2;
-   }
-   char *retn=generic_util_get_type_str(parm);
-   if(tailed){ //最后一个不记入无名调用类型的判断
+   if(tailed) //最后一个不记入无名调用类型的判断
       result=0;
-      if(isFunc)
-         n_string_append_printf(linkStr,"(%s)%s()",retn,name);
-      else
-         n_string_append_printf(linkStr,"(%s)%s",retn,name);
-   }else{
-      if(isFunc)
-         n_string_append_printf(linkStr,"(%s)%s()%s",retn,name,isPointer?"->":".");
-      else
-         n_string_append_printf(linkStr,"(%s)%s%s",retn,name,isPointer?"->":".");
+   //linkStr只为调试用
+   if(linkStr){
+      char *pointerString = "";
+      const char *retn= aet_utils_get_type_string_and_pointer(parm,&pointerString);
+      if(tailed){
+         if(isFunc)
+            n_string_append_printf(linkStr,"(%s %s)%s()",retn,pointerString,name);
+         else
+            n_string_append_printf(linkStr,"(%s %s)%s",retn,pointerString,name);
+      }else{
+         if(isFunc)
+            n_string_append_printf(linkStr,"(%s %s)%s()%s",retn,pointerString,name,isPointer?"->":".");
+         else
+            n_string_append_printf(linkStr,"(%s %s)%s%s",retn,pointerString,name,isPointer?"->":".");
+      }
    }
    return result;
 }
@@ -207,35 +214,41 @@ int class_util_has_nameless_call(tree value)
     NPtrArray *array=n_ptr_array_new();
     generatorCallLink(value,array);
     int i;
-    NString *linkStr=n_string_new("");
+    NString *linkStr=NULL;
+    if(n_log_is_debug())
+       linkStr  = n_string_new("");
     for(i=array->len-1;i>=0;i--){
          tree call=n_ptr_array_index(array,i);
          int r= fillLink(call,linkStr,i==0);
          if(r>result)
              result=r;
     }
-   // printf("class_util_has_nameless_call 调用链:result:%d\n%s\n",result,linkStr->str);
-    n_string_free(linkStr,TRUE);
+    if(n_log_is_debug()){
+       n_debug("class_util_has_nameless_call 调用链:result:%d\n%s\n",result,linkStr->str);
+       n_string_free(linkStr,TRUE);
+    }
     n_ptr_array_unref(array);
     return result;
 }
 
-int class_util_get_nameless_call_link(tree value,NPtrArray *array,char **link)
+int class_util_get_nameless_call_link(tree value,NPtrArray *array)
 {
    int result=0;
    generatorCallLink(value,array);
    int i;
-   NString *linkStr=n_string_new("");
+   NString *linkStr=NULL;
+   if(n_log_is_debug())
+      linkStr  = n_string_new("");
    for(i=array->len-1;i>=0;i--){
       tree call=n_ptr_array_index(array,i);
       int r= fillLink(call,linkStr,i==0);
       if(r>result)
          result=r;
    }
-   n_debug("class_util_has_nameless_call 调用链:result:%d\n%s\n",result,linkStr->str);
-   if(link)
-      *link=n_strdup(linkStr->str);
-   n_string_free(linkStr,TRUE);
+   if(n_log_is_debug()){
+      n_debug("class_util_has_nameless_call 调用链:result:%d\n%s\n",result,linkStr->str);
+      n_string_free(linkStr,TRUE);
+   }
    return result;
 }
 
@@ -384,13 +397,10 @@ nboolean class_util_is_class(struct c_declspecs *declspecs)
 				tree id=DECL_NAME(name);
 				char *sysClassName=IDENTIFIER_POINTER(id);
 				ClassName *className=class_mgr_get_class_name_by_sys(class_mgr_get(),sysClassName);
-				if(className!=NULL){
-			    	n_debug("class_util_is_class name:%s", className->sysName);
+				if(className!=NULL)
 					return TRUE;
-				}
 			}
 		}
-		aet_print_tree(spec);
 	}
 	return FALSE;
 }
@@ -749,43 +759,6 @@ int class_util_check_param_type(tree formulaType,tree actualType)
    return COMPARE_ARGUMENT_ORIG_PARM_ERROR;
 }
 
-int class_util_get_type_name(tree type,char **result)
-{
-	if(TREE_CODE(type)==POINTER_TYPE)
-		type=TREE_TYPE(type);
-	if(TREE_CODE(type)==POINTER_TYPE)
-		type=TREE_TYPE(type);
-	if(TREE_CODE(type)==POINTER_TYPE)
-		type=TREE_TYPE(type);
-    if(TREE_CODE(type)==RECORD_TYPE){
-		tree next=TYPE_NAME(type);
-		if(TREE_CODE(next)!=TYPE_DECL){
-			return 0;
-		}
-		char *declClassName=IDENTIFIER_POINTER(DECL_NAME (next));
-		*result=n_strdup(declClassName);
-		return strlen(declClassName);
-    }else if(TREE_CODE(type)==TYPE_DECL){
-    	char *declClassName=IDENTIFIER_POINTER(DECL_NAME (type));
-       *result=n_strdup(declClassName);
-    	return strlen(declClassName);
-	}else{
-		tree typeName=TYPE_NAME(type);
-		if(aet_utils_valid_tree(typeName) && TREE_CODE(typeName)==IDENTIFIER_NODE){
-			char *typeNameStr=IDENTIFIER_POINTER(typeName);
-			*result=n_strdup(typeNameStr);
-			return strlen(typeNameStr);
-		}else if(aet_utils_valid_tree(typeName) && TREE_CODE(typeName)==TYPE_DECL){
-			char *typeNameStr=IDENTIFIER_POINTER(DECL_NAME(typeName));
-			*result=n_strdup(typeNameStr);
-			return strlen(typeNameStr);
-		}else{
-			aet_print_tree_skip_debug(type);
-			n_error("在classutil找不到类型名。报告此错误。\n");
-		}
-	}
-	return 0;
-}
 
 tree class_util_define_var_decl(tree decl,nboolean initialized)
 {

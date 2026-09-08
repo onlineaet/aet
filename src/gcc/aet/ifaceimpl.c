@@ -49,14 +49,12 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 
 static void ifaceImplInit(IfaceImpl *self)
 {
-    self->saveIfaceFileName=NULL;
 }
 
 static int file_exists (const char *name)
 {
   return access (name, R_OK) == 0;
 }
-
 
 #define SPERATOR "$#@"
 
@@ -65,24 +63,25 @@ static int file_exists (const char *name)
  * 保存在同位置的.ifaceimpl_new.o文件中，并把文件名存在saveIfaceFileName
  * 最终会写入.note.aet_prog
  */
-void iface_impl_save(IfaceImpl *self)
+#define IFACE_IMPL_START "IFACE_IMPL_START:"
+#define IFACE_IMPL_END   "IFACE_IMPL_END:"
+
+char *iface_impl_save(IfaceImpl *self)
 {
    if(makefile_parm_is_second_compile(makefile_parm_get())){
       n_debug("ifaceimpl.c 是第二次编译 %s 不需要写入任何接口信息。\n",in_fnames[0]);
-      return;
+      return NULL;
    }
-   char  *objfile=makefile_parm_get_object_file(makefile_parm_get());
-   char newName[255];
-   sprintf(newName,"%s.ifaceimpl_new.o",objfile);
    NPtrArray *array=class_mgr_get_all_iface_info(class_mgr_get());
    if(array==NULL){
-      if(file_exists(newName)){
-         remove(newName);//删除文件 xxx.ifacecheck.o
-      }
-      return;
+      return NULL;
    }
-   int i;
+   char  *objfile=makefile_parm_get_object_file(makefile_parm_get());
    NString *codes=n_string_new("");
+   n_string_append(codes,IFACE_IMPL_START);
+   n_string_append(codes,"\n");
+   int count = 0;
+   int i;
    for(i=0;i<array->len;i++){
       ClassInfo *info=n_ptr_array_index(array,i);
       char *file=class_info_get_file(info);
@@ -91,23 +90,59 @@ void iface_impl_save(IfaceImpl *self)
          ClassName *className=&info->className;
          n_string_append_printf(codes,"%s%s%s%s%s%s%s\n",
                className->sysName,SPERATOR,className->package,SPERATOR,file,SPERATOR,objfile);
+         count++;
       }
    }
    n_ptr_array_unref(array);
-   if(codes->len==0){
+   if(count==0){
       n_string_free(codes,TRUE);
-      if(file_exists(newName)){
-         remove(newName);//删除文件 xxx.ifacecheck.o
-      }
-      return;
+      return NULL;
    }
-   FILE *fp=fopen(newName,"w");
-   fwrite(codes->str,1,codes->len,fp);
-   fclose(fp);
-   n_string_free(codes,TRUE);
-   gcc_assert(self->saveIfaceFileName==NULL);
-   self->saveIfaceFileName=n_strdup(newName);
-   middle_file_modify(middle_file_get(),COMPILE_IFACE);
+   n_string_append(codes,IFACE_IMPL_END);
+   n_string_append(codes,"\n");
+   return n_string_free(codes,FALSE);
+}
+
+NPtrArray *iface_impl_create_impl_codes(char *content)
+{
+   char *c=content;
+   NPtrArray *array=n_ptr_array_new();
+   while(strstr(c,IFACE_IMPL_START)){
+      char *start=strstr(c,IFACE_IMPL_START);
+      //printf("r0 is :%s\n",start);
+      char *n=start+strlen(IFACE_IMPL_START)+1;//加1跳过 CLASS_BLOCK_START 后的\n号
+      char *end=strstr(n,IFACE_IMPL_END);
+      int len=strlen(n);
+      int remain=strlen(end);
+      char *ret=xmalloc(len-remain+1);
+      memcpy(ret,n,len-remain);
+      ret[len-remain]='\0';
+      n_ptr_array_add(array,ret);
+      c = end+strlen(IFACE_IMPL_END);
+   }
+   return array;
+
+}
+
+
+/**
+ * CLASS_IFACE_INFO_START:
+aet_main_ASourceMgr
+aet_main_ASourceMgr:aet_main_EventMgr:_Z07destroyEPv
+aet_main_ASourceMgr:aet_main_EventMgr:_Z011setPriorityEPvw
+aet_main_ASourceMgr:aet_main_EventMgr:_Z012setReadyTimeEPvx
+aet_main_ASourceMgr:aet_main_EventMgr:_Z07getTimeEv
+CLASS_IFACE_INFO_END:
+ */
+char *iface_impl_check(IfaceImpl *self)
+{
+   ClassMgr *classMgr=class_mgr_get();
+   NString *codes=classMgr->ifaceCheckCodes;
+   if(codes->len==0){
+       return NULL;
+   }
+   NString *ret=n_string_new(codes->str);
+   return n_string_free(ret,FALSE);
 }
 
 typedef struct _IfaceData{
@@ -389,7 +424,8 @@ static char *createCFileSource(NPtrArray *ifaceDataArray,char *parentPath)
       sprintf(oFile,"%s/_%s_%u_%s.o",parentPath,rawName,hashcode,IFACE_FILE_SUFFIX);
       char *headerFile=item->file;
       int action=compareFile(headerFile,oFile);
-      n_debug("ifaceimpl.c 是否要编译接口文件:接口所在头文件:%s action:%d\n",headerFile,action);
+      printf("ifaceimpl.c 是否要编译接口文件:接口所在头文件: i:%d head:%s action:%d len:%d\n",
+            i,headerFile,action,ifaceDataArray->len);
       if(action==0){//headerFile不存在，删除.o文件
          remove(oFile);
       }else if(action==1){
@@ -456,26 +492,54 @@ static NPtrArray *readLocalFile(IfaceImpl *self,char *fileName)
    return array;
 }
 
-/**
- * 处于正在编译temp_func_track_45.c中
- */
-void iface_impl_compile_ready(IfaceImpl *self)
+
+static NPtrArray *readArrays(NPtrArray *strArray)
 {
-   char *fileName = getenv("GCC_AET_IFACE_IMPL_LIST_PATH");
-   char compileFiles[256];
-   sprintf(compileFiles,"%s.o",fileName);
-   if(fileName==NULL ||strlen(fileName)==0){
-      remove(compileFiles);
-      return;
+   NPtrArray *array=n_ptr_array_new();
+   int i;
+   for(i=0;i<strArray->len;i++){
+      char *buffer=n_ptr_array_index(strArray,i);
+      nchar** contents=n_strsplit(buffer,"\n",-1);
+      int contentLen=n_strv_length(contents);
+      int j;
+      for(j=0;j<contentLen;j++){
+         if(!contents[j] || strlen(contents[j])==0)
+            continue;
+         IfaceData *data=createIfaceData(contents[j]);
+         if(data==NULL){
+            n_error("接口数据是错的,make clean后，重新编译。%s\n",buffer);
+            return NULL;
+         }
+         n_ptr_array_add(array,data);
+      }
+      n_strfreev(contents);
    }
-   //取GCC_AET_IFACE_IMPL_LIST_PATH的路径
-   NFile *f=n_file_new(fileName);
-   NFile *parent=n_file_get_parent_file(f);
-   NFile  *canonical=n_file_get_canonical_file(parent);
-   const  char *parentPath = n_file_get_absolute_path(canonical);
+   return array;
+}
+
+void iface_impl_compile_ready(IfaceImpl *self,char *objectRootPath,NPtrArray **arrays,int alen,int pos)
+{
+   char ifaceFileListName[256];
+   sprintf(ifaceFileListName,"%s/%s",objectRootPath,IFACE_IMPL_FILE_LIST_NAME);
+   NPtrArray *temp=n_ptr_array_new();
+   int i,j;
+   for(i=0;i<alen;i++){
+      NPtrArray **as=(NPtrArray **)arrays[i];
+      NPtrArray *ifaceimpl = as[pos];//这是关键
+      if(ifaceimpl && ifaceimpl->len>0){
+         for(j=0;j<ifaceimpl->len;j++)
+            n_ptr_array_add(temp,n_ptr_array_index(ifaceimpl,j));
+      }
+   }
+
+   if(temp->len<=0){
+      n_ptr_array_unref(temp);
+      remove(ifaceFileListName);
+      return ;
+   }
 
    //读取文件 fileName 的内容并生成IfaceData数据
-   NPtrArray *ifaceDataArray=readLocalFile(self,fileName);
+   NPtrArray *ifaceDataArray=readArrays(temp);
    //删除接口名相同的IfaceData
    removeRepeat(ifaceDataArray);
    //合并接口到各自的.h文件中
@@ -483,18 +547,17 @@ void iface_impl_compile_ready(IfaceImpl *self)
    //如果外部库已有接口实现，移走当前接口实现文件
    removeIfaceFromLib(ifaceDataArray);
    //移走缺失的o或c文件
-   removeLackOFileOrCFile(parentPath);
-   char *fileList=createCFileSource(ifaceDataArray,parentPath);
+   removeLackOFileOrCFile(objectRootPath);
+   char *fileList=createCFileSource(ifaceDataArray,objectRootPath);
    if(!fileList || strlen(fileList)==0){
-      remove(compileFiles);
+      remove(ifaceFileListName);
       return;
    }
-   FILE *fp=fopen(compileFiles,"w");
+   FILE *fp=fopen(ifaceFileListName,"w");
    int ret=fwrite(fileList,1,strlen(fileList),fp);
    fclose(fp);
-   n_debug("ifaceimpl.c iface_impl_compile_ready_new --%s\n接口文件列表:\n%s\n",fileName,fileList);
+   n_debug("ifaceimpl.c iface_impl_compile_ready 口文件列表:%s\n",fileList);
 }
-
 
 ////////////////////////////////////////定义接口变量 生成两个函数的源代码------------------------------------
 static void warn_string_init (location_t loc, tree type, tree value,enum tree_code original_code)
@@ -537,6 +600,8 @@ static void createGlobalVar(char *varName,char *data,size_t length)
  *创建一个全局变量，保存这些接口名。
  *每个接口文件一个这样的变量
  *char *LIB_GLOBAL_IFACE_VAR_NAME_PREFIX_hash_random="iface start: ... iface end:"
+ *在aetlib中读取这个全局变量 readIface
+ *处理编译 _RandomGenerator_2962277235__impl_iface.c这样的文件。
  */
 void iface_impl_compile(IfaceImpl *self,char *tokenString)
 {
@@ -643,3 +708,141 @@ IfaceImpl *iface_impl_get()
    return singleton;
 }
 
+//////////////////----------------
+
+/**
+ * 映射如下字符串
+ * Txs
+ * TFirst debug_AObject
+ * Abc:_Z07setdataEv
+ */
+typedef struct _NeedCheckInfo
+{
+   char *sysName;
+   char **extendsClass;
+   int extendsClassCount;
+   char **checkIface;
+   int checkCount;
+}NeedCheckInfo;
+
+
+static void freeNeedCheckInfo(NeedCheckInfo *info)
+{
+   if(!info)
+      return;
+   n_free(info->sysName);
+   n_strfreev(info->extendsClass);
+   int i;
+   for(i=0;i<info->checkCount;i++)
+      free(info->checkIface[i]);
+   n_free(info->checkIface);
+   n_slice_free(NeedCheckInfo,info);
+
+}
+
+static NeedCheckInfo *createNeedInfo(char *str)
+{
+    char **items=n_strsplit(str,"\n",-1);
+    int checkIfaceCount=n_strv_length(items)-2;
+    NeedCheckInfo *info=n_slice_new0(NeedCheckInfo);
+    info->sysName=n_strdup(items[0]);
+    info->extendsClass=n_strsplit(items[1]," ",-1);
+    info->extendsClassCount=n_strv_length(info->extendsClass);
+    int checkCount=n_strv_length(items)-2;
+    info->checkIface=xmalloc(sizeof(char*)*checkCount);
+    int i;
+    for(i=0;i<checkCount;i++)
+       info->checkIface[i]=n_strdup(items[i+2]);
+    info->checkCount=checkCount;
+    n_strfreev(items);
+    return info;
+}
+
+/**
+ * 在本项目中检查接口是否实现
+ * compare参数格式:
+ * TFirst:Abc:_Z07setdataEv  实现的接口所在类+接口+接口方法
+ */
+static nboolean checkIfaceImpl(char *compare,NPtrArray *local,char *lib)
+{
+   int i;
+   if(local){
+      int len=local->len;
+      for(i=0;i<len;i++){
+         char *funcInfo=n_ptr_array_index(local,i);
+         if(strstr(funcInfo,compare))
+            return TRUE;
+      }
+   }
+   //库中是否有字匹配字符串 TFirst:Abc:_Z07setdataEv
+   return strstr(lib,compare)?TRUE:FALSE;
+}
+
+
+static void findImpl( NeedCheckInfo *info,NPtrArray *locaIfaceInfo,char *libIfaceInfo,NString *errorCodes)
+{
+   int i,j;
+   for(i=0;i<info->checkCount;i++){
+      char *ifaceMethod=info->checkIface[i];//检查类item[0]是否实现接口方法 items[j+2]
+      if(!ifaceMethod || strlen(ifaceMethod)==0)
+         continue;
+      nboolean find=FALSE;
+      for(j=0;j<info->extendsClassCount;j++){
+         char compare[512];
+         sprintf(compare,"%s:%s",info->extendsClass[j],ifaceMethod);
+         if(checkIfaceImpl(compare,locaIfaceInfo,libIfaceInfo)){
+            find=TRUE;
+            break;
+         }
+      }
+      if(!find){
+         n_string_append_printf(errorCodes, "类 %s 必须实现继承的接口方法 %s 。\n",info->sysName,ifaceMethod);
+      }
+   }
+}
+
+
+
+//原型 middle_file_func_check
+void iface_impl_valid(IfaceImpl *self,NPtrArray **arrays,int aLen,int needCheckPos,int infoPos)
+{
+   if(aLen==0)
+      return;
+   NPtrArray *needCheckInfo=n_ptr_array_new();
+   NPtrArray *locaIfaceInfo=n_ptr_array_new();
+   int i,j;
+   for(i=0;i<aLen;i++){
+      NPtrArray **as=(NPtrArray **)arrays[i];
+      NPtrArray *ifaceNeedCheck = as[needCheckPos];
+      NPtrArray *ifaceInfo = as[infoPos];
+      if(ifaceNeedCheck && ifaceNeedCheck->len>0){
+         for(j=0;j<ifaceNeedCheck->len;j++)
+            n_ptr_array_add(needCheckInfo,n_ptr_array_index(ifaceNeedCheck,j));
+      }
+
+      if(ifaceInfo && ifaceInfo->len>0){
+         for(j=0;j<ifaceInfo->len;j++)
+            n_ptr_array_add(locaIfaceInfo,n_ptr_array_index(ifaceInfo,j));
+      }
+   }
+
+   if(needCheckInfo->len==0){
+      //printf("本次编译不需要检查类接口实现 iface_impl_valid。\n");
+      n_ptr_array_unref(needCheckInfo);
+      return;
+   }
+   char  *libIfaceInfo = aet_lib_get_class_iface_impl_info(aet_lib_get());
+   NString *errorCodes=n_string_new("");
+   int errorCount=1;
+   for(i=0;i<needCheckInfo->len;i++){
+      char *check=n_ptr_array_index(needCheckInfo,i);
+      NeedCheckInfo *info=createNeedInfo(check);
+      findImpl(info,locaIfaceInfo,libIfaceInfo,errorCodes);
+      freeNeedCheckInfo(info);
+   }
+   if(errorCodes->len>0){
+      fatal_error(0,errorCodes->str);
+   }
+   n_ptr_array_unref(locaIfaceInfo);
+   n_ptr_array_unref(needCheckInfo);
+}

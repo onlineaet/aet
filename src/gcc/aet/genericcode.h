@@ -39,6 +39,6 @@ struct _GenericCode
 };
 
 GenericCode *generic_code_get();
-void generic_code_create_block_codes(GenericCode *self);
+void generic_code_create_block_codes(GenericCode *self,char *objectRootPath);
 
 #endif

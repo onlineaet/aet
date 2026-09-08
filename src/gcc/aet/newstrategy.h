@@ -69,7 +69,8 @@ ClassName *new_strategy_get_class_name(NewStrategy *self);
 char      *new_strategy_get_var_name(NewStrategy *self);
 void       new_strategy_add_close_brace(NewStrategy *self);
 void       new_strategy_new_object(NewStrategy *self,char *tempVarName,GenericModel *genericDefine,
-                  ClassName *className,char *ctorStr,NString *codes,nboolean addSemision,tree mtcsPlatType);
+                  ClassName *className,char *ctorStr,NString *codes,nboolean addSemision,
+                  tree mtcsPlatType,nboolean needVarDecl);
 void       new_strategy_new_object_from_stack(NewStrategy *self,tree var,ClassName *className,NString *codes);
 void       new_strategy_new_object_from_field_stack(NewStrategy *self,tree var,ClassName *className,NString *codes);
 //完成如 return new Abc();返回的是对象而不是指针。

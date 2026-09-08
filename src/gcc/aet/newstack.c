@@ -189,7 +189,6 @@ static nboolean initObject(NewStack *self,tree var)
 	int isStatic=TREE_STATIC(var);
 	char *declName=IDENTIFIER_POINTER(DECL_NAME(var));
 	tree scpe =DECL_CONTEXT(var);
-	aet_print_tree(scpe);
 	nboolean re=isUnpointerClass(var);
 	//printf("new_stack_check 00 var is name:%s isExternal:%d isPublic:%d isStatic:%d isUnpointerClass:%d\n",declName,external,isPublic,isStatic,re);
 	//aet_print_token(c_parser_peek_token (parser));

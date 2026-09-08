@@ -86,6 +86,11 @@ static void classCtorCtor(ClassCtor *self)
    self->superInfoCount=0;
    self->superOfSelfParseing=FALSE;
    self->superOfSelfCount=0;
+   //记录人工加入的缺省构造函数
+   self->artificialCtors =n_ptr_array_new();
+   //记录调用的构造函数
+   self->recordCtorArray=n_ptr_array_new();
+
 }
 
 /**
@@ -369,7 +374,7 @@ nboolean  class_ctor_have_default_field(ClassCtor *self,ClassName *className)
 }
 
 /**
- * 创建缺省的构造函数
+ * 在class${...};创建缺省的构造函数声明
  */
 tree   class_ctor_create_default_decl(ClassCtor *self,ClassName *className,tree structType)
 {
@@ -411,6 +416,8 @@ tree   class_ctor_create_default_decl(ClassCtor *self,ClassName *className,tree 
       class_func_set_decl(newFunc,d,STRUCT_DECL);
       newFunc->permission=CLASS_PERMISSION_PUBLIC;
    }
+   //加入人工创建的构造函数声明。这个方法调用发生在classparser中
+   n_ptr_array_add(self->artificialCtors,n_strdup(className->sysName));
    return decls;
 }
 
@@ -441,11 +448,27 @@ void class_ctor_build_default_define(ClassCtor *self,ClassName *className)
    parser->tokens[0].id_kind=C_ID_ID;//关键
    parser->tokens_avail=tokenCount+5;
    aet_print_token_in_parser("class_ctor_build_default_define className Abc(){}---- %s",className->sysName);
+   //加入人工创建的构造函数声明。这个方法调用发生在classparser中
+   n_ptr_array_add(self->artificialCtors,n_strdup(className->sysName));
 }
 
 nboolean   class_ctor_have_default_define(ClassCtor *self,ClassName *className)
 {
    return haveFieldOrDefine(self,className,FALSE);
+}
+
+/**
+ * 缺省的构造函数是不是人工创建的
+ */
+nboolean class_ctor_is_artificial(ClassCtor *self,ClassName *className)
+{
+   int i;
+   for(i=0;i<self->artificialCtors->len;i++){
+      char *name=n_ptr_array_index(self->artificialCtors,i);
+      if(strcmp(name,className->sysName)==0)
+         return TRUE;
+   }
+   return FALSE;
 }
 
 
@@ -689,7 +712,7 @@ void  class_ctor_end_super_or_self_ctor_call(ClassCtor *self,tree expr)
 /**
  * 进这里说明是在构造函数内，并且是函数内的第一条语句
  */
-void       class_ctor_parser_super(ClassCtor *self,ClassName *className)
+void  class_ctor_parser_super(ClassCtor *self,ClassName *className)
 {
    c_parser *parser=self->parser->parser;
    location_t loc = c_parser_peek_token(parser)->location;
@@ -722,6 +745,12 @@ static char *getLowClassName(tree field)
 
 /**
  * 根据参数选择最终的构造函数
+ * 编译器生成的创建对象的代码如下：
+ * avbc=({
+   TFirst<int > *_notv2_6TFirst0;
+   ...
+   由于 avbc中的泛型传不进变量 _notv2_6TFirst0中，所以在 TFirst后加入泛型字符串<int >
+   由编译器解析。
  */
 tree  class_ctor_select(ClassCtor *self,tree func,vec<tree, va_gc> *exprlist,
         vec<tree, va_gc> *origtypes,vec<location_t> arg_loc,location_t expr_loc,SelectFunc *selectFunc)
@@ -735,9 +764,11 @@ tree  class_ctor_select(ClassCtor *self,tree func,vec<tree, va_gc> *exprlist,
     ClassName *className=class_mgr_get_class_name_by_sys(class_mgr_get(),lowClassName);
     if(className==NULL)
         className=class_mgr_get_class_name_by_user(class_mgr_get(),funName);
+    GenericModel *generics=generic_call_get_generic_from_component_ref(generic_call_get(),func);
     ClassFunc *classFunc=NULL;
     FuncPointerError *errors=NULL;
-    CandidateFunc *candidate=select_field_get_ctor_func(select_field_get(),className,exprlist,origtypes,arg_loc,expr_loc,&errors);
+    CandidateFunc *candidate=select_field_get_ctor_func(select_field_get(),className,exprlist,
+          origtypes,arg_loc,expr_loc,generics,&errors);
     if(candidate!=NULL){
         classFunc=candidate->classFunc;
     }
@@ -756,7 +787,7 @@ tree  class_ctor_select(ClassCtor *self,tree func,vec<tree, va_gc> *exprlist,
     tree last=classFunc->fieldDecl;
     location_t accessLoc=aet_utils_get_location(expr_loc);//如果在附加代码中,该方法返回原始的位置
     access_controls_access_method(access_controls_get(),accessLoc,classFunc);
-    func=rebuildComponentRef(self,func,last);
+    func=last?rebuildComponentRef(self,func,last):classFunc->fromImplDefine;
     selectFunc->classFunc=classFunc;
     selectFunc->sysName=className->sysName;
     return func;
@@ -775,7 +806,8 @@ tree  class_ctor_select_from_self(ClassCtor *self,tree func,vec<tree, va_gc> *ex
    ClassName *className=class_mgr_get_class_name_by_sys(class_mgr_get(),lowClassName);
    ClassFunc *classFunc=NULL;
    FuncPointerError *errors=NULL;
-   CandidateFunc *candidate=select_field_get_ctor_func(select_field_get(),className,exprlist,origtypes,arg_loc,expr_loc,&errors);
+   CandidateFunc *candidate=select_field_get_ctor_func(select_field_get(),
+         className,exprlist,origtypes,arg_loc,expr_loc,NULL,&errors);
    if(candidate!=NULL)
       classFunc=candidate->classFunc;
 
@@ -842,6 +874,14 @@ void class_ctor_set_tag_for_self_and_super_call(ClassCtor *self,tree ref)
       self->superOfSelfParseing=FALSE;
       self->superOfSelf[self->superOfSelfCount++]=ref;
    }
+}
+
+/**
+ * 加入构造函数到数组，分析函数指针调用转转实际函数调用的基础数据
+ */
+void class_ctor_add_call(ClassCtor *self,tree call)
+{
+   n_ptr_array_add(self->recordCtorArray,call);
 }
 
 ClassCtor *class_ctor_new()

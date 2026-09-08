@@ -82,6 +82,7 @@ static VarEntity *createEntity(tree decl,char *orgiName,char *mangleVarName,nboo
    item->init_original_type=NULL_TREE;
    item->serialNumber=0;
    item->sysName=n_strdup(sysName);
+   item->isFinal = 0;
    if(mangleVarName!=NULL)
       item->mangleVarName=n_strdup(mangleVarName);
    return item;
@@ -104,7 +105,8 @@ static nboolean existsVar(VarMgr *self,char *orgiName,ClassName *className)
    return FALSE;
 }
 
-static nboolean addVar(VarMgr *self,ClassName *className,tree decl,char *orgiName,char *mangleVarName,nboolean isStatic)
+static nboolean addVar(VarMgr *self,ClassName *className,tree decl,
+      char *orgiName,char *mangleVarName,nboolean isStatic)
 {
    if(!n_hash_table_contains(self->mgrHash,className->sysName)){
       VarEntity *item=createEntity(decl,orgiName,mangleVarName,isStatic,className->sysName);
@@ -203,7 +205,6 @@ static void defineGlobalVar(VarEntity *item)
    //TREE_STATIC(decl)=1;
    decl=class_util_define_var_decl(decl,TRUE);
    n_debug("varmgr.c defineGlobalVar is -----11  :%s %p %s\n",item->orgiName,init,IDENTIFIER_POINTER(name));
-   //	  aet_print_tree(decl);
    //      if(!aet_utils_valid_tree(init)){
    //    	  tree type=TREE_TYPE(decl);
    //    	  if(TREE_CODE(type)!=ARRAY_TYPE){
@@ -220,10 +221,6 @@ static void defineGlobalVar(VarEntity *item)
    }
    n_debug("类中静态变量全局定义: %s %s context:%p extern:%d static:%d pub:%d",
    item->mangleVarName,item->orgiName,DECL_CONTEXT(decl),DECL_EXTERNAL(decl),TREE_STATIC(decl),TREE_PUBLIC(decl));
-   aet_print_tree(init);
-   aet_print_tree(initOrginalTypes);
-   aet_print_tree(decl);
-   aet_print_tree(DECL_INITIAL(decl));
    if(DECL_INITIAL(decl) && DECL_INITIAL(decl)==error_mark_node)
       DECL_INITIAL(decl)=NULL_TREE;
 
@@ -300,7 +297,8 @@ char *var_mgr_define_class_static_var(VarMgr *self,ClassName *implClassName)
 
 //生成新的变量名
 //格式_V
-nboolean   var_mgr_change_static_decl(VarMgr *self,ClassName *className,struct c_declspecs *specs,struct c_declarator *declarator)
+nboolean   var_mgr_change_static_decl(VarMgr *self,ClassName *className,
+      struct c_declspecs *specs,struct c_declarator *declarator)
 {
    int i;
    struct c_declarator *vardel=NULL;
@@ -369,7 +367,6 @@ nboolean   var_mgr_set_static_decl(VarMgr *self,ClassName *className,tree decl,
 	tree varName=DECL_NAME(decl); //变量名
 	char *mangleName=IDENTIFIER_POINTER(varName);
 	n_debug("var_mgr_set_static_decl 00 静态变量：%s 所在的类:%s",mangleName,className->sysName);
-	aet_print_tree(decl);
 	NPtrArray *array=(NPtrArray *)n_hash_table_lookup(self->mgrHash,className->sysName);
 	if(array==NULL)
 		return FALSE;

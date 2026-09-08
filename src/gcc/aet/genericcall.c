@@ -145,6 +145,7 @@ static tree convertGeneric_1(tree realGenericType,location_t ploc, tree function
                         bool npc, tree rname, int parmnum, int argnum,
                         bool excess_precision, int warnopt,nboolean replace)
 {
+
    /*
    printf("convertGeneric 00 打印泛型定义\n");
    aet_print_tree(realGenericType); //泛型定义
@@ -152,14 +153,14 @@ static tree convertGeneric_1(tree realGenericType,location_t ploc, tree function
    aet_print_tree(val); //实参
    printf("convertGeneric 22 打印泛型的void *类型可能是aet_generic_T，aet_generic_E等\n");
    aet_print_tree(type);//函数声明的类型setdata(E data) E 是 aet_generic_E void *
-   */
+*/
    location_t loc=ploc;
    tree parmval=error_mark_node;
    tree realParmType=valtype;//实参类型
-   //printf("convertGeneric 33 --从实参转为用户设的类型:%s\n",get_tree_code_name(TREE_CODE(realParmType)));
+   //n_debug("convertGeneric 33 --从实参转为用户设的类型:%s\n",get_tree_code_name(TREE_CODE(realParmType)));
    //aet_print_tree(realParmType);
    if(TREE_CODE(realGenericType)==POINTER_TYPE){
-      //printf("convertGeneric 44 --泛型定义是一个指针:\n");
+      //n_debug("convertGeneric 44 --泛型定义是一个指针:\n");
       if(TREE_CODE(realParmType)!=POINTER_TYPE){
          inform(loc,"泛型定义为指针%qE，但实参%qE类型并不是指针。",realGenericType,realParmType);
          n_warning("泛型定义为指针，但实参类型并不是指针。");
@@ -175,7 +176,6 @@ static tree convertGeneric_1(tree realGenericType,location_t ploc, tree function
    }
 
    //如果需要转化，再转化一次，否则返回由系统转
-   //n_debug("convertGeneric 77 打印void *\n");
    //1.val转定义的泛型(realGenericType=int或其它） 2.转化后的实参再转成type类型 type=void *=a_generic_E
    parmval = aet_convert_argument (ploc, function, fundecl, realGenericType,
          origtype,val, valtype, npc, rname, parmnum, argnum, excess_precision, warnopt);
@@ -183,9 +183,7 @@ static tree convertGeneric_1(tree realGenericType,location_t ploc, tree function
       return parmval;
    parmval= generic_convert(ploc,type,parmval,replace);
    return parmval;
-
 }
-
 
 /**
  * 由funcall调用
@@ -201,13 +199,12 @@ tree generic_call_check_parm(GenericCall *self,location_t ploc, tree function, t
                         bool excess_precision, int warnopt,
                         ClassName *globalClassName,GenericModel *globalGenericsDefine)
 {
-    char *str=NULL;
     tree origGenericDecl=type;
     location_t loc=ploc;
     tree parmval=error_mark_node;
     tree realGenericType;
     char *funName=IDENTIFIER_POINTER(DECL_NAME(function));
-    str=generic_util_get_generic_str(origGenericDecl);
+    const char *str=generic_util_get_generic_decl_string(origGenericDecl);
     n_debug("generic_call_check_param 00 如果找不到泛型字符,返回str:%s globalClassName:%s function:%p %s\n",
             str,globalClassName->sysName,function,funName);
     aet_print_tree(origGenericDecl);
@@ -218,23 +215,18 @@ tree generic_call_check_parm(GenericCall *self,location_t ploc, tree function, t
     if(globalClassName!=NULL && !globalGenericsDefine){
         tree valtype=TREE_TYPE(val);
         bool equal=c_tree_equal (origGenericDecl,valtype);
-        char *varStr=generic_util_get_generic_str(valtype);
+        const char *varStr=generic_util_get_generic_decl_string(valtype);
         n_info("generic_call_check_param 11 在类实现中调用带有泛型参数的方法。这时类没有实例化。所以无泛型定义。%s 相等吗：？:%d %s",
               str,equal,varStr);
         if(equal && varStr!=NULL && !strcmp(str,varStr)){
-             n_free(str);
-             n_free(varStr);
              return val;
         }else if(equal && varStr!=NULL && strcmp(str,varStr)){
-             n_free(str);
-             n_free(varStr);
              return val;
         }else{
-            // printf("generic_call_check_parm --- %s funName:%s 泛型函数的声明:%s\n",str,funName,generic_model_tostring(funcGen));
+             printf("generic_call_check_parm tt--- %s funName:%s 泛型函数的声明:%s\n",str,funName,generic_model_tostring(funcGen));
              nboolean ok=generic_model_exits_ident(funcGen,str);
-            // printf("generic_call_check_param --22 在泛型函数%s中找:%s ok:%d\n",funName,str,ok);
+             n_debug("generic_call_check_param --22 在泛型函数%s中找:%s ok:%d\n",funName,str,ok);
              if(!ok){
-                n_free(str);
 //              Multiple markers at this line
 //                  - aaxx cannot be resolved to a variable
 //                  - The method put(T) in the type Hello2<T> is not applicable for the arguments
@@ -252,32 +244,29 @@ tree generic_call_check_parm(GenericCall *self,location_t ploc, tree function, t
        if(!genericParm->isDefine){
           n_debug("generic_call_check_param --44 中对象有泛型定义, 但定义的是泛型通用的字符:%s\n",genericParm->name);
           tree valtype=TREE_TYPE(val);
-          char *parmStr=generic_util_get_generic_str(valtype);
+          const char *parmStr=generic_util_get_generic_decl_string(valtype);
           char *rg=genericParm->name;
           n_info("generic_call_check_param --55 函数参数是泛型:%s 实参是:%s",parmStr,rg);
           if(parmStr && !strcmp(rg,parmStr)){
-             n_free(str);
-             n_free(parmStr);
              return val;
           }else{
-             n_free(str);
              //error_at(loc,"类%qs中的方法%qs的泛型参数是%qs,但传递的实参类型不匹配。",globalClassName?globalClassName->userName:"null",funName,rg);
              n_warning("类%s中的方法%s的泛型参数是%s,但传递的实参类型不匹配。",globalClassName?globalClassName->userName:"null",funName,rg);
              return parmval;
           }
        }else{
-           char *parmTypeStr=generic_util_get_type_str(val);
+           const char *parmTypeStr=aet_utils_get_type_string_and_pointer(val,NULL);
            n_debug("generic_call_check_param --66 真正的泛型定义类型如下：参数是不是aet_void_E等：%s\n",parmTypeStr);
            if(parmTypeStr!=NULL && generic_util_is_generic_ident(parmTypeStr)){
-                char *typeName=generic_util_get_type_str(genericParm->decl);
-                error_at(loc,"类%qs定义的泛型是%qs，但参数是%qs,不匹配。",
-                      globalClassName?globalClassName->userName:"null",typeName,str);
+                char *pointerstr=NULL;
+                const char *typeName=aet_utils_get_type_string_and_pointer(genericParm->decl,&pointerstr);
+                error_at(loc,"类%qs定义的泛型是%qs %qs，但参数是%qs,不匹配。",
+                      globalClassName?globalClassName->userName:"null",typeName,pointerstr,str);
                 return parmval;
            }
            realGenericType=TREE_TYPE(genericParm->decl);
            parmval=convertGeneric_1(realGenericType,ploc, function,  fundecl,type,  origtype,  val,
                              valtype, npc,rname,parmnum,argnum, excess_precision,warnopt,FALSE);
-           n_free(str);
            return parmval;
        }
     }else{
@@ -286,7 +275,6 @@ tree generic_call_check_parm(GenericCall *self,location_t ploc, tree function, t
        aet_print_tree(realGenericType);
        parmval=convertGeneric_1(realGenericType,ploc,  function,  fundecl,type,  origtype,  val,
                valtype, npc,  rname,  parmnum,  argnum, excess_precision,  warnopt,FALSE);
-       n_free(str);
        return parmval;
     }
 }
@@ -307,7 +295,7 @@ tree generic_call_replace_parm(GenericCall *self,location_t ploc, tree function,
         error_at(ploc,"不是一个泛型参数%qE",type);
         return error_mark_node;
     }
-    char *str=generic_util_get_generic_str(type);
+    const char *str=generic_util_get_generic_decl_string(type);
     n_debug("generic_call_replace_parm 33 泛型声明是: %s\n",str);
     if(str!=NULL){
         GenericUnit *genericParm=getGenericRealType(globalClassName,globalGenericsDefine,str);
@@ -326,7 +314,6 @@ tree generic_call_replace_parm(GenericCall *self,location_t ploc, tree function,
                 n_debug("generic_call_replace_parm 55 是一个泛型函数，类型就用实参的类型 %s parmnum:%d ok:%d\n",str,parmnum,parmval!=error_mark_node);
             }
         }
-        n_free(str);
     }
     return parmval;
 }
@@ -393,7 +380,7 @@ static GenericModel *getGenericDefineByCallExpr(tree expr,char **sysName)
     tree callType=TREE_TYPE(expr);
     if(TREE_CODE(callType)!=POINTER_TYPE)
     	return NULL;
-    char *genericStr=generic_util_get_generic_str(callType);
+    const char *genericStr=generic_util_get_generic_decl_string(callType);
     if(genericStr==NULL)
     	return NULL;
    //printf("getGenericDefineByCallExpr 11 %s\n",genericStr);
@@ -432,14 +419,14 @@ static GenericModel *getGenericDefineByCallExpr(tree expr,char **sysName)
 /**
  * 是不是一个返回值是泛型的函数调用。
  */
-static char *getGenericReturnStr(tree expr)
+static const char *getGenericReturnStr(tree expr)
 {
    if(TREE_CODE(expr)!=CALL_EXPR)
       return NULL;
    tree callType=TREE_TYPE(expr);
    if(TREE_CODE(callType)!=POINTER_TYPE)
       return NULL;
-   char *genericStr=generic_util_get_generic_str(callType);
+   const char *genericStr=generic_util_get_generic_decl_string(callType);
    if(genericStr==NULL)
       return NULL;
    return genericStr;
@@ -450,7 +437,7 @@ static char *getGenericReturnStr(tree expr)
  */
 tree generic_call_convert_generic_to_user(GenericCall *self,tree expr)
 {
-   char *genericStr=getGenericReturnStr(expr);
+   const char *genericStr=getGenericReturnStr(expr);
    if(genericStr==NULL)
       return expr;
    char *sysClassName=NULL;
@@ -561,34 +548,32 @@ static void createModifyGenCodes(NString *codes,int i,char *varName,RunGenericIn
 
 static int backupToken(c_parser *parser,c_token *backups)
 {
-     int tokenCount=parser->tokens_avail;
-     int i;
-     c_token *token;
-     for(i=0;i<tokenCount;i++){
-        token=c_parser_peek_token (parser);
-        aet_utils_copy_token(token,&backups[i]);
-        aet_print_token(token);
-
-       c_parser_consume_token (parser);
-     }
-     return tokenCount;
+   int tokenCount=parser->tokens_avail;
+   int i;
+   c_token *token;
+   for(i=0;i<tokenCount;i++){
+      token=c_parser_peek_token (parser);
+      aet_utils_copy_token(token,&backups[i]);
+      c_parser_consume_token (parser);
+   }
+   return tokenCount;
 }
 
 static void restore(c_parser *parser,c_token *backups,int count)
 {
-     if(count==0)
-         return;
-     int tokenCount=parser->tokens_avail;
-     if(tokenCount+count>AET_MAX_TOKEN){
-         error("token太多了");
-         return;
-     }
-     int i;
-      for(i=0;i<count;i++){
-         aet_utils_copy_token(&backups[i],&parser->tokens[i+tokenCount]);
-     }
-     parser->tokens_avail=tokenCount+count;
-     aet_print_token_in_parser("generic_call restore ------");
+   if(count==0)
+      return;
+   int tokenCount=parser->tokens_avail;
+   if(tokenCount+count>AET_MAX_TOKEN){
+      error("token太多了");
+      return;
+   }
+   int i;
+   for(i=0;i<count;i++){
+      aet_utils_copy_token(&backups[i],&parser->tokens[i+tokenCount]);
+   }
+   parser->tokens_avail=tokenCount+count;
+   aet_print_token_in_parser("generic_call restore ------");
 }
 
 

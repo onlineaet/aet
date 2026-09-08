@@ -83,24 +83,24 @@ static void freeClass_cb(npointer userData)
 static void enumParserInit(EnumParser *self)
 {
 	self->hashTable = n_hash_table_new_full (n_str_hash, n_str_equal,n_free, freeClass_cb);
+	self->common = NULL_TREE;
 }
 
 
 static EnumData *getEnumDataByEnumName(EnumParser *self,char *sysName,char *enumName)
 {
-    NPtrArray *array=(NPtrArray *)n_hash_table_lookup(self->hashTable,sysName);
-	if(array==NULL)
-		return NULL;
-    int i;
-    NPtrArray* data=n_ptr_array_new();
-    for(i=0;i<array->len;i++){
-    	EnumData *item=(EnumData *)n_ptr_array_index(array,i);
-    	//printf("getEnumDataByEnumName --- %s %s %s\n",item->origName,item->typedefName,item->enumName);
-		if(strcmp(item->enumName,enumName)==0){
-		   return item;
-		}
-    }
-    return NULL;
+   NPtrArray *array=(NPtrArray *)n_hash_table_lookup(self->hashTable,sysName);
+   if(array==NULL)
+      return NULL;
+   int i;
+   NPtrArray* data=n_ptr_array_new();
+   for(i=0;i<array->len;i++){
+      EnumData *item=(EnumData *)n_ptr_array_index(array,i);
+      //printf("getEnumDataByEnumName --- %s %s %s\n",item->origName,item->typedefName,item->enumName);
+      if(strcmp(item->enumName,enumName)==0)
+         return item;
+   }
+   return NULL;
 }
 
 /**
@@ -111,14 +111,76 @@ EnumData *enum_parser_get_by_enum_name(EnumParser *self,char *sysName,char *enum
 	return getEnumDataByEnumName(self,sysName,enumName);
 }
 
+static  tree create_empty_enum (const char *name)
+{
+  tree id = get_identifier (name);          // "__xxxx"
+  tree enum_type = make_node (ENUMERAL_TYPE);
 
+  // 设置名字
+  TYPE_NAME (enum_type) = build_decl (input_location,
+                                      TYPE_DECL, id, enum_type);
+  TYPE_STUB_DECL (enum_type) = TYPE_NAME (enum_type);
+
+  // 空枚举：没有枚举常量
+  TYPE_VALUES (enum_type) = NULL_TREE;
+
+  // 让它变成完整类型（空枚举也需要 layout）
+  // 默认按 int 处理
+  TYPE_MIN_VALUE (enum_type) = integer_zero_node;
+  TYPE_MAX_VALUE (enum_type) = integer_zero_node;
+  TYPE_SIZE (enum_type) = TYPE_SIZE (integer_type_node);
+  TYPE_SIZE_UNIT (enum_type) = TYPE_SIZE_UNIT (integer_type_node);
+  TYPE_PRECISION (enum_type) = TYPE_PRECISION (integer_type_node);
+  //TYPE_ALIGN (enum_type) = TYPE_ALIGN (integer_type_node);
+  TYPE_USER_ALIGN (enum_type) = 0;
+  TYPE_UNSIGNED (enum_type) = 0;            // 有符号
+  TREE_TYPE (TYPE_NAME (enum_type)) = enum_type;
+
+  // 可选：把它放到当前作用域
+  // pushdecl (TYPE_NAME (enum_type));
+  return enum_type;
+}
+
+static void createOrigDecl(EnumParser *self,location_t loc,char *origName)
+{
+   //return;
+   if(!self->common){
+      struct timeval tv;
+      gettimeofday (&tv, NULL);
+      long local_tick = (unsigned) tv.tv_sec * 1000 + tv.tv_usec / 1000;
+      long randNumber=local_tick+rand ();
+      char name[255];
+      sprintf(name,"_temp_enum_common_%ld",randNumber);
+      self->common = create_empty_enum(name);
+   }
+   tree decl = lookup_name(get_identifier(origName));
+   if(decl){
+      if(TREE_TYPE(decl)!=self->common){
+         error_at(loc,"重复声明%qs",origName);
+      }
+      return;
+   }else{
+      tree decl = build_decl (loc,TYPE_DECL,get_identifier(origName), self->common);
+      DECL_ARTIFICIAL (decl) = 1;
+      DECL_CONTEXT(decl)=NULL_TREE;
+      DECL_EXTERNAL(decl)=0;
+      TREE_STATIC(decl)=0;
+      TREE_PUBLIC(decl)=0;
+      set_underlying_type (decl);
+      c_c_decl_bind_file_scope(decl);//放在file_scope，c_c_decl_bind_file_scope是增加的,原本没有
+      finish_decl (decl, loc, NULL_TREE,NULL_TREE, NULL_TREE);
+     // printf("createOrigDecl 占位枚举类型 :%s common:%p\n",origName,self->common);
+   }
+
+}
 /**
  * 声明枚举
  * enum __xxxx{
  * };
  * typedef __xxx _xxx;
  */
-void enum_parser_create_decl(EnumParser *self,location_t loc,ClassName *className,struct c_declspecs *specs,ClassPermissionType permission)
+void enum_parser_create_decl(EnumParser *self,location_t loc,ClassName *className,
+      struct c_declspecs *specs,ClassPermissionType permission)
 {
    tree nameTree=TYPE_NAME(specs->type);
    if(nameTree==NULL_TREE){
@@ -136,6 +198,7 @@ void enum_parser_create_decl(EnumParser *self,location_t loc,ClassName *classNam
    if(data==NULL){
       n_error("EnumData=NULL,不应该出现的错误。");
    }
+   //printf("enum_parser_create_decl --- %s %s origName:%d\n",sysName,enumName,data->origName);
    char *typedefName=enumName+1;//跳过第一个下划线
    data->typedefName=n_strdup(typedefName);
    tree  idx=aet_utils_create_ident(typedefName);
@@ -148,8 +211,10 @@ void enum_parser_create_decl(EnumParser *self,location_t loc,ClassName *classNam
    set_underlying_type (decl);
    c_c_decl_bind_file_scope(decl);//放在file_scope，c_c_decl_bind_file_scope是增加的,原本没有
    finish_decl (decl, loc, NULL_TREE,NULL_TREE, NULL_TREE);
+   aet_print_tree(decl);
    data->permission=permission;
    data->typeDecl=decl;
+   createOrigDecl(self,loc,data->origName);
 }
 
 static EnumData *getEnumDataByName(EnumParser *self,char *sysName,char *name,nboolean orig)
@@ -256,29 +321,6 @@ static int selectType(EnumParser *self,EnumData **datas,int len)
    return -1;
 }
 
-static nboolean validAccess(EnumParser *self,char *sysName)
-{
-   c_parser *parser=self->parser->parser;
-   if(class_parser_is_parsering(class_parser_get())){
-      ClassName  *className=class_parser_get_class_name(class_parser_get());
-      if(className && !strcmp(sysName,className->sysName)){
-         return TRUE;
-      }
-   }
-
-   if(self->parser->isAet){
-      ClassName  *className=class_impl_get_class_name(class_impl_get());
-      if(className && !strcmp(sysName,className->sysName)){
-         return TRUE;
-      }
-   }
-
-   if(sysName==NULL || strlen(sysName)==0)
-      return TRUE;
-   return FALSE;
-}
-
-
 /**
  * 由classimpl.c调用
  * 当参数是枚举类型时，当前名字替换成
@@ -339,7 +381,6 @@ char *enum_parser_get_orig_name(EnumParser *self,char *mangle)
 	while (n_hash_table_iter_next(&iter, &key, &value)) {
 		char *sysName = (char *)key;
       n_debug("enum_parser_get_orig_name 00 %s %s\n",mangle,sysName);
-
 		EnumData *item=getEnumDataByName(self,sysName,mangle,FALSE);
 		if(item!=NULL){
 			return item->origName;
@@ -356,7 +397,6 @@ EnumData *enum_parser_get_enum(EnumParser *self,char *mangle)
 	while (n_hash_table_iter_next(&iter, &key, &value)) {
 		char *sysName = (char *)key;
       n_debug("enum_parser_get_enum 00 %s %s\n",mangle,sysName);
-
 		EnumData *item=getEnumDataByName(self,sysName,mangle,FALSE);
 		if(item!=NULL){
 			return item;
@@ -370,13 +410,13 @@ EnumData *enum_parser_get_enum(EnumParser *self,char *mangle)
  */
 static tree createEnumName(tree ident,char *sysName)
 {
-      char *enumName=IDENTIFIER_POINTER(ident);
-      char *enumTypeName=aet_utils_create_enum_type_name(sysName,enumName);
-      char _name[256];
-      sprintf(_name,"_%s",enumTypeName);
-      tree newIdent=aet_utils_create_ident(_name);
-      n_free(enumTypeName);
-      return newIdent;
+   char *enumName=IDENTIFIER_POINTER(ident);
+   char *enumTypeName=aet_utils_create_enum_type_name(sysName,enumName);
+   char _name[256];
+   sprintf(_name,"_%s",enumTypeName);
+   tree newIdent=aet_utils_create_ident(_name);
+   n_free(enumTypeName);
+   return newIdent;
 }
 
 /**
@@ -384,23 +424,23 @@ static tree createEnumName(tree ident,char *sysName)
  */
 static tree createElementName(tree ident,char *sysName)
 {
-	  char *origName=IDENTIFIER_POINTER(ident);
-      char *newElement=aet_utils_create_enum_element_name(sysName,origName);
-	  tree newIdent=aet_utils_create_ident(newElement);
-	  n_free(newElement);
-	  return newIdent;
+   char *origName=IDENTIFIER_POINTER(ident);
+   char *newElement=aet_utils_create_enum_element_name(sysName,origName);
+   tree newIdent=aet_utils_create_ident(newElement);
+   n_free(newElement);
+   return newIdent;
 }
 
 static void addElement(EnumData *enumData,char *sysName,char *origName,tree value)
 {
-    char *newElement=aet_utils_create_enum_element_name(sysName,origName);
-    EnumElement *elem=(EnumElement *)n_slice_new0(EnumElement);
-    elem->sysName=n_strdup(sysName);
-    elem->origName=n_strdup(origName);
-    elem->mangleName=n_strdup(newElement);
-    elem->value=value;
-    enumData->elements[enumData->elementCount++]=elem;
-    n_free(newElement);
+   char *newElement=aet_utils_create_enum_element_name(sysName,origName);
+   EnumElement *elem=(EnumElement *)n_slice_new0(EnumElement);
+   elem->sysName=n_strdup(sysName);
+   elem->origName=n_strdup(origName);
+   elem->mangleName=n_strdup(newElement);
+   elem->value=value;
+   enumData->elements[enumData->elementCount++]=elem;
+   n_free(newElement);
 }
 
 static EnumData *createBaseData(char *sysName,char *origName,char *enumName)
@@ -539,8 +579,7 @@ static struct c_typespec c_parser_enum_specifier (EnumParser *self,ClassName *cl
          if (c_parser_next_token_is_not (parser, CPP_NAME)){
             /* Give a nicer error for "enum {}".  */
             if (c_parser_next_token_is (parser, CPP_CLOSE_BRACE)  && !parser->error){
-               error_at (c_parser_peek_token (parser)->location,
-               "empty enum is invalid");
+               error_at (c_parser_peek_token (parser)->location,"empty enum is invalid");
                parser->error = true;
             }else
                c_parser_error (parser, "expected identifier");
@@ -558,15 +597,18 @@ static struct c_typespec c_parser_enum_specifier (EnumParser *self,ClassName *cl
          c_parser_consume_token (parser);
          /* Parse any specified attributes.  */
          tree std_attrs = NULL_TREE;
-         if (aet_parser_c_parser_nth_token_starts_std_attributes/*!c_c_parser_nth_token_starts_std_attributes*/(self->parser, 1))
-            std_attrs = aet_parser_c_parser_std_attribute_specifier_sequence/*!c_c_parser_std_attribute_specifier_sequence*/(self->parser);
+         if (aet_parser_c_parser_nth_token_starts_std_attributes/*!c_c_parser_nth_token_starts_std_attributes*/
+               (self->parser, 1))
+            std_attrs = aet_parser_c_parser_std_attribute_specifier_sequence
+            /*!c_c_parser_std_attribute_specifier_sequence*/(self->parser);
          tree enum_attrs = chainon (std_attrs,
                aet_parser_c_parser_gnu_attributes/*!c_c_parser_gnu_attributes*/(self->parser));
          if (c_parser_next_token_is (parser, CPP_EQ)){
             c_parser_consume_token (parser);
             value_loc = c_parser_peek_token (parser)->location;
             enum_value = convert_lvalue_to_rvalue (value_loc,
-                  (aet_parser_c_parser_expr_no_commas/*!c_parser_expr_no_commas*/(self->parser, NULL)),true, true).value;
+                  (aet_parser_c_parser_expr_no_commas/*!c_parser_expr_no_commas*/
+                        (self->parser, NULL)),true, true).value;
          } else
             enum_value = NULL_TREE;
          enum_decl = build_enumerator (decl_loc, value_loc,  &the_enum, enum_id, enum_value);
@@ -633,15 +675,15 @@ static struct c_typespec c_parser_enum_specifier (EnumParser *self,ClassName *cl
 
 static void addEnumData(EnumParser *self,ClassName *className,EnumData *item)
 {
-	char *sysName=className?className->sysName:"";
-	if(!n_hash_table_contains(self->hashTable,sysName)){
-		NPtrArray *array=n_ptr_array_sized_new(2);
-	    n_ptr_array_add(array,item);
-	    n_hash_table_insert (self->hashTable, n_strdup(sysName),array);
-	}else{
-		NPtrArray *array=(NPtrArray *)n_hash_table_lookup(self->hashTable,sysName);
-	    n_ptr_array_add(array,item);
-	}
+   char *sysName=className?className->sysName:"";
+   if(!n_hash_table_contains(self->hashTable,sysName)){
+      NPtrArray *array=n_ptr_array_sized_new(2);
+      n_ptr_array_add(array,item);
+      n_hash_table_insert (self->hashTable, n_strdup(sysName),array);
+   }else{
+      NPtrArray *array=(NPtrArray *)n_hash_table_lookup(self->hashTable,sysName);
+      n_ptr_array_add(array,item);
+   }
 }
 
 /**
@@ -673,8 +715,6 @@ struct c_typespec  enum_parser_parser(EnumParser *self,location_t loc,ClassName 
 
 static EnumData *findEnumType(EnumParser *self,char *sysName,char *origNameOrTypeName,nboolean orig)
 {
-   n_debug("findEnumType 00 %s %s\n",origNameOrTypeName,sysName);
-
 	EnumData *item=getEnumDataByName(self,sysName,origNameOrTypeName,orig);
 	if(item!=NULL){
 		return item;
@@ -835,7 +875,6 @@ void   enum_parser_build_class_dot_enum (EnumParser *self, location_t loc,char *
 			 return;
 		}
 	    access_controls_access_enum(access_controls_get(),loc, enumData,elem->origName);
-	//	expr->value =TREE_VALUE(elem->value);
 	    expr->value =DECL_INITIAL (TREE_VALUE(elem->value));
 		set_c_expr_source_range (expr, loc, end_loc);
 	}else if(token->type==CPP_NAME){
@@ -848,7 +887,6 @@ void   enum_parser_build_class_dot_enum (EnumParser *self, location_t loc,char *
 	   return;
 	}
 }
-
 
 /**
  * 解析 var= AObject.Enum.element;
@@ -891,14 +929,13 @@ void enum_parser_build_class_enum_dot (EnumParser *self, location_t loc,struct c
 
 EnumParser *enum_parser_get()
 {
-	static EnumParser *singleton = NULL;
-	if (!singleton){
-		 singleton =n_slice_alloc0 (sizeof(EnumParser));
-		 enumParserInit(singleton);
-		 singleton->parser=aet_parser_get();
-
-	}
-	return singleton;
+   static EnumParser *singleton = NULL;
+   if (!singleton){
+      singleton =n_slice_alloc0 (sizeof(EnumParser));
+      enumParserInit(singleton);
+      singleton->parser=aet_parser_get();
+   }
+   return singleton;
 }
 
 

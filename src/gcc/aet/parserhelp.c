@@ -63,7 +63,6 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 
 #define UNKNOWN_POINTER 0
 
-static nboolean forbidden=FALSE;//禁止改变token
 
 static inline tree canonicalize_for_substitution (tree node)
 {
@@ -232,11 +231,6 @@ void     parser_help_add_magic(location_t loc)
    aet_print_token_in_parser("parser_help_add_magic ---- ",classParser->currentClassName->sysName);
 }
 
-void parser_help_set_forbidden(nboolean is)
-{
-    forbidden=is;
-}
-
 /**
  * 把c_token 中的value设为类的sysName名
  * id_kind 设为 C_ID_TYPENAME; //描述类型的标识符
@@ -249,52 +243,6 @@ void parser_help_set_forbidden(nboolean is)
  *  include "debug/repeat/ARandom.h"
  *  debug/repeat/ARandom.h中的ARandom会被改成上一次加入的debug_ARandom
  */
-nboolean parser_help_set_class_or_enum_type(c_token *who)
-{
-    if(forbidden){
-        //printf("parser_help_set_class_or_enum_type 禁止的.\n",IDENTIFIER_POINTER(who->value));
-        return FALSE;
-    }
-    ClassName *className=class_mgr_get_class_name_by_user(class_mgr_get(),IDENTIFIER_POINTER(who->value));
-    nboolean result=FALSE;
-    //printf("parser_help_set_class_or_enum_type 00\n");
-   // aet_print_token(who);
-    if(className!=NULL){
-       if(strcmp(className->sysName,className->userName)){
-          tree newValue=aet_utils_create_ident(className->sysName);
-          who->value=newValue;
-          //if(strstr(id,"ARandom") || strstr(id,"ATxy") || strstr(id,"DataType"))
-          //printf("parser_help_set_class_or_enum_type 找到的class 改成className->sysName:%s \n",className->sysName);
-          result= TRUE;
-       }
-    }else{
-         //检查是不是类中声明的枚举。如果是，也需要c-parser.c设为ID_TYPENAME
-        // if(strstr(id,"ARandom") || strstr(id,"ATxy") || strstr(id,"DataType"))
-           // printf("parser_help_set_class_or_enum_type 找不到className 进枚举中找。%s\n",id);
-         result= enum_parser_set_enum_type(enum_parser_get(),who);
-    }
-    if(result){
-       tree  decl = lookup_name (who->value);
-       if(decl){
-            if (TREE_CODE (decl) == TYPE_DECL){
-               // if(strstr(id,"ARandom") || strstr(id,"ATxy"))
-               //printf("parser_help_set_class_or_enum_type 22 通过lookup_name 这是一个类型名  decl:%p value:%s\n",decl,IDENTIFIER_POINTER(who->value));
-                who->id_kind = C_ID_TYPENAME; //描述类型的标识符
-                return TRUE;
-            }
-//            else if(TREE_CODE (decl) == FUNCTION_DECL){
-//                char *name=IDENTIFIER_POINTER(DECL_NAME(decl));
-//                if(!strcmp(name,className->sysName)){
-//                   // if(strstr(id,"ARandom") || strstr(id,"ATxy"))
-//                    printf("parser_help_set_class_or_enum_type 33 通过lookup_name 这是一个构造函数名  decl:%p value:%s\n",decl,IDENTIFIER_POINTER(who->value));
-//                    who->id_kind = C_ID_TYPENAME; //描述类型的标识符
-//                    return TRUE;
-//                }
-//            }
-       }
-    }
-    return FALSE;
-}
 
 
 /**
@@ -304,7 +252,6 @@ static nboolean packageDotClass(char *firstId,int start)
 {
    ClassParser *classParser=class_parser_get();
    c_parser *parser=aet_parser_get()->parser;
-   parser_help_set_forbidden(TRUE);
    int count=start;//当前c_parser_peek_token (parser)->type=CPP_DOT
    NString *str=n_string_new(firstId);
    n_string_append_c(str,'.');
@@ -353,7 +300,6 @@ static nboolean packageDotClass(char *firstId,int start)
       }
    }
    n_string_free(str,TRUE);
-   parser_help_set_forbidden(FALSE);
    return result;
 }
 
@@ -367,7 +313,6 @@ nboolean parser_help_parser_left_package_dot_class()
    c_token *token=c_parser_peek_token (parser);
    return packageDotClass(IDENTIFIER_POINTER(token->value),3);
 }
-
 
 nboolean parser_help_parser_right_package_dot_class(char *firstId)
 {

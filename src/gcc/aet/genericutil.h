@@ -27,18 +27,16 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 #include "classinfo.h"
 
 
-nboolean  generic_util_is_generic_ident(char *name);
-nboolean  generic_util_is_generic_pointer(tree type);
-char     *generic_util_get_generic_str(tree type);
-char     *generic_util_get_type_str(tree arg,int *pointerCount);
-int       generic_util_get_generic_type(tree type);
-tree      generic_util_get_generic_type_by_str(const char *genericStr);
-
-
-tree      generic_convert(location_t location,tree type,tree rhs,nboolean replace);
-
-char     *generic_util_create_block_func_type_decl_name(char *sysName,int index);
-char     *generic_util_create_block_func_name(char *sysName,int index);
+nboolean    generic_util_is_generic_ident(char *name);
+nboolean    generic_util_is_generic_pointer(tree type);
+int         generic_util_get_generic_type(tree type);
+tree        generic_util_get_generic_type_by_str(const char *genericStr);
+//返回 E F泛型声明字符串，genericStr = aet_generic_E
+const char *generic_util_get_generic_decl_string(char *genericStr);
+const char *generic_util_get_generic_decl_string(tree type);
+tree        generic_convert(location_t location,tree type,tree rhs,nboolean replace);
+char       *generic_util_create_block_func_type_decl_name(char *sysName,int index);
+char       *generic_util_create_block_func_name(char *sysName,int index);
 
 static   inline nboolean  generic_util_valid_by_str(char *str)
 {
@@ -73,8 +71,6 @@ static   inline nboolean generic_util_valid_id(tree id)
 tree      generic_util_create_target(char *codes);
 tree      generic_util_create_target_loc(char *codes,location_t loc);
 
-char     *generic_util_get_type_str(tree arg);//类型转成字符串
-nboolean  generic_util_is_generic_var_or_parm(tree decl);//判断是不是T abc类型的声明
 nboolean  generic_util_get_array_type_and_parm_name(tree arg,char **typeStr,char **parmName,char *oldParmName);
 void      generic_util_parameter_declaration ();//解析函数定义中的形参
 /**
@@ -102,7 +98,7 @@ nboolean generic_util_start_with_generic(char *str);
  * str 字符串 例如 "aet_generic_E * atcs"
  * 返回 aet_generic_E
  */
-char * generic_util_get_start_with_generic(char *str);
+const char * generic_util_get_start_with_generic(char *str);
 
 //如果参数是泛型类型，需要改变为新的名字
 char *generic_util_create_param_new_name(char *origName);

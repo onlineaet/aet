@@ -468,16 +468,30 @@ static void addMiddleCodes(NewStrategy *self,char *varName,ClassName *className,
 /**
  * rtcs=({ TFirst *_notv2_6TFirst0;
 _notv2_6TFirst0=TFirst.newObject(sizeof(TFirst));
+ * rtcs变量的泛型定义传不进代码中，所以通过 generic_model_create_codes 补上变量的泛型定义
+ * TFirst *_notv2_6TFirst0;变成了 TFirst *_notv2_6TFirst0<...,...>;
  */
 static void new_strategy_create_common_heap_codes(NewStrategy *self,char *varName,ClassName *className,
       GenericModel *genericDefine,char *undefineImplCodes,
-      char *ctorStr,NString *codes,nboolean addSSemicolon,tree mtcsPlatType)
+      char *ctorStr,NString *codes,nboolean addSSemicolon,
+      tree mtcsPlatType,nboolean needVarDecl)
 {
    ClassInit *classInit=((NewStrategy *)self)->classInit;
    ClassInfo *info=class_mgr_get_class_info_by_class_name(class_mgr_get(),className);
-   n_string_append_printf(codes,"({\n \t%s *%s;\n",className->sysName,varName);
+   if(needVarDecl){
+      char *genericCodes = generic_model_create_codes(genericDefine);
+      if(!genericCodes){
+         n_string_append_printf(codes,"({\n \t%s *%s;\n",className->sysName,varName);
+      }else{
+         n_string_append_printf(codes,"({\n \t%s%s *%s;\n",className->sysName,genericCodes,varName);
+         n_free(genericCodes);
+      }
+   }else{
+      n_string_append(codes,"({\n");
+   }
+
    if(mtcsPlatType){
-      printf("new_strategy_create_common_heap_codes---- %lu\n",(unsigned long)mtcsPlatType);
+     printf("new_strategy_create_common_heap_codes---- %lu\n",(unsigned long)mtcsPlatType);
      n_ptr_array_add(self->mtcsPlatformAndDevnum,mtcsPlatType);
    }
    if(mtcsPlatType==NULL_TREE)
@@ -494,13 +508,7 @@ static void new_strategy_create_common_heap_codes(NewStrategy *self,char *varNam
          atClassFunc=TRUE;
       }
    }
-   /*
-   if(atClassFunc){
-      n_string_append(codes,"\tint _isMtcs=self->getClass()->isMtcsClass();\n");
-   }else{
-      n_string_append_printf(codes,"\tint _isMtcs=((AClass *)%s.class)->isMtcsClass();\n",className->sysName);
-   }
-   */
+
    n_string_append_printf(codes,"\tint _isMtcs=((AClass *)%s.class)->isMtcsClass();\n",className->sysName);
    if(atClassFunc){
       n_string_append(codes,"\tif(!_isMtcs)\n");
@@ -571,8 +579,6 @@ static void modifyParentGenericCodes(NString *codes,int i,char *varName,RunGener
 static void collectNewObjectParentGeneric(NewStrategy *self,char *varName,RunGenericInfo **childRunGenInfos,ClassName *child,NString *codes)
 {
    ClassInfo *childInfo=class_mgr_get_class_info_by_class_name(class_mgr_get(),child);
-  // printf("collectNewObjectParentGeneric --00 %s\n",childInfo->parentName.sysName);
-
    while(childInfo->parentName.sysName!=NULL){
       RunGenericInfo **parentGenericInfos=generic_impl_collect_parent_info(generic_impl_get(),childInfo,childRunGenInfos);
       ClassInfo *parentInfo=class_mgr_get_class_info(class_mgr_get(),childInfo->parentName.sysName);
@@ -621,7 +627,7 @@ static RunGenericInfo **collectNewObjectGeneric(NewStrategy *self,GenericModel *
          return NULL;
       }
    }
-   char *currentFuncName=IDENTIFIER_POINTER(DECL_NAME(currentFunc));
+   char *currentFuncName=currentFunc?IDENTIFIER_POINTER(DECL_NAME(currentFunc)):NULL;
    ClassName *atClassName=class_impl_get()->className;
    ClassInfo *atInfo=class_mgr_get_class_info_by_class_name(class_mgr_get(),atClassName);
    ClassFunc *atFunc=func_mgr_get_entity(func_mgr_get(),atClassName, currentFuncName);
@@ -707,12 +713,21 @@ static char *newObject(NewStrategy *self,char *tempVarName,GenericModel *generic
    return n_string_free(codes,FALSE);
 }
 
+/**
+ * 创建new对象的代码
+ * addSemision 当无名调用时不需要分号，为什么要加分号？
+ * needVarDecl 是否需要第一行，new_heap_create_object_no_decl不需要其它需要
+ * 要不要创建一个变量声明
+ * 第一行是这样
+ * Second<float > *_notv5_6Second1;
+ */
 void new_strategy_new_object(NewStrategy *self,char *tempVarName, GenericModel *genericDefine,
-      ClassName *className,char *ctorStr,NString *codes,nboolean addSemision,tree mtcsPlatType)
+      ClassName *className,char *ctorStr,NString *codes,nboolean addSemision,
+      tree mtcsPlatType,nboolean needVarDecl)
 {
    char *modifyGenericCodes=newObject(self,tempVarName,genericDefine,className);
    new_strategy_create_common_heap_codes(self,tempVarName,className,genericDefine,
-         modifyGenericCodes,ctorStr,codes,addSemision,mtcsPlatType);
+         modifyGenericCodes,ctorStr,codes,addSemision,mtcsPlatType,needVarDecl);
    if(modifyGenericCodes)
       n_free(modifyGenericCodes);
 }
@@ -760,7 +775,18 @@ void new_strategy_new_object_from_stack(NewStrategy *self,tree var,ClassName *cl
     n_debug("在这里调用 new_strategy_new_object_from_stack mtcsplatformType:%p\n",mtcsPlatType);
     char *tempVarName=class_util_create_new_object_temp_var_name(className->sysName,CREATE_OBJECT_METHOD_STACK);
     char *undefineImplCodes=newObject(self,tempVarName,genericDefine,className);
-    n_string_append_printf(codes,"\t%s *%s=(%s *)(&%s);\n",className->sysName,tempVarName,className->sysName,varName);
+    char *genericCodes = generic_model_create_codes(genericDefine);
+    if(!genericCodes)
+       n_string_append_printf(codes,"\t%s *%s=(%s *)(&%s);\n",
+             className->sysName,tempVarName,className->sysName,varName);
+    else{
+       //生成代泛型的源代码 这样编译器解析  _notv1_6TFirst0 时就会变泛型设为变量 _notv1_6TFirst0中
+       //TFirst<int> *_notv1_6TFirst0=(TFirst *)(&avbc);
+       //如果构造函数中有泛型声明，不会报找不到函数错识
+       n_string_append_printf(codes,"\t%s%s *%s=(%s *)(&%s);\n",
+                    className->sysName,genericCodes,tempVarName,className->sysName,varName);
+       n_free(genericCodes);
+    }
     if(mtcsPlatType==NULL_TREE)
        n_string_append(codes,"\tunsigned int _mtcsPlatType0=0;\n");
     else
@@ -800,7 +826,6 @@ tree  new_strategy_get_mtcs_plat_and_dev(NewStrategy *self,unsigned long address
       printf("new_strategy_get_mtcs_plat_and_dev -- %lu %lu\n",address,((unsigned long)item));
       if(((unsigned long)item)==address){
          printf("new_strategy_get_mtcs_plat_and_dev xxx-- %lu %lu\n",address,((unsigned long)item));
-
          aet_print_tree(item);
          return item;
       }

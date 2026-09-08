@@ -447,27 +447,28 @@ void   class_cast_in_finish_decl(ClassCast *self ,location_t loc,tree decl)
    if(TREE_CODE(decl)!=VAR_DECL && TREE_CODE(decl)!=PARM_DECL)
       return;
    if(TREE_CODE(decl)==VAR_DECL){
-   char *declClassName=getClassNameInVarDeclOrModifyOrComponentRefExpr(self,decl);
-   if(declClassName==NULL)
-      return;
-   //检查返回的是不是NClass
-   tree init=DECL_INITIAL(decl);
-   n_debug("class_cast_add_ref_in_finish_decl 先声明再有初始值 00 declClassName:%s init tree:%p declClassName:%s init code:%s",
-   declClassName,init,declClassName,aet_utils_valid_tree(init)?get_tree_code_name(TREE_CODE(init)):"null");
-   if(!aet_utils_valid_tree(init))
-      return;
-   if(TREE_CODE(init)==NOP_EXPR){
-      setNopExpr(self,loc,decl,init,declClassName);
-   }else if(TREE_CODE(init)==TARGET_EXPR){
-      setTargetExpr(self,decl,init,declClassName);
-   }else if(TREE_CODE(init)==VAR_DECL){
-      GenericModel *generics=c_aet_get_generics_model(init);
-      if(generics)
-         c_aet_set_generics_model(decl,generics);
+      char *declClassName=getClassNameInVarDeclOrModifyOrComponentRefExpr(self,decl);
+      if(declClassName==NULL)
+         return;
+      //检查返回的是不是NClass
+      tree init=DECL_INITIAL(decl);
+      n_debug("class_cast_add_ref_in_finish_decl 先声明再有初始值 00 \
+            declClassName:%s init tree:%p declClassName:%s init code:%s",
+            declClassName,init,declClassName,aet_utils_valid_tree(init)?get_tree_code_name(TREE_CODE(init)):"null");
+      if(!aet_utils_valid_tree(init))
+         return;
+      if(TREE_CODE(init)==NOP_EXPR){
+         setNopExpr(self,loc,decl,init,declClassName);
+      }else if(TREE_CODE(init)==TARGET_EXPR){
+         setTargetExpr(self,decl,init,declClassName);
+      }else if(TREE_CODE(init)==VAR_DECL){
+         GenericModel *generics=c_aet_get_generics_model(init);
+         if(generics)
+            c_aet_set_generics_model(decl,generics);
       }else if(TREE_CODE(init)==PARM_DECL){
-         //setParmDecl(self,decl,init,declClassName);
+            //setParmDecl(self,decl,init,declClassName);
       }else if(TREE_CODE(init)==CALL_EXPR){
-         //setCallExpr(self,decl,init,declClassName);
+            //setCallExpr(self,decl,init,declClassName);
       }
    }else if(TREE_CODE(decl)==PARM_DECL){
       printf("class_cast_add_ref_in_finish_decl 是参数还未实现 ！！！\n");

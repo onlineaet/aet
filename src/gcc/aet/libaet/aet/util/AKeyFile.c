@@ -163,19 +163,12 @@ impl$ AKeyFile{
    }
 
    static void init(){
-      printf("init--00\n");
       currentGroup = a_slice_new0 (KeyFileGroup);
       currentGroup->keyValuePairList=new$ AList();
-      printf("init--11\n");
-
       groups = new$ AList();
       groups->add(currentGroup);
-      printf("init--22\n");
-
       groupHash =new$ AHashTable(AHashTable.strHash,AHashTable.strEqual,a_free,NULL);
       startGroup = NULL;
-      printf("init--33\n");
-
       strBuffer = new$ AString(128);
       list_separator = ';';
       flags = 0;

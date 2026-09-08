@@ -35,7 +35,6 @@
 #include "IdleSource.h"
 #include "TimeoutSource.h"
 
-
 #define SYSDEF_POLLNVAL 32
 
 /**

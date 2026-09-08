@@ -131,9 +131,6 @@ struct c_expr aet_expr_varof_parser(AetExpr *self,struct c_expr lhs)
    struct c_expr expr;
    location_t startLoc=lhs.get_start();
    tree left=lhs.value;
-   //printf("aet_expr_varof_parser 00\n");
-   //aet_print_tree(left);
-   //aet_print_token(c_parser_peek_token (parser));
    c_parser_consume_token (parser);//consume varof$
    c_token *token = c_parser_peek_token (parser);
    location_t loc=c_parser_peek_token (parser)->location;

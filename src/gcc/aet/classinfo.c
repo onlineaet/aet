@@ -440,12 +440,12 @@ nboolean class_info_decl_equal_impl(ClassInfo *self,NPtrArray *implParent,NPtrAr
    }
    return TRUE;
 }
+
 //class$ A extends$ B loc是B的位置。
 void  class_info_set_parent_location(ClassInfo *self,location_t loc)
 {
    self->parentLoc=loc;
 }
-
 
 nboolean class_info_check_generic_decl(ClassInfo *self)
 {

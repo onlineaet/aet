@@ -258,15 +258,18 @@ static inline void* dynamic_iface_to_class(void *atClass,char *ifaceSysName,char
    }
 }
 
-
-
 void *mtcs_alloc_object(int size,int platformType);
 /**
  * 实现AObject.h声明的函数 释放 mtcs_alloc_object 分配的内存
  */
 void  mtcs_free_object(void *obj);
 void  mtcs_copy_device_func_address(void *dest,char *devicePointerVarName,int element,int platformType);
-void  mtcs_copy_device_address_to_super(unsigned long *hostParentDeviceAddress,int count,char *destVarName,int platformType);
+void  mtcs_copy_device_address_to_super(unsigned long *hostParentDeviceAddress,
+      int count,char *destVarName,int platformType);
+
+//E getData(){return NULL},return NULL被转化为 return generic_is_pointer(E)?NULL:_aet_generic_zero_storage
+//全局零数组变量名，在so文件中有属性weak,在可执行文件中是强类型
+extern const char _aet_generic_zero_storage[];
 
 
 static inline void printgen(void *data)

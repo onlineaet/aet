@@ -87,18 +87,25 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
  * 检查文件的头，判断是不是elf文件并且有aet标志
  * 见aetmicro关于ELF位置，内存的定义
  */
-static nboolean  isAetFile(const char *path)
+static nboolean  isAetFile(const char *path,int *is_shared)
 {
    int fd = open(path, O_RDONLY);
    if (fd < 0)
       return false;
 
    Elf64_Ehdr eh;
-   if (read(fd, &eh, sizeof(eh)) != sizeof(eh))
+   if (read(fd, &eh, sizeof(eh)) != sizeof(eh)){
+      close(fd);
       return false;
+   }
 
-   if (memcmp(eh.e_ident, ELFMAG, SELFMAG) != 0)
+   if (memcmp(eh.e_ident, ELFMAG, SELFMAG) != 0){
+      close(fd);
       return false;
+   }
+   /* ★ 在这里就可以判断是否是 .so，零额外开销 */
+   if (is_shared)
+     *is_shared = (eh.e_type == ET_DYN);
 
    lseek(fd, eh.e_shoff, SEEK_SET);
 
@@ -176,8 +183,6 @@ static char *readContent(char *fileName,nint64 offset,int size,int *dataSize)
    return data;
 }
 
-
-
 typedef struct _SegmentData{
 	char *name;
 	nuint64 virt_addr;
@@ -190,7 +195,8 @@ typedef struct _SegmentData{
 #define SEGMENT_NAME_RODATA_1 ".rodata.str1.1"
 #define SEGMENT_NAME_RODATA ".rodata"
 
-static char *SEGMENT_NAME[4][2]={{".data","PROGBITS"},{".bss","NOBITS"},{".rodata.str1.1","PROGBITS"},{".rodata","PROGBITS"}};
+static char *SEGMENT_NAME[4][2]={{".data","PROGBITS"},{".bss","NOBITS"},
+      {".rodata.str1.1","PROGBITS"},{".rodata","PROGBITS"}};
 static int SEGMENT_COUNT=4;
 
 
@@ -313,6 +319,14 @@ typedef struct _VarInfo{
 	nint64 size;
 }VarInfo;
 
+static void freeVarInfo_cb(VarInfo *info)
+{
+   if(!info)
+      return;
+   free(info->name);
+   n_slice_free(VarInfo,info);
+}
+
 /**
  * 获取变量在data段的虚拟地址
  * src格式如下
@@ -331,12 +345,14 @@ static VarInfo *getVarInfo(char *src,char *varName)
 	//printf("getVarInfo 00 is:%s\n",src);
 	NString *sub=n_string_substring(content,index+1);
 	n_string_trim(sub);
-    nchar**	items=n_strsplit(sub->str," ",-1);
+   nchar**	items=n_strsplit(sub->str," ",-1);
 	n_string_free(content,TRUE);
 	n_string_free(sub,TRUE);
     int len=n_strv_length(items);
-    if(len==0)
+    if(len==0){
+       n_strfreev(items);
     	return NULL;
+    }
     int i;
     int size=0;
     for(i=1;i<len;i++){
@@ -353,6 +369,7 @@ static VarInfo *getVarInfo(char *src,char *varName)
     data->virtAdd=add;
     data->size=size;
     data->name=n_strdup(varName);
+    n_strfreev(items);
     return data;
 }
 
@@ -615,47 +632,31 @@ static char *getFullVarName(char *content,char *varNamePrefix)
  * ret 字符串格式:
  * 0000000000004038 D _test_AObject_global_class_name
  */
-static NPtrArray *getMatchVar(AetLib *self,char *fileName,char *varName)
+static NPtrArray *getMatchVar(AetLib *self,char *fileName,char *varName,int isSoFile)
 {
-	char cmd[512];
-	sprintf(cmd,"readelf -s -W %s | grep '%s'",fileName,varName);
-	FILE *fd = popen(cmd, "r");
-	//printf("aet_lib_get_global_var_from_file is 00 :%s %p\n",cmd,fd);
-	char tempBuff[LINE_SIZE];
-	NPtrArray *array=n_ptr_array_new_with_free_func(n_free);
-	if(fd){
-		while(TRUE){
-		  char *ret=fgets(tempBuff, sizeof(tempBuff), fd); //将刚刚FILE* stream的数据流读取到buf中
-		  if(ret==NULL)
-			 break;
-       // printf("getMatchVar 找到了变量 is 11xx :%s | %s\n",ret,varName);
-		  if(strstr(ret,varName)){
-			  char *trueVarName=getFullVarName(ret,varName);
-			 // printf("getMatchVar 找到了变量 is 11 :%s | %s\n",ret,trueVarName);
-			  if(trueVarName)
-			    n_ptr_array_add(array,trueVarName);
-		  }
-		}
-		pclose(fd);
-	}
-	return array;
-}
-
-
-static void addLibPath(NPtrArray *array,char *newPath)
-{
-	int i;
-	nboolean find=FALSE;
-	for(i=0;i<array->len;i++){
-		char *item=n_ptr_array_index(array,i);
-		if(strcmp(item,newPath)==0){
-			find=TRUE;
-			break;
-		}
-	}
-	if(!find){
-		n_ptr_array_add(array,n_strdup(newPath));
-	}
+   char cmd[512];
+   if(isSoFile)
+      sprintf(cmd,"readelf --dyn-syms -W %s | grep '%s'",fileName,varName);
+   else
+      sprintf(cmd,"readelf -s -W %s | grep '%s'",fileName,varName);
+   FILE *fd = popen(cmd, "r");
+   if(!fd)
+      return NULL;
+   char tempBuff[LINE_SIZE];
+   NPtrArray *array=n_ptr_array_new_with_free_func(n_free);
+   while(TRUE){
+      char *ret=fgets(tempBuff, sizeof(tempBuff), fd); //将刚刚FILE* stream的数据流读取到buf中
+      if(ret==NULL)
+         break;
+      if(strstr(ret,varName)){
+         char *trueVarName=getFullVarName(ret,varName);
+         //printf("getMatchVar 找到了变量 is 11 :%s | %s\n",ret,trueVarName);
+         if(trueVarName)
+            n_ptr_array_add(array,trueVarName);
+      }
+   }
+   pclose(fd);
+   return array;
 }
 
 typedef struct _VarData{
@@ -683,115 +684,11 @@ static nboolean addLibData(AetLib *self,char *varName,char *value,int size,int c
 }
 
 /**
- * 判断是不是AET库文件
- * 需要满足两个条件
- * 1. so文件
- * 2. elf的magic包含有aetxxx
- */
-static inline nboolean isAetLib(char *fileName)
-{
-   if(fileName==NULL || strlen(fileName)<=3)
-      return FALSE;
-   int len=strlen(fileName);
-   if(fileName[len-3]=='.' && fileName[len-2]=='s' && fileName[len-1]=='o' && isAetFile(fileName))
-      return TRUE;
-   return FALSE;
-}
-
-static void filter(AetLib *self,NList *list)
-{
-   int len=n_list_length(list);
-   int i;
-   for(i=0;i<len;i++){
-      NFile *file=n_list_nth_data(list,i);
-      char *fp=n_file_get_absolute_path(file);
-      if(isAetLib(fp)/*!n_string_ends_with(f,".so")*/){
-         //printf("aetlib.c filter 00 文件是aet类型 %s\n",fp);
-
-         NPtrArray *result= getMatchVar(self,fp,LIB_GLOBAL_GENERIC_VAR_NAME_PREFIX);
-         //printf("aetlib.c filter 11 文件是aet类型 %s\n",fp);
-
-         //从文件取出全局变量的值
-         int j;
-         for(j=0;j<result->len;j++){
-            char *varName=n_ptr_array_index(result,j);
-            int size=0;
-            char *value=getVarValue(varName,fp,&size);
-            if(!addLibData(self,varName,value,size,TRUE)){
-               n_free(value);
-            }
-            //生成文本文件
-         }
-        // printf("aetlib.c filter 22 文件是aet类型 %s\n",fp);
-
-        result= getMatchVar(self,fp,LIB_GLOBAL_IFACE_VAR_NAME_PREFIX);
-         //从文件取出全局变量的值
-         for(j=0;j<result->len;j++){
-            char *varName=n_ptr_array_index(result,j);
-            int size=0;
-            char *value=getVarValue(varName,fp,&size);
-            if(!addLibData(self,varName,value,size,FALSE)){
-               n_free(value);
-            }
-            //生成文本文件
-         }
-      }
-   }
-}
-
-
-/**
  * 如果库中有全局变量的前缀与GLOBAL_CLASS_NAME_PREFIX相同，就保留该文件
  */
-static void createGlobalVar(AetLib *self,NPtrArray *libPathArray)
+static void createGlobalVarBySingleFile(AetLib *self,char *fileName,int isSoFile)
 {
-	int i;
-	int len=libPathArray->len;
-	for(i=0;i<len;i++){
-		char *path=n_ptr_array_index(libPathArray,i);
-		NFile *file=n_file_new(path);
-		NList *list=n_file_list_files_to_list(file);
-		filter(self,list);
-		n_list_free(list);
-		list=NULL;
-	}
-}
-
-static void createGlobalVarBySingleFile(AetLib *self,NPtrArray *libPathArray)
-{
-   int i;
-   int len=libPathArray->len;
-   for(i=0;i<len;i++){
-      char *fp=n_ptr_array_index(libPathArray,i);
-      if(isAetLib(fp)/*!n_string_ends_with(f,".so")*/){
-         NPtrArray *result= getMatchVar(self,fp,LIB_GLOBAL_GENERIC_VAR_NAME_PREFIX);
-         //从文件取出全局变量的值
-         int j;
-         for(j=0;j<result->len;j++){
-            char *varName=n_ptr_array_index(result,j);
-            int size=0;
-            char *value=getVarValue(varName,fp,&size);
-            if(!addLibData(self,varName,value,size,TRUE)){
-               n_free(value);
-            }
-         }
-         //从文件取出接口全局变量的值
-        result= getMatchVar(self,fp,LIB_GLOBAL_IFACE_VAR_NAME_PREFIX);
-        for(j=0;j<result->len;j++){
-           char *varName=n_ptr_array_index(result,j);
-           int size=0;
-           char *value=getVarValue(varName,fp,&size);
-           if(!addLibData(self,varName,value,size,FALSE)){
-              n_free(value);
-           }
-        }
-      }
-   }
-}
-
-static void createGlobalVarBySingleFile_new(AetLib *self,char *fileName)
-{
-   NPtrArray *result= getMatchVar(self,fileName,LIB_GLOBAL_GENERIC_VAR_NAME_PREFIX);
+   NPtrArray *result= getMatchVar(self,fileName,LIB_GLOBAL_GENERIC_VAR_NAME_PREFIX,isSoFile);
    //从文件取出全局变量的值
    int j;
    for(j=0;j<result->len;j++){
@@ -804,7 +701,7 @@ static void createGlobalVarBySingleFile_new(AetLib *self,char *fileName)
    }
    n_ptr_array_unref(result);
    //从文件取出接口全局变量的值
-   result= getMatchVar(self,fileName,LIB_GLOBAL_IFACE_VAR_NAME_PREFIX);
+   result= getMatchVar(self,fileName,LIB_GLOBAL_IFACE_VAR_NAME_PREFIX,isSoFile);
    for(j=0;j<result->len;j++){
       char *varName=n_ptr_array_index(result,j);
       int size=0;
@@ -814,27 +711,27 @@ static void createGlobalVarBySingleFile_new(AetLib *self,char *fileName)
       }
    }
    n_ptr_array_unref(result);
- }
 
-
-static char *getStr(char *src,char *match)
-{
-   NString *ss=n_string_new(src);
-   int of=n_string_indexof(ss,match);
-   char *result=NULL;
-   if(of>=0){
-      of=n_string_indexof(ss,"=");
-      if(of>0){
-         NString *r=n_string_substring(ss,of+1);
-         n_string_trim(r);
-         result=n_strdup(r->str);
-         n_string_free(r,TRUE);
-      }
+   //读取 GENERIC_ZERO_STORAGE 变量的大小 在 AObject.h中声明，第一个.so与可执行
+   //文件定义，.so中定义为 weak类型 ，可执行文件中定义为强类型
+   result= getMatchVar(self,fileName,GENERIC_ZERO_STORAGE,isSoFile);
+   for(j=0;j<result->len;j++){
+      char *varName=n_ptr_array_index(result,j);
+      VarInfo *varInfo=createVarInfoFromFile(fileName,varName);
+      //printf("varInfo _aet_generic_zero_storage 大小 fileName:%s %s size %d\n",fileName,varName,varInfo->size);
+      if(varInfo->size>self->genericZeroStorageSize)
+         self->genericZeroStorageSize = varInfo->size;
+      freeVarInfo_cb(varInfo);
    }
-   n_string_free(ss,TRUE);
-   return result;
+   n_ptr_array_unref(result);
 }
 
+
+
+/**
+ * 从库文件中读出变量文本信息
+ * libFile 所有库文件列表
+ */
 static void readVarContent(AetLib *self,char *libFile)
 {
    FILE *fp = fopen(libFile, "r");
@@ -855,17 +752,21 @@ static void readVarContent(AetLib *self,char *libFile)
    int len=n_strv_length(items);
    if(len==0)
       return;
+   int isSoFile = 0;
    int i;
    for(i=0;i<len;i++){
       char *str=items[i];
-      if(isAetFile(str)){
+      if(isAetFile(str,&isSoFile)){
          //printf("aet_lib_import_lib value --是aet库- is:%d %s\n",i,str);
-         createGlobalVarBySingleFile_new(self,str);
+         createGlobalVarBySingleFile(self,str,isSoFile);
       }
    }
    n_strfreev(items);
 }
 
+/**
+ * 两个变量内容写入字符串
+ */
 static void varContentWrite(AetLib *self)
 {
    NString *codes=n_string_new("");
@@ -895,16 +796,21 @@ static void aetLibInit(AetLib *self)
    self->haveFuncWithGb = FALSE;
    self->genObjArray=NULL;
    self->funcWithGbArray = NULL;
+   self->genericZeroStorageSize=0;
    char *fileName = getenv("GCC_AET_LIB_PATH");
    if(fileName!=NULL){
      // printf("aetlib 初始化打开的文件:%s\n",fileName);
       readVarContent(self,fileName);
       varContentWrite(self);
    }else{
-      n_error("实始化 aetlib 应该处于编译 temp_func_track_45.c中。");
+      n_error("初始化 aetlib 应该处于编译 temp_func_track_45.c中。");
    }
 }
 
+/**
+ * 来自编译单个文件_RandomGenerator_2962277235__impl_iface.c生成的变量
+ * 变量名 LIB_GLOBAL_IFACE_VAR_NAME_PREFIX
+ */
 static char *readIface(char *buffer)
 {
    if(buffer==NULL)
@@ -931,6 +837,9 @@ static char *readIface(char *buffer)
 
 /**
  * 库中是否已实现接口
+ * 被
+ * IFACE_START...IFACE_END
+ * 包裹的字符串
  */
 nboolean aet_lib_have_iface(AetLib *self,char *sysName)
 {
@@ -955,7 +864,7 @@ NPtrArray *aet_lib_get_generic_objs(AetLib *self)
 NPtrArray *aet_lib_get_generic_info_and_block(AetLib *self)
 {
    if(!self->haveGenericInfoAndBlock){
-      self->genInfoAndBlockArray=generic_info_create_info(self->buffer);
+      self->genInfoAndBlockArray=generic_info_create_array(self->buffer);
       self->haveGenericInfoAndBlock=TRUE;
    }
    return self->genInfoAndBlockArray;
@@ -967,12 +876,12 @@ static char *readClassIfaceImplInfo(char *buffer)
       return NULL;
    NString *ifaces=n_string_new("");
    char *c=buffer;
-   while(strstr(c,CLASS_IFACE_IMPL_START)){
-      char *start=strstr(c,CLASS_IFACE_IMPL_START);
+   while(strstr(c,CLASS_IFACE_INFO_START)){
+      char *start=strstr(c,CLASS_IFACE_INFO_START);
       //printf("r0 is :%s\n",start);
-      char *n=start+strlen(CLASS_IFACE_IMPL_START);
+      char *n=start+strlen(CLASS_IFACE_INFO_START);
     //  printf("r1 is :%s\n",n);
-      char *end=strstr(n,CLASS_IFACE_IMPL_END);
+      char *end=strstr(n,CLASS_IFACE_INFO_END);
      // printf("r2 is :%s\n",end);
       int len=strlen(n);
       int remain=strlen(end);
@@ -980,7 +889,7 @@ static char *readClassIfaceImplInfo(char *buffer)
       memcpy(ret,n,len-remain);
       ret[len-remain]='\0';
       n_string_append(ifaces,ret);
-      c = end+strlen(CLASS_IFACE_IMPL_END);
+      c = end+strlen(CLASS_IFACE_INFO_END);
    }
    return n_string_free(ifaces,FALSE);
 }
@@ -1007,13 +916,20 @@ NPtrArray *aet_lib_get_func_with_gb(AetLib *self)
    return self->funcWithGbArray;
 }
 
+/**
+ * 返回所有库中变量 _aet_generic_zero_storage 声明最大数组元素个数
+ */
+int aet_lib_get_generic_zero_storage_size(AetLib *self)
+{
+   return self->genericZeroStorageSize;
+}
 
 AetLib *aet_lib_get()
 {
 	static AetLib *singleton = NULL;
 	if (!singleton){
-		 singleton =(AetLib *)n_slice_new0(AetLib);
-		 aetLibInit(singleton);
+		singleton =(AetLib *)n_slice_new0(AetLib);
+		aetLibInit(singleton);
 	}
 	return singleton;
 }

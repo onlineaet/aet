@@ -160,7 +160,8 @@ static void createInitCodes(NewHeap *self,tree var,ClassName *className,NString 
 	}
 	tree mtcsPlatType= c_aet_get_mtcs_plat_type(var);
 	char *tempVarName=class_util_create_new_object_temp_var_name(className->sysName,CREATE_OBJECT_METHOD_HEAP);
-	new_strategy_new_object((NewStrategy *)self,tempVarName,genericDefine,className,ctorStr,codes,TRUE,mtcsPlatType);
+	new_strategy_new_object((NewStrategy *)self,tempVarName,genericDefine,
+	      className,ctorStr,codes,TRUE,mtcsPlatType,TRUE);
 }
 
 static void setInitGlobalVar(NewHeap *self,tree var,ClassName *className)
@@ -288,7 +289,6 @@ static tree createNamelessVar(char *sysName,char *varName)
         n_error("错误，创建实参无名对象%s，找不到类声明。",sysName);
         return NULL_TREE;
     }
-    aet_print_tree(decl);
     tree pointerType=build_pointer_type(TREE_TYPE(decl));
     tree varNameId=aet_utils_create_ident(varName);
     location_t  loc = input_location;
@@ -339,7 +339,11 @@ void new_heap_create_object_no_decl(NewHeap *self,ClassName *className,GenericMo
       finish_decl (decl, loc, NULL_TREE,type, NULL_TREE);
    }
    NString *codes=n_string_new("");
-   new_strategy_new_object((NewStrategy *)self,tempVarName,genericDefine,className,ctorStr,codes,FALSE,mtcsPlatType);
+   //(aet_utils_valid_tree(current_function_decl) && isParserParmsState)=TRUE不需要第一行变量声明
+   //像这样 Second<float > *_notv5_6Second1;
+   new_strategy_new_object((NewStrategy *)self,tempVarName,genericDefine,
+         className,ctorStr,codes,FALSE,mtcsPlatType,
+         !(aet_utils_valid_tree(current_function_decl) && isParserParmsState));
    char *remain= getRemainToken(self);
    if(remain!=NULL){
       n_string_append_printf(codes,"%s\n",remain);
@@ -348,12 +352,12 @@ void new_heap_create_object_no_decl(NewHeap *self,ClassName *className,GenericMo
    }
    new_strategy_add_new((NewStrategy*)self,className,tempVarName);
    new_strategy_set_var_type((NewStrategy*)self,NEW_OBJECT_LOCAL);
-   if(aet_utils_valid_tree(current_function_decl) && isParserParmsState){
-      //替换debug_AObject *_notv5_13debug_AObject1;为空:
-      char find[512];
-      sprintf(find,"%s *%s;",className->sysName,tempVarName);
-      n_string_replace(codes,find,"",1);
-   }
+//   if(aet_utils_valid_tree(current_function_decl) && isParserParmsState){
+//      //替换debug_AObject *_notv5_13debug_AObject1;为空:
+//      char find[512];
+//      sprintf(find,"%s *%s;",className->sysName,tempVarName);
+//      n_string_replace(codes,find,"",1);
+//   }
    aet_utils_add_token_with_location(parse_in,codes->str,codes->len,loc);
    n_debug("new_heap new_heap_create_object_no_decl 源代码:\n%s\n",codes->str);
    n_string_free(codes,TRUE);
@@ -409,7 +413,8 @@ char *new_heap_create_object_for_static(NewHeap *self,tree var)
    }
    tree mtcsPlatType= c_aet_get_mtcs_plat_type(var);
    char *tempVarName=n_strdup_printf("_temp_%s_%d",className->sysName,CREATE_OBJECT_METHOD_HEAP);
-   new_strategy_new_object((NewStrategy *)self,tempVarName,genericDefine,className,ctorStr,codes,TRUE,mtcsPlatType);
+   new_strategy_new_object((NewStrategy *)self,tempVarName,genericDefine,
+         className,ctorStr,codes,TRUE,mtcsPlatType,TRUE);
    n_string_append(codes,"}\n");
    free(tempVarName);
    //不能加因为_cpp_pop_buffer 会把最后一个}省略了 n_string_append(codes,"}\n");//结否constructor函数

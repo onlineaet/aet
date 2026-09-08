@@ -33,12 +33,10 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 #define AET_INIT_GLOBAL_METHOD_STRING      "init_object"
 #define AET_INNER_ARRAY_VARIABLE_NAME      "innerArrayRef0302"
 
-
 #define AET_GENERIC_ARRAY                  "_generic_1234_array" //类中的泛型模型数组变量名
 #define AET_GENERIC_BLOCK_ARRAY_VAR_NAME  "_gen_blocks_array_897" //类中的泛型块函数指针数组变量名 void *_gen_blocks_array_897[xx];
 #define AET_MAX_GENERIC_BLOCKS             30  //类中最大块数
 
-#define AET_GENERIC_TYPE_NAME_PREFIX       "aet_generic_" //泛型类型名的前缀，后缀是A-Z
 #define AET_GET_GENERIC_INFO_FUNC_NAME     "generic_info$" //该方法定义在aobject.h头文件中
 #define AET_GENERIC_INFO_STRUCT_NAME       "aet_generic_info"
 #define AET_GENERIC_FUNC_THREAD_BLOCK_ADDR  "_gen_func_block_addr_128347" //泛型函数中块函数的地址 __thread _gen_func_block_add_128347
@@ -49,10 +47,12 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 #define AET_GENERIC_FUNC_GET_ADDRESS        "aet_generic_func_get_address"
 //获取带泛型块函数的真实地址
 #define AET_GENERIC_FUNC_WITH_GB_ADDRESS     "aet_geneirc_get_func_with_gb_address"
+#define AET_GENERIC_BLOCK_FWGB_FILE_LIST     "aet_generic_block_fwgb_file_list.o"
 
 //2025-11-03 新加
 #define GENERIC_BLOCK_FILE_NAME             "_block_func_" //泛型块函数输出文件名
-
+//全局零数组变量名，在so文件中有属性weak,在可执行文件中是强类型
+#define GENERIC_ZERO_STORAGE                "_aet_generic_zero_storage"
 
 //接口声明中的变量，由aet加入，变量指向实现该接口的类对象 IfaceCommonData123 定义在AObject.h中。
 #define IFACE_AT_CLASS                     "_atClass123"
@@ -62,6 +62,8 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 #define IFACE_UNREF_FIELD_NAME             "_iface_reserve_unref_field_123"
 #define IFACE_REF_FUNC_DEFINE_NAME         "_iface_reserve_ref_func_define_123"
 #define IFACE_UNREF_FUNC_DEFINE_NAME       "_iface_reserve_unref_func_define_123"
+#define IFACE_IMPL_FILE_LIST_NAME          "aet_iface_compile_list.o"
+
 //super方法实现 在AObject.h中定义
 #define AET_SUPER_ADDRESS_ARRAY             "_superAddressArray" //用来保存类方法实现的地址
 #define AET_SUPER_FUNC_NAME_ARRAY           "_superFuncNameArray" //用来保存类方法实现的混淆函数名
@@ -83,6 +85,7 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 
 #define AET_MTCS_PLATFORM_TYPE_VAR_NAME             "mtcsPlatformType" //平台变量名 在AObject.h中声明
 #define AET_MTCS_DEVICE_FUNC_POINTERS_VAR_NAME      "deviceFuncPointers" //保存设备函数地址的变量名
+#define AET_MTCS_LINK_FILE_LIST_NAME                "mtcs_file_list_name.o" //保存mtcslink的内容，aetcollect.c中需要
 
 
 #define RID_AET_GOTO_STR                   "aet_goto_compile$" //在c_parser_declaration_or_fndef 需要跳转处理的关键字，内部使用
@@ -90,12 +93,12 @@ typedef enum{
    GOTO_GENERIC_BLOCK_FUNC_TEST_COMPILE_START =2, //把泛型块定义成内部函数编译
    GOTO_GENERIC_BLOCK_FUNC_TEST_COMPILE_END =3, //把泛型块定义成内部函数编译结束
    GOTO_STATIC_VAR_FUNC=10, //在类中的静态变量或函数
-   GOTO_CHECK_FUNC_DEFINE=12, //检查类方法的实现 在临时文件中使用temp_func_track_45.c
    GOTO_IFACE_COMPILE=13, //检查类方法的实现 在临时文件中使用temp_func_track_45.c
    GOTO_MTCS_CREATE_OBJ=14,//创建MTCS对象时<<<cuda,1>>>生成mtcsPlatType树作为变量的初始值。
    GOTO_READY_COMPILE_GENERIC_BLOCK_FUNC=15,//在每个类实现完成时，通过makefileparm.c makefile_parm_insert_block_func_codes 调用。
    GOTO_ENTER_COMPILE_GENERIC_BLOCK_FUNC=16,//开始编译泛型块函数。
    GOTO_ADD_H_FILE=17,//自动加入头文件
+   GOTO_COMPILE_TYPE = 18,//进入 temp_func_track_45.c
 }AetGotoTag;
 
 #define LIB_GLOBAL_IFACE_VAR_NAME_PREFIX   "_global_aet_iface_A_$_"

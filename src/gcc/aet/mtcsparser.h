@@ -86,8 +86,9 @@ char      *mtcs_parser_create_device_func_pointers_var(MtcsParser *self,ClassNam
  * 创建的代码嵌入到类初始化方法中。
  */
 char      *mtcs_parser_modify_host_device_func_var_array(MtcsParser *self,ClassName *className);
-void       mtcs_parser_link_func(MtcsParser *self);
 nboolean   mtcs_parser_have_mtcs(MtcsParser *self);
+
+void       mtcs_parser_link_func(MtcsParser *self,char *objRootPath,NPtrArray **arrays,int length,int pos);
 
 #endif
 

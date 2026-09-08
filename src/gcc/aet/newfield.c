@@ -121,7 +121,8 @@ static nboolean initHeapFieldObject(NewField *self,tree var)
    tree mtcsPlatType= c_aet_get_mtcs_plat_type(field);
    NString *codes=n_string_new("");
    n_string_append(codes,"=");
-   new_strategy_new_object((NewStrategy *)self,tempVarName,genericDefine,className,ctorStr,codes,TRUE,mtcsPlatType);
+   new_strategy_new_object((NewStrategy *)self,tempVarName,genericDefine,
+         className,ctorStr,codes,TRUE,mtcsPlatType,TRUE);
    aet_utils_add_token_with_location(parse_in,codes->str,codes->len,ctorLoc);
    n_debug("initHeapFieldObject 11 源代码:\n%s\n",codes->str);
    n_string_free(codes,TRUE);

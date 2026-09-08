@@ -59,6 +59,8 @@
 #include "parserhelp.h"
 #include "classmgr.h"
 #include "mtcsparser.h"
+#include "middlefile.h"
+#include "funcpointer.h"
 
 #include "aetparser.h"
 
@@ -91,6 +93,7 @@ struct GTY(()) omp_attribute_pragma_state
   c_token * GTY((skip)) save_tokens;
   unsigned int save_tokens_avail;
 };
+
 
 /* The actual parser and external interface.  ??? Does this need to be
    garbage-collected?  */
@@ -203,6 +206,7 @@ static void c_lex_one_token (c_parser *parser, c_token *token, bool raw = false)
          decl = lookup_name (token->value);
          if (decl){
             if (TREE_CODE (decl) == TYPE_DECL){
+               aet_parser_convert_type_decl(decl,token);
                token->id_kind = C_ID_TYPENAME;
                break;
             }
@@ -216,11 +220,8 @@ static void c_lex_one_token (c_parser *parser, c_token *token, bool raw = false)
                token->id_kind = C_ID_CLASSNAME;
                break;
             }
-         }else{
-            if(parser_help_set_class_or_enum_type(token))//zclei
-               break;
-
          }
+
          token->id_kind = C_ID_ID;
       }
          break;
@@ -1689,7 +1690,6 @@ static tree c_parser_declaration_or_fndef (c_parser *parser, bool fndef_ok,
       return result;
    }
    n_debug("分析声明说明符 00:创建一个空的声明说明符 ：have_attrs:%d nested:%d", have_attrs,nested);
-   aet_print_token(c_parser_peek_token (parser));
    c_token *tok=c_parser_peek_token (parser);
    if(tok->type==CPP_KEYWORD && (tok->keyword==RID_AET_PUBLIC
          || tok->keyword==RID_AET_PROTECTED || tok->keyword==RID_AET_PRIVATE)){
@@ -5211,8 +5211,6 @@ static struct c_expr c_parser_initializer (c_parser *parser, tree decl)
       && (TREE_CODE (ret.value) != COMPOUND_LITERAL_EXPR
       || C_DECL_DECLARED_CONSTEXPR (COMPOUND_LITERAL_EXPR_DECL(ret.value)))){
          n_debug("c_parser_initializer 11 执行 convert_lvalue_to_rvalue 转化");
-         //aet_print_tree(decl);
-         //aet_print_tree(ret.value);
          ret.value=generic_parser_initializer(generic_parser_get(),decl,ret.value);
          ret = convert_lvalue_to_rvalue (loc, ret, true, true, true);
       }
@@ -6975,7 +6973,7 @@ restart:
             case RID_RETURN:
                c_parser_consume_token (parser);
                n_debug("语句标签后 33 分析return isAet:%d nest:%d isCtor:%d,",
-               aetParser->isAet,classImpl->nest,classImpl->isConstructor);
+                     aetParser->isAet,classImpl->nest,classImpl->isConstructor);
                //zclei
                class_ctor_parser_return(classImpl->classCtor,classImpl->isConstructor);
                if (c_parser_next_token_is (parser, CPP_SEMICOLON)){
@@ -6994,9 +6992,10 @@ restart:
                   struct c_expr expr = c_parser_expression_conv (parser);
                   mark_exp_read (expr.value);
                   n_debug("语句标签后 44 分析return ");
-                  //zclei 10.4.0
+                  //zclei
                   expr.value=class_impl_add_return(classImpl,expr.get_location(),expr.value,expr.original_type);
-                  stmt = c_finish_return (EXPR_LOC_OR_LOC (expr.value, xloc),expr.value, expr.original_type, astate.musttail_p);
+                  stmt = c_finish_return (EXPR_LOC_OR_LOC (expr.value, xloc),
+                        expr.value, expr.original_type, astate.musttail_p);
                   goto expect_semicolon;
                }
                break;
@@ -7059,7 +7058,6 @@ restart:
                            OPT_Wattributes,"attribute %<musttail%> mixed with other attributes on %<return%> statement");
                   }
                   n_debug("c_parser_statement_after_labels 11");
-                          aet_print_tree(attrs);
                   goto restart;
                }
                if (attribute_fallthrough_p (attrs)){
@@ -7134,6 +7132,8 @@ expr_stmt:
 expect_semicolon:
          c_parser_skip_until_found (parser, CPP_SEMICOLON, "expected %<;%>");
          n_debug("语句标签后 100 把整个赋值表达式语句的树结构挂接到语句列表上 ");
+         aet_print_token(c_parser_peek_token (parser));
+
          break;
    }
    /* Two cases cannot and do not have line numbers associated: If stmt
@@ -8437,13 +8437,14 @@ static struct c_expr c_parser_expr_no_commas (c_parser *parser, struct c_expr *a
    generic_parser_modify(generic_parser_get(),&lhs.value,&rhs.value);
    rhs = convert_lvalue_to_rvalue (exp_location, rhs, true, true);
    mtcs_parser_modify_check(mtcsParser,op_location,lhs.value,rhs.value);//zclei
+   //检查final$变量赋值是否符合语义
+   class_final_check_modify(class_final_get(),op_location,lhs.value,rhs.value);
    //n_debug("c_parser_expr_no_commas --modify ready\n");
    ret.value = build_modify_expr (op_location, lhs.value, lhs.original_type,code,
          exp_location, rhs.value, rhs.original_type);
    ret.m_decimal = 0;
   // n_debug("c_parser_expr_no_commas 44 右边作赋值表达式处理，ret.value code:%s 赋值运算符:code:%s value:%p lhs.value:%p rhs.value:%p",
           //  get_tree_code_name(TREE_CODE(ret.value)),get_tree_code_name(code),ret.value,lhs.value,rhs.value);
-   //aet_print_tree(ret.value);
    set_c_expr_source_range (&ret, lhs.get_start (), rhs.get_finish ());
    if (code == NOP_EXPR)
       ret.original_code = MODIFY_EXPR;
@@ -8550,17 +8551,10 @@ static struct c_expr c_parser_conditional_expression (c_parser *parser, struct c
    && c_tree_equal (exp2.value, omp_atomic_lhs)
    && (c_tree_equal (TREE_OPERAND (cond.value, 0), omp_atomic_lhs)
    || c_tree_equal (TREE_OPERAND (cond.value, 1), omp_atomic_lhs))){
-      n_debug("c_parser_conditional_expression 55 C_MAYBE_CONST_EXPR 条件表达式   ");
-      aet_print_tree(exp1.value);
-      aet_print_tree(exp2.value);
-      aet_print_tree(cond.value);
-
+      //n_debug("c_parser_conditional_expression 55 C_MAYBE_CONST_EXPR 条件表达式   ");
       ret.value = build3_loc (colon_loc, COND_EXPR, TREE_TYPE (omp_atomic_lhs),cond.value, exp1.value, exp2.value);
    }else{
-      n_debug("c_parser_conditional_expression 66 C_MAYBE_CONST_EXPR 条件表达式   ");
-      aet_print_tree(exp1.value);
-      aet_print_tree(exp2.value);
-
+      //n_debug("c_parser_conditional_expression 66 C_MAYBE_CONST_EXPR 条件表达式   ");
       ret.value = build_conditional_expr (colon_loc, cond.value,
                                           cond.original_code == C_MAYBE_CONST_EXPR,
                                           exp1.value, exp1.original_type, loc1,
@@ -8570,7 +8564,7 @@ static struct c_expr c_parser_conditional_expression (c_parser *parser, struct c
    if (exp1.value == error_mark_node || exp2.value == error_mark_node)
       ret.original_type = NULL;
    else{
-      n_debug("c_parser_conditional_expression 77 条件表达式   ");
+      //n_debug("c_parser_conditional_expression 77 条件表达式   ");
       tree t1, t2;
 
       /* If both sides are enum type, the default conversion will have
@@ -8581,7 +8575,6 @@ static struct c_expr c_parser_conditional_expression (c_parser *parser, struct c
       ret.original_type = ((t1 != error_mark_node && t2 != error_mark_node &&
             (TYPE_MAIN_VARIANT (t1) == TYPE_MAIN_VARIANT (t2))) ? t1 : NULL);
    }
-   n_debug("c_parser_conditional_expression 88 条件表达式   ");
    set_c_expr_source_range (&ret, start, exp2.get_finish ());
    ret.m_decimal = 0;
    c_omp_array_section_p = save_c_omp_array_section_p;
@@ -8909,7 +8902,6 @@ c_parser_binary_expression (c_parser *parser, struct c_expr *after,
    }
       sp++;
       stack[sp].loc = binary_loc;
-      n_debug("c_parser_binary_expression ---22----- %s sp:%d\n",get_tree_code_name(ocode),sp);
       stack[sp].expr = c_parser_cast_expression (parser, NULL);
       stack[sp].prec = oprec;
       stack[sp].op = ocode;
@@ -9017,8 +9009,7 @@ static struct c_expr c_parser_cast_expression (c_parser *parser, struct c_expr *
          error_at (type_name->specs->locations[cdw_alignas], "alignment specified for type name in cast");
 
       {
-         n_debug("c_parser_cast_expression 22 强转表达式 重要!!! 强转(XXX *)CPP_OPEN_PAREN 第二是类型名 %p ",after);
-         aet_print_tree(expr.value);
+         //n_debug("c_parser_cast_expression 22 强转表达式 重要!!! 强转(XXX *)CPP_OPEN_PAREN 第二是类型名 %p ",after);
          location_t expr_loc = c_parser_peek_token (parser)->location;
          expr = c_parser_cast_expression (parser, NULL);
          expr = convert_lvalue_to_rvalue (expr_loc, expr, true, true);
@@ -9086,8 +9077,6 @@ static struct c_expr c_parser_unary_expression (c_parser *parser)
    ret.original_type = NULL;
    switch (c_parser_peek_token (parser)->type){
       case CPP_PLUS_PLUS:
-         n_debug("c_parser_unary_expression -----00 一元表达式 CPP_PLUS_PLUS ");
-
          c_parser_consume_token (parser);
          exp_loc = c_parser_peek_token (parser)->location;
          op = c_parser_cast_expression (parser, NULL);
@@ -9190,13 +9179,11 @@ static struct c_expr c_parser_unary_expression (c_parser *parser)
             //zclei
             case RID_AET_NEW:
                n_debug("c_parser_unary_expression 11 一元表达式 分析RID_AET_NEW ");
-               aet_print_token(c_parser_peek_token (parser));
                new_object_parser_new$(new_object_get());//zclei
                return c_parser_postfix_expression (parser);
             case RID_AET_GENERIC_INFO:
                return generic_impl_generic_info_expression (generic_impl_get());
             case RID_AET_GENERIC_BLOCK:
-               n_debug("c_parser_unary_expression 00nn 分析genericblock$ 。");
                return block_mgr_parser(block_mgr_get());
             case RID_AET_GOTO:
             {
@@ -9217,13 +9204,10 @@ static struct c_expr c_parser_unary_expression (c_parser *parser)
             }
                return ret;
             default:
-               n_debug("c_parser_unary_expression 11 xx %d\n",c_parser_peek_token (parser)->keyword);
-               aet_print_token(c_parser_peek_token (parser));
                return c_parser_postfix_expression (parser);
          }
       default:
-         n_debug("c_parser_unary_expression 22 一元表达式 进入后缀表达式 ");
-         aet_print_token(c_parser_peek_token (parser));
+         //n_debug("c_parser_unary_expression 22 一元表达式 进入后缀表达式 ");
          return c_parser_postfix_expression (parser);
    }
 }
@@ -10102,7 +10086,6 @@ static struct c_expr c_parser_postfix_expression (c_parser *parser)
                   printf("这是一个com.ai.NLayer\n");
                   goto classAccessLabel;
                }
-               aet_print_token(c_parser_peek_token (parser));
                if(aetParser->isAet && mtcs_parser_is_compiling(mtcsParser)){
                    //检查是不是内置变量
                    tree decl = mtcs_parser_vars_parser(mtcsParser,loc,id);
@@ -12122,8 +12105,8 @@ static struct c_expr c_parser_postfix_expression_after_primary (c_parser *parser
                expr.value= generic_call_build_call(generic_call_get(), selectFunc.classFunc,
                      defineGenModel,expr_loc,expr.value);
               // printf("调用泛型函数转为 target_expr 或 bind_expr\n");
-              // aet_print_tree(expr.value);
             }
+            func_pointer_add(func_pointer_get(),expr.value);
             set_c_expr_source_range (&expr, start, finish);
             expr.m_decimal = 0;
             expr.original_code = ERROR_MARK;
@@ -20297,35 +20280,21 @@ c_parser_oacc_loop (location_t loc, c_parser *parser, char *p_name,
 
   strcat (p_name, " loop");
   mask |= OACC_LOOP_CLAUSE_MASK;
-  printf("c_parser_oacc_loop 00 %s\n",p_name);
-
   tree clauses = c_parser_oacc_all_clauses (parser, mask, p_name,
                    /*finish_p=*/cclauses == NULL,
                    /*target=*/is_parallel);
   if (cclauses)
     {
-      printf("c_parser_oacc_loop 22tttxxx %s\n",p_name);
-
       clauses = c_oacc_split_loop_clauses (clauses, cclauses, is_parallel);
       if (*cclauses)
    *cclauses = c_finish_omp_clauses (*cclauses, C_ORT_ACC_TARGET);
       if (clauses)
    clauses = c_finish_omp_clauses (clauses, C_ORT_ACC);
     }
-  printf("c_parser_oacc_loop 22 %s\n",p_name);
-
   tree block = c_begin_compound_stmt (true);
-  aet_print_tree(block);
-
   tree stmt = c_parser_omp_for_loop (loc, parser, OACC_LOOP, clauses, NULL,
                  if_p);
   block = c_end_compound_stmt (loc, block, true);
-  printf("c_parser_oacc_loop 33 %s\n",p_name);
-  aet_print_tree(block);
-  printf("c_parser_oacc_loop 44 %s\n",p_name);
-
-  aet_print_tree(stmt);
-
   add_stmt (block);
 
   return stmt;
@@ -28184,6 +28153,7 @@ void aet_parser_c_parser_translation_unit (AetParser *self)
 {
    classImpl->compileTime.start=aet_utils_current_time_millis();
    setIncludeCallback();
+   middle_file_delete_collect_file(middle_file_get());
    printf("编译文件:%s debug:%s\n",in_fnames[0],n_log_get_info());
    c_parser_translation_unit(self->parser);
 }
@@ -28313,12 +28283,6 @@ tree aet_parser_c_parser_std_attribute_specifier_sequence (AetParser *self)
 {
    return c_parser_std_attribute_specifier_sequence(self->parser);
 }
-
-nboolean aet_parser_set_class_or_enum_type(AetParser *self,c_token *who)
-{
-   return parser_help_set_class_or_enum_type(who);
-}
-
 
 void aet_parser_set_parser(AetParser *self,c_parser *parser)
 {
@@ -28884,6 +28848,78 @@ struct c_expr aet_parser_build_binary_op (location_t location, enum tree_code co
 {
    generic_parser_binary_op(generic_parser_get(),code,&arg1.value,&arg2.value);
    return parser_build_binary_op (location,code,arg1,arg2);
+}
+
+//原型 c_parser_expression_conv c-parser.cc
+struct c_expr aet_parser_c_parser_expression_conv (AetParser *self)
+{
+   return c_parser_expression_conv(self->parser);
+}
+
+int  aet_parser_backup_token(AetParser *self,c_token *backups)
+{
+   c_parser *parser = self->parser;
+   int tokenCount=parser->tokens_avail;
+   int i;
+   c_token *token;
+   for(i=0;i<tokenCount;i++){
+      token=c_parser_peek_token (parser);
+      aet_utils_copy_token(token,&backups[i]);
+      c_parser_consume_token (parser);
+   }
+   return tokenCount;
+}
+
+void aet_parser_restore_token(AetParser *self,c_token *backups,int count)
+{
+   c_parser *parser = self->parser;
+   if(count==0)
+      return;
+   int tokenCount=parser->tokens_avail;
+   if(tokenCount+count>AET_MAX_TOKEN){
+      error("token太多了");
+      return;
+   }
+   int i;
+   for(i=0;i<count;i++)
+      aet_utils_copy_token(&backups[i],&parser->tokens[i+tokenCount]);
+
+   parser->tokens_avail=tokenCount+count;
+}
+
+/**
+ * class$ Abc 把Abc类型转为包+类名
+ * enum$ DataType,把DataType转成aet定义的新名字
+ */
+void  aet_parser_convert_type_decl (tree decl,c_token *who)
+{
+   tree type = TREE_TYPE (decl);          // @3 record_type
+   if (TREE_CODE (type) == RECORD_TYPE){
+      tree main = TYPE_MAIN_VARIANT (type);       // 或 TYPE_MAIN_VARIANT (TYPE_MAIN_VARIANT (type))
+      if (!main)
+         main = type;
+      tree name_decl = TYPE_NAME (main);          // 这里通常是 TYPE_DECL 或 IDENTIFIER_NODE
+      if (!name_decl || TREE_CODE (name_decl) != IDENTIFIER_NODE)
+         return ;
+      const char *str = IDENTIFIER_POINTER (name_decl);
+      if(str[0]!='_')
+         return ;
+      const char *lastName = str + 1;  // debug_AObject
+      tree ret =  lookup_name (get_identifier (lastName));
+      if(!ret || ret == decl)
+         return ;
+      who->value=get_identifier (lastName);
+   }else if(TREE_CODE (type) == ENUMERAL_TYPE){
+      tree main = TYPE_MAIN_VARIANT (type);       // 或 TYPE_MAIN_VARIANT (TYPE_MAIN_VARIANT (type))
+      if (!main)
+         main = type;
+      if(main!=enum_parser_get()->common)
+         return;
+      nboolean ret =  enum_parser_set_enum_type(enum_parser_get(),who);
+      if(!ret){
+         n_error("枚举是错了----\n");
+      }
+   }
 }
 
 AetParser *aet_parser_get()

@@ -30,7 +30,6 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 
 #define MAX_GEN_BLOCKS 30
 
-
 typedef struct _GenericInfo GenericInfo;
 /* --- structures --- */
 struct _GenericInfo
@@ -63,11 +62,14 @@ tree             generic_info_get_field(GenericInfo *self,char *name);
 nboolean         generic_info_same(GenericInfo *self,ClassName *className);
 char            *generic_info_save(GenericInfo *self);
 
-//新版 11-05
-NPtrArray       *generic_info_create_info(char *content);
+
 //根据函数名取所属的块数量
 int              generic_info_get_block_count_by_belong(GenericInfo *self,char *managleFuncName);
 GenericBlock    *generic_info_get_first_block_by_belong(GenericInfo *self,char *managleFuncName);
+NPtrArray       *generic_info_create_text(char *buffer);
+NPtrArray       *generic_info_create_array_by_array(NPtrArray *array);
+NPtrArray       *generic_info_create_array(char *content);
+void             generic_info_restore(NString *codes,char *buffer);
 
 #endif
 

@@ -359,20 +359,20 @@ static tree createNewRef(location_t loc,tree varDecl,tree fieldDecl)
  */
 static tree processComponentRef(tree call,tree varVal,tree item,location_t loc,int *result)
 {
-      tree fieldDecl=TREE_OPERAND (item, 1);
-      //fieldDecl是变量
-      if(class_util_is_function_field(fieldDecl)){ //是一个函数调用
-          tree callExpr=findCall(call,item,CALL_EXPR);//找到调用这个域的call_expr,然后可以取到参数
-         // printf("processComponentRef ----\n");
-          tree newCall=createNewCall00(callExpr,loc,varVal,fieldDecl);
-          *result=1;
-          return newCall;
-      }else{
-          //printf("processComponentRef 引用域 :%s\n",IDENTIFIER_POINTER(DECL_NAME(fieldDecl)));
-          tree ref= createNewRef(loc,varVal,fieldDecl);
-          *result=2;
-          return ref;
-      }
+   tree fieldDecl=TREE_OPERAND (item, 1);
+   //fieldDecl是变量
+   if(class_util_is_function_field(fieldDecl)){ //是一个函数调用
+      tree callExpr=findCall(call,item,CALL_EXPR);//找到调用这个域的call_expr,然后可以取到参数
+      // printf("processComponentRef ----\n");
+      tree newCall=createNewCall00(callExpr,loc,varVal,fieldDecl);
+      *result=1;
+      return newCall;
+   }else{
+      //printf("processComponentRef 引用域 :%s\n",IDENTIFIER_POINTER(DECL_NAME(fieldDecl)));
+      tree ref= createNewRef(loc,varVal,fieldDecl);
+      *result=2;
+      return ref;
+   }
 }
 
 /**
@@ -410,9 +410,8 @@ static tree createVarDeclStmt(tree rvalue,NamelessBuffer *bufs,location_t loc,tr
 static tree process(tree call)
 {
     NPtrArray *array=n_ptr_array_new();
-    char *link=NULL;
-    class_util_get_nameless_call_link(call,array,&link);
-    n_debug("process nameless 生成target 原来调用的链是:%s\n",link);
+    n_debug("process nameless 生成target 原来调用的链是:\n");
+    class_util_get_nameless_call_link(call,array);
     location_t loc=EXPR_LOCATION (call);
     tree rtnType=TREE_TYPE(call);//返回值类型
     nboolean hasRtn=(TREE_CODE(rtnType)!=VOID_TYPE);//调用是否有返回值

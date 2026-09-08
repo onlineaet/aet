@@ -329,7 +329,7 @@ static void addGenericParm(char *genStr,tree type,int count,NPtrArray *array,Gen
          }
       }
    }else{
-      char *str=generic_util_get_generic_str(type);
+      const char *str=generic_util_get_generic_decl_string(type);
       if(strcmp(str,genStr)==0){
          n_debug("class_func_get_generic_parm 33 参数:%d 泛型声明:%s",count,str);
          ParmGenInfo *pgi=(ParmGenInfo *)n_slice_new(ParmGenInfo);
@@ -670,6 +670,31 @@ void class_func_set_end_location(ClassFunc *self,location_t endLoc)
     if(!self)
        return;
     self->endLoc = endLoc;
+}
+
+//获取参数个数据
+int   class_func_get_param_count(ClassFunc *self)
+{
+   if(!self)
+      return 0;
+   tree funcType=NULL;
+   if(self->fieldDecl){
+      tree fieldType=TREE_TYPE(self->fieldDecl);
+      funcType=TREE_TYPE(fieldType);
+   }else if(self->fromImplDefine){
+      funcType=TREE_TYPE(self->fromImplDefine);
+   }else{
+      n_error("classfunc无声明和定义%s\n",self->orgiName);
+   }
+
+   int count=0;
+   for (tree al = TYPE_ARG_TYPES (funcType); al; al = TREE_CHAIN (al)){
+      tree type=TREE_VALUE(al);
+      if(type == void_type_node)
+         break;
+      count++;
+   }
+   return count;
 }
 
 ClassFunc *class_func_new()

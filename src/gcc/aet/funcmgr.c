@@ -339,7 +339,8 @@ static nboolean findIntefaceFunc(FuncMgr *self,ClassName *className,char *rawMan
  *  mangleNoself 生成mangle名时不带self
  */
 static ClassFunc *addSubstitutions(FuncMgr *self,tree decl,tree classTree,ClassName *className,
-		 char *mangle,char *orgiName,enum func_from_code code,char *mangleNoSelf,char *rawMangleName,tree parms,int *errInfo)
+		 char *mangle,char *orgiName,enum func_from_code code,char *mangleNoSelf,char *rawMangleName,
+		 tree parms,int *errInfo)
 {
    int ret=0;
    nboolean isCtor=strcmp(className->userName,orgiName)==0;
@@ -353,7 +354,8 @@ static ClassFunc *addSubstitutions(FuncMgr *self,tree decl,tree classTree,ClassN
    n_debug("addSubstitutions通过参数判断函数是什么泛型类型的函数:%s 问号:%d 泛型类:%d 全是问号:%d decl:%p\n",
          orgiName,haveQueryParam,haveGenericClassParam,allParmIsQuery,decl);
    if(!n_hash_table_contains(self->hashTable,className->sysName)){
-      item=createEntity(decl,classTree,mangle,orgiName,code,isCtor,isFinalized,isUnref,mangleNoSelf,rawMangleName);
+      item=createEntity(decl,classTree,mangle,orgiName,code,isCtor,
+            isFinalized,isUnref,mangleNoSelf,rawMangleName);
       item->isQueryGenFunc=haveQueryParam;
       item->isGenericParmFunc=haveGenericClassParam;
       item->allParmIsQuery=allParmIsQuery;
@@ -364,16 +366,19 @@ static ClassFunc *addSubstitutions(FuncMgr *self,tree decl,tree classTree,ClassN
       }
       NPtrArray *array=n_ptr_array_sized_new(2);
       n_ptr_array_add(array,item);
-      n_debug("addSubstitutions 00 第一次加 class:%s mangle:%s org:%s rawMangleName:%s code:%d item:%p NPtrArray:%p self:%p parms:%p\n",
-      className->sysName,mangle,orgiName,rawMangleName,code,item,array,self,parms);
+      n_debug("addSubstitutions 00 第一次加 class:%s mangle:%s org:%s rawMangleName:%s \
+            code:%d item:%p NPtrArray:%p self:%p parms:%p\n",
+               className->sysName,mangle,orgiName,rawMangleName,code,item,array,self,parms);
       n_hash_table_insert (self->hashTable, n_strdup(className->sysName),array);
    }else{
       NPtrArray *array=(NPtrArray *)n_hash_table_lookup(self->hashTable,className->sysName);
       item=getEntity(array,mangle);
-      n_debug("addSubstitutions 11 第二次加 class:%s mangle:%s org:%s rawMangleName:%s 函数类型：code:%d item:%p array:%p parms:%p\n",
-      className->sysName,mangle,orgiName,rawMangleName,code,item,array,parms);
+      n_debug("addSubstitutions 11 第二次加 class:%s mangle:%s org:%s rawMangleName:%s \
+            函数类型：code:%d item:%p array:%p parms:%p\n",
+            className->sysName,mangle,orgiName,rawMangleName,code,item,array,parms);
       if(item==NULL){
-         item=createEntity(decl,classTree,mangle,orgiName,code,isCtor,isFinalized,isUnref,mangleNoSelf,rawMangleName);
+         item=createEntity(decl,classTree,mangle,orgiName,code,isCtor,
+               isFinalized,isUnref,mangleNoSelf,rawMangleName);
          item->isQueryGenFunc=haveQueryParam;
          item->isGenericParmFunc=haveGenericClassParam;
          item->allParmIsQuery=allParmIsQuery;
@@ -429,7 +434,7 @@ static ClassFunc *addFunc(FuncMgr *self,tree structTree,ClassName *className,enu
    func = getStaticFunc(self,staticNewName,className);
    if(func){
       if(fromType==CLASS_IMPL_DEFINE){
-         n_debug("函数定义是实现了的静态声明函数 %s newNameNoSelf:%s\n",className->userName,staticNewName);
+         //n_debug("函数定义是实现了的静态声明函数 %s newNameNoSelf:%s\n",className->userName,staticNewName);
          //去除self参数，把函数名改为staticNewName
          tree value = aet_utils_create_ident (staticNewName);
          funid->u.id.id=value;
@@ -547,7 +552,6 @@ int func_mgr_get_device_func_index(FuncMgr *self,ClassName *className,char *mang
    }
    return -1;
 }
-
 
 NPtrArray  *func_mgr_get_funcs(FuncMgr *self,ClassName *className)
 {
@@ -710,6 +714,7 @@ char * func_mgr_get_mangle_func_name(FuncMgr *self,ClassName *className,char *or
     return NULL;
 }
 
+
 NPtrArray *func_mgr_get_constructors(FuncMgr *self,ClassName *className)
 {
 	NPtrArray *array=(NPtrArray *)n_hash_table_lookup(self->hashTable,className->sysName);
@@ -719,7 +724,7 @@ NPtrArray *func_mgr_get_constructors(FuncMgr *self,ClassName *className)
 	NPtrArray* data=n_ptr_array_new();
 	for(i=0;i<array->len;i++){
 		ClassFunc *item=(ClassFunc *)n_ptr_array_index(array,i);
-		if(strcmp(item->orgiName,className->userName)==0 && aet_utils_valid_tree(item->fieldDecl)){
+		if(strcmp(item->orgiName,className->userName)==0/* && aet_utils_valid_tree(item->fieldDecl)*/){
 			//printf("func_mgr_get_constructors %s %s\n",item->mangleFunName,className->sysName);
 			n_ptr_array_add(data,item);
 		}
@@ -789,7 +794,8 @@ nboolean  func_mgr_change_static_func_decl(FuncMgr *self,struct c_declarator *de
    }
 
    if(existsStaticFuncAtField(self,newName,className)){
-      n_debug("func_mgr_change_static_func_decl 22 existsStaticFunc %s %s class:%s\n",newName,newSysName,className->sysName);
+      n_debug("func_mgr_change_static_func_decl 22 existsStaticFunc %s %s class:%s\n",
+            newName,newSysName,className->sysName);
       error_at (id_loc,"%qE 有同名的函数声明，并且参数也是一样的 ！", funName);
       n_free(orgiName);
       n_free(newName);
@@ -801,7 +807,8 @@ nboolean  func_mgr_change_static_func_decl(FuncMgr *self,struct c_declarator *de
    nboolean haveGenericClassParam=0;
    nboolean allParmIsQuery=0;
    fillGenericFuncType(args->parms,&haveQueryParam,&haveGenericClassParam,&allParmIsQuery);
-   n_debug("通过参数判断静态函数是什么泛型类型的函数:%s 问号:%d 泛型类:%d 全是问号:%d\n",orgiName,haveQueryParam,haveGenericClassParam,allParmIsQuery);
+   n_debug("通过参数判断静态函数是什么泛型类型的函数:%s 问号:%d 泛型类:%d 全是问号:%d\n",
+         orgiName,haveQueryParam,haveGenericClassParam,allParmIsQuery);
    nboolean result=TRUE;
    if(!n_hash_table_contains(self->staticHashTable,className->sysName)){
       ClassFunc *item=createEntity(NULL_TREE,structTree,newSysName,orgiName, STRUCT_DECL,FALSE,FALSE,FALSE,NULL,rawMangleName);
@@ -812,14 +819,16 @@ nboolean  func_mgr_change_static_func_decl(FuncMgr *self,struct c_declarator *de
       item->className = class_name_clone(className);
       NPtrArray *array=n_ptr_array_sized_new(2);
       n_ptr_array_add(array,item);
-      n_debug("func_mgr_change_static_func_decl 33 第一次加 class:%s mangle:%s org:%s code:%d item:%p NPtrArray:%p self:%p\n",
+      n_debug("func_mgr_change_static_func_decl 33 第一次加 class:%s mangle:%s\
+             org:%s code:%d item:%p NPtrArray:%p self:%p\n",
       className->sysName,newSysName,orgiName,STRUCT_DECL,item,array,self);
       n_hash_table_insert (self->staticHashTable, n_strdup(className->sysName),array);
    }else{
       NPtrArray *array=(NPtrArray *)n_hash_table_lookup(self->staticHashTable,className->sysName);
       ClassFunc *item=getEntity(array,newSysName);
-      n_debug("func_mgr_change_static_func_decl 44 第二次加 class:%s mangle:%s org:%s 函数类型：code:%d item:%p array:%p\n",
-      className->sysName,newSysName,orgiName,STRUCT_DECL,item,array);
+      n_debug("func_mgr_change_static_func_decl 44 第二次加 class:%s mangle:%s org:%s \
+            函数类型：code:%d item:%p array:%p\n",
+            className->sysName,newSysName,orgiName,STRUCT_DECL,item,array);
       if(item==NULL){
          item=createEntity(NULL_TREE,structTree,newSysName,orgiName, STRUCT_DECL,FALSE,FALSE,FALSE,NULL,rawMangleName);
          item->isQueryGenFunc=haveQueryParam;
@@ -855,7 +864,6 @@ nboolean  func_mgr_set_static_func_decl(FuncMgr *self,tree funcDecl,ClassName *c
    tree funName=DECL_NAME(funcDecl); //函数名
    char *mangleName=IDENTIFIER_POINTER(funName);
    n_debug("func_mgr_set_static_func_decl 00 %s funcDecl:%p className:%s",mangleName,funcDecl,className->sysName);
-   aet_print_tree(funcDecl);
    nboolean ok = setStaticDecl(self,funcDecl,className,STRUCT_DECL);
    if(define)
       ok= setStaticDecl(self,funcDecl,className,CLASS_IMPL_DEFINE);
@@ -934,19 +942,19 @@ nboolean  func_mgr_have_generic_func(FuncMgr *self,ClassName *className)
 
 nboolean  func_mgr_is_generic_func(FuncMgr *self,ClassName *className,char *mangleFuncName)
 {
-	   if(className==NULL)
-			return FALSE;
-	    NPtrArray  *array=func_mgr_get_funcs(self,className);
-	    if(array==NULL)
-	    	return FALSE;
-	    int i;
-	    for(i=0;i<array->len;i++){
-	  	   ClassFunc *item=(ClassFunc *)n_ptr_array_index(array,i);
-	  	   if(!strcmp(item->mangleFunName,mangleFuncName)){
-	  	     return class_func_is_func_generic(item);
-	  	   }
-	    }
-	    return FALSE;
+   if(className==NULL)
+      return FALSE;
+   NPtrArray  *array=func_mgr_get_funcs(self,className);
+   if(array==NULL)
+      return FALSE;
+   int i;
+   for(i=0;i<array->len;i++){
+      ClassFunc *item=(ClassFunc *)n_ptr_array_index(array,i);
+      if(!strcmp(item->mangleFunName,mangleFuncName)){
+         return class_func_is_func_generic(item);
+      }
+   }
+   return FALSE;
 }
 
 /**
@@ -982,43 +990,7 @@ static nboolean compareFunctionType(tree define,tree field)
  * 从类from中开始找是否实现了接口方法.
  * from找不到，从父类中找，一直找到AObject
  */
-ClassFunc *func_mgr_get_interface_impl00(FuncMgr *self,ClassName *from,ClassFunc *interfaceMethod,char **atClass)
-{
-	 NPtrArray  *srcFuncs=func_mgr_get_funcs(func_mgr_get(),from);
-	 char *praw=interfaceMethod->rawMangleName;
-	 int i;
-	 if(srcFuncs!=NULL){
-		 for(i=0;i<srcFuncs->len;i++){
-			 ClassFunc *compareFunc=(ClassFunc *)n_ptr_array_index(srcFuncs,i);
-			 if(strcmp(compareFunc->rawMangleName,praw)==0){
-			     n_debug("在类中找接口的方法。fieldDecl:%p %s %s public:%d\n",
-			           compareFunc->fieldDecl,from->sysName,compareFunc->rawMangleName,class_func_is_public(compareFunc));
-				 if(aet_utils_valid_tree(compareFunc->fromImplDefine)){
-				     n_debug("在类中找接口的方法。找到定义:%p %s %s public:%d\n",
-				           compareFunc->fromImplDefine,from->sysName,compareFunc->rawMangleName,class_func_is_public(compareFunc));
-					 if(compareFunctionType(compareFunc->fromImplDefine,interfaceMethod->fieldDecl)){
-						 *atClass=n_strdup(from->sysName);
-						 return compareFunc;
-					 }
-				 }else if(aet_utils_valid_tree(compareFunc->fieldDecl) && !class_func_is_private(compareFunc)){
-				     n_debug("在类中找接口的方法。找到域声明:%p %s %s public:%d\n",
-				           compareFunc->fieldDecl,from->sysName,compareFunc->rawMangleName,class_func_is_public(compareFunc));
-					 if(compareFunctionType(compareFunc->fieldDecl,interfaceMethod->fieldDecl)){
-						 *atClass=n_strdup(from->sysName);
-						 return compareFunc;
-					 }
-				 }
-			 }
-		 }
-	 }
-	 ClassInfo *info=class_mgr_get_class_info_by_class_name(class_mgr_get(),from);
-	 if(info==NULL)
-		 return NULL;
-	 if(info->parentName.sysName==NULL)
-		 return NULL;
-	 n_debug("在父类中找接口的方法。praw:%s from:%s parent:%s\n",praw,from->sysName,info->parentName.sysName);
-	 return func_mgr_get_interface_impl(self,&info->parentName,interfaceMethod,atClass);
-}
+
 
 /**
  * 在接口在from中是否有实现。
@@ -1544,7 +1516,6 @@ nboolean func_mgr_can_use_outside(FuncMgr *self,tree decl)
    !ret->isFinalized &&
    !ret->isUnref &&
    !ret->isMtcsFunc);
-
 }
 
 FuncMgr *func_mgr_get()

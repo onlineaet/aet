@@ -330,12 +330,12 @@ static nboolean createByParm(ClassFunc *func,vec<tree, va_gc> *exprlist,GenDefin
          char *typeName=getGenericDeclName(TREE_TYPE(parm));
          n_debug("createByParm  00 泛型单元:%d typeName:%s declUnit:%s\n",count,typeName,unit->name);
          if(typeName==NULL){
-            char *typeName=NULL;
-            class_util_get_type_name(TREE_TYPE(parm),&typeName);
-            int pointerCount=class_util_get_pointers(TREE_TYPE(parm));
+            int pointerCount=0;
+            const char *typeName = aet_utils_get_const_type_string(TREE_TYPE(parm),&pointerCount);
             GenericUnit  *newUnit=generic_unit_new(typeName,pointerCount);
             defineData->units[count]=newUnit;
-            n_debug("createByParm  11 泛型单元:%d typeName:%s declUnit:%s pointerCount:%d %p\n",count,typeName,unit->name,pointerCount,defineData);
+            n_debug("createByParm  11 泛型单元:%d typeName:%s declUnit:%s pointerCount:%d %p\n",
+                  count,typeName,unit->name,pointerCount,defineData);
          }else{
             //从参数中获取到是T
             char genStr[2];

@@ -59,9 +59,65 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 #include "genericutil.h"
 #include "classutil.h"
 
+static int tempVarCount = 0;
+
+/**
+ * 常数赋值给变量，并插入赋值语名到函数第一条语句的位置
+ */
+static tree modifyCst(tree fndecl, tree realOrIntCst)
+{
+   tree body = DECL_SAVED_TREE (fndecl);
+   gcc_assert (body != NULL_TREE);
+  // tree var = make_const_var (fndecl, realOrIntCst);
+   char varname[255];
+   sprintf(varname,"_temp_generic_const_var_%d",tempVarCount++);
+   tree var = build_decl (DECL_SOURCE_LOCATION (fndecl),VAR_DECL, get_identifier (varname), TREE_TYPE(realOrIntCst));
+   tree decl_expr = build1 (DECL_EXPR, void_type_node, var);
+   tree init_stmt = build2_loc(DECL_SOURCE_LOCATION (fndecl), MODIFY_EXPR,
+                               TREE_TYPE(var),var,realOrIntCst);
+   if (TREE_CODE (body) == STATEMENT_LIST){
+      /* 已有语句列表：插到最前面 */
+      tree_stmt_iterator i = tsi_start (body);
+      tsi_link_before (&i, decl_expr, TSI_SAME_STMT);
+      tsi_link_before (&i, init_stmt, TSI_SAME_STMT);
+
+   }else if (TREE_CODE (body) == BIND_EXPR){
+      /* 少数情况已经是 BIND：挂 vars，并插到 BIND 的 body 最前 */
+      TREE_CHAIN (var) = BIND_EXPR_VARS (body);
+      BIND_EXPR_VARS (body) = var;
+      if (BIND_EXPR_BLOCK (body) != NULL_TREE)
+         BLOCK_VARS (BIND_EXPR_BLOCK (body)) = BIND_EXPR_VARS (body);
+
+      tree *stmt_p = &BIND_EXPR_BODY (body);
+      gcc_assert (*stmt_p != NULL_TREE);
+      if (TREE_CODE (*stmt_p) == STATEMENT_LIST){
+         tree_stmt_iterator i = tsi_start (*stmt_p);
+         tsi_link_before (&i, decl_expr, TSI_SAME_STMT);
+         tsi_link_before (&i, init_stmt, TSI_SAME_STMT);
+      }else{
+         /* body 是单条语句：收成 list，声明在前 */
+         tree sl = alloc_stmt_list ();
+         append_to_statement_list (decl_expr, &sl);
+         append_to_statement_list (init_stmt, &sl);
+         append_to_statement_list (*stmt_p, &sl);
+         *stmt_p = sl;
+      }
+   }else{
+      /* 单条语句（例如目前只有一个 RETURN_EXPR）：收成 list，声明在前 */
+      tree sl = alloc_stmt_list ();
+      append_to_statement_list (decl_expr, &sl);
+      append_to_statement_list (init_stmt, &sl);
+      append_to_statement_list (body, &sl);
+      DECL_SAVED_TREE (fndecl) = sl;
+   }
+   return var;
+}
+
+
 /**
  * setData(3.1)
  * 把实参3.1转成地址:({float axt=3.1;&axt;})
+ * 用在函数选择，如果建call_expr,用临时变量，并插在函数开头
  */
 static tree convertRealOrIntegerCstToPointer_new(location_t loc,tree realOrIntCst)
 {
@@ -110,42 +166,30 @@ static tree convertRealOrIntegerCstToPointer_new(location_t loc,tree realOrIntCs
 }
 
 
+/**
+ * replace=true 创建真实的调用
+ * replace=fale,只是用在选择函数
+ * 如果是在文件中创建泛型对象
+ * static TFirst *tempxd = new$ TFirst<int>(5);
+ * 编译器生成一个constructor函数来包裹新的对象，代码如下：
+ * static TFirst *tempxd = new$ TFirst<int>(5);
+ * 变成这样：
+ * static TFirst *tempxd =NULL;
+ * static __attribute__((constructor)) void TFirst_tempxd_3460645734_ctor()
+{
+tempxd=({
+   TFirst<int > *_notv2_6TFirst0;
+   unsigned int _mtcsPlatType0=0;
+   ...
+ */
 static tree convertRealOrIntegerCstToPointer(location_t loc,tree realOrIntCst,nboolean replace)
 {
    if(replace){
-      //		char varName[128];
-      //		sprintf(varName,"realOrIntCstToPointer_%d",tempVarNameCount++);
-      //		tree id=aet_utils_create_ident(varName);
-      //		tree numberType=TREE_TYPE(realOrIntCst);
-      //		tree varDecl=build_decl (loc, VAR_DECL, id, numberType);
-      //		DECL_INITIAL(varDecl)=realOrIntCst;
-      //		DECL_CONTEXT(varDecl)=current_function_decl;
-      //		varDecl = pushdecl (varDecl);
-      //		//add_stmt (build_stmt (DECL_SOURCE_LOCATION (varDecl),DECL_EXPR, varDecl));
-      //		finish_decl (varDecl, loc, realOrIntCst,numberType, NULL_TREE);
-      //		tree xx=lookup_name(id);
-      //		 printf("convertRealOrIntegerCstToPointer 加入新语句 %p\n",xx);
-      //		tree pointerType=build_pointer_type(numberType);
-      //		tree addExpr= build1 (ADDR_EXPR, pointerType, varDecl);
-      //		return addExpr;
-      tree numberType=TREE_TYPE(realOrIntCst);
-      char *typeName=NULL;
-      class_util_get_type_name(numberType,&typeName);
-      char *codes=n_strdup_printf("({%s realOrIntCstToPointer[0];realOrIntCstToPointer[0]=3;realOrIntCstToPointer;}))\n",
-            typeName);
-      tree target=generic_util_create_target(codes);
-      tree bind=TREE_OPERAND (target, 1);
-      tree body=TREE_OPERAND (bind, 1);
-      tree_stmt_iterator it;
-      int i=0;
-      for (i = 0, it = tsi_start (body); !tsi_end_p (it); tsi_next (&it), i++){
-         if(i==1){
-            tree modify= tsi_stmt (it);
-            TREE_OPERAND (modify, 1)=realOrIntCst;
-         }
-      }
-      free(codes);
-      return target;
+      tree ret = modifyCst(current_function_decl,realOrIntCst);
+      tree pointerType=build_pointer_type(TREE_TYPE(realOrIntCst));
+      tree addExpr= build1 (ADDR_EXPR, pointerType, ret);
+      n_debug("常数转地址\n");
+      return addExpr;
    }else{
       return convertRealOrIntegerCstToPointer_new(loc,realOrIntCst);
    }
@@ -239,6 +283,11 @@ static inline bool div_or_mod_p (enum tree_code code)
     }
 }
 
+/**
+ * 转泛型参数
+ * replace = FALE ，用在选择函数
+ * replace =TRUE,创建调用
+ */
 tree generic_convert(location_t loc,tree type,tree rhs,nboolean replace)
 {
    enum tree_code codel = TREE_CODE (type);
@@ -246,27 +295,34 @@ tree generic_convert(location_t loc,tree type,tree rhs,nboolean replace)
    enum tree_code  coder = TREE_CODE (rhstype);
    tree ret=NULL_TREE;
    if (codel == POINTER_TYPE && (coder == INTEGER_TYPE || coder == REAL_TYPE)){
-      n_debug("convertForAssignment 00 泛型 从 %s 转指针 替换吗:%d",get_tree_code_name(coder),replace);
+      n_debug("generic_convert 00 泛型 从 %s转%s 转指针 替换吗:%d",
+            get_tree_code_name(codel),get_tree_code_name(coder),replace);
       if(TREE_CODE(rhs)==INTEGER_CST || coder == REAL_TYPE){
-         n_debug("convertForAssignment 00-11  从%s常数转指针",get_tree_code_name(TREE_CODE(rhs)));
+         n_debug("generic_convert 00-11  从%s常数转指针",get_tree_code_name(TREE_CODE(rhs)));
          return convertRealOrIntegerCstToPointer(loc,rhs,replace);
       }else if(TREE_CODE(rhs)==VAR_DECL || TREE_CODE(rhs)==PARM_DECL){
-         n_debug("convertForAssignment 00-22 从VAR_DECL类型的变量转指针",get_tree_code_name(TREE_CODE(rhs)));
+         n_debug("generic_convert 00-22 从VAR_DECL类型的变量转指针",get_tree_code_name(TREE_CODE(rhs)));
          return convertRealorIntVarToPointer(loc,rhs);
       }else if(TREE_CODE(rhs)==NOP_EXPR){
-         n_debug("convertForAssignment 00-33 从NOP_EXPR类型的变量转指针");
+         n_debug("generic_convert 00-33 从NOP_EXPR类型的变量转指针");
          return convertNopExprToPointer(loc,rhs);
       }else if(TREE_CODE(rhs)==COMPONENT_REF){
-         n_debug("convertForAssignment 00-44 从component_ref类型的变量转指针");
+         n_debug("generic_convert 00-44 从component_ref类型的变量转指针");
          return convertComponentRefToPointer(loc,rhs);
       }else if(TREE_CODE(rhs)==ARRAY_REF){
-         n_debug("convertForAssignment 00-55 从array_ref类型的变量转指针");
+         n_debug("generic_convert 00-55 从array_ref类型的变量转指针");
          return convertArrayRefToPointer(loc,rhs);
       }else if (TREE_CODE(rhs)==MULT_EXPR ||TREE_CODE(rhs)==PLUS_EXPR ||
             TREE_CODE(rhs)==MINUS_EXPR || div_or_mod_p(TREE_CODE(rhs))
             || TREE_CODE(rhs)==BIT_NOT_EXPR){
         // printf("出现了乘法 %s\n",get_tree_code_name(coder));
-         //aet_print_tree(rhs);
+         n_debug("generic_convert 00-66 从 MULT_EXPR 类PLUS_EXPR MINUS_EXPR div_or_mod_p BIT_NOT_EXPR 型的变量转指针");
+         tree type=TREE_TYPE(rhs);
+         tree pointerType=build_pointer_type(type);
+         tree addExpr= build1 (ADDR_EXPR, pointerType, rhs);
+         return addExpr;
+      }else if(TREE_CODE(rhs)==INDIRECT_REF){
+         n_debug("generic_convert 00-77 从 INDIRECT_REF 类型的变量转指针");
          tree type=TREE_TYPE(rhs);
          tree pointerType=build_pointer_type(type);
          tree addExpr= build1 (ADDR_EXPR, pointerType, rhs);
@@ -277,12 +333,14 @@ tree generic_convert(location_t loc,tree type,tree rhs,nboolean replace)
          ret=error_mark_node;
       }
    }else if(codel == POINTER_TYPE && coder == RECORD_TYPE){
-       n_debug("convertForAssignment  RECORD_TYPE 替换吗:%d",replace);
+       n_debug("generic_convert  RECORD_TYPE 替换吗:%d",replace);
        if(TREE_CODE(rhs)==VAR_DECL){
-           n_debug("convertForAssignment RECORD_TYPE 变量");
+           n_debug("generic_convert RECORD_TYPE 变量");
            return convertRealorIntVarToPointer(loc,rhs);
        }
    }
    return ret;
 }
+
+
 

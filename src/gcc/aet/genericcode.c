@@ -221,7 +221,7 @@ static char * replaceParams(GenericObj *genObj,char *paramsStr)
       //如果参数据类型是 aet_generic_E或T等
       if(param!=NULL && generic_util_start_with_generic(param)){
          int strSize=strlen(param);
-         char *genericType= generic_util_get_start_with_generic(param);
+         const char *genericType= generic_util_get_start_with_generic(param);
          int pointer=0;
          for(j=strlen(genericType);j<strSize;j++){
             if(param[j] ==' ')
@@ -349,7 +349,7 @@ static char *createCodesForGenfunc(GenericObj *funObj,GenericInfo *info,
          if(block->isFuncGeneric && !strcmp(block->belongFunc,funObj->callee->mangleFunName)){
             char *newFuncName=createFuncName(block->name,funcDefineUnits,NULL);
             char *funcdefine=createBlockFuncCode(funObj,block,newFuncName);
-            printf("createCodesForGenfunc 00 %s -- %s\n",newFuncName,funcdefine);
+            //printf("createCodesForGenfunc 00 %s -- %s\n",newFuncName,funcdefine);
             n_string_append(codes,funcdefine);
             n_string_append(codes,"\n");
             gcc_assert(block->index==i);
@@ -717,14 +717,8 @@ static char *genHeaderStr(CompileFile *cf)
  * 生成最终代码，每个编译单元一个,并写入文件 _block_func__0.o
  * 返回三段文件 泛型块+带泛型块函数源代码，编译源代码，编译源代码的输出文件
  */
-static char * createFinalCodes( NPtrArray *compileFileArray)
+static char * createFinalCodes( NPtrArray *compileFileArray,char *parentPath)
 {
-   char *fileName = getenv("GCC_AET_BLOCK_LIST_PATH");
-   NFile *f=n_file_new(fileName);
-   NFile *parent=n_file_get_parent_file(f);
-   NFile *canon=n_file_get_canonical_file(parent);
-   const char *parentPath=n_file_get_absolute_path(canon);
-
    int i,j;
    NString *listFile=n_string_new("");
    for(i=0;i<compileFileArray->len;i++){
@@ -845,20 +839,11 @@ static CompileFile *createCodeForSingleFile(GraphData *graphData,
  *把生成的块函数源代码所在的源文件，还有块函数源文件的编译所依赖的项目文件，项目文件的输出.o文件
  *三者存入fileName.o文件，供aetcollect.c中进行第二次编译泛型块函数编译 。
  */
-void generic_code_create_block_codes(GenericCode *self)
+void generic_code_create_block_codes(GenericCode *self,char *objectRootPath)
 {
-   //整个项目有泛型块文件列表的文件名。GCC_AET_BLOCK_LIST_PATH
-   //生成的结果是 block,.c,.o格式的字符串
-   //来自aetcollect
-   //sprintf(blockListFileParam,"-Daetblocklist%s",strlen(blockfiles)>0?blockListFileName:"");
-   char *fileName = getenv("GCC_AET_BLOCK_LIST_PATH");
-   if(fileName==NULL){
-      //n_error("进入这里不应该没GCC_AET_BLOCK_LIST_PATH文件名");
-      return;
-   }
    char saveFile[512];
    //这是与aetcollect的协议 在ifaceimpl.c中也有类似
-   sprintf(saveFile,"%s.o",fileName);
+   sprintf(saveFile,"%s/%s",objectRootPath,AET_GENERIC_BLOCK_FWGB_FILE_LIST);
    n_debug("generic_code_create_block_codes 11 saveFile:%s\n",saveFile);
 
    NPtrArray *graphArray=generic_graph_files_graph(generic_graph_get());
@@ -867,6 +852,9 @@ void generic_code_create_block_codes(GenericCode *self)
       remove(saveFile);
       return;
    }
+
+   n_debug("generic_code_create_block_codes 11aa graphArray:%d\n",graphArray->len);
+
    NPtrArray *genInfoArray=block_mgr_get_output_generic_info(block_mgr_get());
    //没有泛型块
    if(genInfoArray==NULL || genInfoArray->len==0){
@@ -895,11 +883,12 @@ void generic_code_create_block_codes(GenericCode *self)
       CompileFile *cf=createCodeForSingleFile(item,classGenObjArray,funcGenObjArray);
       n_ptr_array_add(cfArray,cf);
    }
-   char *listFile = createFinalCodes(cfArray);
+   char *listFile = createFinalCodes(cfArray,objectRootPath);
    FILE *fp=fopen(saveFile,"w");
    fwrite(listFile,1,strlen(listFile),fp);
    fclose(fp);
 }
+
 
 /**
  * 通过 unit index获取对应的块函数名

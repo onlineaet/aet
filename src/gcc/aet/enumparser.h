@@ -32,6 +32,7 @@ struct _EnumParser
 {
 	AetParser *parser;
 	NHashTable *hashTable;
+	tree common;//所有原始枚举名字的类型
 };
 
 typedef struct _EnumElement{

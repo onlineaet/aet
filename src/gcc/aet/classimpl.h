@@ -118,7 +118,8 @@ void           class_impl_in_finish_stmt(ClassImpl *self ,location_t loc,tree st
 
 void           class_impl_compile_over(ClassImpl *self);
 struct c_expr  class_impl_parser_object(ClassImpl *self);//解析__OBJECT__
-tree           class_impl_build_deref(ClassImpl *self,location_t loc,location_t component_loc,tree component,tree exprValue);
+tree           class_impl_build_deref(ClassImpl *self,location_t loc,
+                     location_t component_loc,tree component,tree exprValue);
 
 /**
  * 检查是不是给函数变量赋值，如果右边是类中的静态函数。需要重新生成新的tree
@@ -154,7 +155,6 @@ tree            class_impl_record_mtcs_call(ClassImpl *self,location_t loc,tree 
 
 GenericModel   *class_impl_get_func_generic_mode(ClassImpl *self);
 
-void            class_impl_test_target(tree target);
 /**
  * 原型 push_parm_decl c-tree.h c-decl.cc
  * 原 push_parm_decl 没有返回decl

@@ -55,7 +55,8 @@ struct _ClassFunc
 	nboolean isStatic;//是不是静态函数
 	nboolean isQueryGenFunc;    //是不是有问号泛型参数的函数。
 	nboolean isGenericParmFunc;//是不是有泛型类参数的函数
-	GenericModel *parmsGenModel[50];//方法中的参数的泛型 因为field只有类型没有参数，所以从struct c_declarator *declarator取出参数保存在这里
+	//方法中的参数的泛型 因为field只有类型没有参数，所以从struct c_declarator *declarator取出参数保存在这里
+	GenericModel *parmsGenModel[50];
 	int parsmGenModeCount; //泛型参数个数，如果self也是泛型类也包括。
 	ClassPermissionType permission;
 	int genBlockCount;//泛型块数量
@@ -123,6 +124,13 @@ ClassFunc  *class_func_clone(ClassFunc *self,tree newFieldDecl,char **names,tree
 //定义一个普通的方法
 nboolean    class_func_is_normal(ClassFunc *self);
 void        class_func_set_end_location(ClassFunc *self,location_t endLoc);
+//获取参数个数据
+int         class_func_get_param_count(ClassFunc *self);
+
+static inline nboolean class_func_is_ctor(ClassFunc *self)
+{
+   return self->isCtor;
+}
 
 #endif
 

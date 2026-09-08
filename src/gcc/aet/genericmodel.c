@@ -101,15 +101,15 @@ static void getExtendsClass(c_parser *parser,char **parentClass,tree *parentTree
  * 泛型声明的tree 是IDENTIFIER_NODE
  */
 static GenericUnit *createGenUnit(tree generic,char *parentName,tree parentTree,location_t loc)
-   {
+{
    GenericUnit *unit=(GenericUnit *)n_slice_new0(GenericUnit);
    if(TREE_CODE(generic)!=IDENTIFIER_NODE){
       tree type=TREE_TYPE(generic);
-      class_util_get_type_name(type,&unit->name);
+      const char *typeName = aet_utils_get_const_type_string(type,&unit->pointerCount);
+      unit->name=n_strdup(typeName);
       tree cs=c_sizeof(0,type);
       wide_int result=wi::to_wide(cs);
       unit->size=result.to_shwi();
-      unit->pointerCount=class_util_get_pointers(type);
       unit->genericType=generic_util_get_generic_type(type);
       unit->isDefine=TRUE;
       unit->decl=generic;
@@ -289,7 +289,6 @@ nboolean  generic_model_equal(GenericModel *self,GenericModel *comp)
 	   if(!compareUnit(unit1,unit2)){
 		   return FALSE;
 	   }
-
    }
    return TRUE;
 }
@@ -431,7 +430,7 @@ int generic_model_get_undefine_count(GenericModel *self)
 	return count;
 }
 
-char         *generic_model_get_first_decl_name(GenericModel *self)
+char  *generic_model_get_first_decl_name(GenericModel *self)
 {
 	if(self==NULL)
 		return NULL;
@@ -628,6 +627,28 @@ char  *generic_model_tostring(GenericModel *self)
    return self->toString;
 }
 
+/**
+ * 还原model为代码形式
+ * 例如 int <int> ,int * <int *>
+ */
+char *generic_model_create_codes(GenericModel *self)
+{
+   if(self==NULL)
+      return NULL;
+   NString *codes=n_string_new("<");
+   int i,j;
+   for(i=0;i<self->unitCount;i++){
+      GenericUnit *unit=self->genUnits[i];
+      n_string_append_printf(codes,"%s ",unit->name);
+      for(j=0;j<unit->pointerCount;j++)
+         n_string_append(codes,"*");
+      if(i<self->unitCount-1)
+         n_string_append(codes,",");
+   }
+   n_string_append(codes,">");
+   return n_string_free(codes,FALSE);
+}
+
 
 /**
  * 1 解析 如:class$ Abc<E>形式
@@ -732,7 +753,6 @@ nboolean  generic_model_exits_unit(GenericModel *self,GenericUnit *unit)
 
 /**
  * self与other合并成一个新的GenericModel
- * 过渡重复的声明包括问号
  */
 GenericModel *generic_model_merge(GenericModel *self,GenericModel *other)
 {
@@ -782,7 +802,8 @@ GenericUnit  *generic_unit_new(char *typeName,int pointer)
 		if(!aet_utils_valid_tree(type))
 		   n_error("没有找到类型:%s。",typeName);
 	}
-	class_util_get_type_name(type,&self->name);
+   const char *tn = aet_utils_get_const_type_string(type,NULL);
+   self->name = n_strdup(tn);
 	if(TREE_CODE(type)==TYPE_DECL)
 		type=TREE_TYPE(type);
 	tree cs=c_sizeof(0,type);
@@ -792,7 +813,8 @@ GenericUnit  *generic_unit_new(char *typeName,int pointer)
 	self->genericType=generic_util_get_generic_type(type);
 	self->isDefine=TRUE;
 	self->decl = build_decl (0,PARM_DECL,NULL_TREE, type);
-	n_debug("createGenUnit 00 是一个具体的类型 %s size:%d pointerCount:%d,genericType:%d\n",self->name,self->size,self->pointerCount,self->genericType);
+	n_debug("createGenUnit 00 是一个具体的类型 %s size:%d pointerCount:%d,genericType:%d\n",
+	      self->name,self->size,self->pointerCount,self->genericType);
 	return self;
 }
 
@@ -805,7 +827,7 @@ GenericUnit  *generic_unit_new_undefine(char *idName)
 	return self;
 }
 
-nboolean      generic_unit_equal(GenericUnit *self,GenericUnit *dest)
+nboolean  generic_unit_equal(GenericUnit *self,GenericUnit *dest)
 {
 	return compareUnit(self,dest);
 }

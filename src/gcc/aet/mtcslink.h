@@ -34,11 +34,15 @@ typedef struct _MtcsLink MtcsLink;
 struct _MtcsLink
 {
     char *collectMtcsLinkFile;
+    NPtrArray *linkInfoArray;
 };
 
 MtcsLink *mtcs_link_new();
 void  mtcs_link_add(MtcsLink *self,const char *linkFuncNames,int version,int isa,const char *platName);
-void  mtcs_link_link(MtcsLink *self);
+char *mtcs_link_save(MtcsLink *self);
+///新方案
+NPtrArray * mtcs_link_create_array(char *buffer);
+ void mtcs_link_link(MtcsLink *self,char *objRootPath,NPtrArray **arrays,int length,int pos);
 
 #endif
 

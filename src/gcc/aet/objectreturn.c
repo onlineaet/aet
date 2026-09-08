@@ -39,9 +39,10 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 #include "bitmap.h"
 #include "tree-nested.h"
 #include "opts.h"
+#include "../libcpp/include/cpplib.h"
+#include "../libcpp/internal.h"
 
 #include "aet-c-parser-header.h"
-
 #include "c-aet.h"
 #include "aetutils.h"
 #include "classmgr.h"
@@ -75,7 +76,6 @@ static void objectReturnlInit(ObjectReturn *self)
    //泛型块函数中播入的tls
    self->tlsDataArray=n_ptr_array_new();
 }
-
 
 typedef struct _DataReturn{
 	  tree function;
@@ -379,8 +379,8 @@ static tree finalize_remove_cleanup_r (tree *tp, int *walk_subtrees, void *data)
   // printf("finalize_nrv_remove_cleanup 00 %s\n",get_tree_code_name(TREE_CODE(t)));
    if (TYPE_P (t))
       *walk_subtrees = 0;
-   else if (TREE_CODE (t) == BIND_EXPR)
-      walk_tree (&BIND_EXPR_BODY (t), finalize_remove_cleanup_r, data, NULL);
+   //else if (TREE_CODE (t) == BIND_EXPR)
+     ///walk_tree (&BIND_EXPR_BODY (t), finalize_remove_cleanup_r, data, NULL);
   else if (TREE_CODE (t) == RETURN_EXPR) {
 	  //TREE_CODE (TREE_OPERAND (t, 0)) == INIT_EXPR
 	  printf("finalize_nrv_remove_cleanup RETURN_EXPR 被替换 %s\n",get_tree_code_name(TREE_CODE(t)));
@@ -462,10 +462,11 @@ static tree finalize_test_iter (tree *tp, int *walk_subtrees, void *data)
       printf("finalize_test_iter 00 TYPE_P (t) %s\n",get_tree_code_name(TREE_CODE(t)));
       aet_print_tree_skip_debug(t);
       *walk_subtrees = 0;
-   }else if (TREE_CODE (t) == BIND_EXPR){
-      printf("finalize_test_iter 11 BIND_EXPR %s\n",get_tree_code_name(TREE_CODE(t)));
-      aet_print_tree_skip_debug(t);
-      walk_tree (&BIND_EXPR_BODY (t), finalize_test_iter, data, NULL);
+
+ //  }else if (TREE_CODE (t) == BIND_EXPR){
+     // printf("finalize_test_iter 11 BIND_EXPR %s\n",get_tree_code_name(TREE_CODE(t)));
+    //  aet_print_tree_skip_debug(t);
+     // walk_tree (&BIND_EXPR_BODY (t), finalize_test_iter, data, NULL);
    }else if (TREE_CODE (t) == RETURN_EXPR) {
       //TREE_CODE (TREE_OPERAND (t, 0)) == INIT_EXPR
       printf("finalize_test_iter 22 RETURN_EXPR 被替换 %s\n",get_tree_code_name(TREE_CODE(t)));
@@ -597,7 +598,6 @@ static int aggregate_value_class(const_tree exp, const_tree fntype)
    return 0;
 }
 
-
 static void  build_return_expr (ObjectReturn *self,tree ret_obj, tree ret_val)
 {
    if (ret_val){
@@ -626,13 +626,15 @@ static void  build_return_expr (ObjectReturn *self,tree ret_obj, tree ret_val)
       /* If the function returns an aggregate type, find out whether this is
       a candidate for Named Return Value.  If so, record it.  Otherwise,
       if this is an expression of some kind, record it elsewhere.  */
-      if (AGGREGATE_TYPE_P (operation_type) && aggregate_value_class (operation_type, current_function_decl)){
+      if (AGGREGATE_TYPE_P (operation_type)
+            && aggregate_value_class (operation_type, current_function_decl)){
          /* Strip useless conversions around the return value.  */
          if (gnat_useless_type_conversion (ret_val))
             ret_val = TREE_OPERAND (ret_val, 0);
          /* Now apply the test to the return value.  */
          if (return_value_ok_for_nrv_p (ret_obj, ret_val)){
-            n_debug("加入的返回值是class对象变量 ，并且是一个可以优化的变量00 Id:%d ret_val:%p old:%p current_function_decl:%p",
+            n_debug("加入的返回值是class对象变量 ，并且是一个可以优化的变量00 \
+                  Id:%d ret_val:%p old:%p current_function_decl:%p",
                   DECL_UID (ret_val),ret_val,old,current_function_decl);
             DataReturn *data=getDataReturn(self,current_function_decl);
             if(data==NULL)
@@ -642,7 +644,8 @@ static void  build_return_expr (ObjectReturn *self,tree ret_obj, tree ret_val)
             /* Note that we need not care about CONSTRUCTORs here, as they are
             totally transparent given the read-compose-write semantics of
             assignments from CONSTRUCTORs.  */
-            n_debug("加入的返回值是class对象变量 ，但不是一个变量11，可以是一个target表达式 ret_val:%p old:%p current_function_decl:%p\n",
+            n_debug("加入的返回值是class对象变量 ，但不是一个变量11，可以是一个target表达式 \
+                  ret_val:%p old:%p current_function_decl:%p\n",
                   ret_val,old,current_function_decl);
             DataReturn *data=getDataReturn(self,current_function_decl);
             if(data==NULL){
@@ -657,34 +660,34 @@ static void  build_return_expr (ObjectReturn *self,tree ret_obj, tree ret_val)
 
 static tree getClearup(tree decl)
 {
-	  tree attr = lookup_attribute ("cleanup", DECL_ATTRIBUTES (decl));
-	  if (attr){
-		  printf("用户自设的cleanup %s\n",IDENTIFIER_POINTER(DECL_NAME(decl)));
-		  return NULL_TREE;
-	  }
-	  tree cleanup_id = aet_utils_create_ident(AET_CLEANUP_OBJECT_METHOD);
-	  tree cleanup_decl = lookup_name (cleanup_id);
-	  tree cleanup;
-	  vec<tree, va_gc> *v;
+   tree attr = lookup_attribute ("cleanup", DECL_ATTRIBUTES (decl));
+   if (attr){
+      printf("用户自设的cleanup %s\n",IDENTIFIER_POINTER(DECL_NAME(decl)));
+      return NULL_TREE;
+   }
+   tree cleanup_id = aet_utils_create_ident(AET_CLEANUP_OBJECT_METHOD);
+   tree cleanup_decl = lookup_name (cleanup_id);
+   tree cleanup;
+   vec<tree, va_gc> *v;
 
-	  /* Build "cleanup(&decl)" for the destructor.  */
-	  cleanup = build_unary_op (input_location, ADDR_EXPR, decl, false);
-	  vec_alloc (v, 1);
-	  v->quick_push (cleanup);
-	  cleanup = c_build_function_call_vec (DECL_SOURCE_LOCATION (decl), vNULL, cleanup_decl, v, NULL);
-	  vec_free (v);
+   /* Build "cleanup(&decl)" for the destructor.  */
+   cleanup = build_unary_op (input_location, ADDR_EXPR, decl, false);
+   vec_alloc (v, 1);
+   v->quick_push (cleanup);
+   cleanup = c_build_function_call_vec (DECL_SOURCE_LOCATION (decl), vNULL, cleanup_decl, v, NULL);
+   vec_free (v);
 
-	  /* Don't warn about decl unused; the cleanup uses it.  */
-	  TREE_USED (decl) = 1;
-	  TREE_USED (cleanup_decl) = 1;
-	  DECL_READ_P (decl) = 1;
+   /* Don't warn about decl unused; the cleanup uses it.  */
+   TREE_USED (decl) = 1;
+   TREE_USED (cleanup_decl) = 1;
+   DECL_READ_P (decl) = 1;
 
-	  enum tree_code code;
-	  tree stmt;
+   enum tree_code code;
+   tree stmt;
 
-	  code = TRY_FINALLY_EXPR;
-	  stmt = build_stmt (DECL_SOURCE_LOCATION (decl), code, NULL, cleanup);
-	  return stmt;
+   code = TRY_FINALLY_EXPR;
+   stmt = build_stmt (DECL_SOURCE_LOCATION (decl), code, NULL, cleanup);
+   return stmt;
 }
 
 
@@ -747,38 +750,38 @@ static tree addTryFinallyExpr (tree *tp,NPtrArray *dataArray)
 
 static tree copyStmtList(tree *stmtList,NPtrArray *dataArray)
 {
-	  tree result=NULL_TREE;
-	  tree_stmt_iterator oi;
-	  oi = tsi_start (*stmtList);
-	  nboolean find=FALSE;
-	  for (; !tsi_end_p (oi); tsi_next (&oi)){
-	       tree stmt = tsi_stmt (oi);
-	       if (TREE_CODE (stmt) == DECL_EXPR ){
-	       	   tree var=DECL_EXPR_DECL (stmt);
-	       	   find=exitsVar(dataArray,var);
-	       	   if(find)
-	       		   break;
-	       }
+   tree result=NULL_TREE;
+   tree_stmt_iterator oi;
+   oi = tsi_start (*stmtList);
+   nboolean find=FALSE;
+   for (; !tsi_end_p (oi); tsi_next (&oi)){
+      tree stmt = tsi_stmt (oi);
+      if (TREE_CODE (stmt) == DECL_EXPR ){
+         tree var=DECL_EXPR_DECL (stmt);
+         find=exitsVar(dataArray,var);
+         if(find)
+            break;
       }
-	  if(find){
-	     n_debug("aet_copy_statement_list 00 遇到一个变量声明。查到需要加入finally的变量了吗:%d\n",find);
-		 result=addTryFinallyExpr(stmtList,dataArray);
-	  }
-	  return result;
+   }
+   if(find){
+      n_debug("aet_copy_statement_list 00 遇到一个变量声明。查到需要加入finally的变量了吗:%d\n",find);
+      result=addTryFinallyExpr(stmtList,dataArray);
+   }
+   return result;
 }
 
 static void removeReadyVar(NPtrArray *dataArray,tree var)
 {
-	int i;
-	for(i=0;i<dataArray->len;i++){
-		 tree item=n_ptr_array_index(dataArray,i);
-		 if(var==item){
-			 n_ptr_array_remove(dataArray,item);
-			 printf("找到一个变量声明，DECL_EXPR 但已有try_finally_expr.所以不再加clearup\n");
-			 aet_print_tree_skip_debug(item);
-			 return;
-		 }
-	}
+   int i;
+   for(i=0;i<dataArray->len;i++){
+      tree item=n_ptr_array_index(dataArray,i);
+      if(var==item){
+         n_ptr_array_remove(dataArray,item);
+         printf("找到一个变量声明，DECL_EXPR 但已有try_finally_expr.所以不再加clearup\n");
+         aet_print_tree_skip_debug(item);
+         return;
+      }
+   }
 }
 
 /**
@@ -786,21 +789,21 @@ static void removeReadyVar(NPtrArray *dataArray,tree var)
  */
 static tree getFinallyExprVar(tree call)
 {
-	if(TREE_CODE (call) == CALL_EXPR){
-	   tree funAdd=CALL_EXPR_FN (call);
-	   if(TREE_CODE(funAdd)==ADDR_EXPR){
-		  tree func=TREE_OPERAND (funAdd, 0);
-		  if(TREE_CODE(func)==FUNCTION_DECL){
-			char *funcName=IDENTIFIER_POINTER(DECL_NAME(func));
-			tree arg;
-			call_expr_arg_iterator iter;
-			FOR_EACH_CALL_EXPR_ARG (arg, iter, call){
-				return getClearupCallFromTry(arg);
-			}
-		 }
-	   }
-	}
-	return NULL_TREE;
+   if(TREE_CODE (call) == CALL_EXPR){
+      tree funAdd=CALL_EXPR_FN (call);
+      if(TREE_CODE(funAdd)==ADDR_EXPR){
+         tree func=TREE_OPERAND (funAdd, 0);
+         if(TREE_CODE(func)==FUNCTION_DECL){
+            char *funcName=IDENTIFIER_POINTER(DECL_NAME(func));
+            tree arg;
+            call_expr_arg_iterator iter;
+            FOR_EACH_CALL_EXPR_ARG (arg, iter, call){
+               return getClearupCallFromTry(arg);
+            }
+         }
+      }
+   }
+   return NULL_TREE;
 }
 
 /**
@@ -815,8 +818,8 @@ static tree readyCleanup_cb (tree *tp, int *walk_subtrees, void *data)
    tree t = *tp;
    if (TYPE_P (t))
       *walk_subtrees = 0;
-   else if (TREE_CODE (t) == BIND_EXPR)
-      walk_tree (&BIND_EXPR_BODY (t), readyCleanup_cb, data, NULL);
+  // else if (TREE_CODE (t) == BIND_EXPR)
+      //walk_tree (&BIND_EXPR_BODY (t), readyCleanup_cb, data, NULL);
    else if (TREE_CODE (t) == TRY_FINALLY_EXPR){
 	   tree p0 = TREE_OPERAND (t, 1);
 	   tree varByCleanup=getFinallyExprVar(p0);
@@ -866,8 +869,8 @@ static tree addCleanupFunc_cb (tree *tp, int *walk_subtrees, void *data)
    tree t = *tp;
    if (TYPE_P (t))
       *walk_subtrees = 0;
-   else if (TREE_CODE (t) == BIND_EXPR)
-      walk_tree (&BIND_EXPR_BODY (t), addCleanupFunc_cb, data, NULL);
+  // else if (TREE_CODE (t) == BIND_EXPR)
+    //  walk_tree (&BIND_EXPR_BODY (t), addCleanupFunc_cb, data, NULL);
    else if(TREE_CODE(t)==STATEMENT_LIST){
 	  tree result= copyStmtList(&t,dp->dataArray);
 	  if(result!=NULL_TREE){
@@ -904,7 +907,7 @@ void  object_return_finish_function(ObjectReturn *self,tree fndecl)
       n_warning("object_return_finish_function fndecl无效");
       return;
    }
-   n_debug("解析函数的返回值 --- %s\n",IDENTIFIER_POINTER(DECL_NAME(fndecl)));
+   n_debug("object_return_finish_function --- %s\n",IDENTIFIER_POINTER(DECL_NAME(fndecl)));
    finalize_add_cleanup(self,fndecl);
    DataReturn *dataReturn=getDataReturn(self,fndecl);
    if(dataReturn!=NULL){
@@ -916,10 +919,8 @@ void  object_return_finish_function(ObjectReturn *self,tree fndecl)
 
 void object_return_add_return(ObjectReturn *self,tree retExpr)
 {
-	 tree  decl = DECL_RESULT (current_function_decl);
-	// printf("object_return_add_return 00 %s %p %d\n",IDENTIFIER_POINTER(DECL_NAME(current_function_decl)),current_function_decl,TREE_ADDRESSABLE (retExpr));
-	 //TREE_ADDRESSABLE (retExpr)=0;
-	 build_return_expr(self,decl,retExpr);
+    tree  decl = DECL_RESULT (current_function_decl);
+    build_return_expr(self,decl,retExpr);
 }
 
 /**
@@ -943,7 +944,19 @@ tree   object_return_convert(ObjectReturn *self,location_t loc,tree retExpr)
    return retExpr;
 }
 
-//////////////泛型块返回值
+
+
+//////////////泛型块返回值--------------------------------------
+/**
+ * E ret = genericblock$(){
+ *    E a= ...
+ *    return a;
+ * }
+ * 如果E =int 返回的a = int 但接收的返回值是 E = aet_void_E,类型不匹配，在genericblock内部生成
+ * tls 变量 static __thread 类型 aet_tls_xxx这是一个变量不是数组也不是指针，如果类型是结构体，变量类型
+ * 就是结构体，static __thread int  aet_tls_xxx 或 static __thread struct abc aet_tls_xxx
+ */
+
 static bool expr_is_pointer_p (tree expr)
 {
    if (!expr || expr == error_mark_node)
@@ -1088,29 +1101,21 @@ static nboolean atCompileGenericBlock(ObjectReturn *self)
  */
 tree object_return_convert_block(ObjectReturn *self,tree expr)
 {
-   return expr;
    //是否进入编译泛型块函数
    if(!atCompileGenericBlock(self))
       return expr;
-   printf("object_return_convert_block 00 \n");
-
    tree fndecl=current_function_decl;
-
    //返回表达式的类型是不是指针
    if(expr_is_pointer_p(expr))
       return expr;
-   printf("object_return_convert_block 22 \n");
-
    //泛型块函数的返回值是不是指针
    tree type TREE_TYPE(TREE_TYPE(fndecl));
    if(!POINTER_TYPE_P (type))
       return expr;
-   printf("object_return_convert_block 33 \n");
-
    //插入 __thread 根据泛型的定义，如果有多个泛型如何选择，判断返回值 如果是 E ，就用 E ， 如果用户返回的类型是 void *应报错。
    int pointerCount = 0;
-   char *re = generic_util_get_type_str(type ,&pointerCount);
-   char *genericDeclStr=  generic_util_get_generic_str(type);
+   const char *re = aet_utils_get_const_type_string(type,&pointerCount);
+   const char *genericDeclStr=  generic_util_get_generic_decl_string(re);
    if(genericDeclStr==NULL){
       n_error("泛型块函数返回的不是泛型声明类型\n");
    }
@@ -1140,12 +1145,8 @@ tree object_return_convert_block(ObjectReturn *self,tree expr)
 
    /* 在 c_finish_return 之前 */
    tree store = build2 (MODIFY_EXPR, void_type_node, tlsvar, expr);
-   printf("object_return_convert_block 44 %s %d %s trueTypeName:%s\n",re,pointerCount,genericDeclStr,trueTypeName);
-
-   aet_print_tree(expr);
-
+   n_debug("object_return_convert_block 44 %s %d %s trueTypeName:%s\n",re,pointerCount,genericDeclStr,trueTypeName);
    add_stmt (store);   /* 追加到当前 stmt list（if 体、复合语句体等） */
-
    /* 再正常结束 return，返回 &tls_var */
    tree addr = build_fold_addr_expr (tlsvar);
    tree trueType = lookup_name (get_identifier (trueTypeName));
@@ -1156,9 +1157,6 @@ tree object_return_convert_block(ObjectReturn *self,tree expr)
       trueType = TREE_TYPE (trueType);
    trueType=build_pointer_type(trueType);
    addr = fold_convert (trueType, addr);  /* 按E 类型转 */
-   printf("object_return_convert_block 55 %s %d %s\n",re,pointerCount,genericDeclStr);
-   aet_print_tree(addr);
-   aet_print_tree(trueType);
    return addr;
 }
 
@@ -1166,14 +1164,11 @@ tree object_return_convert_block(ObjectReturn *self,tree expr)
 
 ObjectReturn *object_return_get()
 {
-	static ObjectReturn *singleton = NULL;
-	if (!singleton){
-		 singleton =n_slice_alloc0 (sizeof(ObjectReturn));
-		 objectReturnlInit(singleton);
-		 singleton->parser = aet_parser_get();
-	}
-	return singleton;
+   static ObjectReturn *singleton = NULL;
+   if (!singleton){
+      singleton =n_slice_alloc0 (sizeof(ObjectReturn));
+      objectReturnlInit(singleton);
+      singleton->parser = aet_parser_get();
+   }
+   return singleton;
 }
-
-
-

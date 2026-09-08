@@ -160,7 +160,6 @@ static tree getFieldInfo(tree field,char *fN,tree *lastField)
                        tree rtn=TREE_TYPE(TREE_TYPE(func));
                        GenericModel *genModel=c_aet_get_generics_model(rtn);
                        printf("是不是有泛型:%s\n",generic_model_tostring(genModel));
-                       aet_print_tree(rtn);
                     }
                     n_debug("在genericquery.c getFieldInfo mode iss model:%s\n",generic_model_tostring(mm));
                     field=func;
@@ -841,7 +840,6 @@ void  generic_query_check_var_and_parm(GenericQuery *self,tree decl,tree initOrR
        tree type=getFieldInfo(initOrRhs,fieldName,&last);
        n_debug("generic_query_check_var_and_parm 00 变量:%s的泛型声明是:%s initOrRhs:%s type:%p\n",
                      name,generic_model_tostring(lhsModel),get_tree_code_name(TREE_CODE(initOrRhs)),type);
-       aet_print_tree(initOrRhs);
        if(!aet_utils_valid_tree(type))
           return;
        location_t loc=input_location;

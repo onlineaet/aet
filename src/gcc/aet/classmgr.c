@@ -55,7 +55,7 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 #include "funcmgr.h"
 #include "classparser.h"
 #include "classimpl.h"
-#include "middlefile.h"
+#include "ifaceimpl.h"
 
 
 static void classMgrInit(ClassMgr *self)
@@ -166,10 +166,11 @@ ClassName *class_mgr_get_class_name_by_user(ClassMgr *self,char *userClassName)
    NFile *inFnames=n_file_new(in_fnames[0]);
    NFile  *inc=n_file_get_canonical_file(inFnames);
    const char *parentDir=n_file_get_parent(inc);
+   n_warning("classmgr.c 00 有两个相同的类名:%s in_fnames:%s\n",result->className.sysName),in_fnames[0];
    while (n_hash_table_iter_next(&iter, &key, &value)) {
       ClassInfo *info = (ClassInfo *)value;
       if(strcmp(info->className.userName,userClassName)==0){
-         printf("in_fnames[0] %s file:%s\n",in_fnames[0],info->file);
+         n_warning("classmgr.c 11 有两个相同的类名 in_fnames[0] %s file:%s\n",in_fnames[0],info->file);
          NFile *f=n_file_new(info->file);
          if(n_file_equals(inFnames,f)){
             n_file_unref(f);
@@ -178,7 +179,7 @@ ClassName *class_mgr_get_class_name_by_user(ClassMgr *self,char *userClassName)
          NFile  *fc=n_file_get_canonical_file(f);
          const char *dir=n_file_get_parent(fc);
          if(!strcmp(dir,parentDir)){
-            printf("in_fnames[0] 返回了-----%s file:%s\n",in_fnames[0],info->file);
+            printf("classmgr.c 22 有两个相同的类名 in_fnames[0] 返回了-----%s file:%s\n",in_fnames[0],info->file);
             n_file_unref(fc);
             n_file_unref(f);
             return &(info->className);
@@ -225,7 +226,8 @@ ClassName *class_mgr_get_class_name_by_user(ClassMgr *self,char *userClassName)
          result=info;
       }
    }
-   n_string_append_printf(str," 最终选择的是:%s。 要精确的访问类，你可在类名前加上包名。如：com_ai_ConvOps。",result->className.sysName);
+   n_string_append_printf(str," 最终选择的是:%s。 要精确的访问类，你可在类名前加上包名。如：com_ai_ConvOps。",
+         result->className.sysName);
    warning_at (input_location,0,"%qs",str->str);
    n_string_free(str,TRUE);
    return &(result->className);
@@ -233,10 +235,10 @@ ClassName *class_mgr_get_class_name_by_user(ClassMgr *self,char *userClassName)
 
 ClassName *class_mgr_get_class_name_by_sys(ClassMgr *self,char *sysClassName)
 {
-    ClassInfo *info = class_mgr_get_class_info(self,sysClassName);
-    if(info==NULL)
-    	return NULL;
-    return &(info->className);
+   ClassInfo *info = class_mgr_get_class_info(self,sysClassName);
+   if(info==NULL)
+      return NULL;
+   return &(info->className);
 }
 
 ClassInfo *class_mgr_get_class_info(ClassMgr *self,char *sysClassName)
@@ -350,7 +352,7 @@ ClassRelationship   class_mgr_relationship(ClassMgr *self,char *my,char *other)
 	if(info==NULL || otherInfo==NULL)
 		return CLASS_RELATIONSHIP_UNKNOWN;
 	ClassRelationship ship=getParentByClassName(my,other);
-	n_debug("class_mgr_relationship 00 my:%s other:%s %d",my,other,ship);
+	//n_debug("class_mgr_relationship 00 my:%s other:%s %d",my,other,ship);
 	if(ship==CLASS_RELATIONSHIP_UNKNOWN){
 		ship=getParentByClassName(other,my);
 		if(ship==CLASS_RELATIONSHIP_UNKNOWN){
@@ -600,8 +602,6 @@ nboolean   class_mgr_is_ancestors(ClassMgr *self,char *childSysName,char *ancest
    return FALSE;
 }
 
-
-
 //保存impl$ A的位置
 void class_mgr_set_impl_location(ClassMgr *self,ClassName *className,location_t implLoc)
 {
@@ -652,7 +652,6 @@ static nboolean findDefine(ClassFunc *dest,ClassName *src)
     }
     return findDefine;
 }
-
 
 /**
  * 检查在class$中声明的方法，是否已实现
@@ -837,7 +836,8 @@ static void creatNeedCheckFunc(ClassMgr *self,ClassName *className)
                ClassFunc *interfaceMethod=(ClassFunc *)n_ptr_array_index(ifaceFuncsArray,j);
                if(class_func_is_interface_reserve(interfaceMethod)) //是接口需要保留的ref和unref
                   continue;
-               ClassFunc *needImpl=func_mgr_get_func_by_raw_mangle(func_mgr_get(), className,interfaceMethod->rawMangleName);
+               ClassFunc *needImpl=func_mgr_get_func_by_raw_mangle(func_mgr_get(),
+                     className,interfaceMethod->rawMangleName);
                if(!needImpl){
                   //肯实有定义的，因为不是抽象函数
                   n_string_append_printf(codes,"%s:%s\n",
@@ -899,7 +899,8 @@ static void saveInterfaceMethod(ClassMgr *self,ClassName *className)
          ClassFunc *impl=func_mgr_get_interface_impl(func_mgr_get(),className, interfaceMethod,&atSysName);
          n_debug("classmgr.c saveInterfaceMethod 22 %s %s %p\n",ifaceInfo->className.sysName,atSysName,impl);
          if(impl!=NULL){
-            n_string_append_printf(codes,"%s:%s:%s\n",atSysName,ifaceInfo->className.sysName,interfaceMethod->rawMangleName);
+            n_string_append_printf(codes,"%s:%s:%s\n",atSysName,
+                  ifaceInfo->className.sysName,interfaceMethod->rawMangleName);
          }
       }
    }
@@ -997,5 +998,3 @@ ClassMgr *class_mgr_get()
 	}
 	return singleton;
 }
-
-

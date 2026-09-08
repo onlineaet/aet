@@ -711,9 +711,10 @@ tree   select_field_call_back(location_t ploc, tree function, tree fundecl,tree 
 
    //function 调用函数 fundecl函数声明 type 函数参数类型  origtype 实参的原始类型 val具体的实参 valtype具体实参的类型 npc实参是否是空指针
    //rname =function parmnum当前第几个参数 argnum 总的参数个数+1 excess_precision 超精度 0 是否警告
-   nboolean isGenericType=generic_util_is_generic_pointer(type);//参数是不是:setData(E data)中的E data aet_generic_E aet_generic_F等
-   n_debug("select_field_call_back  origtype code:%s  parmnum:%d 是不是泛型:%d function:%p state:%d",
-         origtype?get_tree_code_name(TREE_CODE(origtype)):"NULL", parmnum,isGenericType,function,state);
+   //参数是不是:setData(E data)中的E data aet_generic_E aet_generic_F等
+   nboolean isGenericType=generic_util_is_generic_pointer(type);
+  // n_debug("select_field_call_back  origtype code:%s  parmnum:%d 是不是泛型:%d function:%p state:%d",
+      //   origtype?get_tree_code_name(TREE_CODE(origtype)):"NULL", parmnum,isGenericType,function,state);
 
    if(isGenericType){
       if(state==CALLBACK_SELECT_FIELD){
@@ -725,7 +726,7 @@ tree   select_field_call_back(location_t ploc, tree function, tree fundecl,tree 
             error_at(ploc,"aet convert arguments error");
             return error_mark_node;
          }else if(parmval==NULL_TREE){
-            n_debug("泛型检查结果 parmval==NULL_TREE 由c-typeck.cc处理\n");
+           // n_debug("泛型检查结果 parmval==NULL_TREE 由c-typeck.cc处理\n");
             return aet_convert_argument (ploc, function, fundecl, type, origtype,
                                     val, valtype, npc, rname, parmnum, argnum,
                                     excess_precision, 1/*warnopt=1*/);
@@ -734,11 +735,10 @@ tree   select_field_call_back(location_t ploc, tree function, tree fundecl,tree 
             return parmval;
          }
       }else if(state==CALLBACK_BUILD_FUNCTION_CALL){
-         n_debug("替换泛型参数 generic_call_replace_parm 状态：CALLBACK_BUILD_FUNCTION_CALL call:%d\n",checkCallback->className->sysName);
+        // n_debug("替换泛型参数 generic_call_replace_parm 状态：CALLBACK_BUILD_FUNCTION_CALL call:%d\n",checkCallback->className->sysName);
          parmval=generic_call_replace_parm(generic_call_get(), ploc,function, fundecl,
          type,  origtype,  val,  valtype, npc, rname, parmnum,argnum,excess_precision,  0/*warnopt=0*/,
          checkCallback->className,checkCallback->generics);
-         aet_print_tree(parmval);
          if(parmval==error_mark_node){
             return error_mark_node;
          }else if(parmval==NULL_TREE){
@@ -775,15 +775,15 @@ tree   select_field_call_back(location_t ploc, tree function, tree fundecl,tree 
 static void aet_info_cb(int kind,const char *gmsgid,void *userData)
 {
    CheckParamCallback *checkCallback=(CheckParamCallback *)userData;
-   n_debug("aet_info_cb 回调 kind:%d DK_ERROR:%d DK_PERMERROR:%d DK_WARNING:%d DK_PEDWARN:%d gmsgid:%s\n",
-         kind,DK_ERROR,DK_PERMERROR,DK_WARNING,DK_PEDWARN,gmsgid);
+   //n_debug("aet_info_cb 回调 kind:%d DK_ERROR:%d DK_PERMERROR:%d DK_WARNING:%d DK_PEDWARN:%d gmsgid:%s\n",
+        // kind,DK_ERROR,DK_PERMERROR,DK_WARNING,DK_PEDWARN,gmsgid);
    if(kind==DK_ERROR || kind==DK_PERMERROR)
       checkCallback->error++;
    if(kind==DK_WARNING || kind==DK_PEDWARN){
       checkCallback->warn++;
       if(strstr(gmsgid,"zero as null pointer constant")){
          //把零当作NULL空指针处理
-         printf("aet_info_cb 回调  --- zero as null pointer constant %s\n",checkCallback->classFunc->mangleFunName);
+         //n_debug("aet_info_cb 回调  --- zero as null pointer constant %s\n",checkCallback->classFunc->mangleFunName);
          checkCallback->warnZeroAsNullPointerConst++;
       }
    }
@@ -937,6 +937,8 @@ static CandidateFunc * checkCallParam(SelectField *self,ClassFunc *func,tree dec
 /**
  * 先在本类中找
  * allscope==TRUE 找定义、声明、field，否则只找field
+ * funcArray 所有候选函数数组
+ * funcType 函数类型 见 NORMAL_FUNC...
  */
 static CandidateFunc *getFuncFromClass(SelectField *self,ClassName *className,
       char *orgiFuncName,vec<tree, va_gc> *exprlist,
@@ -967,7 +969,8 @@ static CandidateFunc *getFuncFromClass(SelectField *self,ClassName *className,
             decl=createTempFunction(item->fieldDecl,funcType);
          }else if(aet_utils_valid_tree(item->fieldDecl) && funcType==STATIC_FUNC){
             decl=item->fieldDecl;
-         }else if(aet_utils_valid_tree(item->fromImplDefine) && funcType==IMPLICITLY_FUNC){
+         }else if(aet_utils_valid_tree(item->fromImplDefine)
+               && (funcType==IMPLICITLY_FUNC || funcType==CTOR_FUNC)){
             decl=item->fromImplDefine;
          }
       }
@@ -1130,8 +1133,9 @@ CandidateFunc *select_field_get_func_by_recursion(SelectField *self,ClassName *c
 /**
  * 从类中找出最好的构造函数。
  */
-CandidateFunc *select_field_get_ctor_func(SelectField *self,ClassName *className,vec<tree, va_gc> *exprlist,
-        vec<tree, va_gc> *origtypes,vec<location_t> arg_loc,location_t expr_loc,FuncPointerError **errors)
+CandidateFunc *select_field_get_ctor_func(SelectField *self,ClassName *className,
+      vec<tree, va_gc> *exprlist,vec<tree, va_gc> *origtypes,vec<location_t> arg_loc,
+      location_t expr_loc,GenericModel *generic,FuncPointerError **errors)
 {
    if(className==NULL ||  className->sysName==NULL)
       return NULL;
@@ -1142,7 +1146,8 @@ CandidateFunc *select_field_get_ctor_func(SelectField *self,ClassName *className
    if(errors!=NULL)
       localError=(FuncPointerError *)n_slice_new0(FuncPointerError);
    CandidateFunc *candidate= getFuncFromClass(self,
-         className,className->userName,exprlist,origtypes,arg_loc,expr_loc,FALSE,NULL,ctorFuncArray,CTOR_FUNC,localError);
+         className,className->userName,exprlist,origtypes,arg_loc,expr_loc,FALSE,generic,
+         ctorFuncArray,CTOR_FUNC,localError);
    n_debug("select_field_get_ctor_func 最终选择 ----candidate:%p\n",candidate);
    replaceFunctionPointer(candidate,exprlist);
    if(errors!=NULL)

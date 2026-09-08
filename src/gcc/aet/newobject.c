@@ -391,6 +391,12 @@ static nboolean genericCheck(NewObject *self,location_t loc,ClassName *varClassN
     }
 }
 
+/**
+ * 检查，同时把构造函数源代码存入变量decl中
+ * Abc<int> *value=new$ Abc(5);
+ * c_aet_set_ctor 存入  Abc(5);
+ *
+ */
 static nboolean checkVar(NewObject *self,tree decl,GenericModel *genericsModel)
 {
    if(TREE_CODE(decl)!=VAR_DECL && TREE_CODE(decl)!=FIELD_DECL)
@@ -422,8 +428,9 @@ static nboolean checkVar(NewObject *self,tree decl,GenericModel *genericsModel)
       if(genericsDefineModel && genericsModel){
          nboolean equal=  generic_model_equal(genericsDefineModel,genericsModel);
          if(!equal){
-             //error_at(token->location,"多个泛型定义，它们的类型不匹配。");
-            // return FALSE;
+//             error_at(token->location,"多个泛型定义，它们的类型不匹配。%qs %qs",
+//                   generic_model_tostring(genericsDefineModel), generic_model_tostring(genericsModel));
+//             return FALSE;
              n_warning("又设了一次泛型。定义的泛型:%s,声明的泛型:%s",
                    generic_model_tostring(genericsDefineModel), generic_model_tostring(genericsModel));
          }
@@ -454,7 +461,6 @@ static nboolean checkVar(NewObject *self,tree decl,GenericModel *genericsModel)
       c_parser_skip_to_end_of_parameter(parser,codes);
       n_string_insert(codes,0,info->className.userName);
       n_debug("获取构造函数的源代码是:%s\n",codes->str);
-      aet_print_token(c_parser_peek_token (parser));
       tree ctorCodes=aet_utils_create_ident(codes->str);
       tree sysClassName=aet_utils_create_ident(info->className.sysName);
       c_aet_set_ctor(decl,ctorCodes,sysClassName,ctorLoc,mtcsPlat);

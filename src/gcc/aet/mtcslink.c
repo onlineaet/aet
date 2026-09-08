@@ -328,6 +328,7 @@ static char *catchLibDeviceCodes(char *libDeviceFile,NPtrArray *funcNameArray)
 static void mtcsLinkInit(MtcsLink *self)
 {
    self->collectMtcsLinkFile=NULL;
+   self->linkInfoArray = n_ptr_array_new();
 }
 
 /**
@@ -744,24 +745,20 @@ static void freeLinkInfo_cb(LinkInfo *info)
 
 /**
  * 从当前编译的文件中加入mtcs需要链接的函数。
+ * 由于有多个mtcstarget,所以这里会被多次调用
  */
 void  mtcs_link_add(MtcsLink *self,const char *linkFuncNames,int version,int isa,const char *platName)
 {
-   char fileName[512];
-   char  *objfile=makefile_parm_get_object_file(makefile_parm_get());
-   sprintf(fileName,"%s.mtcslink_new.o",objfile);
-   NPtrArray *linkArray=readFile(fileName);
    int i;
    nboolean find=FALSE;
-   for(i=0;i<linkArray->len;i++){
-      LinkInfo *info=n_ptr_array_index(linkArray,i);
-      //printf("mtcslink info---%d %s\n",i,linkFuncNames);
+   for(i=0;i<self->linkInfoArray->len;i++){
+      LinkInfo *info=n_ptr_array_index(self->linkInfoArray,i);
       if(strcmp(info->platName,platName)==0 && info->version==version && info->isa==isa){
          //有相同的平台 version,isa
          //用新的linkFuncNames覆盖老的
          //printf("在原有的文件中找到相同的平台:%s %s %d %d\n",fileName,platName,version,isa);
          if(linkFuncNames==NULL){
-            n_ptr_array_remove(linkArray,info);
+            n_ptr_array_remove(self->linkInfoArray,info);
             freeLinkInfo_cb(info);
          }else{
             removeFuncName(info);
@@ -771,72 +768,67 @@ void  mtcs_link_add(MtcsLink *self,const char *linkFuncNames,int version,int isa
          break;
       }
    }
-   if(find){
-      writeFile(fileName,linkArray);
-   }else{
+
+   if(!find){
       if(linkFuncNames!=NULL){
+         char fileName[512];
+         nboolean haveMtcs = mtcs_parser_have_mtcs(mtcs_parser_get());
+         gcc_assert(haveMtcs);
+         //创建的文件名与middle的一样
+         char  *objfile=makefile_parm_get_object_file(makefile_parm_get());
+         sprintf(fileName,"%s.mtcs_collect.o",objfile);
          LinkInfo *info=newLinkInfo(fileName,linkFuncNames,version,isa,platName);
-         n_ptr_array_add(linkArray,info);
-         writeFile(fileName,linkArray);
+         n_ptr_array_add(self->linkInfoArray,info);
       }
    }
-
-   if(linkArray->len==0){
-      //printf("mtcs_link_add 11 不写入COMPILE_MTCS_LINK  :%s\n",fileName);
-      remove(fileName);
-   }else{
-      //printf("mtcs_link_add 22 %s :%s\n",linkFuncNames,fileName);
-      gcc_assert(self->collectMtcsLinkFile==NULL);
-      self->collectMtcsLinkFile=n_strdup(fileName);
-      middle_file_modify(middle_file_get(),COMPILE_MTCS_LINK);
-   }
-   n_ptr_array_set_free_func(linkArray,freeLinkInfo_cb);
-   n_ptr_array_unref(linkArray);
-
 }
+
+char *mtcs_link_save(MtcsLink *self)
+{
+   if(self->linkInfoArray->len==0){
+      return NULL;
+   }
+
+   int i;
+   NString *codes=n_string_new("");
+   for(i=0;i<self->linkInfoArray->len;i++){
+      LinkInfo *info=n_ptr_array_index(self->linkInfoArray,i);
+      appendLinkInfo(codes,info);
+   }
+   return n_string_free(codes,FALSE);
+}
+
 
 /**
  * 链接外部数学库中的函数，
  * 例如:cuda的libdevice.ptx
  * 处于正在编译文件temp_func_track_45.c
  */
-void  mtcs_link_link(MtcsLink *self)
+void mtcs_link_link(MtcsLink *self,char *objectRootPath,NPtrArray **arrays,int alen,int pos)
 {
-   char *fileName = getenv("GCC_AET_MTCS_LINK_LIST_PATH");
-   //printf("mtcs_link_link 进入 %s\n",fileName);
-   if(fileName==NULL ||strlen(fileName)==0){
-      return;
-   }
-   char compileFileName[255];
-   sprintf(compileFileName,"%s.o",fileName);
-   FILE *fp=fopen(fileName,"r");
-   char fileList[10*1024];
-   int rev=fread(fileList,1,10*1024,fp);
-   fclose(fp);
-   if(rev<=0){
-      remove(compileFileName);
-      return ;
-   }
-   fileList[rev]='\0';
-   nchar **items=n_strsplit(fileList,"\n",-1);
-   int length= n_strv_length(items);
+   char linkFileListName[256];
+   sprintf(linkFileListName,"%s/%s",objectRootPath,AET_MTCS_LINK_FILE_LIST_NAME);
    int i,j;
    NPtrArray *allLinkInfoArray=n_ptr_array_new_with_free_func(freeLinkInfo_cb);
-   for(i=0;i<length;i++){
-      char *fileName=items[i];
-      NPtrArray *linkArray=readFile(fileName);//从文件的内容生成LinkInfo数组
-      for(j=0;j<linkArray->len;j++){
-         n_ptr_array_add(allLinkInfoArray,n_ptr_array_index(linkArray,j));
+
+   for(i=0;i<alen;i++){
+      NPtrArray **as=(NPtrArray **)arrays[i];
+      NPtrArray *link = as[pos];//这是关键
+      if(!link || link->len==0)
+         continue;
+      for(j=0;j<link->len;j++){
+         char *item=n_ptr_array_index(link,j);
+         LinkInfo *info=createLinkInfo(item);
+         n_ptr_array_add(allLinkInfoArray,info);
       }
-      n_ptr_array_unref(linkArray);
    }
-   n_strfreev(items);
 
    if(allLinkInfoArray->len==0){
       n_ptr_array_unref(allLinkInfoArray);
-      remove(compileFileName);
-      return;
+      remove(linkFileListName);
+      return NULL;
    }
+
    //清除源文件时间大于xxx.mtcslink.o的linkInfo
    removeByTime(allLinkInfoArray);
    //合并LinkInfo
@@ -847,24 +839,26 @@ void  mtcs_link_link(MtcsLink *self)
    for(i=0;i<platArray->len;i++){
       NHashTable *versionIsaHash=n_ptr_array_index(platArray,i);
       NHashTableIter iter;
-        npointer key, value;
-        n_hash_table_iter_init(&iter, versionIsaHash);
-        while (n_hash_table_iter_next(&iter, &key, &value)) {
-           //相同平台、version和isa的LinkInfo
-           NPtrArray *infoArray = (NPtrArray *)value;
-           createCodes(infoArray,codes);
-        }
+      npointer key, value;
+      n_hash_table_iter_init(&iter, versionIsaHash);
+      while (n_hash_table_iter_next(&iter, &key, &value)) {
+         //相同平台、version和isa的LinkInfo
+         NPtrArray *infoArray = (NPtrArray *)value;
+         createCodes(infoArray,codes);
+      }
    }
-   //printf("mtcslink.c mtcs_link_link file:%s str:%s\n",compileFileName,codes->str);
+   //printf("mtcslink.c mtcs_link_link file:%s str:%s\n",linkFileListName,codes->str);
    if(codes->len==0){
-      remove(compileFileName);
+      remove(linkFileListName);
    }else{
-      FILE *fp=fopen(compileFileName,"w");
-      fwrite(codes->str,1,codes->len,fp);
+      FILE *fp=fopen(linkFileListName,"w");
+      int ret=fwrite(codes->str,1,codes->len,fp);
       fclose(fp);
    }
    n_string_free(codes,TRUE);
+
 }
+
 
 MtcsLink  *mtcs_link_new()
 {
@@ -873,5 +867,30 @@ MtcsLink  *mtcs_link_new()
    return self;
 }
 
+
+NPtrArray * mtcs_link_create_array(char *buffer)
+{
+   if(buffer==NULL)
+      return NULL;
+   NPtrArray *array=n_ptr_array_new();
+   char *c=buffer;
+   while(strstr(c,LINK_START)){
+      char *start=strstr(c,LINK_START);
+      //printf("r0 is :%s\n",start);
+      char *n=start+strlen(LINK_START)+1;//加1跳过 LINK_START 后的\n号
+    //  printf("r1 is :%s\n",n);
+      char *end=strstr(n,LINK_END);
+      //printf("r2 is :%s\n",end);
+      int len=strlen(n);
+      int remain=strlen(end);
+      char *ret=xmalloc(len-remain+1);
+      memcpy(ret,n,len-remain);
+      ret[len-remain]='\0';
+      //printf("mtcslink.c createLinkInfoArray :%s\n",ret);
+      n_ptr_array_add(array,ret);
+      c = end+strlen(LINK_END);
+   }
+   return array;
+}
 
 

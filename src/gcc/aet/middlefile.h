@@ -26,30 +26,22 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 #include "c-aet.h"
 #include "classinfo.h"
 
-#define CLASS_IFACE_IMPL_START "class iface impl start:"
-#define CLASS_IFACE_IMPL_END   "class iface impl end:"
-#define CLASS_IFACE_INFO_START "CLASS_IFACE_INFO_START:"
-#define CLASS_IFACE_INFO_END "CLASS_IFACE_INFO_END:"
-#define CLASS_IFACE_NEED_CHECK_START "CLASS_IFACE_NEED_CHECK_START:"
-#define CLASS_IFACE_NEED_CHECK_END "CLASS_IFACE_NEED_CHECK_END:"
+
+
 
 typedef struct _MiddleFile MiddleFile;
 /* --- structures --- */
 struct _MiddleFile
 {
-   int action;
    char *compileParam;
-   char *ifaceOFile;
+   NPtrArray **arrays;
 };
 
 MiddleFile  *middle_file_get();
-void         middle_file_modify(MiddleFile *self,CompileType type);
-void         middle_file_create_global_var(MiddleFile *self);
 char        *middle_file_decode(char *value,int size);
-void         middle_file_iface_impl_check(MiddleFile *self);
-void         middle_file_func_check(MiddleFile *self);
 void         middle_file_save_note(MiddleFile *self);
-void         middle_file_test(MiddleFile *self,char *codes);
+void         middle_file_collect(MiddleFile *self);
+void         middle_file_delete_collect_file(MiddleFile *self);
 
 
 #endif

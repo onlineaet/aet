@@ -23,30 +23,31 @@
 
 #include "../../aet.h"
 
-
 package$ aet.util;
 
 /**
  * elementSize 每个元素的大小 比如：int的大小是sizeof(int)
+ * data 保存元素的内存
+ * len  所有元素的个数
  * capacity 预分配多少个元素的空间
+ * alloc 实际分配的内存
  * 如果元素是指针，保存的是指针地址，而不是指针指向地址的内容。
  */
 public$ class$ AArray<E>{
     private$ auint elementSize;//E的大小
-    private$ ADestroyNotify clearFunc;
+    private$ ADestroyNotify destroyFunc;
     private$ aboolean isPointer;
     private$ aboolean haveZero;//是否清零数据
 
-    private$ E *start;           // 起始位置 (begin)
-    private$ E *finish;          // 当前写位置
-    private$ E *end_of_storage;  // 容量结束位置
+    public$ E *start;           // 起始位置 (begin)
+    public$ E *finish;          // 当前写位置
+    public$ E *end_of_storage;  // 容量结束位置
 
     public$ AArray(auint capacity);
-    public$ AArray(auint capacity,ADestroyNotify clearFunc);
+    public$ AArray(auint capacity,ADestroyNotify destroyFunc);
 
     public$ void addFirst(E data);
     public$ void add(E value);
-    public$ void addFast(E value);
 
     public$ auint getESize ();
 
@@ -55,9 +56,11 @@ public$ class$ AArray<E>{
     public$ void removeRange (auint index,auint removeCount);
     public$ aboolean removeData(E data);
     public$ void removeAll();
-    public$ void setSize(auint newEleCount);
-
+    //无index越界检查
     public$ E get(int index);
+    //有index越界检查
+    public$ E getAt(int index);
+
     public$ auint size();
     public$ void insert(E data, int index);
     public$ aboolean isEmpty();
@@ -65,16 +68,15 @@ public$ class$ AArray<E>{
     public$ void sort(ACompareFunc compareFunc);
     public$ void sort(ACompareFunc compareFunc,apointer userData);
     private$ void maybeExpand(auint eleCount);
-    public$ void popBack();
+    public$ E popBack();
     public$ E back();
     private$ void clear(int index);
-    //新分配的内存是否清零
-    public$ void setClearZero(aboolean need);
+    public$ void set(E value,int index);
+    public$ void setAt(E value,int index);
+    public$ void resize(auint newSize);
 
     public$ ~AArray();
-
 };
-
 
 
 #endif /* __N_MEM_H__ */

@@ -45,13 +45,10 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 #include "c-family/name-hint.h"
 #include "c-family/known-headers.h"
 #include "c-family/c-spellcheck.h"
-#include "c-aet.h"
 #include "../libcpp/internal.h"
 #include "c/c-parser.h"
 #include "c/gimple-parser.h"
-
 #include "../libcpp/include/cpplib.h"
-#include "aet-c-parser-header.h"
 #include "plugin.h"
 
 #include "gcc-plugin.h"
@@ -60,6 +57,7 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 #include "gimple-iterator.h"
 #include "gimple-walk.h"
 
+#include "aet-c-parser-header.h"
 #include "aetutils.h"
 #include "aetinfo.h"
 #include "varmgr.h"
@@ -90,10 +88,8 @@ static void genericParserInit(GenericParser *self)
 {
    self->funcWithBlockArray=n_ptr_array_new();
    self->localFwgbArray=n_ptr_array_new();
-
    self->directiveCount = 0;
    self->funcWithGBFileName = NULL;
-
    self->constDeclArray=n_ptr_array_new();
 }
 
@@ -177,12 +173,10 @@ static int createDefineToken(GenericParser *self,char *genDefineStr,c_token *rep
          tree id=token->value;
          char *str=IDENTIFIER_POINTER(id);
          if(strcmp(str,"gen_replace_start")==0){
-            //printf("开始了------\n");
             c_parser_consume_token (parser);
             continue;
          }
          if(strcmp(str,"gen_replace_end")==0){
-            //printf("结束了------\n");
             c_parser_consume_token (parser);
             break;
          }
@@ -190,19 +184,14 @@ static int createDefineToken(GenericParser *self,char *genDefineStr,c_token *rep
       aet_utils_copy_token(token,&replaces[replaceCount++]);
       c_parser_consume_token (parser);
    }
-   //_cpp_pop_buffer (parse_in);
-   //printf("结束了------xxxxxxccccccxxxx \n");
    _cpp_pop_buffer(parse_in);
-   //printf("结束了------wwwwwwwwwww \n");
    cpp_buffer *buffer = parse_in->buffer;
-   //printf("结束了------111 %p %p\n",buffer,buffer->prev);
    buffer->prev=NULL;
    return replaceCount;
 }
 
 
 #define INDEX_CONNECT_STR "$YZt0@"
-
 
 /**
  * 把genericof(E)或genericof(obj,E)替换成int或float
@@ -215,66 +204,66 @@ static int createDefineToken(GenericParser *self,char *genDefineStr,c_token *rep
 
 static nboolean getCallerAndGenType(GenericParser *self,char **callObj,char **gen)
 {
-      c_parser *parser=self->parser->parser;
-	  tree currentFunc=current_function_decl;
-      char *funcName=IDENTIFIER_POINTER(DECL_NAME(currentFunc));
-	  //printf("getCallerAndGenType 00 %s\n",funcName);
-	  aet_print_token(c_parser_peek_token (parser));
-	  c_token *first=c_parser_peek_token (parser);
-	  c_token *second=c_parser_peek_2nd_token (parser);
-	  if(first->type==CPP_NAME){
-		  tree id1=first->value;
-		  nboolean re=generic_util_valid_all(id1);
-		  if(re){
-			  //是 E
-			  c_token *second=c_parser_peek_2nd_token (parser);
-			  if(second->type==CPP_CLOSE_PAREN){
-				  //是 E)
-				  *callObj=n_strdup("self");
-				  *gen=n_strdup(IDENTIFIER_POINTER(id1));
-				  c_parser_consume_token (parser); // E
-				  c_parser_consume_token (parser); // )
-				  return TRUE;
-			  }else{
-				 return FALSE;
-			  }
-		  }else{
-			  c_token *second=c_parser_peek_2nd_token (parser);
-			  if(second->type==CPP_COMMA){
-			 			  //是 xxx,
-				 c_token *three=c_parser_peek_nth_token (parser,3);
-				 if(three->type==CPP_NAME){
-				    tree id1=three->value;
-				    nboolean re=generic_util_valid_all(id1);
-				    if(re){
-					  //是 xxx,E
-					   c_token *four=c_parser_peek_nth_token (parser,4);
-					   if(four->type==CPP_CLOSE_PAREN){
-						  //是 xxx,E)
-						  *callObj=n_strdup(IDENTIFIER_POINTER(first->value));
-						  *gen=n_strdup(IDENTIFIER_POINTER(id1));
-						   c_parser_consume_token (parser); // obj
-						   c_parser_consume_token (parser); // ,
-						   c_parser_consume_token (parser); // E
-						   c_parser_consume_token (parser); // )
-						   return TRUE;
-					   }else{
-						 return FALSE;
-					   }
-				    }else{
-					  return FALSE;
-				    }
-				 }else{
-				   return FALSE;
-				 }//end cpp_name
-			  }else{
-			 	return FALSE;
-			  }//end CPP_COMMA
-		  }//end re
-	  }else{
-
-	  }
-	  return FALSE;
+   c_parser *parser=self->parser->parser;
+   tree currentFunc=current_function_decl;
+   char *funcName=IDENTIFIER_POINTER(DECL_NAME(currentFunc));
+   //printf("getCallerAndGenType 00 %s\n",funcName);
+   aet_print_token(c_parser_peek_token (parser));
+   c_token *first=c_parser_peek_token (parser);
+   c_token *second=c_parser_peek_2nd_token (parser);
+   if(first->type==CPP_NAME){
+      tree id1=first->value;
+      nboolean re=generic_util_valid_all(id1);
+      if(re){
+         //是 E
+         c_token *second=c_parser_peek_2nd_token (parser);
+         if(second->type==CPP_CLOSE_PAREN){
+            //是 E)
+            *callObj=n_strdup("self");
+            *gen=n_strdup(IDENTIFIER_POINTER(id1));
+            c_parser_consume_token (parser); // E
+            c_parser_consume_token (parser); // )
+            return TRUE;
+         }else{
+            return FALSE;
+         }
+      }else{
+         c_token *second=c_parser_peek_2nd_token (parser);
+         if(second->type==CPP_COMMA){
+            //是 xxx,
+            c_token *three=c_parser_peek_nth_token (parser,3);
+            if(three->type==CPP_NAME){
+               tree id1=three->value;
+               nboolean re=generic_util_valid_all(id1);
+               if(re){
+                  //是 xxx,E
+                  c_token *four=c_parser_peek_nth_token (parser,4);
+                  if(four->type==CPP_CLOSE_PAREN){
+                     //是 xxx,E)
+                     *callObj=n_strdup(IDENTIFIER_POINTER(first->value));
+                     *gen=n_strdup(IDENTIFIER_POINTER(id1));
+                     c_parser_consume_token (parser); // obj
+                     c_parser_consume_token (parser); // ,
+                     c_parser_consume_token (parser); // E
+                     c_parser_consume_token (parser); // )
+                     return TRUE;
+                  }else{
+                     return FALSE;
+                  }
+               }else{
+                  return FALSE;
+               }
+            }else{
+               return FALSE;
+            }//end cpp_name
+         }else{
+            return FALSE;
+         }//end CPP_COMMA
+      }//end re
+   }else{
+      ;
+   }
+   return FALSE;
 }
 
 /**
@@ -282,33 +271,40 @@ static nboolean getCallerAndGenType(GenericParser *self,char **callObj,char **ge
  */
 static void testGenericTypeOf(GenericParser *self)
 {
-     c_parser *parser=self->parser->parser;
-     location_t loc=c_parser_peek_token (parser)->location;
-     int tokenCount=parser->tokens_avail;
-     int addtoken=2;
-     if(tokenCount+addtoken>AET_MAX_TOKEN){
-         error("token太多了");
-         return FALSE;
-     }
-     int i;
-     for(i=tokenCount;i>0;i--)
-        aet_utils_copy_token(&parser->tokens[i-1],&parser->tokens[i-1+addtoken]);
+   c_parser *parser=self->parser->parser;
+   location_t loc=c_parser_peek_token (parser)->location;
+   int tokenCount=parser->tokens_avail;
+   int addtoken=2;
+   if(tokenCount+addtoken>AET_MAX_TOKEN){
+      error("token太多了");
+      return FALSE;
+   }
+   int i;
+   for(i=tokenCount;i>0;i--)
+      aet_utils_copy_token(&parser->tokens[i-1],&parser->tokens[i-1+addtoken]);
 
-     aet_utils_create_int_token(&parser->tokens[0],loc);
-     aet_utils_create_token(&parser->tokens[1],CPP_CLOSE_PAREN,")",1);
-     parser->tokens_avail=tokenCount+addtoken;
-     aet_print_token_in_parser("在测试泛型块中testGenericOf xxxx----");
+   aet_utils_create_int_token(&parser->tokens[0],loc);
+   aet_utils_create_token(&parser->tokens[1],CPP_CLOSE_PAREN,")",1);
+   parser->tokens_avail=tokenCount+addtoken;
+   aet_print_token_in_parser("在测试泛型块中testGenericOf xxxx----");
 }
 
 ///////////////////////新版-------------------------
-typedef struct _Directive
+static Directive **cloneDirective(GenericParser *self)
 {
-   //新版 E_int_0_5{,F_float_1_8}
-   char *declName; //声明的名字 E、F...
-   char *defineTypeName; //定义的名字 int、float,AObject,...
-   int  pointerCount;    //指针数
-   int  size;            //类型大小
-}Directive;
+   int i;
+   Directive **dest=xmalloc(sizeof(Directive *)*self->directiveCount);
+   for(i=0;i<self->directiveCount;i++){
+      Directive *src = self->directives[i];
+      Directive *item=n_slice_new(Directive);
+      item->declName = n_strdup(src->declName);
+      item->defineTypeName = n_strdup(src->defineTypeName);
+      item->pointerCount = src->pointerCount;
+      item->size = src->size;
+      dest[i] = item;
+   }
+   return dest;
+}
 
 static void freeDirectives(GenericParser *self)
 {
@@ -351,10 +347,11 @@ static void createDirectives(GenericParser *self,char *content)
       n_strfreev(elems);
    }
    n_strfreev(items);
-
    self->directiveCount=len;
-
 }
+
+
+
 /**
  * 当编译块函数实现时，会进入每一个条件块中的第一条语名。aet_goto_compile$ 6 model_0$YZt0@b_0 这是每个参数在
  * 该条件块时的泛型定义
@@ -495,64 +492,6 @@ void generic_parser_parser_typeof(GenericParser *self)
 
 
 ///////////////---以下是解析泛型块中泛型变量的赋值-------------------------
-/**
- * 只转化类中域是指针的情况
- * 例如
- * class$ Abc{
- *   E *abc;或 E **abc;
- * };
- * 如果 E 不是指针类型，则转成
- * int *abc;
- * pointer是从 E *abc中提取的，不是泛型定义的。比如 E=int **
- * 如果 E的真实类型 不是指针，就按下面的方法处理
- * typeName 真实类型如int float 类，结构体等
- * genericPointer 真实类型的指针数
- */
-static tree createCast(char *typeName,int genericPointer,tree component,int fieldPointer,tree *genDefine)
-{
-   tree castType = lookup_name(get_identifier(typeName));
-   if(TREE_CODE(castType)==TYPE_DECL)
-      castType = TREE_TYPE(castType);
-   if(genDefine)
-      *genDefine=castType;
-   tree origType = castType;
-   gcc_assert(castType);
-   if(genericPointer==0){
-      //E = int 变量 = E queue 转成*((int*)queue)
-      if(fieldPointer==0){
-         castType = build_pointer_type (castType);
-         tree casted = fold_build1 (NOP_EXPR, castType, component);
-         //E queue变成 *((int*)queue)
-         printf("进这里了--xxxx---\n");
-         tree deref = casted;//fold_build1 (INDIRECT_REF, origType,casted);
-         return deref;
-      }else{
-         //E = int 变量 =E *value 转成 (int *)value;变量 =E **value 转成 (int **)value
-         int i;
-         for(i=0;i<fieldPointer;i++)
-            castType = build_pointer_type (castType);
-      }
-      tree casted = fold_build1 (NOP_EXPR, castType, component);
-      return casted;
-   }else{
-      int i;
-      if(fieldPointer==0){
-         //E =int * 变量 =E queue  转成 E *queue = (int *)value;
-         //for(i=0;i<genericPointer;i++)
-            //castType = build_pointer_type (castType);
-         return component;
-      }else{
-         //E =int * 变量 =E *queue  转成 E **queue = (int *)value;
-         for(i=0;i<genericPointer+fieldPointer;i++)
-             castType = build_pointer_type (castType);
-      }
-      tree casted = fold_build1 (NOP_EXPR, castType, component);
-      printf("convert----ttt-\n");
-      aet_print_tree(casted);
-      return casted;
-   }
-}
-
 
 /**
  * 获取 E对应的具体类型的索引号
@@ -560,7 +499,7 @@ static tree createCast(char *typeName,int genericPointer,tree component,int fiel
 static int getDirective(GenericParser *self,tree componentRef,int *fieldPointer)
 {
    int pointer=0;
-   char *str=generic_util_get_type_str(componentRef,&pointer);
+   const char *str = aet_utils_get_const_type_string(componentRef,&pointer);
    if(!str)
       return -1;
    //str是 aet_generic_E
@@ -865,7 +804,7 @@ static void genericBlock_cb (void *event_data, void *data ATTRIBUTE_UNUSED)
          //printf("genericBlock_cb 11 找到了速泛型块的函数 xx %s %p\n",func->orgiName,func->fromImplDefine);
          if(func->fromImplDefine == fndecl){
             bool can = can_safely_migrate_function(func,fndecl);
-            n_debug("genericBlock_cb 11 找到了带泛型块的函数 11 %s 是否可外部使用:%d\n",func->orgiName,can);
+            //printf("genericBlock_cb 11 找到了带泛型块的函数 11 %s 是否可外部使用:%d\n",func->orgiName,can);
             if(!can){
                n_ptr_array_remove(self->funcWithBlockArray,funcData);
                freeFuncData(funcData);
@@ -892,8 +831,9 @@ static void genericBlock_cb (void *event_data, void *data ATTRIBUTE_UNUSED)
    FILE *fp=fopen(newName,"w");
    int rx=fwrite(codes->str,1,codes->len,fp);
    fclose(fp);
-   n_string_free(codes,TRUE);
+  // n_string_free(codes,TRUE);
    self->funcWithGBFileName=n_strdup(newName);
+   self->funcWithGBBuffer = codes;
 }
 
 void generic_parser_register_fwg(GenericParser *self)
@@ -1045,7 +985,7 @@ static void c_parser_skip_to_pragma_eol (c_parser *parser, bool error_if_not_eol
 /**
  * 如果const_decl的位置与fwgb中的token名字位置一样，把token替换为整形常数
  */
-static char *replaceTokenByContDecl(GenericParser *self,c_token *token)
+static char *replaceTokenByConstDecl(GenericParser *self,c_token *token)
 {
    if(token->type==CPP_NAME && token->id_kind == C_ID_ID){
       int i;
@@ -1134,7 +1074,7 @@ static void c_parser_skip_to_end_of_block_or_statement (GenericParser *self,NStr
          if(strlen(source)==1 && source[0]>='A' && source[0]<='Z'){
             n_string_append(codes,"aet_generic_");
          }else{
-            char *buf =replaceTokenByContDecl(self,token);
+            char *buf =replaceTokenByConstDecl(self,token);
             if(buf)
                source = buf;
          }
@@ -1211,16 +1151,13 @@ void   generic_parser_save_fwgb(GenericParser *self,ClassName *className)
       ClassFunc *func=n_ptr_array_index(array,i);
       if(class_func_have_generic_block(func) && !class_func_is_func_generic(func)){
            location_t startloc = DECL_SOURCE_LOCATION(DECL_RESULT(func->fromImplDefine));
-           aet_print_location(startloc);
            location_t endloc = func->endLoc;
-           aet_print_location(endloc);
            //从文件读出的数据有'\0',改到NString追加换行符，长度是字符长度，所以不会有'\0'符号存在
            char *sourcecode=aet_get_source_text(startloc,endloc);
            NString *re=n_string_new(sourcecode);
            n_string_append(re,"\n");
            c_token backups[30];
            int backCount=backupToken(self,backups);
-           parser_help_set_forbidden(true);
            /* 1. 进入一个“虚拟文件”或生成内容的 map */
            const char *fake_name = "<injected>";   /* 或你自己的名字 */
            int line = LOCATION_LINE (startloc);
@@ -1241,7 +1178,6 @@ void   generic_parser_save_fwgb(GenericParser *self,ClassName *className)
                n_string_prepend(funcdefineSourceCode,returnStr);
            }
            restore(self->parser->parser,backups,backCount);
-           parser_help_set_forbidden(FALSE);
            free(sourcecode);
            n_string_free(re,TRUE);
            FuncWithGbData *data=n_slice_new(FuncWithGbData);
@@ -1261,26 +1197,24 @@ void   generic_parser_save_fwgb(GenericParser *self,ClassName *className)
 
 /**
  * 编译temp_func_track_45.c时进入这里,所以funcWithBlockArray长度是零
- * GCC_AET_FUNC_WITH_GB_LIST_PATH是一个文件名，内容是各个编译单元有带泛型块
  * 函数的文件名列表。在这里把分散的函数集中到一起了。
  */
-void generic_parser_ready(GenericParser *self)
+void generic_parser_ready(GenericParser *self,NPtrArray **arrays,int alen,int pos)
 {
-   char *fileName = getenv("GCC_AET_FUNC_WITH_GB_LIST_PATH");
-   if(fileName==NULL ||strlen(fileName)==0){
-      return;
+   int i,j;
+   for(i=0;i<alen;i++){
+      NPtrArray **as=(NPtrArray **)arrays[i];
+      NPtrArray *fwgbArray = as[pos];//这是关键
+      if(!fwgbArray || fwgbArray->len==0)
+         continue;
+      for(j=0;j<fwgbArray->len;j++){
+         char *fwgb=n_ptr_array_index(fwgbArray,j);
+         FuncWithGbData *data=createFuncData(fwgb);
+         n_ptr_array_add(self->funcWithBlockArray,data);
+      }
    }
-   gcc_assert(self->funcWithBlockArray->len==0);
-   FILE *fp=fopen(fileName,"r");
-   if(fp){
-      char fileList[50*1024];
-      int rev=fread(fileList,1,50*1024,fp);
-      fclose(fp);
-      fileList[rev]='\0';
-      readFuncWithGbCodes(self,fileList);
-   }
+
    //把本地的FuncWithGbData转存到localFwgbArray,因为库的FuncWithGbData也要到funcWithBlockArray
-   int i;
    for(i=0;i<self->funcWithBlockArray->len;i++){
       FuncWithGbData *d=n_ptr_array_index(self->funcWithBlockArray,i);
       n_ptr_array_add(self->localFwgbArray,d);
@@ -1288,19 +1222,14 @@ void generic_parser_ready(GenericParser *self)
    n_debug("generic_parser_ready 所有带泛型块的函数所在文件的列表:%d\n",self->funcWithBlockArray->len);
    NPtrArray *funcDataFromlibFunc = aet_lib_get_func_with_gb(aet_lib_get());
    if(funcDataFromlibFunc && funcDataFromlibFunc->len>0){
+      n_debug("generic_parser_ready xx 所有带泛型块的函数所在文件的列表:%d\n",funcDataFromlibFunc->len);
+
       for(i=0;i<funcDataFromlibFunc->len;i++){
          FuncWithGbData *d=n_ptr_array_index(funcDataFromlibFunc,i);
          n_ptr_array_add(self->funcWithBlockArray,d);
       }
    }
-   /*
-   int i;
-   for(i=0;i<self->funcWithBlockArray->len;i++){
-      FuncWithGbData *item=n_ptr_array_index(self->funcWithBlockArray,i);
-      printf("带泛型块的函数如下 i:%d\n",i);
-      printFuncData(item);
-   }
-   */
+
 }
 
 #define FUNC_WITH_GB_CONTENT_START "func_with_gb_content_start:"
@@ -1333,7 +1262,7 @@ NPtrArray  *generic_parser_create_fwg(char *content)
    if(strstr(content,FUNC_WITH_GB_CONTENT_START)){
       char *c=content;
       char *start=strstr(c,FUNC_WITH_GB_CONTENT_START);
-      char *n=start+strlen(FUNC_WITH_GB_CONTENT_START)+1;//加1跳过 CLASS_BLOCK_START 后的\n号
+      char *n=start+strlen(FUNC_WITH_GB_CONTENT_START)+1;//加1跳过 FUNC_WITH_GB_CONTENT_START 后的\n号
       char *end=strstr(n,FUNC_WITH_GB_CONTENT_END);
       int len=strlen(n);
       int remain=strlen(end);
@@ -1357,7 +1286,7 @@ int generic_parser_get_func(GenericParser *self,char *sysName,FuncWithGbData **d
 {
    int i;
    int count=0;
-   //n_debug("generic_parser_get_func --- %d sysName:%s\n",self->funcWithBlockArray->len,sysName);
+   n_debug("generic_parser_get_func --- %d sysName:%s\n",self->funcWithBlockArray->len,sysName);
    for(i=0;i<self->funcWithBlockArray->len;i++){
       FuncWithGbData *item=n_ptr_array_index(self->funcWithBlockArray,i);
       if(strcmp(sysName,item->className)==0){
@@ -1684,12 +1613,6 @@ void generic_parser_parm(GenericParser *self,vec<tree, va_gc> *params, vec<tree,
    for (ix = 0; params->iterate (ix, &arg); ++ix){
       tree old = arg;
       tree type=(*origtypes)[ix] ;
-
-      n_debug("参数----- ix:%d\n",ix);
-      aet_print_tree(arg);
-      aet_print_tree(type);
-      //arg = convertLhs(self,arg,NULL_TREE,type);
-
       if(old!=arg){
          n_debug("参数----被改了- ix:%d\n",ix);
          (*params)[ix]=arg;
@@ -1709,8 +1632,6 @@ void generic_parser_binary_op(GenericParser *self,enum tree_code code,tree *blhs
      tree rhs = *brhs;
      tree newlhs = lhs;
      tree newrhs = rhs;
-     n_debug("generic_parser_binary_op --- 00\n");
-     aet_print_tree(lhs);
      newlhs = convertLhs(self,lhs,rhs,TREE_TYPE(rhs));
      if(lhs==newlhs){
         //如果左值没改变，可以判断右值
@@ -2075,69 +1996,6 @@ tree generic_parser_initializer(GenericParser *self,tree decl,tree init)
    return init;
 }
 
-
-// 核心逻辑：遍历 AST 节点的隐式回调函数
-static tree walk_ast_cb(tree *tp, int *walk_subtrees, void *data) {
-    tree t = *tp;
-    if (!t) return NULL_TREE;
-
-    // 关键点 1：寻找代码中的常量节点 (如被替换后的 0, 1, 2)
-    if (TREE_CODE(t) == INTEGER_CST) {
-        // 获取该常量的类型节点
-        tree type = TREE_TYPE(t);
-        aet_print_tree(t);
-
-        // 关键点 2：判断这个常量的底层类型是否为枚举 (ENUMERAL_TYPE)
-        if (type && TREE_CODE(type) == ENUMERAL_TYPE) {
-            // 获取该枚举类型的类型声明节点 (TYPE_DECL)
-            tree type_decl = TYPE_NAME(type);
-            printf("是不是enumeral----\n");
-
-            if (type_decl && TREE_CODE(type_decl) == TYPE_DECL) {
-                // 关键点 3：获取该枚举定义在源码中的物理位置 (Location)
-                location_t loc = DECL_SOURCE_LOCATION(type_decl);
-                const char *file = LOCATION_FILE(loc);
-
-                // 关键点 4：获取当前正在编译的主输入文件名 (.c 文件)
-                const char *main_file = main_input_filename;
-
-                // 如果枚举定义的文件名和当前编译的 .c 文件名一致，说明是本地枚举
-                if (file && main_file && strcmp(file, main_file) == 0) {
-                    // 打印迁移提示信息
-                    const char *enum_name = IDENTIFIER_POINTER(DECL_NAME(type_decl));
-                    if (!enum_name) enum_name = "anonymous enum"; // 处理匿名枚举
-
-                    inform(EXPR_LOCATION(t),
-                           "发现不可直接迁移的本地枚举依赖: 常量值 %ld 来自定义于 [%s:%d] 的 '%s'",
-                           (long)TREE_INT_CST_LOW(t), file, LOCATION_LINE(loc), enum_name);
-                }
-            }
-        }
-    }
-
-    return NULL_TREE;
-}
-
-// 每一个函数被解析完、准备转为 GENERIC 树时触发的回调
-static void on_pre_genericize_cb(void *event_data, void *data) {
-    tree fndecl = (tree)event_data;
-    GenericParser *self = (GenericParser *)data;
-    if(!self->isAddBlock)
-       return;
-    self->isAddBlock = FALSE;
-    printf("on_pre_genericize_cb ----\n");
-    if (TREE_CODE(fndecl) == FUNCTION_DECL) {
-        // 获取当前函数的函数体
-        tree body = DECL_SAVED_TREE(fndecl);
-        printf("on_pre_genericize_cb -xxx--- body:%p\n",body);
-
-        if (body) {
-            // 使用 GCC 内置的 walk_tree 深度优先遍历函数体 AST
-            walk_tree(&body, walk_ast_cb, NULL, NULL);
-        }
-    }
-}
-
 /**
  * 记录fwgb函数中的const_decl
  */
@@ -2161,6 +2019,13 @@ void generic_parser_record_const_decl(GenericParser *self,location_t loc,tree id
    }
 }
 
+
+Directive **generic_parser_get_directive(GenericParser *self,int *count)
+{
+   *count = self->directiveCount;
+   return (Directive **)self->directives;
+}
+
 GenericParser *generic_parser_get()
 {
    static GenericParser *singleton = NULL;
@@ -2172,3 +2037,22 @@ GenericParser *generic_parser_get()
    return singleton;
 }
 
+//读取fwgb内容
+NPtrArray *generic_parser_create_fwgb_text(char *content)
+{
+   NPtrArray *array=n_ptr_array_new();
+   while(strstr(content,FUNC_WITH_GB_START)){
+      char *c=content;
+      char *start=strstr(c,FUNC_WITH_GB_START);
+      char *n=start+strlen(FUNC_WITH_GB_START)+1;//加1跳过 CLASS_BLOCK_START 后的\n号
+      char *end=strstr(n,FUNC_WITH_GB_END);
+      int len=strlen(n);
+      int remain=strlen(end);
+      char *ret=xmalloc(len-remain+1);
+      memcpy(ret,n,len-remain);
+      ret[len-remain]='\0';
+      n_ptr_array_add(array,ret);
+      content = end+strlen(FUNC_WITH_GB_END);
+   }
+   return array;
+}

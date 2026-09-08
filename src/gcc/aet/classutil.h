@@ -26,6 +26,7 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 #include "c-aet.h"
 #include "classinfo.h"
 
+
 /**
  * 实参与形参比较后返回三种状态
   */
@@ -52,7 +53,6 @@ tree                 class_util_create_null_tree();
 nint                 class_util_get_random_number();
 char                *class_util_get_o_file();
 int                  class_util_check_param_type(tree orgi,tree realType);
-int                  class_util_get_type_name(tree type,char **result);
 tree                 class_util_define_var_decl(tree decl,nboolean initialized);
 location_t           class_util_get_declspecs_first_location(struct c_declspecs *specs);
 /**
@@ -64,7 +64,7 @@ int                   class_util_has_nameless_call(tree value);
  * 利用函数第一个参数是self可知该函数所属的类
  */
 char                 *class_util_get_class_name_from_field_decl(tree fieldDecl);
-int                   class_util_get_nameless_call_link(tree value,NPtrArray *array,char **link);
+int                   class_util_get_nameless_call_link(tree value,NPtrArray *array);
 nboolean              class_util_is_function_field(tree field);
 nboolean              class_util_have_field(tree type, tree component);//在结构体或UNION中查找component
 

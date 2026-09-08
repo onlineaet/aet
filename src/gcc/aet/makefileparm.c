@@ -111,6 +111,8 @@ static char *getRootObjectPathOrObjectFile(char *src,char *dest,nboolean needRoo
    NFile *droot=dfile;
    char *p1=n_file_get_absolute_path(n_file_get_parent_file(sroot));
    char *p2=n_file_get_absolute_path(n_file_get_parent_file(dfile));
+   if(!p1 || !p2)
+      return NULL;
    if(!strcmp(p1,p2)){
       n_debug("源文件与.o中同一个目录下:p1:%s sname:%s\n",p1,sname);
       if(needRootPath){

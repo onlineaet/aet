@@ -210,20 +210,6 @@ static unsigned long getFuncpointerAddress()
 
 static char *aetDemangleFuncPointer=NULL;
 
-//int pp_demangle_text_by_aet(const char *start,int length,char *newStr)
-//{
-//    if(aetDemangleFuncPointer==NULL){
-//        aetDemangleFuncPointer=getenv("initAddressDiagnosticCallback");
-//        if(aetDemangleFuncPointer!=NULL){
-//          unsigned long address=atol(aetDemangleFuncPointer);
-//          aetDemangleFunc=address;
-//        }
-//    }
-//    if(aetDemangleFunc)
-//        return aetDemangleFunc(start,length,newStr);
-//    return 0;
-//}
-
 static int convertMangleCallback_cb(const char *start,int length,char *newStr)
 {
    if(aetDemangleFuncPointer==NULL){

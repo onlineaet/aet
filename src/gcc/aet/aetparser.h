@@ -90,7 +90,6 @@ tree aet_parser_c_parser_gnu_attributes (AetParser *self);
 //原型 c_parser_std_attribute_specifier_sequence c-parser.cc
 tree aet_parser_c_parser_std_attribute_specifier_sequence (AetParser *self);
 
-nboolean aet_parser_set_class_or_enum_type(AetParser *self,c_token *who);
 //原型 c_parser_declarator c-parser.h c-parsr.cc
 struct c_declarator * aet_parser_c_parser_declarator (AetParser *self, bool type_seen_p, c_dtr_syn kind,
            bool *seen_id);
@@ -110,6 +109,12 @@ vec<tree, va_gc> *aet_parser_c_parser_expr_list (AetParser *aetParser, bool conv
 
 void aet_parser_c_parser_declspecs_generic (AetParser *self,struct c_declspecs *specs);
 
+//原型 c_parser_expression_conv c-parser.cc
+struct c_expr aet_parser_c_parser_expression_conv (AetParser *self);
+
+int    aet_parser_backup_token(AetParser *self,c_token *backups);
+void   aet_parser_restore_token(AetParser *self,c_token *backups,int count);
+void   aet_parser_convert_type_decl (tree decl,c_token *who);
 
 #endif
 

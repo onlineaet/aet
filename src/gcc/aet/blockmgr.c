@@ -79,6 +79,7 @@ static void blockMgrInit(BlockMgr *self)
 	self->infoCount=0;
 	self->currentBlockName=NULL;
 	self->blockFileName=NULL;
+	self->strBuffer = NULL;
 }
 
 
@@ -609,20 +610,15 @@ int   block_mgr_get_block_count_by_func(BlockMgr *self,ClassFunc *func)
  * 保存块到xxx.block.o文件中
  * xxx是in_fnames[0]对应的输出文件名
  */
-void block_mgr_save(BlockMgr *self)
+char *block_mgr_save(BlockMgr *self)
 {
    if(makefile_parm_is_second_compile(makefile_parm_get())){
       n_debug("blockmgr.c block_mgr_save.c 是第二次编译 %s 不需要写入任何信息。\n",in_fnames[0]);
-      return;
+      return NULL;
    }
-   char  *objfile=makefile_parm_get_object_file(makefile_parm_get());
- //  printf("block_mgr_save --- 没有genericinfo说明没有块:%d %s\n",self->infoCount,objfile);
-   char newName[255];
-   sprintf(newName,"%s.block_new.o",objfile);
    //如果没有泛型块，移走原来的块代码文件
    if(self->infoCount==0){
-      remove(newName);//移走块代码文件
-      return;
+      return NULL;
    }
    int i;
    NString *codes=n_string_new("");
@@ -633,13 +629,7 @@ void block_mgr_save(BlockMgr *self)
       n_free(re);
    }
    gcc_assert(codes->len>0);
-   FILE *fp=fopen(newName,"w");
-   int rx=fwrite(codes->str,1,codes->len,fp);
-   fclose(fp);
-   n_string_free(codes,TRUE);
-   gcc_assert( self->blockFileName==NULL);
-   self->blockFileName=n_strdup(newName);
-   middle_file_modify(middle_file_get(),COMPILE_BLOCK);
+   return n_string_free(codes,FALSE);
 }
 
 /**
@@ -697,20 +687,21 @@ static char * readLocaFile(char *localFileList)
      block end:
      class_block end:
  */
-void block_mgr_ready(BlockMgr *self)
+void block_mgr_ready(BlockMgr *self,NPtrArray **arrays,int alen,int pos)
 {
-   char *fileName = getenv("GCC_AET_BLOCK_LIST_PATH");
-   if(fileName==NULL ||strlen(fileName)==0){
-      return;
-   }
-   FILE *fp=fopen(fileName,"r");
-   char *content = NULL;
-   if(fp){
-      char fileList[50*1024];
-      int rev=fread(fileList,1,50*1024,fp);
-      fclose(fp);
-      fileList[rev]='\0';
-      content = readLocaFile(fileList);
+   NPtrArray *temp=n_ptr_array_new();
+   int i,j;
+   NString *codes=n_string_new("");
+   for(i=0;i<alen;i++){
+      NPtrArray **as=(NPtrArray **)arrays[i];
+      NPtrArray *block = as[pos];//这是关键
+      if(!block || block->len==0)
+         continue;
+      for(j=0;j<block->len;j++){
+         n_ptr_array_add(temp,n_ptr_array_index(block,j));
+         //重新加上 CLASS_BLOCK_START CLASS_BLOCK_END 保存到全局变量中需要完整的数据
+         generic_info_restore(codes,n_ptr_array_index(block,j));
+      }
    }
 
    if(self->saveString){
@@ -718,16 +709,15 @@ void block_mgr_ready(BlockMgr *self)
       self->saveString=NULL;
    }
    //存放的是本项目所有的genericinfo
-   NPtrArray *genInfoArrayFromLocal= generic_info_create_info(content);
+   NPtrArray *genInfoArrayFromLocal= generic_info_create_array_by_array(temp);
    //从库中生成的genInfo
    NPtrArray *genInfoArrayFromLib=aet_lib_get_generic_info_and_block(aet_lib_get());
-   self->saveString=content;
+   self->saveString=n_string_free(codes,FALSE);
    if(self->outputArray){
       n_ptr_array_unref(self->outputArray);
       self->outputArray=NULL;
    }
    self->outputArray=n_ptr_array_new();
-   int i;
    if(genInfoArrayFromLocal){
       for(i=0;i<genInfoArrayFromLocal->len;i++)
          n_ptr_array_add(self->outputArray,n_ptr_array_index(genInfoArrayFromLocal,i));

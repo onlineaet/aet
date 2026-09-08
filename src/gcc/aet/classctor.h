@@ -47,6 +47,12 @@ struct _ClassCtor
 	nboolean superOfSelfParseing; //正在解析self或super$()
 	tree superOfSelf[10];
 	int  superOfSelfCount;
+	//如果人工加入的缺省构造函数的声明或定义
+	NPtrArray *artificialCtors;
+	//记录调用的构造函数
+   NPtrArray *recordCtorArray;;
+
+
 };
 
 
@@ -69,7 +75,11 @@ nboolean   class_ctor_self_is_first(ClassCtor *self,ClassName *className,int *er
 void       class_ctor_end_super_or_self_ctor_call(ClassCtor *self,tree expr);
 void       class_ctor_process_self_call(ClassCtor *self,ClassName *className);
 void       class_ctor_set_tag_for_self_and_super_call(ClassCtor *self,tree ref);
-
+/**
+ * 缺省的构造函数是不是人工创建的
+ */
+nboolean   class_ctor_is_artificial(ClassCtor *self,ClassName *className);
+void       class_ctor_add_call(ClassCtor *self,tree call);
 
 #endif
 

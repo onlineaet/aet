@@ -157,7 +157,7 @@ tree aet_utils_create_identifier(const uchar *str,size_t len)
    return HT_IDENT_TO_GCC_IDENT (HT_NODE (result));
 }
 
-c_token      *aet_utils_create_typedef_token(c_token *token,location_t start_loc)
+c_token  *aet_utils_create_typedef_token(c_token *token,location_t start_loc)
 {
    token->type = CPP_KEYWORD;
    token->id_kind=C_ID_NONE;
@@ -170,7 +170,7 @@ c_token      *aet_utils_create_typedef_token(c_token *token,location_t start_loc
    return token;
 }
 
-c_token      *aet_utils_create_struct_token(c_token *token,location_t start_loc)
+c_token  *aet_utils_create_struct_token(c_token *token,location_t start_loc)
 {
    token->type = CPP_KEYWORD;
    token->id_kind=C_ID_NONE;
@@ -881,4 +881,123 @@ nboolean aet_utils_is_inner_function(char *funcName)
 }
 
 
+static const char *get_type_name_from_type(tree type)
+{
+   if (!aet_utils_valid_tree(type))
+      return NULL;
+   tree typeName = TYPE_NAME(type);
+   if (aet_utils_valid_tree(typeName)){
+      if (TREE_CODE(typeName) == TYPE_DECL){
+         tree name = DECL_NAME(typeName);
+         if (aet_utils_valid_tree(name))
+            return IDENTIFIER_POINTER(name);
+      }else if (TREE_CODE(typeName) == IDENTIFIER_NODE)
+         return IDENTIFIER_POINTER(typeName);
+   }
+   return NULL;
+}
+
+static const char * getTypeString(tree type, int *pointer)
+{
+   if (!aet_utils_valid_tree(type))
+      return NULL;
+
+   if (!TYPE_P(type))
+      return NULL;
+
+   enum tree_code code = TREE_CODE(type);
+
+   /*
+   * pointer type:
+   *
+   * int *              → pointer = 1
+   * int **             → pointer = 2
+   *
+   * 但是：
+   *
+   * aet_generic_E
+   *
+   * 自己就是一个带 typedef 名字的 pointer type，
+   * 因此虽然它是 POINTER_TYPE，但不能增加 pointer。
+   */
+   if (code == POINTER_TYPE){
+      const char *tn = get_type_name_from_type(type);
+      if (tn)
+         return tn;
+
+      (*pointer)++;
+   }else{
+      const char *tn = get_type_name_from_type(type);
+      if (tn)
+         return tn;
+   }
+
+   /*
+   * function_type:
+   * TREE_TYPE(function_type) = return type
+   *
+   * 其他 wrapper type 也继续向下找。
+   */
+   tree next = TREE_TYPE(type);
+   if (!aet_utils_valid_tree(next))
+      return NULL;
+   return getTypeString(next, pointer);
+}
+
+char *aet_utils_get_type_string(tree any)
+{
+   tree type = TYPE_P(any) ? any : TREE_TYPE(any);
+   if (!aet_utils_valid_tree(type) || !TYPE_P(type))
+        return NULL;
+   int pointer = 0;
+   char *ret = getTypeString(type,&pointer);
+   if(!ret)
+      return NULL;
+   if(pointer==0)
+      return xstrdup(ret);
+
+   NString *strtype=n_string_new(ret);
+   n_string_append(strtype, " ");
+   int i;
+   for (i = 0; i < pointer; i++)
+       n_string_append(strtype, "*");
+   return n_string_free(strtype,FALSE);
+}
+
+
+static char *pointerStrings[4]={"","*","**","***"};
+
+/**
+ * 声明在结构体的无名结构体，返回是空的
+ * struct {
+      int w,h,channels;
+   }outputDimen;
+ */
+const char *aet_utils_get_type_string_and_pointer(tree any,char **pointerString)
+{
+   tree type = TYPE_P(any) ? any : TREE_TYPE(any);
+   if (!aet_utils_valid_tree(type) || !TYPE_P(type))
+      return NULL;
+   int pointer = 0;
+   char *ret = getTypeString(type,&pointer);
+   if(!ret)
+      return NULL;
+   if(pointerString)
+      *pointerString = pointerStrings[pointer];
+   return ret;
+}
+
+const char *aet_utils_get_const_type_string(tree any,int *pointer)
+{
+     tree type = TYPE_P(any) ? any : TREE_TYPE(any);
+     if (!aet_utils_valid_tree(type) || !TYPE_P(type))
+        return NULL;
+     int p = 0;
+     char *ret = getTypeString(type,&p);
+     if(!ret)
+        return NULL;
+     if(pointer)
+        *pointer =p;
+     return ret;
+}
 

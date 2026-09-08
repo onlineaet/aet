@@ -183,7 +183,6 @@ nboolean class_dot_is_class_ref(ClassDot *self,tree exprValue)
    char *className=class_access_get_class_name((ClassAccess*)self,exprValue);
    if(className==NULL){
       n_debug("class_dot_is_class_ref 点访问不是一个Class %s",get_tree_code_name(TREE_CODE(exprValue)));
-      //aet_print_tree(exprValue);
    }
    return className!=NULL;
 }

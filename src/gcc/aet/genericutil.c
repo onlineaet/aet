@@ -74,28 +74,35 @@ genericutils.c中引用到，现在改为BITS_PER_WORD
 #define GENERIC_BLOCK_TO_FUNC_PREFIX "_gen_block_func"
 
 static char *genericIdentifier[]={"aet_generic_A","aet_generic_B","aet_generic_C","aet_generic_D","aet_generic_E",
-		"aet_generic_F","aet_generic_G","aet_generic_H","aet_generic_I","aet_generic_J",
-		"aet_generic_K","aet_generic_L","aet_generic_M","aet_generic_N","aet_generic_O",
-		"aet_generic_P","aet_generic_Q","aet_generic_R","aet_generic_S","aet_generic_T",
-		"aet_generic_U","aet_generic_V","aet_generic_W","aet_generic_X","aet_generic_Y",
-		"aet_generic_Z"};
+      "aet_generic_F","aet_generic_G","aet_generic_H","aet_generic_I","aet_generic_J",
+      "aet_generic_K","aet_generic_L","aet_generic_M","aet_generic_N","aet_generic_O",
+      "aet_generic_P","aet_generic_Q","aet_generic_R","aet_generic_S","aet_generic_T",
+      "aet_generic_U","aet_generic_V","aet_generic_W","aet_generic_X","aet_generic_Y",
+      "aet_generic_Z"};
 
 
+static char *genericA_Z[26]={"A","B","C","D","E","F",
+      "G","H","I","J","K","L","M","N","O","P","Q","R","S","T","U","V",
+      "W","X","Y","Z"};
+
+/**
+ * 判断是不是字符串 aet_generic_A-aet_generic_Z
+ */
 nboolean generic_util_is_generic_ident(char *name)
 {
    if(name==NULL)
-	   return FALSE;
+      return FALSE;
    int i;
    for(i=0;i<26;i++){
-	   if(strcmp(genericIdentifier[i],name)==0)
-		   return TRUE;
+      if(strcmp(genericIdentifier[i],name)==0)
+         return TRUE;
    }
    return FALSE;
 }
 
 /**
  * str的开始部分是否是genericIdentifier
- * str 字符串 例如 "aet_generic_E * atcs"
+ * str 字符串 例如 "aet_generic_E * varName
  */
 nboolean generic_util_start_with_generic(char *str)
 {
@@ -111,21 +118,17 @@ nboolean generic_util_start_with_generic(char *str)
 
 /**
  * 返回字符前的泛型类型
- * str 字符串 例如 "aet_generic_E * atcs"
+ * str 字符串 例如  aet_generic_E * varName
  * 返回 aet_generic_E
  */
-char * generic_util_get_start_with_generic(char *str)
+const char * generic_util_get_start_with_generic(char *str)
 {
    if(!str)
       return NULL;
    int i;
    for(i=0;i<26;i++){
-      if(startswith(str,genericIdentifier[i])){
-         char ret[50];
-         strncpy(ret,str,strlen(genericIdentifier[i]));
-         ret[strlen(genericIdentifier[i])]='\0';
-         return xstrdup(ret);
-      }
+      if(startswith(str,genericIdentifier[i]))
+         return genericIdentifier[i];
    }
    return NULL;
 }
@@ -134,9 +137,7 @@ char * generic_util_get_start_with_generic(char *str)
 //如果参数是泛型类型，需要改变为新的名字
 char *generic_util_create_param_new_name(char *origName)
 {
-   char param[512];
-   sprintf(param,"%s%s",CHANGE_PARAM_NAME_PREFIX,origName);
-   return xstrdup(param);
+   return n_strdup_printf("%s%s",CHANGE_PARAM_NAME_PREFIX,origName);
 }
 
 //_aetGenNewParamPrefix_atcs取出原来的名字
@@ -146,9 +147,7 @@ char *generic_util_get_block_orig_param_name(char *newName)
       return NULL;
    if(strlen(newName)<=strlen(CHANGE_PARAM_NAME_PREFIX))
       return NULL;
-   char orig[128];
-   sprintf(orig,"%s",newName+strlen(CHANGE_PARAM_NAME_PREFIX));
-   return xstrdup(orig);
+   return n_strdup_printf("%s",newName+strlen(CHANGE_PARAM_NAME_PREFIX));
 }
 
 /**
@@ -172,66 +171,40 @@ static tree getTypeFromPointer(tree type)
  * 如 setData(E data) data的类型是aet_generic_E
  * 如果 type 是 aet_generic_A *，也返回类型是泛型
  */
-nboolean  generic_util_is_generic_pointer(tree type0)
+nboolean  generic_util_is_generic_pointer(tree type)
 {
-    if(TREE_CODE(type0)!=POINTER_TYPE)
-    	return FALSE;
-    tree type= getTypeFromPointer(type0);
-    tree typeName=TYPE_NAME(type);
-    tree mainVar=TYPE_MAIN_VARIANT (type);
-    tree ptd=TREE_TYPE (type);
-    if(!aet_utils_valid_tree(typeName) || !aet_utils_valid_tree(typeName)|| !aet_utils_valid_tree(typeName))
-    	return FALSE;
-    if(TREE_CODE(typeName)!=TYPE_DECL)
-    	return FALSE;
-    if(TREE_CODE(mainVar)!=POINTER_TYPE)
-    	return FALSE;
-    if(TREE_CODE(ptd)!=VOID_TYPE)
-    	return FALSE;
-    tree declName=DECL_NAME(typeName);
-    if(!aet_utils_valid_tree(declName))
-     	return FALSE;
-    char *name=IDENTIFIER_POINTER(declName);
-    if(!generic_util_is_generic_ident(name))
-       return FALSE;
-    return TRUE;
+   const char *str = aet_utils_get_const_type_string(type,NULL);
+   if(!str)
+      return FALSE;
+   return generic_util_is_generic_ident(str);
 }
-
 
 /**
  * 获取泛型的字符串A-Z。如:E、F
  * type:类声明和定义中函数声明或定义的参数。
  */
-char *generic_util_get_generic_str(tree type0)
+const char *generic_util_get_generic_decl_string(tree type)
 {
-   if(!aet_utils_valid_tree(type0))
+   const char *str = aet_utils_get_const_type_string(type,NULL);
+   if(!str)
       return NULL;
-   if(TREE_CODE(type0)!=POINTER_TYPE)
+   int i;
+   for(i=0;i<26;i++)
+      if(strcmp(genericIdentifier[i],str)==0)
+         return genericA_Z[i];
+
+   return NULL;
+}
+
+/**
+ * genericStr是aet_generic_E
+ */
+const char *generic_util_get_generic_decl_string(char *genericStr)
+{
+   if(!genericStr)
       return NULL;
-   tree type= getTypeFromPointer(type0);
-   tree typeName=TYPE_NAME(type);
-   tree mainVar=TYPE_MAIN_VARIANT (type);
-   tree ptd=TREE_TYPE (type);
-   if(!aet_utils_valid_tree(typeName) || !aet_utils_valid_tree(mainVar)|| !aet_utils_valid_tree(ptd))
-      return NULL;
-   if(TREE_CODE(typeName)!=TYPE_DECL)
-      return NULL;
-   if(TREE_CODE(mainVar)!=POINTER_TYPE)
-      return NULL;
-   if(TREE_CODE(ptd)!=VOID_TYPE)
-      return NULL;
-   tree declName=DECL_NAME(typeName);
-   if(!aet_utils_valid_tree(declName))
-      return NULL;
-   char *name=IDENTIFIER_POINTER(declName);
-   if(!generic_util_is_generic_ident(name))
-      return NULL;
-   //取 aet_generic_E 中的最后一个字母 E
-   char ax=name[strlen(name)-1];
-   char *re=(char*)n_malloc(2);
-   re[0]=ax;
-   re[1]='\0';
-   return re;
+   char a=genericStr[strlen(genericStr)-1];
+   return genericA_Z[a-'A'];;
 }
 
 /**
@@ -239,87 +212,87 @@ char *generic_util_get_generic_str(tree type0)
  */
 int generic_util_get_generic_type(tree type)
 {
-	int gt=-1;
-	if(TREE_CODE(type)==POINTER_TYPE)
-	  return generic_util_get_generic_type(TREE_TYPE(type));
-	if(TREE_CODE(type)==INTEGER_TYPE){
-		int precision= TYPE_PRECISION (type);
-		int unsig=TYPE_UNSIGNED (type);
-		if(precision==CHAR_TYPE_SIZE){
-			gt=unsig==1?GENERIC_TYPE_UCHAR:GENERIC_TYPE_CHAR;
-		}else if(precision==SHORT_TYPE_SIZE){
-			gt=unsig==1?GENERIC_TYPE_USHORT:GENERIC_TYPE_SHORT;
-		}else if(precision==INT_TYPE_SIZE){
-			gt=unsig==1?GENERIC_TYPE_UINT:GENERIC_TYPE_INT;
-		}else if(precision==LONG_TYPE_SIZE){
-		    gt=unsig==1?GENERIC_TYPE_ULONG:GENERIC_TYPE_LONG;
-		}else if(precision==LONG_LONG_TYPE_SIZE){
-		    gt=unsig==1?GENERIC_TYPE_ULONG_LONG:GENERIC_TYPE_LONG_LONG;
-	    }
-	}else if(TREE_CODE(type)==REAL_TYPE){
-		int precision= TYPE_PRECISION (type);
-		if(precision==AET_FLOAT_TYPE_SIZE){
-			gt=GENERIC_TYPE_FLOAT;
-	    }else if(precision==AET_DOUBLE_TYPE_SIZE){
-			gt=GENERIC_TYPE_DOUBLE;
-	    }else if(precision==AET_LONG_DOUBLE_TYPE_SIZE){
-			gt=GENERIC_TYPE_LONG_DOUBLE;
-		}else if(precision==DECIMAL32_TYPE_SIZE){
-			gt=GENERIC_TYPE_DECIMAL32_FLOAT;
-		}else if(precision==DECIMAL64_TYPE_SIZE){
-			gt=GENERIC_TYPE_DECIMAL64_FLOAT;
-		}else if(precision==DECIMAL128_TYPE_SIZE){
-			gt=GENERIC_TYPE_DECIMAL128_FLOAT;
-		}
-	}else if(TREE_CODE(type)==COMPLEX_TYPE){
-		tree t1=TREE_TYPE(type);
-		if(TREE_CODE(t1)==INTEGER_TYPE){
-			int precision= TYPE_PRECISION (t1);
-			int unsig=TYPE_UNSIGNED (t1);
-			if(precision==CHAR_TYPE_SIZE){
-				gt=unsig==1?GENERIC_TYPE_COMPLEX_UCHAR:GENERIC_TYPE_COMPLEX_CHAR;
-			}else if(precision==SHORT_TYPE_SIZE){
-				gt=unsig==1?GENERIC_TYPE_COMPLEX_USHORT:GENERIC_TYPE_COMPLEX_SHORT;
-			}else if(precision==INT_TYPE_SIZE){
-				gt=unsig==1?GENERIC_TYPE_COMPLEX_UINT:GENERIC_TYPE_COMPLEX_INT;
-			}else if(precision==LONG_TYPE_SIZE){
-				gt=unsig==1?GENERIC_TYPE_COMPLEX_ULONG:GENERIC_TYPE_COMPLEX_LONG;
-			}else if(precision==LONG_LONG_TYPE_SIZE){
-				gt=unsig==1?GENERIC_TYPE_COMPLEX_ULONG_LONG:GENERIC_TYPE_COMPLEX_LONG_LONG;
-			}
-		}else if(TREE_CODE(t1)==REAL_TYPE){
-			int precision= TYPE_PRECISION (t1);
-			if(precision==AET_FLOAT_TYPE_SIZE){
-				gt=GENERIC_TYPE_COMPLEX_FLOAT;
-			}else if(precision==AET_DOUBLE_TYPE_SIZE){
-				gt=GENERIC_TYPE_COMPLEX_DOUBLE;
-			}else if(precision==AET_LONG_DOUBLE_TYPE_SIZE){
-				gt=GENERIC_TYPE_COMPLEX_LONG_DOUBLE;
-			}
-		}
-	}else if(TREE_CODE(type)==ENUMERAL_TYPE){
-		gt=GENERIC_TYPE_ENUMERAL;
-	}else if(TREE_CODE(type)==BOOLEAN_TYPE){
-			gt=GENERIC_TYPE_BOOLEAN;
-	}else if(TREE_CODE(type)==FIXED_POINT_TYPE){
-		gt=GENERIC_TYPE_FIXED_POINT;
-	}else if(TREE_CODE(type)==RECORD_TYPE){
-		char *className=class_util_get_class_name_by_record(type);
-		gt=className!=NULL?GENERIC_TYPE_CLASS:GENERIC_TYPE_STRUCT;
-	}
-	return gt;
+   int gt=-1;
+   if(TREE_CODE(type)==POINTER_TYPE)
+     return generic_util_get_generic_type(TREE_TYPE(type));
+   if(TREE_CODE(type)==INTEGER_TYPE){
+      int precision= TYPE_PRECISION (type);
+      int unsig=TYPE_UNSIGNED (type);
+      if(precision==CHAR_TYPE_SIZE){
+         gt=unsig==1?GENERIC_TYPE_UCHAR:GENERIC_TYPE_CHAR;
+      }else if(precision==SHORT_TYPE_SIZE){
+         gt=unsig==1?GENERIC_TYPE_USHORT:GENERIC_TYPE_SHORT;
+      }else if(precision==INT_TYPE_SIZE){
+         gt=unsig==1?GENERIC_TYPE_UINT:GENERIC_TYPE_INT;
+      }else if(precision==LONG_TYPE_SIZE){
+          gt=unsig==1?GENERIC_TYPE_ULONG:GENERIC_TYPE_LONG;
+      }else if(precision==LONG_LONG_TYPE_SIZE){
+          gt=unsig==1?GENERIC_TYPE_ULONG_LONG:GENERIC_TYPE_LONG_LONG;
+       }
+   }else if(TREE_CODE(type)==REAL_TYPE){
+      int precision= TYPE_PRECISION (type);
+      if(precision==AET_FLOAT_TYPE_SIZE){
+         gt=GENERIC_TYPE_FLOAT;
+       }else if(precision==AET_DOUBLE_TYPE_SIZE){
+         gt=GENERIC_TYPE_DOUBLE;
+       }else if(precision==AET_LONG_DOUBLE_TYPE_SIZE){
+         gt=GENERIC_TYPE_LONG_DOUBLE;
+      }else if(precision==DECIMAL32_TYPE_SIZE){
+         gt=GENERIC_TYPE_DECIMAL32_FLOAT;
+      }else if(precision==DECIMAL64_TYPE_SIZE){
+         gt=GENERIC_TYPE_DECIMAL64_FLOAT;
+      }else if(precision==DECIMAL128_TYPE_SIZE){
+         gt=GENERIC_TYPE_DECIMAL128_FLOAT;
+      }
+   }else if(TREE_CODE(type)==COMPLEX_TYPE){
+      tree t1=TREE_TYPE(type);
+      if(TREE_CODE(t1)==INTEGER_TYPE){
+         int precision= TYPE_PRECISION (t1);
+         int unsig=TYPE_UNSIGNED (t1);
+         if(precision==CHAR_TYPE_SIZE){
+            gt=unsig==1?GENERIC_TYPE_COMPLEX_UCHAR:GENERIC_TYPE_COMPLEX_CHAR;
+         }else if(precision==SHORT_TYPE_SIZE){
+            gt=unsig==1?GENERIC_TYPE_COMPLEX_USHORT:GENERIC_TYPE_COMPLEX_SHORT;
+         }else if(precision==INT_TYPE_SIZE){
+            gt=unsig==1?GENERIC_TYPE_COMPLEX_UINT:GENERIC_TYPE_COMPLEX_INT;
+         }else if(precision==LONG_TYPE_SIZE){
+            gt=unsig==1?GENERIC_TYPE_COMPLEX_ULONG:GENERIC_TYPE_COMPLEX_LONG;
+         }else if(precision==LONG_LONG_TYPE_SIZE){
+            gt=unsig==1?GENERIC_TYPE_COMPLEX_ULONG_LONG:GENERIC_TYPE_COMPLEX_LONG_LONG;
+         }
+      }else if(TREE_CODE(t1)==REAL_TYPE){
+         int precision= TYPE_PRECISION (t1);
+         if(precision==AET_FLOAT_TYPE_SIZE){
+            gt=GENERIC_TYPE_COMPLEX_FLOAT;
+         }else if(precision==AET_DOUBLE_TYPE_SIZE){
+            gt=GENERIC_TYPE_COMPLEX_DOUBLE;
+         }else if(precision==AET_LONG_DOUBLE_TYPE_SIZE){
+            gt=GENERIC_TYPE_COMPLEX_LONG_DOUBLE;
+         }
+      }
+   }else if(TREE_CODE(type)==ENUMERAL_TYPE){
+      gt=GENERIC_TYPE_ENUMERAL;
+   }else if(TREE_CODE(type)==BOOLEAN_TYPE){
+         gt=GENERIC_TYPE_BOOLEAN;
+   }else if(TREE_CODE(type)==FIXED_POINT_TYPE){
+      gt=GENERIC_TYPE_FIXED_POINT;
+   }else if(TREE_CODE(type)==RECORD_TYPE){
+      char *className=class_util_get_class_name_by_record(type);
+      gt=className!=NULL?GENERIC_TYPE_CLASS:GENERIC_TYPE_STRUCT;
+   }
+   return gt;
 }
 
 /**
- * 通过泛型声明E 获取 aet_generic_E 类型
+ * 通过泛型声明 E 获取 aet_generic_E 类型
  */
 tree generic_util_get_generic_type_by_str(const char *genericStr)
 {
-   char temp[255];
-   sprintf(temp,"%s%s",AET_GENERIC_TYPE_NAME_PREFIX,genericStr);
-   tree id=aet_utils_create_ident(temp);
-   tree type=lookup_name(id);
-   if(!type || type==NULL_TREE || type==error_mark_node)
+   if(!genericStr || strlen(genericStr)!=1)
+      return NULL_TREE;
+   const char *gstr=  genericIdentifier[genericStr[0]-'A'];
+   tree type=lookup_name(get_identifier(gstr));
+   if(!aet_utils_valid_tree(type))
       return NULL_TREE;
    return type;
 }
@@ -332,12 +305,10 @@ tree generic_util_get_generic_type_by_str(const char *genericStr)
  */
 char *generic_util_create_block_func_name(char *sysName,int index)
 {
-	char blockFuncName[256];
-	if(index>=0)
-	  sprintf(blockFuncName,"_%s_%s_%d",sysName,GENERIC_BLOCK_TO_FUNC_PREFIX,index);
-	else
-	  sprintf(blockFuncName,"_%s_%s_",sysName,GENERIC_BLOCK_TO_FUNC_PREFIX);
-	return n_strdup(blockFuncName);
+   if(index>=0)
+      return n_strdup_printf("_%s_%s_%d",sysName,GENERIC_BLOCK_TO_FUNC_PREFIX,index);
+   else
+      return n_strdup_printf("_%s_%s_",sysName,GENERIC_BLOCK_TO_FUNC_PREFIX);
 }
 
 char *generic_util_create_block_func_type_decl_name(char *sysName,int index)
@@ -361,12 +332,12 @@ static inline void c_parser_check_literal_zero (c_parser *parser, unsigned *lite
     case CPP_CHAR32:
     case CPP_UTF8CHAR:
       /* If a parameter is literal zero alone, remember it
-	 for -Wmemset-transposed-args warning.  */
+    for -Wmemset-transposed-args warning.  */
       if (integer_zerop (tok->value)
-	  && !TREE_OVERFLOW (tok->value)
-	  && (c_parser_peek_2nd_token (parser)->type == CPP_COMMA
-	      || c_parser_peek_2nd_token (parser)->type == CPP_CLOSE_PAREN))
-	*literal_zero_mask |= 1U << idx;
+     && !TREE_OVERFLOW (tok->value)
+     && (c_parser_peek_2nd_token (parser)->type == CPP_COMMA
+         || c_parser_peek_2nd_token (parser)->type == CPP_CLOSE_PAREN))
+   *literal_zero_mask |= 1U << idx;
     default:
       break;
     }
@@ -424,14 +395,14 @@ static tree createTarget(c_parser *parser,char *codes)
  */
 tree generic_util_create_target(char *codes)
 {
-	c_parser *parser=class_impl_get()->parser->parser;
-	int count=parser->tokens_avail;
-	c_token backups[30];
-	int backCount=backupToken(parser,backups);
-	tree target=createTarget(parser,codes);
-	restore(parser,backups,backCount);
-	c_parser_consume_token (parser);
-	return target;
+   c_parser *parser=class_impl_get()->parser->parser;
+   int count=parser->tokens_avail;
+   c_token backups[30];
+   int backCount=backupToken(parser,backups);
+   tree target=createTarget(parser,codes);
+   restore(parser,backups,backCount);
+   c_parser_consume_token (parser);
+   return target;
 }
 
 tree generic_util_create_target_loc(char *codes,location_t loc)
@@ -455,135 +426,10 @@ tree generic_util_create_target_loc(char *codes,location_t loc)
 }
 
 /**
- * 是否泛型 aet_generic_E或..F等
- */
-static char *getGenericA_Z(tree type)
-{
-   tree typeName=TYPE_NAME(type);
-   if(!aet_utils_valid_tree(typeName))
-      return NULL;
-   if(TREE_CODE(typeName)==TYPE_DECL){
-      tree name=DECL_NAME(typeName);
-      if(generic_util_is_generic_ident(IDENTIFIER_POINTER(name)))
-         return IDENTIFIER_POINTER(name);
-   }
-   return NULL;
-}
-
-static char *getId(tree arg,int *pointer)
-{
-   tree type=TREE_TYPE(arg);
-   if(!aet_utils_valid_tree(type))
-      return NULL;
-   if(TREE_CODE(type)==POINTER_TYPE){
-      *pointer=*pointer+1;
-      char *genericA_Z=getGenericA_Z(type);
-      if(genericA_Z!=NULL){
-         *pointer=*pointer-1;
-         return genericA_Z;
-      }
-      return getId(type,pointer);
-   }else if(TREE_CODE(type)==ARRAY_TYPE){
-      return getId(type,pointer);
-   }else{
-      tree typeName=TYPE_NAME(type);
-      if(!aet_utils_valid_tree(typeName))
-         return NULL;
-      if(TREE_CODE(typeName)==TYPE_DECL){
-         tree name=DECL_NAME(typeName);
-         return IDENTIFIER_POINTER(name);
-      }else
-         return NULL;
-   }
-   return NULL;
-}
-/**
- * 是不是A-E泛型，如果是因该转化成aet_void_E,aet_void_F等
- */
-static char *getGenericDecl(tree arg)
-{
-	int pointer=0;
-	char *type=getId(arg,&pointer);
-	if(pointer>0){
-		tree type=TREE_TYPE(arg);
-		tree typeName=TYPE_NAME(type);
-		if(typeName && TREE_CODE(typeName)==TYPE_DECL){
-			tree name=DECL_NAME(typeName);
-			if(generic_util_is_generic_ident(IDENTIFIER_POINTER(name)))
-	        	return IDENTIFIER_POINTER(name);
-		}
-	}
-	return NULL;
-}
-
-/**
- * 类型转成字符串
- */
-char *generic_util_get_type_str(tree arg)
-{
-	char *n=getGenericDecl(arg);
-	if(n!=NULL){
-	    char *re=n_strdup(n);
-	    return re;
-	}
-    int pointer=0;
-    n=getId(arg,&pointer);
-    if(n==NULL)
-    	return NULL;
-    NString *strtype=n_string_new(n);
-    if(pointer==1){
-    	n_string_append(strtype," *");
-    }else if(pointer==2){
-    	n_string_append(strtype," **");
-    }else if(pointer==3){
-    	n_string_append(strtype," ***");
-    }
-    char *re=n_strdup(strtype->str);
-    n_string_free(strtype,TRUE);
-    return re;
-}
-
-/**
- * 获取泛型声明的字符串和指针数
- * 返回像aet_generic_E这梓的字符串
- * 泛型没有 E *这种概念。
- */
-char *generic_util_get_type_str(tree arg,int *pointerCount)
-{
-   if(arg==NULL)
-      return NULL;
-   int pointer=0;
-   char *n=getId(arg,&pointer);
-   if(n==NULL)
-      return NULL;
-   *pointerCount = pointer;
-   return n;
-}
-
-
-/**
- * 是不是变量
- * T abc或E abc等form
- */
-nboolean generic_util_is_generic_var_or_parm(tree decl)
-{
-   if(!aet_utils_valid_tree(decl))
-      return FALSE;
-   if(TREE_CODE(decl)!=VAR_DECL && TREE_CODE(decl)!=PARM_DECL)
-      return FALSE;
-   char *str=generic_util_get_type_str(decl);
-   if(str==NULL)
-      return FALSE;
-   nboolean re= generic_util_is_generic_ident(str);
-   n_free(str);
-   return re;
-}
-
-
-/**
  * 把参数 int *abcd[][5]从arg中取出来
  */
-nboolean generic_util_get_array_type_and_parm_name(tree arg,char **typeStr,char **parmName,char *oldParmName)
+nboolean generic_util_get_array_type_and_parm_name(tree arg,char **typeStr,
+      char **parmName,char *oldParmName)
 {
    tree type=TREE_TYPE(arg);
    if(TREE_CODE(type)!=POINTER_TYPE)
@@ -604,7 +450,7 @@ nboolean generic_util_get_array_type_and_parm_name(tree arg,char **typeStr,char 
    }
    tree maxValue=TYPE_MAX_VALUE (domn);
    wide_int dimen=wi::to_wide(maxValue);
-   int ds=	dimen.to_shwi()+1;
+   int ds=  dimen.to_shwi()+1;
    *parmName=n_strdup_printf("%s[][%d]",oldParmName,ds);
    return TRUE;
 }
@@ -771,12 +617,12 @@ nboolean gneric_util_have_generic_type (tree expr)
    vec<tree> out = vNULL;
    walk_tree (&expr, find_aet_generic_vars, &out, NULL);
    int len = out.length ();
-   /* 现在 vars 里就是所有类型为 aet_generic_E 的变量 */
-   for (unsigned i = 0; i < out.length (); i++){
-       tree v = out[i];
-       aet_print_tree(v);
-       /* 对 v 做你需要的处理 */
-   }
+//   /* 现在 vars 里就是所有类型为 aet_generic_E 的变量 */
+//   for (unsigned i = 0; i < out.length (); i++){
+//       tree v = out[i];
+//       aet_print_tree(v);
+//       /* 对 v 做你需要的处理 */
+//   }
    out.release ();
    return len>0;
 }

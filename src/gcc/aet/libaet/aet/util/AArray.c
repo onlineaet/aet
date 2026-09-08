@@ -17,16 +17,12 @@
  * If not see <http://www.gnu.org/licenses/>.
  * AET was originally developed  by the zclei@sina.com
  */
-
 #include <string.h>
 #include <stdlib.h>
 #include "../lang/AQSort.h"
-
-#include <string.h>
-#include <stdlib.h>
 #include "AArray.h"
 
-//element_pos中必须转化成char * 应为array是void类型
+//element_pos中必须转化成char * 因为array是void类型
 #define MIN_ARRAY_SIZE  16
 
 #define element_count()  (( (char*)finish - (char*)start ) / elementSize)
@@ -53,14 +49,14 @@ impl$ AArray{
       init(capacity,NULL);
    }
 
-   AArray(auint capacity,ADestroyNotify clearFunc){
-      init(capacity,clearFunc);
+   AArray(auint capacity,ADestroyNotify destroyFunc){
+      init(capacity,destroyFunc);
    }
 
-   void init(auint capacity,ADestroyNotify clearFunc){
+   void init(auint capacity,ADestroyNotify destroyFunc){
       self->elementSize     = sizeof(E);
       self->isPointer       =generic_is_pointer(E);
-      self->clearFunc       = clearFunc;
+      self->destroyFunc       = destroyFunc;
       self->start = finish = end_of_storage= NULL;
       if (capacity != 0)
          maybeExpand (capacity);
@@ -72,12 +68,6 @@ impl$ AArray{
    void maybeExpand(auint eleCount) {
        // 当前已有元素个数
        auint currentCount = element_count();   // 即 (finish - start) / elementSize
-       // 检查溢出
-       if (A_UNLIKELY((A_MAXUINT - currentCount) < eleCount)) {
-           a_error("加 %u 到数组将溢出。\n", eleCount);
-           // 这里可以改成 a_error 或直接 return
-           return;
-       }
        // 需要的总元素个数
        auint needCount = currentCount + eleCount;
        // 当前容量（元素个数）
@@ -88,29 +78,30 @@ impl$ AArray{
        if (needCount <= currentCapacity)
            return;
 
+       // 检查溢出
+       if (A_UNLIKELY((A_MAXUINT - currentCount) < eleCount)) {
+           a_error("加 %u 到数组溢出。\n", eleCount);
+           return;
+       }
        // 计算新的容量（字节）
        auint want_alloc = elementSize * needCount;
        want_alloc = nearestPow(want_alloc);
        want_alloc = MAX(want_alloc, MIN_ARRAY_SIZE);
        // 重新分配
        void *new_array = a_realloc(start, want_alloc);
-
        // 更新三个指针
        auint oldSizeBytes = (char*)finish - (char*)start;
        start          = new_array;
        finish         =(E *) ((char*)start + oldSizeBytes);
        end_of_storage = (E *)((char*)start + want_alloc);
-       if(haveZero)
-          memset((char*)finish, 0, (char*)end_of_storage-(char*)finish);
-
    }
 
    /**
     * 释放元素index的内存
     */
    void clear(int index){
-      if (clearFunc != NULL){
-         clearFunc(isPointer?start[index]:(char*)start+index*elementSize);
+      if (destroyFunc != NULL){
+         destroyFunc(isPointer?start[index]:(char*)start+index*elementSize);
       }
    }
 
@@ -118,12 +109,11 @@ impl$ AArray{
     * 从 index_ 开始移除 removeCount 个元素
     */
    void removeRange(auint index_, auint removeCount){
-
        auint sz = element_count();
        a_return_if_fail(index_ <= sz);
        a_return_if_fail(index_ + removeCount <= sz);
        // 调用销毁回调
-       if (clearFunc != NULL) {
+       if (destroyFunc != NULL) {
            for (auint i = 0; i < removeCount; ++i) {
                clear(index_ + i);
            }
@@ -135,23 +125,22 @@ impl$ AArray{
                    (char*)start + (index_ + removeCount) * elementSize,
                    (sz - index_ - removeCount) * elementSize);
        }
-
        // 回退 finish 指针
        finish = (E*)((char*)finish - removeCount * elementSize);
-       // 可选：把移出的区域清零（保持原行为）
-       if(haveZero)
-          memset((char*)finish, 0, removeCount * elementSize);
    }
 
    /**
-    * 设置数组大小
+    * 基于当前size()的大小 设置元素个数据
     */
-   void setSize(auint newEleCount){
+   void resize(auint newSize){
       auint currentCount = element_count();   // 即 (finish - start) / elementSize
-      if (newEleCount > currentCount){
-         maybeExpand (newEleCount - currentCount);
-      }else if (newEleCount < currentCount)
-         removeRange (newEleCount, currentCount - newEleCount);
+      if (newSize > currentCount){
+         int expandSize  = newSize - currentCount;
+         maybeExpand (expandSize);
+         memset((char*)finish, 0, expandSize*elementSize);
+         finish = (E*)((char*)finish + expandSize * elementSize);
+      }else if (newSize < currentCount)
+         removeRange (newSize, currentCount - newSize);
    }
 
    /**
@@ -202,11 +191,6 @@ impl$ AArray{
        genericblock$(){
           finish = (void**)((char*)finish-sizeof(E));
        };
-       // 回退 finish 指针
-       //finish = (E*)((char*)finish - elementSize);
-       // 可选：把移出的那个位置清零（保持与原行为一致）
-       if(haveZero)
-          memset((char*)finish, 0, elementSize);
    }
 
    /**
@@ -227,7 +211,7 @@ impl$ AArray{
    }
 
    /**
-    * 进入内联
+    * 放入泛型块中，size()可以进入内联
     */
    auint size(){
       return  genericblock$() {
@@ -245,32 +229,27 @@ impl$ AArray{
       };
    }
 
-   void addFast(E value) {
-       genericblock$(value){
-          finish = value;
-          finish = (void **)((char*)finish + sizeof(E));
-       };
+   E get(int index){
+      return genericblock$(index) {
+         return start[index];  // 直接通过 start 指针访问
+      };
    }
 
-
-   E get(int index){
-       // 使用三指针计算当前元素个数
-       auint sz = element_count();
-       if (index < 0 || (auint)index >= sz)
-           return NULL;          // 保持原来的越界返回值风格
-
-       return genericblock$(index) {
-           return start[index];  // 直接通过 start 指针访问
-       };
+   E getAt(int index){
+      return genericblock$(index) {
+         auint sz =(( (char*)finish - (char*)start ) / sizeof(E));
+         if (index < 0 || index >= sz){
+            a_error("下标越界:%d 大小:%d\n",index,sz);
+         }
+         return start[index];  // 直接通过 start 指针访问
+      };
    }
 
    void insert(E data, int index) {
        auint sz = element_count();
        if (index < -1 || index > (int)sz) {
            a_error("插入位置越界 index:%d 大于 %d\n", index, sz);
-           return;
        }
-
        // -1表示尾插
        if (index < 0)
            index = sz;
@@ -290,11 +269,9 @@ impl$ AArray{
         * 变成:
         * [0 ... index-1][空][index ... finish]
         */
-       memmove(
-           (char*)start + (index + 1) * elementSize,
+       memmove( (char*)start + (index + 1) * elementSize,
            (char*)start + index * elementSize,
-           (sz - index) * elementSize
-       );
+           (sz - index) * elementSize);
 
        genericblock$(data,index){
            start[index] = data;
@@ -326,19 +303,17 @@ impl$ AArray{
    /**
     * 弹出最后一个数据，并且清除
     */
-   void popBack(){
+   E popBack(){
       if ((char*)finish <= (char*)start)
-         return;
-      genericblock$(){
+         return NULL;
+      return genericblock$(){
          finish = (void **)((char*)finish - sizeof(E));
+         return finish;
       };
-      if(clearFunc != NULL){
-         clearFunc(finish);
-      }
    }
 
    /**
-    * 取最后一个数据，如果无数据返回空
+    * 取最后一个数据，如果无数据返回空，不执行清除工作，因为有返回值 E 由调用者决定
     */
    E back(){
        if (finish <= start){
@@ -351,10 +326,25 @@ impl$ AArray{
    }
 
    /**
-    * 当分配内存后是否需要清零
+    * 给数组在index位置赋值,不做边界检查
     */
-   void setClearZero(aboolean need){
-      haveZero = need;
+   void set(E value,int index){
+      genericblock$(value,index){
+         start[index] = value;
+      };
+   }
+
+   /**
+     * 给数组在index位置赋值,做边界检查
+     */
+   void setAt(E value,int index){
+      genericblock$(value,index){
+         auint sz =(( (char*)finish - (char*)start ) / sizeof(E));
+         if (index < 0 || index >= sz){
+            a_error("下标越界:%d 大小:%d\n",index,sz);
+         }
+         start[index] = value;
+      };
    }
 
    ~AArray(){

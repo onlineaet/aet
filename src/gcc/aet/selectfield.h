@@ -34,7 +34,8 @@ struct _CheckParamCallback{
                   tree type, tree origtype, tree val, tree valtype,
                   bool npc, tree rname, int parmnum, int argnum,
                   bool excess_precision, int warnopt);
-    nboolean (*addFuncPointer)(CheckParamCallback *self,int paramNum,tree actual,tree formal);//实参是一个函数指针，形参与时函数指针。实参来自类的静态变量。
+    //实参是函数指针，形参是函数指针。实参来自类的静态变量。
+    nboolean (*addFuncPointer)(CheckParamCallback *self,int paramNum,tree actual,tree formal);
     struct{
         int paramNum;
         tree actual;
@@ -108,7 +109,8 @@ typedef struct _FuncPointerError
 SelectField       *select_field_get();
 tree               select_field_modify_or_init_field(SelectField *self,location_t loc ,tree lhsType,tree rhs,FuncPointerError **errors);
 CandidateFunc     *select_field_get_ctor_func(SelectField *self,ClassName *className,vec<tree, va_gc> *exprlist,
-                          vec<tree, va_gc> *origtypes,vec<location_t> arg_loc,location_t expr_loc,FuncPointerError **errors);
+                          vec<tree, va_gc> *origtypes,vec<location_t> arg_loc,
+                          location_t expr_loc,GenericModel *generic,FuncPointerError **errors);
 /**
  * 在当前类中取方法
  */

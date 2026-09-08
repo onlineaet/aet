@@ -46,13 +46,14 @@ struct _BlockMgr
 
 	char *blockFileName;
 
+	NString *strBuffer;
+
 };
 
 
 BlockMgr      *block_mgr_get();
 struct c_expr  block_mgr_parser(BlockMgr *self);
-void           block_mgr_save(BlockMgr *self);
-void           block_mgr_ready(BlockMgr *self);
+char         * block_mgr_save(BlockMgr *self);
 char          *block_mgr_get_save(BlockMgr *self);
 NPtrArray     *block_mgr_get_output_generic_info(BlockMgr *self);
 nboolean       block_mgr_parser_goto(BlockMgr *self,nboolean start_attr_ok,AetGotoTag re);
@@ -64,6 +65,7 @@ int            block_mgr_get_block_count_by_func(BlockMgr *self,ClassFunc *func)
 nboolean       block_mgr_have_block(BlockMgr *self);
 GenericInfo   *block_mgr_get_info (BlockMgr *self,ClassName *className);
 
+void           block_mgr_ready(BlockMgr *self,NPtrArray **arrays,int alen,int pos);
 
 
 #endif

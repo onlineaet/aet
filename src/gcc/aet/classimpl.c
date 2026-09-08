@@ -68,6 +68,7 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 #include "aetparser.h"
 #include "genericgraph.h"
 #include "middlefile.h"
+#include "funcpointer.h"
 
 /**
  * class的实现样式如下：
@@ -406,7 +407,6 @@ void class_impl_parser(ClassImpl *self)
    ClassName *tempClassName=NULL;
    self->readyEnd=0;
    self->semicolonCount=0;
-   parser_help_set_forbidden(TRUE);//禁止下一个C_TOKEN被parser_help_set_class_or_enum_type改名了。
    impl_loc = c_parser_peek_token (parser)->location;
    c_parser_consume_token (parser);//consume impl$
    aet_parser_c_parser_set_source_position_from_token/*!c_parser_set_source_position_from_token*/(c_parser_peek_token (parser));
@@ -429,7 +429,6 @@ void class_impl_parser(ClassImpl *self)
       error_at(impl_loc, "关键字impl$后应是类名!");
    }
 
-   parser_help_set_forbidden(FALSE);//禁止下一个C_TOKEN被parser_help_set_class_or_enum_type改名了。
    access_controls_add_impl(access_controls_get(),n_strdup(IDENTIFIER_POINTER (ident)));
    n_debug("开始编译 impl{中的代码 class:%s %s\n",IDENTIFIER_POINTER (ident),in_fnames[0]);
    updateClassName(self,IDENTIFIER_POINTER (ident));
@@ -445,6 +444,12 @@ void class_impl_parser(ClassImpl *self)
    n_debug("结束编译 impl{中的代码 class:%s %s\n",IDENTIFIER_POINTER (ident),in_fnames[0]);
    if(!class_mgr_check/*!func_check_check_define*/(class_mgr_get(),self->className)){
       //说明出错了，返回
+      return;
+   }
+   //检查final$变量是否有初始化
+   class_final_check_var(class_final_get(),self->className);
+   if(haveError()){
+      n_debug("编译结束后检查 final$ 变量有错误。返回。");
       return;
    }
    //保存实现的接口信息。
@@ -748,10 +753,8 @@ static nboolean atGenericBlockOrFwgb(ClassImpl *self,location_t loc,char *name)
       VarEntity *entity = var_mgr_get_var(var_mgr_get(),sysName,name);
       if(entity){
          //是不是声明为泛型E,A,B str内容是aet_generic_A * aet_generic_A **...
-         int pointer=0;
-         char *genericDeclName=generic_util_get_type_str(entity->decl,&pointer);
-         n_debug("processGenericBlockFunc 在这里找到self对应的类 %s %s entity:%p %s pointer:%d\n",
-               sysName,name,entity,genericDeclName,pointer);
+        // n_debug("processGenericBlockFunc 在这里找到self对应的类 %s %s entity:%p %s\n",
+             //  sysName,name,entity,aet_utils_get_type_string(entity->decl));
          ClassName *className = class_mgr_get_class_name_by_sys(class_mgr_get(),sysName);
          var_call_add_deref(self->varCall,get_identifier(name),className);
          return TRUE;
@@ -1024,7 +1027,8 @@ struct c_expr class_impl_replace_func_id(ClassImpl *self,struct c_expr expr,vec<
    selectFunc->funcdecl=expr.value;
    tree func=expr.value;
    if(TREE_CODE (func) != FUNCTION_DECL && TREE_CODE (func)!=COMPONENT_REF){
-      n_info("class_impl_replace_func_id 00 不是正确的类型 FUNCTION_DECL或COMPONENT_REF code:%s", get_tree_code_name(TREE_CODE (func)));
+      n_info("class_impl_replace_func_id 00 不是正确的类型 FUNCTION_DECL或COMPONENT_REF code:%s",
+            get_tree_code_name(TREE_CODE (func)));
       return expr;
    }
    tree returnType=TREE_TYPE(func);
@@ -1041,7 +1045,8 @@ struct c_expr class_impl_replace_func_id(ClassImpl *self,struct c_expr expr,vec<
       }
       fName=IDENTIFIER_POINTER(id);
    }
-   n_debug("class_impl_replace_func_id 33 fName:%s returnType:%s func:%p",fName,get_tree_code_name(TREE_CODE (returnType)),func);
+   n_debug("class_impl_replace_func_id 33 fName:%s returnType:%s func:%p",
+         fName,get_tree_code_name(TREE_CODE (returnType)),func);
    tree last=NULL_TREE;
    FuncPointerError *errors =NULL;
    //对于构造函数的调用一定是指针引用
@@ -1074,7 +1079,8 @@ struct c_expr class_impl_replace_func_id(ClassImpl *self,struct c_expr expr,vec<
       }
       n_free(funName);
    }else if(TREE_CODE (func)==FUNCTION_DECL &&  AET_LANG_FLAG_2(func)==1){
-      n_debug("class_impl_replace_func_id 55 这是在implimpl中的函数调用，没有加self-> %s funcName:%s",fName,IDENTIFIER_POINTER(DECL_NAME(func)));
+      n_debug("class_impl_replace_func_id 55 这是在implimpl中的函数调用，没有加self-> %s funcName:%s",
+            fName,IDENTIFIER_POINTER(DECL_NAME(func)));
       last=func_call_select(self->funcCall,func,exprlist,origtypes,arg_loc,expr_loc,&errors,selectFunc);
       if(!aet_utils_valid_tree(last)){
          char currentClassName[256];
@@ -1128,22 +1134,15 @@ struct c_expr class_impl_replace_func_id(ClassImpl *self,struct c_expr expr,vec<
       n_debug("class_impl_replace_func_id 77 这是指针引用  funcName:%s",funcName);
       last=func_call_deref_select(self->funcCall,
             func,exprlist,origtypes,arg_loc,expr_loc,&errors,selectFunc);
-      n_debug("class_impl_replace_func_id 88 这是指针引用  funcName:%s",funcName);
       class_cast_parm_convert_from_deref(self->classCast,last,exprlist);
-      n_debug("class_impl_replace_func_id 99 这是指针引用  funcName:%s",funcName);
-
       //是否优化为函数调用
       last = cmp_ref_opt_outside(self->cmpRefOpt,last,selectFunc->classFunc,exprlist,expr_loc);
-      n_debug("class_impl_replace_func_id 100 这是指针引用  funcName:%s",funcName);
-
    }else if(TREE_CODE (func)==COMPONENT_REF && AET_LANG_FLAG_5(func)==1){
       tree field=TREE_OPERAND(func,1);
       char *funcName=IDENTIFIER_POINTER(DECL_NAME (field));
       n_debug("class_impl_replace_func_id 88 这是super指针引用  funcName:%s",funcName);
       last=func_call_super_select(self->funcCall,func,exprlist,origtypes,arg_loc,expr_loc,&errors,selectFunc);
       class_cast_parm_convert_from_deref(self->classCast,last,exprlist);
-      n_debug("class_impl_replace_func_id 99 这是super指针引用  funcName:%s last:%p",funcName,last);
-
       if(aet_utils_valid_tree(last)){
          last=super_call_replace_super_call(self->superCall,expr_loc,last,selectFunc->classFunc);
       }else{
@@ -1156,7 +1155,6 @@ struct c_expr class_impl_replace_func_id(ClassImpl *self,struct c_expr expr,vec<
          return expr;
       }
    }else if(TREE_CODE (func)==FUNCTION_DECL && AET_LANG_FLAG_0(func)==1){
-      printf("在构造函数中第一条语句调用self()\n");
       char *funcName=IDENTIFIER_POINTER(DECL_NAME(func));
       n_debug("class_impl_replace_func_id self 这是在implimpl中的self调用，没有加self-> %s funcName:%s",fName,funcName);
       last=class_ctor_select_from_self(self->classCtor,func,exprlist,origtypes,arg_loc,expr_loc,selectFunc);
@@ -1251,7 +1249,7 @@ tree class_impl_build_function_call_vec(ClassImpl *self,location_t loc, vec<loca
         tree function, vec<tree, va_gc> *params, vec<tree, va_gc> *origtypes,
         SelectFunc *selectFunc,GenericModel **defineGenModel)
 {
-   printParams(params);
+   //printParams(params);
    tree ret;
    if(selectFunc->sucessed==0){
       //说明是一个外部函数 如果在源文件前有太多错误，ret返回的是error_mark_node bug 041
@@ -1271,6 +1269,11 @@ tree class_impl_build_function_call_vec(ClassImpl *self,location_t loc, vec<loca
          //如果funcGenericDefine是有效的说明这是一个泛型函数
          GenericModel *funcGenericDefine=c_aet_get_func_generics_model(function);
          *defineGenModel=funcGenericDefine;
+      }
+      //记录调用带泛型参数的构造函数
+      if(class_func_is_ctor(selectFunc->classFunc)
+            && class_func_get_generic_param_count(selectFunc->classFunc)>0){
+         class_ctor_add_call(self->classCtor,ret);
       }
    }
    return ret;
@@ -1406,7 +1409,6 @@ void class_impl_build_class_dot (ClassImpl *self, location_t loc,struct c_expr *
    char *sysClassName=IDENTIFIER_POINTER(classTree);
    tree component;
    c_parser_consume_token (parser);//consume AObject
-   parser_help_set_forbidden(TRUE);
    if (!c_parser_require (parser, CPP_DOT, "expected %<.%>")){//这里consume CPP_DOT
       expr->set_error ();
       return;
@@ -1421,7 +1423,6 @@ void class_impl_build_class_dot (ClassImpl *self, location_t loc,struct c_expr *
    location_t end_loc = component_tok->get_finish ();
    location_t compLoc=component_tok->location;
    c_parser_consume_token (parser);//consume CPP_NAME
-   parser_help_set_forbidden(FALSE);
    if (c_parser_next_token_is (parser, CPP_OPEN_PAREN)){
       n_debug("是函数调用----Class.func %s %s\n",sysClassName,IDENTIFIER_POINTER(component));
       expr->value =createTempStaticFunction(sysClassName,component,TRUE,compLoc);
@@ -1449,9 +1450,7 @@ void class_impl_build_class_dot (ClassImpl *self, location_t loc,struct c_expr *
                   n_debug("查找是不是枚举 Class和CPP_DOT已被consume了 -- %s %s\n",enumOrigName,sysClassName);
                   nboolean isClassDotEnum=enum_parser_is_class_dot_enum(enum_parser_get(),sysClassName,enumOrigName);
                   if(isClassDotEnum){
-                     parser_help_set_forbidden(TRUE);
                      enum_parser_build_class_dot_enum(enum_parser_get(),loc,sysClassName,enumOrigName,expr);
-                     parser_help_set_forbidden(FALSE);
                   }else{
                      error_at(loc,"在类%qs中找不到变量:%qE",sysClassName,component);
                      expr->set_error ();
@@ -1500,9 +1499,7 @@ void class_impl_build_class_dot (ClassImpl *self, location_t loc,struct c_expr *
 
 void class_impl_build_enum_dot (ClassImpl *self, location_t loc,struct c_expr *expr)
 {
-   parser_help_set_forbidden(TRUE);
    enum_parser_build_dot(enum_parser_get(),loc,expr);
-   parser_help_set_forbidden(FALSE);
 }
 
 /**
@@ -1523,12 +1520,9 @@ void   class_impl_compile_over(ClassImpl *self)
       implicitly_call_link(self->implicitlyCall);//链接隐藏调用
       cmp_ref_opt_opt(self->cmpRefOpt);//把调用self->xxx 转成函数调用
 	   access_controls_check(access_controls_get());
-      block_mgr_save(block_mgr_get());
-      iface_impl_save(iface_impl_get());
-	   middle_file_iface_impl_check(middle_file_get());
 	   makefile_parm_append_d_file(makefile_parm_get());
-	   generic_graph_save(generic_graph_get());
 	   generic_parser_register_fwg(generic_parser_get());
+	   func_pointer_optimize(func_pointer_get());
 	   nuint64 diff=(self->compileTime.end-self->compileTime.start);//毫秒
 	   if(diff>1000){
 	      n_warning("生成语法树所花时间：%s %llu\n",in_fnames[0],diff);
@@ -1639,7 +1633,7 @@ struct c_expr class_impl_parser_object(ClassImpl *self)
    return expr;
 }
 
-void   class_impl_finish_function(ClassImpl *self,tree fndecl,location_t endLoc)
+void  class_impl_finish_function(ClassImpl *self,tree fndecl,location_t endLoc)
 {
    if(self->parser->isAet){
       //检查覆盖了final$方法
@@ -1660,22 +1654,36 @@ void   class_impl_finish_function(ClassImpl *self,tree fndecl,location_t endLoc)
 tree   class_impl_add_return(ClassImpl *self,location_t loc,tree retExpr,tree exprOrigType)
 {
    if(self->parser->isAet){
-      tree valtype = TREE_TYPE (TREE_TYPE (current_function_decl));
       n_debug("class_impl_add_return 检查调用隐藏函数的返回值是否与lhs匹配 %s\n",self->className->sysName);
-      nboolean isCallImplic= implicitly_call_set_return_impl_conv(self->implicitlyCall,valtype,retExpr,
-                                          exprOrigType,self->className->sysName);
-      if(isCallImplic){
-         printf("class_impl_add_return left -------\n");
-         aet_print_tree(valtype);
-         printf("class_impl_add_return right -------\n");
-         aet_print_tree(retExpr);
+      //进入这样的函数 E getData(){return NULL;}
+      tree returntype=TREE_TYPE(TREE_TYPE(current_function_decl));
+      int pointer = 0;
+      const char *tn = aet_utils_get_const_type_string(returntype,&pointer);
+      if(pointer==0 && generic_util_is_generic_ident(tn)){
+         if(TREE_CODE(retExpr)==INTEGER_CST
+         && TREE_CODE(TREE_TYPE(retExpr))==POINTER_TYPE
+         && TREE_CODE(TREE_TYPE(TREE_TYPE(retExpr)))==VOID_TYPE){
+            const char *gendecl = generic_util_get_generic_decl_string(tn);
+            char *codes =n_strdup_printf("generic_is_pointer(%s)?NULL:%s;\n",gendecl,GENERIC_ZERO_STORAGE);
+            c_parser *parser=self->parser->parser;
+            c_token backups[30];
+            int backCount=aet_parser_backup_token(self->parser,backups);
+            aet_utils_add_token(parse_in,codes,strlen(codes));
+            struct c_expr expr = aet_parser_c_parser_expression_conv (self->parser);
+            aet_parser_restore_token(self->parser,backups,backCount);
+            //清除；
+            c_parser_consume_token (parser);
+            retExpr = expr.value;
+         }
       }
+      implicitly_call_set_return_impl_conv(self->implicitlyCall,returntype,retExpr,
+            exprOrigType,self->className->sysName);
    }
+   //解析泛型块中的返回语句
    generic_parser_return(generic_parser_get(),&retExpr);
    object_return_add_return(object_return_get(),retExpr);
    tree expr=object_return_convert(object_return_get(),loc,retExpr);
    expr=object_return_convert_block(object_return_get(),expr);
-
    return expr;
 }
 
@@ -2150,36 +2158,4 @@ ClassImpl *class_impl_get()
    return singleton;
 }
 
-void class_impl_test_target(tree target)
-{
-    if(TREE_CODE(target)!=TARGET_EXPR)
-        return;
-    tree init=TREE_OPERAND (target, 1);
-    if(TREE_CODE(init)!=BIND_EXPR)
-        return;
-    tree body=TREE_OPERAND (init, 1);
-    if(TREE_CODE(body)!=STATEMENT_LIST)
-        return;
-    tree t=body;
-    tree_stmt_iterator it;
-    int i;
-    for (i = 0, it = tsi_start (t); !tsi_end_p (it); tsi_next (&it), i++){
-//            char buffer[32];
-//            sprintf (buffer, "%u", i);
-//            dump_child (buffer, tsi_stmt (it));
-    }
-    printf("class_impl_test_target --- stmt count:%d\n",i);
-    if(i==5){
-        for (i = 0, it = tsi_start (t); !tsi_end_p (it); tsi_next (&it), i++){
-            if(i==3){
-                tree modify=tsi_stmt (it);
-                tree decl=TREE_OPERAND (modify, 0);
-                aet_print_tree(decl);
-                printf("zclei sss createVarDeclStmt --- %d %d %d %d %d TREE_PUBLIC (decl):%d DECL_REGISTER (decl):%d\n",VAR_P (decl),DECL_SEEN_IN_BIND_EXPR_P (decl),TREE_STATIC (decl),DECL_EXTERNAL (decl),
-                            decl_function_context (decl) == current_function_decl,TREE_PUBLIC (decl),DECL_REGISTER (decl));
-
-            }
-        }
-    }
-}
 

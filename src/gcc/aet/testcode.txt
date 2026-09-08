@@ -1538,3 +1538,50 @@ int main()
    printf("指钍类型:%p %p %p\n",p0,p1,p2);
    return 0;
 }
+
+//测试35，最简单的测试优化泛型块中的函数指针调用变成直接函数调用
+#include "AObject.h"
+
+class$ TFirst<E,F>{
+   final$ F cmptcs;
+   TFirst(F compareFunc);
+   void push(E a);
+};
+
+impl$ TFirst{
+   TFirst(F compareFunc){
+      cmptcs = compareFunc;
+   }
+   TFirst(){
+      cmptcs=NULL;
+   }
+   //支持两种路径优化
+   //1.类变量赋值给函数指针变量，然后调用新的函数指针变量
+   //2.类变量转函数指针，然后调用
+   void push(E a){
+      genericblock$(a){
+         //ACompareFunc lastcompare =cmptcs;
+         E tysw = 5;
+        // lastcompare(&a,&tysw);
+         ((ACompareFunc)cmptcs)(&a,&tysw);
+      };
+   }
+};
+
+static int great_int(void *a,void *b)
+{
+   int ia = *(int*)a;
+   int ib = *(int*)b;
+   printf("great int  %d %d\n",ia,ib);
+   return ia-ib;
+}
+
+typedef aint   (*GreatFunc)         (aconstpointer  a,aconstpointer  b);
+
+int main()
+{
+   TFirst<int,GreatFunc> *greatHeap=new$ TFirst(great_int);
+   greatHeap->push(32);
+   return 0;
+}
+

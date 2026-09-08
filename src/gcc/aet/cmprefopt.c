@@ -151,12 +151,15 @@ static char *createFuncName(char *mangleName,GenericModel *mm)
       return NULL;
    if(generic_model_get_undefine_count(mm)==0){
       int i;
-      char ret[128];
+      NString *codes=n_string_new("");
       for(i=0;i<generic_model_get_count(mm);i++){
          GenericUnit  *unit=generic_model_get(mm,i);
+         char ret[128];
          generic_unit_create_block_func_prefix(unit->name,unit->pointerCount,ret);
+         n_string_append(codes,ret);
       }
-      return n_strdup_printf("%s_%s",ret,mangleName);
+      n_string_append_printf(codes,"_%s",mangleName);
+      return n_string_free(codes,FALSE);
    }
    return NULL;
 }
@@ -168,14 +171,12 @@ static nboolean isFuncWithGb(CmpRefOpt *self,ClassFunc *classFunc,GenericModel *
 {
    //如果是第二次编译，再一次判断该调用可不可以优化
    if(makefile_parm_is_second_compile(makefile_parm_get()) && mm){
-      n_debug("comprefopt.c 是第二次编译 %s\n",in_fnames[0]);
+      n_debug("comprefopt.c isFuncWithGb 00 是第二次编译 %s genmode:%s\n",in_fnames[0],generic_model_tostring(mm));
       char *funcName = createFuncName(classFunc->mangleFunName,mm);
       if(funcName!=NULL){
-        // printf("查带泛型埠的函数是真实类型定义。%s\n",funcName);
          tree fndecl=lookup_name(get_identifier(funcName));
          if(fndecl){
-           // printf("这是一个带泛型块函数的调用 无条件替换 %s\n",funcName);
-           // aet_print_tree(fndecl);
+            n_debug("cmprefopt.c isFuncWithGb 11 这是一个带泛型块函数的调用 无条件替换 %s\n",funcName);
             if(fnwithgb)
                *fnwithgb=fndecl;
             free(funcName);
@@ -185,40 +186,6 @@ static nboolean isFuncWithGb(CmpRefOpt *self,ClassFunc *classFunc,GenericModel *
       }
    }
    return FALSE;
-}
-
-/**
- * 根据ClassFunc中的fieldDecl，构建一个函数声明。
- *
- */
-static tree  createExternFuncDecl(location_t loc,ClassFunc *func)
-{
-   char *funName=func->mangleFunName;
-   tree fieldDecl = func->fieldDecl;
-   tree id = aet_utils_create_ident (funName);
-   tree funcDecl=lookup_name(id);
-   if(funcDecl && TREE_CODE(funcDecl)==FUNCTION_DECL){
-      printf("createExternFuncDecl 00 已存在 %s\n",funName);
-      aet_print_tree(funcDecl);
-      return funcDecl;
-   }
-   //tree funcType=TREE_TYPE(fieldDecl);
-   tree oldfntype= TREE_TYPE(TREE_TYPE(fieldDecl));
-   tree retn = TREE_TYPE (oldfntype);
-   tree parmList = TYPE_ARG_TYPES (oldfntype);
-   tree funcType = build_function_type(retn,parmList);
-
-   funcDecl = build_decl (loc, FUNCTION_DECL, id, funcType);
-   TREE_STATIC (funcDecl) = 0;
-   TREE_PUBLIC (funcDecl) = 1;
-   DECL_EXTERNAL (funcDecl) = 1;
-   DECL_CONTEXT(funcDecl) = NULL;
-   pushdecl (funcDecl); //不能调用 finish_decl 否则出undefined reference to `_TSecond__superFuncAddressArray'
-   //c_c_decl_bind_file_scope(funcDecl);//放在file_scope，c_c_decl_bind_file_scope是增加的,原本没有
-   //finish_decl (funcDecl, loc, NULL_TREE,NULL_TREE, NULL_TREE);
- //  printf("createExternFuncDecl 11 创建新的extern 函数声明 %s\n",funName);
-
-   return funcDecl;
 }
 
 /**
@@ -323,8 +290,7 @@ typedef struct _WalkData{
 /**
  * 把self->xxx() 替换成 yyy()
  * 如果方法是private$才能替换，否则不允许，因为子类可能重载覆盖该方法.
- * 语意是在父类中调用了子类覆盖的方法
- *
+ * 语义是在父类中调用了子类覆盖的方法
  */
 static tree link_cb (tree *tp, int *walk_subtrees, void *data)
 {
@@ -332,9 +298,10 @@ static tree link_cb (tree *tp, int *walk_subtrees, void *data)
    tree t = *tp;
    if (TYPE_P (t))
       *walk_subtrees = 0;
-   else if (TREE_CODE (t) == BIND_EXPR){
-      walk_tree (&BIND_EXPR_BODY (t), link_cb, data, NULL);
-   }else if(TREE_CODE(t)==CALL_EXPR){
+   //else if (TREE_CODE (t) == BIND_EXPR){
+    //  *walk_subtrees = 0;          // 阻止 walk_tree 继续走子树
+    //  walk_tree (&BIND_EXPR_BODY (t), link_cb, data, NULL);
+   else if(TREE_CODE(t)==CALL_EXPR){
       tree func=CALL_EXPR_FN(t);
       char *mangleName=NULL;
       GenericModel *mm=NULL;
@@ -352,10 +319,11 @@ static tree link_cb (tree *tp, int *walk_subtrees, void *data)
                              || class_func_is_final(classFunc)
                              || class_info_is_final(cinfo))){
                funcWithGb = isFuncWithGb(dp->self,classFunc,mm,&fnwithgb);
-               //printf("cmprefopt.c link_cb 00 不是 private final func final class 调用带泛型块的函数:%d\n",funcWithGb);
+               //printf("cmprefopt.c link_cb 00 不是 private final func final class 调用带泛型块的函数:%d %s model:%s\n",
+                     //funcWithGb,classFunc->mangleFunName,generic_model_tostring(mm));
                if(!funcWithGb){
                   sameType = isSameType(trueVar, classFunc,dp->currentFuncDecl);
-                  //printf("cmprefopt.c link_cb 11 不是 private final func final class 调用公共方法 sameType:%d\n",sameType);
+                 // printf("cmprefopt.c link_cb 11 不是 private final func final class 调用公共方法 sameType:%d\n",sameType);
                }
             }
 
@@ -364,14 +332,10 @@ static tree link_cb (tree *tp, int *walk_subtrees, void *data)
                         || class_func_is_final(classFunc)
                         || class_info_is_final(cinfo) || funcWithGb || sameType)){
                tree last = classFunc->fromImplDefine;
-//               if(!class_func_is_private(classFunc) && !aet_utils_valid_tree(last)){
-//                  printf("cmprefopt.c link_cb 22 没有定义，只有域声明 %s\n",mangleName);
-//                  last =  createExternFuncDecl(EXPR_LOCATION(t),classFunc);
-//               }
                if(funcWithGb)
                   last= fnwithgb;
                if(last){
-                  //如果是泛型类调用的函数，需要检查函数是不是带泛型块，并且并优化为具体类型了。
+                  //如果是泛型类调用的函数，需要检查函数是不是带泛型块，并且可优化为具体类型了。
                   //只能在第二次编译时才能查找是否有存在具体类的函数
                   n_debug("cmprefopt.c 可以替换了  mangleName:%s funcWithGb:%d name:%s",
                         mangleName,funcWithGb,IDENTIFIER_POINTER(DECL_NAME(last)));
@@ -431,16 +395,15 @@ static tree print_body_cb (tree *tp, int *walk_subtrees, void *data)
    tree t = *tp;
    if (TYPE_P (t))
       *walk_subtrees = 0;
-   else if (TREE_CODE (t) == BIND_EXPR){
-      walk_tree (&BIND_EXPR_BODY (t), print_body_cb, data, NULL);
-   }else if(TREE_CODE(t)==CALL_EXPR){
+   //else if (TREE_CODE (t) == BIND_EXPR){
+      //walk_tree (&BIND_EXPR_BODY (t), print_body_cb, data, NULL);
+   else if(TREE_CODE(t)==CALL_EXPR){
       tree func=CALL_EXPR_FN(t);
       printf("CmpRefOpt print_body_cb 00\n");
       aet_print_tree(t);
    }else{
       printf("CmpRefOpt print_body_cb 11\n");
       aet_print_tree(t);
-
    }
    return NULL_TREE;
 }
@@ -474,8 +437,9 @@ void cmp_ref_opt_add(CmpRefOpt *self,tree func)
 }
 
 
-//////////////////////------------------------------------
-
+/*在外部新建一个对象，如果调用是这个对象的方法，可以进入优化
+ *因为new对象时知道不是子类
+*/
 
 /* 判断 tree 是否是目标变量（或它的 SSA 名，但 GENERIC 阶段通常还没有 SSA） */
 static bool is_target_var(tree expr, tree target_var)
@@ -620,7 +584,7 @@ static tree getInitExpr(tree ref,tree currentFuncDecl)
 }
 
 /*
-*trueVar是aet类，查找它的来源new$ XXX，是不是在存在并且类名是想同的
+*trueVar是aet类，查找它的来源new$ XXX，是否存在并且类名是想同的
 *func是被调用的方法,
 *currentFuncDecl调用func所在的函数
 *代码如下：目的是找出tyxf是来自new,这样保证被调用的func就是来自func.而不是子类的覆盖方法
@@ -672,10 +636,10 @@ tree  cmp_ref_opt_outside(CmpRefOpt *self,tree compref,
    n_debug("cmp_ref_opt_outside 00 -- %d %s model:%s\n",
          ret,mangleName,classFunc->mangleFunName,generic_model_tostring(mm));
    if(ret && !strcmp(mangleName,classFunc->mangleFunName)){
-      char *currentName=IDENTIFIER_POINTER(DECL_NAME(current_function_decl));
-      if(!n_hash_table_contains(self->noAtAetCallTable,currentName)){
-         n_debug("cmp_ref_opt_outside 11-- %s %s",currentName,mangleName);
-         n_hash_table_insert (self->noAtAetCallTable, currentName,current_function_decl);
+      char *funcName=IDENTIFIER_POINTER(DECL_NAME(current_function_decl));
+      if(!n_hash_table_contains(self->noAtAetCallTable,funcName)){
+         n_debug("cmp_ref_opt_outside 11-- funcName:%s mangleName:%s",funcName,mangleName);
+         n_hash_table_insert (self->noAtAetCallTable, funcName,current_function_decl);
       }
    }
    return compref;

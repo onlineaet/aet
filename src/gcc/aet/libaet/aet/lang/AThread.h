@@ -45,7 +45,7 @@ public$ class$ AThread{
     public$  static void  yield();//调用此函数的当调线程将被内核调度不再使用CPU
     public$  static void  sleep (aulong microseconds);
     public$  static aboolean  getShedulerSettings(ASchedSettings *schedulerSettings);
-	private$ AThreadFunc func;
+	 private$ AThreadFunc func;
     private$ apointer    userData;
     private$ aboolean    joinable;
     private$ int         priority;

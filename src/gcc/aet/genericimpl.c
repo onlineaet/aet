@@ -339,43 +339,47 @@ static tree getGenericInfo(location_t loc,tree objExpr,tree id2)
          error_at(loc,"类%qs没有泛型声明(%qs)！",selfObjectInfo->className.userName,str);
          return NULL_TREE;
       }
-      }
-      tree genericInfo=lookup_name(aet_utils_create_ident(AET_GENERIC_INFO_STRUCT_NAME));
-      if(!aet_utils_valid_tree(genericInfo)){
-         error("没找到aet_generic_info结构体，检查是否包含了头文件。");
+   }
+   tree genericInfo=lookup_name(aet_utils_create_ident(AET_GENERIC_INFO_STRUCT_NAME));
+   if(!aet_utils_valid_tree(genericInfo)){
+      error("没找到aet_generic_info结构体，检查是否包含了头文件。");
+      return NULL_TREE;
+   }
+   if(from){ //表示从泛型类中取泛型模型。
+      char *genericArrayName=AET_GENERIC_ARRAY;
+      tree genericIndex=build_int_cst(integer_type_node,index);
+      tree ident=aet_utils_create_ident(genericArrayName);
+      tree genericArrayRef = build_component_ref (loc,
+            build_indirect_ref (loc,objExpr,RO_ARROW),ident, loc,UNKNOWN_LOCATION);
+      tree result = build4 (ARRAY_REF, TREE_TYPE (genericInfo),
+            genericArrayRef, genericIndex, NULL_TREE,NULL_TREE);
+      if(!aet_utils_valid_tree(result)){
+         error_at(loc,"调用函数%qs失败！参数1：%qE 参数2:%qE",
+               AET_GET_GENERIC_INFO_FUNC_NAME,genericIndex,genericArrayRef);
          return NULL_TREE;
       }
-      if(from){ //表示从泛型类中取泛型模型。
-         char *genericArrayName=AET_GENERIC_ARRAY;
-         tree genericIndex=build_int_cst(integer_type_node,index);
-         tree ident=aet_utils_create_ident(genericArrayName);
-         tree genericArrayRef = build_component_ref (loc,build_indirect_ref (loc,objExpr,RO_ARROW),ident, loc,UNKNOWN_LOCATION);
-         tree result = build4 (ARRAY_REF, TREE_TYPE (genericInfo), genericArrayRef, genericIndex, NULL_TREE,NULL_TREE);
-         aet_print_tree(result);
-         if(!aet_utils_valid_tree(result)){
-            error_at(loc,"调用函数%qs失败！参数1：%qE 参数2:%qE",AET_GET_GENERIC_INFO_FUNC_NAME,genericIndex,genericArrayRef);
-            return NULL_TREE;
-         }
-         return result;
-      }else{
-         tree genFuncRunModel =lookup_name(aet_utils_create_ident(AET_GENERIC_FUNC_THREAD_BLOCK_ADDR));
-         if(!aet_utils_valid_tree(genFuncRunModel)){
-            error("无泛型函数%qs的泛型模型。",IDENTIFIER_POINTER(DECL_NAME(current_function_decl)));
-            return NULL_TREE;
-         }
-         char *genericArrayName=AET_GENERIC_ARRAY;
-         tree genericIndex=build_int_cst(integer_type_node,index);
-         tree ident=aet_utils_create_ident(genericArrayName);
-         tree genericArrayRef = build_component_ref (loc,build_indirect_ref (loc,genFuncRunModel,RO_ARROW),ident, loc,UNKNOWN_LOCATION);
-         tree result = build4 (ARRAY_REF, TREE_TYPE (genericInfo), genericArrayRef, genericIndex, NULL_TREE,NULL_TREE);
-         aet_print_tree(result);
-         if(!aet_utils_valid_tree(result)){
-            error_at(loc,"调用函数%qs失败！参数1：%qE 参数2:%qE",AET_GET_GENERIC_INFO_FUNC_NAME,genericIndex,genericArrayRef);
-            return NULL_TREE;
-         }
-         return result;
+      return result;
+   }else{
+      tree genFuncRunModel =lookup_name(aet_utils_create_ident(AET_GENERIC_FUNC_THREAD_BLOCK_ADDR));
+      if(!aet_utils_valid_tree(genFuncRunModel)){
+         error("无泛型函数%qs的泛型模型。",IDENTIFIER_POINTER(DECL_NAME(current_function_decl)));
+         return NULL_TREE;
       }
+      char *genericArrayName=AET_GENERIC_ARRAY;
+      tree genericIndex=build_int_cst(integer_type_node,index);
+      tree ident=aet_utils_create_ident(genericArrayName);
+      tree genericArrayRef = build_component_ref (loc,
+            build_indirect_ref (loc,genFuncRunModel,RO_ARROW),ident, loc,UNKNOWN_LOCATION);
+      tree result = build4 (ARRAY_REF, TREE_TYPE (genericInfo),
+            genericArrayRef, genericIndex, NULL_TREE,NULL_TREE);
+      if(!aet_utils_valid_tree(result)){
+         error_at(loc,"调用函数%qs失败！参数1：%qE 参数2:%qE",
+               AET_GET_GENERIC_INFO_FUNC_NAME,genericIndex,genericArrayRef);
+         return NULL_TREE;
+      }
+      return result;
    }
+}
 
 
 static inline void c_parser_check_literal_zero (c_parser *parser, unsigned *literal_zero_mask,unsigned int idx)
@@ -468,35 +472,34 @@ static nboolean getCallerAndGenType(GenericImpl *self,location_t loc,tree *callO
  */
 struct c_expr generic_impl_generic_info_expression (GenericImpl *self)
 {
-	  c_parser *parser=self->parser->parser;
-	  struct c_expr expr;
-	  struct c_expr result;
-	  location_t expr_loc;
-	  location_t start;
-	  location_t finish = UNKNOWN_LOCATION;
-	  start = c_parser_peek_token (parser)->location;
-	  location_t loc=c_parser_peek_token (parser);
-	  if(!self->parser->isAet){
-		  error_at(start,"关键字generic_info$只能用在类实现中。");
-		  struct c_expr ret;
-		  ret.set_error ();
-		  ret.original_code = ERROR_MARK;
-		  ret.original_type = NULL;
-		  return ret;
-	  }
-	  c_parser_consume_token (parser);
-	  aet_print_token(c_parser_peek_token (parser));
-	  aet_print_token(c_parser_peek_2nd_token (parser));
-	  tree callObj=NULL;
-	  tree gen=NULL;
-	  nboolean ok=getCallerAndGenType(self,loc,&callObj,&gen);
-	  if(ok){
-		   result.value=getGenericInfo(start,callObj,gen);
-	  }
-	  if (finish == UNKNOWN_LOCATION)
-		finish = start;
-	  set_c_expr_source_range (&result, start, finish);
-	  return result;
+   c_parser *parser=self->parser->parser;
+   struct c_expr expr;
+   struct c_expr result;
+   location_t expr_loc;
+   location_t start;
+   location_t finish = UNKNOWN_LOCATION;
+   start = c_parser_peek_token (parser)->location;
+   location_t loc=c_parser_peek_token (parser);
+   if(!self->parser->isAet){
+      error_at(start,"关键字generic_info$只能用在类实现中。");
+      struct c_expr ret;
+      ret.set_error ();
+      ret.original_code = ERROR_MARK;
+      ret.original_type = NULL;
+      return ret;
+   }
+   c_parser_consume_token (parser);
+   aet_print_token(c_parser_peek_token (parser));
+   aet_print_token(c_parser_peek_2nd_token (parser));
+   tree callObj=NULL;
+   tree gen=NULL;
+   nboolean ok=getCallerAndGenType(self,loc,&callObj,&gen);
+   if(ok)
+      result.value=getGenericInfo(start,callObj,gen);
+   if (finish == UNKNOWN_LOCATION)
+      finish = start;
+   set_c_expr_source_range (&result, start, finish);
+   return result;
 }
 
 /**
@@ -598,12 +601,8 @@ tree generic_impl_cast(GenericImpl *self,struct c_type_name *type_name,tree expr
    bool type_expr_const = true;
    tree ret;
    realGen = groktypename (type_name, &type_expr, &type_expr_const);
-   n_debug("generic_impl_cast 00-----\n");
-   aet_print_tree(realGen);
    if(TREE_CODE(realGen)==POINTER_TYPE){
       n_debug("generic_impl_cast 11 转指针 expr是泛型void_geneirc_E类型 要转的也是指针\n");
-      aet_print_tree(expr);
-
       //		tree pointer=build_pointer_type(long_unsigned_type_node);
       //		tree ret = build1 (NOP_EXPR, pointer,expr);
       //		ret = build1 (INDIRECT_REF, long_unsigned_type_node, ret);
@@ -703,7 +702,7 @@ void generic_impl_cast_by_token(GenericImpl *self,c_token *token)
 nboolean  generic_impl_check_var(GenericImpl *self,tree decl,GenericModel *varGen)
 {
    tree type=TREE_TYPE(decl);
-   char *genericStr=generic_util_get_generic_str(type);
+   const char *genericStr=generic_util_get_generic_decl_string(type);
    if(genericStr==NULL && !varGen)
       return TRUE;
    location_t loc=DECL_SOURCE_LOCATION(decl);
@@ -883,7 +882,7 @@ static void checkClassFunc(GenericImpl *self,tree fndecl,GenericModel *declGen,G
 	//printf("checkClassFunc --- belongInfo: %s\n",implClassName->sysName);
 	ClassInfo *belongInfo=class_mgr_get_class_info_by_class_name(class_mgr_get(),implClassName);
 	if(!declGen){
-		char *str=generic_util_get_generic_str(retn);
+		const char *str=generic_util_get_generic_decl_string(retn);
 		if(str!=NULL){
 			n_debug("是泛型aet_void_E,aet_void_T等 %s",str);
 			nboolean find=generic_model_include_decl_by_str(belongInfo->genericModel,str);
@@ -907,7 +906,7 @@ static void checkClassFunc(GenericImpl *self,tree fndecl,GenericModel *declGen,G
 				count,declGen,belongInfo->genericModel,funcGen,parmGen,parm);
 		count++;
 		if(!parmGen){
-			char *str=generic_util_get_generic_str(TREE_TYPE(parm));
+			const char *str=generic_util_get_generic_decl_string(TREE_TYPE(parm));
 			if(str!=NULL){
 				n_debug("是泛型aet_void_E,aet_void_T等 %s belongInfo->genericModel:%p",str,belongInfo->genericModel);
 				nboolean find=FALSE;
@@ -1084,17 +1083,21 @@ void  generic_impl_check_var_and_parm(GenericImpl *self,tree decl,tree init)
 {
 	if(!aet_utils_valid_tree(init))
 		return;
-	nboolean re=generic_util_is_generic_var_or_parm(decl);
-	if(!re)
+   if(!aet_utils_valid_tree(decl))
+      return FALSE;
+   if(TREE_CODE(decl)!=VAR_DECL && TREE_CODE(decl)!=PARM_DECL)
+      return FALSE;
+   const char *declTypeStr=aet_utils_get_const_type_string(decl,NULL);
+	if(!declTypeStr || !generic_util_is_generic_ident(declTypeStr))
 		return;
-	char *initType=generic_util_get_type_str(init);
+   int pointer = 0;
+   const char *initType=aet_utils_get_const_type_string(init,&pointer);
 	if(initType==NULL)
 		return;
-	if(!generic_util_is_generic_ident(initType) && strcmp(initType,"void *")){
-		 char *varType=generic_util_get_type_str(decl);
-		 char *single=n_strndup(varType+strlen(varType)-1,1);
+	//不是泛型aet_generic_E 也不是 void * 报错
+	if(!generic_util_is_generic_ident(initType) && !(!strcmp(initType,"void") && pointer==1)){
+		 char single[2]={declTypeStr[strlen(declTypeStr)-1],'\0'};
 		 error_at(input_location,"不能从类型%qs转化到类型%qs。",initType,single);
-		 n_free(single);
 		 return;
 	}
 }

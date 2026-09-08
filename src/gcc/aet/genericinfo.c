@@ -315,12 +315,25 @@ static char *readInclude(char *buffer)
    class_block end:
  *
  */
-NPtrArray *generic_info_create_info(char *content)
+NPtrArray *generic_info_create_array(char *content)
 {
    if(!content || strlen(content)==0)
       return NULL;
-   NPtrArray *infos=n_ptr_array_new();
    NPtrArray *array=readInfo(content);
+   NPtrArray *infos = generic_info_create_array_by_array(array);
+   n_ptr_array_unref(array);
+   return infos;
+}
+
+/**
+ * array存放的是没有class_block start: class_block end:标签的字符串
+ *
+ */
+NPtrArray *generic_info_create_array_by_array(NPtrArray *array)
+{
+   if(!array || array->len==0)
+      return NULL;
+   NPtrArray *infos=n_ptr_array_new();
    int i;
    for(i=0;i<array->len;i++){
       char *str=n_ptr_array_index(array,i);
@@ -347,6 +360,7 @@ NPtrArray *generic_info_create_info(char *content)
    n_ptr_array_unref(array);
    return infos;
 }
+
 
 //根据函数名取所属的块数量
 int  generic_info_get_block_count_by_belong(GenericInfo *self,char *managleFuncName)
@@ -380,5 +394,38 @@ GenericInfo  *generic_info_new(ClassName *className)
 	 return self;
 }
 
+/**
+ * 从buffer中取出 CLASS_BLOCK_START...CLASS_BLOCK_END中的内容
+ * 并存入NPtrArray
+ */
+NPtrArray *generic_info_create_text(char *buffer)
+{
+   NPtrArray *array=n_ptr_array_new();
+   char *c=buffer;
+   while(strstr(c,CLASS_BLOCK_START)){
+      char *start=strstr(c,CLASS_BLOCK_START);
+      //printf("r0 is :%s\n",start);
+      char *n=start+strlen(CLASS_BLOCK_START)+1;//加1跳过 CLASS_BLOCK_START 后的\n号
+      char *end=strstr(n,CLASS_BLOCK_END);
+      int len=strlen(n);
+      int remain=strlen(end);
+      char *ret=xmalloc(len-remain+1);
+      memcpy(ret,n,len-remain);
+      ret[len-remain]='\0';
+      n_ptr_array_add(array,ret);
+      c = end+strlen(CLASS_BLOCK_END);
+   }
+   return array;
+}
 
 
+/**
+ * buffer是没有 CLASS_BLOCK_START CLASS_BLOCK_END标签内容的字符串
+ * 加上标签后，存入 codes middlefile.c保存为全局变量时需要恢复原来的字符串
+ */
+void generic_info_restore(NString *codes,char *buffer)
+{
+   n_string_append_printf(codes,"%s\n",CLASS_BLOCK_START);
+   n_string_append_printf(codes,"%s\n",buffer);
+   n_string_append_printf(codes,"%s\n",CLASS_BLOCK_END);
+}

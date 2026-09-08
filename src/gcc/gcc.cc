@@ -8289,12 +8289,8 @@ static int setAetArgv (int argc, char **argv)
    static char *aet_param_2 ="-noaetinclude";
    static char *aet_param_3 ="-aetdump";
    static char *aet_param_4 ="-Daetlib";
-   static char *aet_param_5 ="-Daetchecklist";
-   static char *aet_param_6 ="-Daetifaceimpllist";
-   static char *aet_param_7 ="-Daetblocklist";
-   static char *aet_param_8 ="-Daetnewgenlist";
-   static char *aet_param_9 ="-Daetmtcslinklist";
-   static char *aet_param_10 ="-Daetfuncwithgblist";
+   static char *aet_param_5 ="-Daetcollect";
+   static char *aet_param_6 ="-Daettarget";
 
 #define FOR1 \
    int j;\
@@ -8330,40 +8326,16 @@ static int setAetArgv (int argc, char **argv)
          //fprintf(stderr,"-Daetlib arg is --- %s %s\n",path,arg);
          FOR2;
       }else if(startswith(arg,aet_param_5)){
-         FOR1;
-         char *path=arg+strlen(aet_param_5);
-         xputenv (concat ("GCC_AET_CHECK_LIST_PATH=", path, NULL));
-         //fprintf(stderr,"Daetchecklist arg is --- %s %s\n",path,arg);
-         FOR2;
+          FOR1;
+          char *path=arg+strlen(aet_param_5);
+          xputenv (concat ("GCC_AET_COLLECT_PATH=", path, NULL));
+          //fprintf(stderr,"GCC_AET_COLLECT_PATH arg is --- %s %s\n",path,arg);
+          FOR2;
       }else if(startswith(arg,aet_param_6)){
-         FOR1;
-         char *path=arg+strlen(aet_param_6);
-         xputenv (concat ("GCC_AET_IFACE_IMPL_LIST_PATH=", path, NULL));
-         //fprintf(stderr,"GCC_AET_IFACE_IMPL_LIST_PATH arg is --- %s %s\n",path,arg);
-         FOR2;
-      }else if(startswith(arg,aet_param_7)){
           FOR1;
-          char *path=arg+strlen(aet_param_7);
-          xputenv (concat ("GCC_AET_BLOCK_LIST_PATH=", path, NULL));
-          //fprintf(stderr,"GCC_AET_BLOCK_LIST_PATH arg is --- %s %s\n",path,arg);
-          FOR2;
-      }else if(startswith(arg,aet_param_8)){
-          FOR1;
-          char *path=arg+strlen(aet_param_8);
-          xputenv (concat ("GCC_AET_NEW_GENERIC_LIST_PATH=", path, NULL));
-          //fprintf(stderr,"GCC_AET_NEW_GENERIC_LIST_PATH arg is --- %s %s\n",path,arg);
-          FOR2;
-      }else if(startswith(arg,aet_param_9)){
-          FOR1;
-          char *path=arg+strlen(aet_param_9);
-          xputenv (concat ("GCC_AET_MTCS_LINK_LIST_PATH=", path, NULL));
-          //fprintf(stderr,"GCC_AET_MTCS_LINK_LIST_PATH arg is --- %s %s\n",path,arg);
-          FOR2;
-      }else if(startswith(arg,aet_param_10)){
-          FOR1;
-          char *path=arg+strlen(aet_param_10);
-          xputenv (concat ("GCC_AET_FUNC_WITH_GB_LIST_PATH=", path, NULL));
-          //fprintf(stderr,"GCC_AET_MTCS_LINK_LIST_PATH arg is --- %s %s\n",path,arg);
+          char *path=arg+strlen(aet_param_6);
+          xputenv (concat ("GCC_AET_TARGET=", path, NULL));
+          //fprintf(stderr,"GCC_AET_TARGET arg is --- %s %s\n",path,arg);
           FOR2;
       }
       strcat(buffer,arg);

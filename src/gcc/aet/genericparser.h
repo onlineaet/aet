@@ -18,8 +18,6 @@ along with GCC Exception along with this program; see the file COPYING3.
 If not see <http://www.gnu.org/licenses/>.
 AET was originally developed  by the zclei@sina.com at guiyang china .
 */
-
-
 #ifndef __GCC_GENERIC_PARSER_H__
 #define __GCC_GENERIC_PARSER_H__
 
@@ -28,25 +26,34 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 #include "aetparser.h"
 #include "classfunc.h"
 
+//泛型块文件中的源代码如下部分的映射
+//aet_goto_compile$ 16
+//"E_int_0_4,F_GreatFunc_1_8"
+typedef struct _Directive
+{
+   //新版 E_int_0_5{,F_float_1_8}
+   char *declName; //声明的名字 E、F...
+   char *defineTypeName; //定义的名字 int、float,AObject,...
+   int  pointerCount;    //指针数
+   int  size;            //类型大小
+}Directive;
+
 typedef struct _GenericParser GenericParser;
 /* --- structures --- */
 struct _GenericParser
 {
 	AetParser *parser;
-	char *currentDefineStr;
 	//新版 E_int_0_5{,F_float_1_8}
-	void *directives[10];
+	Directive *directives[10];
 	int directiveCount;
 	//当编译完整个单元的ast，收集有块函数的classFunc并存入funcWithBlockArray;
    NPtrArray *localFwgbArray;
    //本项目+库的fwgb数组
 	NPtrArray *funcWithBlockArray;
 	char *funcWithGBFileName;
-
-	nboolean isAddBlock;//是否加入泛型块
-	nboolean isRegisterPlugin;//是否注册了判断函数是否可迁移的插件
-
+   //收集泛型块函数中的常数
 	NPtrArray *constDeclArray;
+	NString *funcWithGBBuffer;
 };
 
 //描述带泛型块的函数
@@ -61,37 +68,43 @@ typedef struct _FuncWithGbData
    ClassFunc *func;//带泛型块的函数，只在编译单元时存在，在编译 temp_func_track_45.c是空的
 }FuncWithGbData;
 
+
+
 GenericParser  *generic_parser_get();
-void           generic_parser_cast_by_token(GenericParser *self,c_token *token);
-void           generic_parser_replace(GenericParser *self,char *genStr);
-void           generic_parser_parser_typeof(GenericParser *self);
+void       generic_parser_cast_by_token(GenericParser *self,c_token *token);
+void       generic_parser_replace(GenericParser *self,char *genStr);
+void       generic_parser_parser_typeof(GenericParser *self);
 
 //新版2025-11-10
-void           generic_parser_enter(GenericParser *self);
+void       generic_parser_enter(GenericParser *self);
 
-//编译第单元时调用
-void           generic_parser_register_fwg(GenericParser *self);
-void           generic_parser_save_fwgb(GenericParser *self,ClassName *className);
+//编译单元完成时调用
+void       generic_parser_register_fwg(GenericParser *self);
+//编译完类后调用
+void       generic_parser_save_fwgb(GenericParser *self,ClassName *className);
 //这两个方法处于编译temp_func_track_45.c时调用
-void           generic_parser_ready(GenericParser *self);
-char          *generic_parser_get_fwg_source(GenericParser *self);
+char      *generic_parser_get_fwg_source(GenericParser *self);
 /**
  * 由aetlib库调用,从库中生成FuncWithGbData
  */
-NPtrArray     *generic_parser_create_fwg(char *content);
-int            generic_parser_get_func(GenericParser *self,char *sysName,FuncWithGbData **data);
+NPtrArray *generic_parser_create_fwg(char *content);
+int        generic_parser_get_func(GenericParser *self,char *sysName,FuncWithGbData **data);
 /**
  * 根据泛型声明返回真实的类型,调用该方法应处于编译泛型块函数期。
  */
-char *generic_parser_get_true_type(GenericParser *self,char *genStr,int *pointerCount);
+char       *generic_parser_get_true_type(GenericParser *self,char *genStr,int *pointerCount);
 //获取index泛型的定义大小
-int   generic_parser_get_true_type_size(GenericParser *self,int index);
-void generic_parser_modify(GenericParser *self,tree *mlhs,tree *mrhs);
-void generic_parser_parm(GenericParser *self,vec<tree, va_gc> *params, vec<tree, va_gc> *origtypes);
-tree generic_parser_initializer(GenericParser *self,tree decl,tree init);
-void generic_parser_binary_op(GenericParser *self,enum tree_code code,tree *lhs,tree *rhs);
-void generic_parser_return (GenericParser *self,tree *expr);
+int         generic_parser_get_true_type_size(GenericParser *self,int index);
+void        generic_parser_modify(GenericParser *self,tree *mlhs,tree *mrhs);
+void        generic_parser_parm(GenericParser *self,vec<tree, va_gc> *params, vec<tree, va_gc> *origtypes);
+tree        generic_parser_initializer(GenericParser *self,tree decl,tree init);
+void        generic_parser_binary_op(GenericParser *self,enum tree_code code,tree *lhs,tree *rhs);
+void        generic_parser_return (GenericParser *self,tree *expr);
 
-void generic_parser_record_const_decl(GenericParser *self,location_t loc,tree id,tree ref);
+void        generic_parser_record_const_decl(GenericParser *self,location_t loc,tree id,tree ref);
+//新加匹配读取fwgb内容
+NPtrArray  *generic_parser_create_fwgb_text(char *content);
+void        generic_parser_ready(GenericParser *self,NPtrArray **arrays,int alen,int pos);
+Directive **generic_parser_get_directive(GenericParser *self,int *count);
 
 #endif

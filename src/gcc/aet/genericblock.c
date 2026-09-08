@@ -154,7 +154,8 @@ void generic_block_set_parm(GenericBlock *self,vec<tree, va_gc> *exprlist)
         if(parmName==NULL)
            parmName="temp";
       }
-      char *typeStr=generic_util_get_type_str(arg);
+
+      char *typeStr = aet_utils_get_type_string(arg);
       nboolean needFree=FALSE;
       if(typeStr==NULL){
          //试一下是不是 int zuiz[][5];//这种形式
@@ -195,19 +196,19 @@ void generic_block_set_parm(GenericBlock *self,vec<tree, va_gc> *exprlist)
 
 static tree getParmType(tree arg)
 {
-	tree type=TREE_TYPE(arg);
-	if(TREE_CODE(type)==POINTER_TYPE){
-		return getParmType(type);
-	}else{
-        tree typeName=TYPE_NAME(type);
-        if(TREE_CODE(typeName)==TYPE_DECL){
-        	tree parmType= TREE_TYPE(typeName);
-        	return parmType;
-        }else{
-        	error("genericblock 未知类型");
-        }
-	}
-	return NULL;
+   tree type=TREE_TYPE(arg);
+   if(TREE_CODE(type)==POINTER_TYPE){
+      return getParmType(type);
+   }else{
+      tree typeName=TYPE_NAME(type);
+      if(TREE_CODE(typeName)==TYPE_DECL){
+         tree parmType= TREE_TYPE(typeName);
+         return parmType;
+      }else{
+         error("genericblock 未知类型");
+      }
+   }
+   return NULL;
 }
 
 void generic_block_set_body(GenericBlock *self,char *source)
@@ -337,9 +338,11 @@ void  generic_block_set_return_type(GenericBlock *self,tree lhs)
       n_debug("generic_block_set_return_type 00 void\n");
     	self->returnType=n_strdup("void");
     }else{
-    	char *rnt=generic_util_get_type_str(lhs);
-    	if(rnt==NULL)
+    	char *rnt=aet_utils_get_type_string(lhs);
+    	if(rnt==NULL){
+    	   aet_print_tree_skip_debug(lhs);
     		error("在generic_block_set_return_type出错。");
+    	}
     	self->returnType=rnt;
     }
 }
@@ -485,7 +488,8 @@ static void createCallInGenericFunc(GenericBlock *self,tree lhs,vec<tree, va_gc>
       //找self 生成参数 self->_generic_1234_array
       tree selftree=lookup_name(get_identifier("self"));
       tree datum=build_indirect_ref (UNKNOWN_LOCATION,selftree,RO_ARROW);
-      tree componentRef= build_component_ref (UNKNOWN_LOCATION, datum,get_identifier(AET_GENERIC_ARRAY), UNKNOWN_LOCATION,UNKNOWN_LOCATION);
+      tree componentRef= build_component_ref (UNKNOWN_LOCATION,
+            datum,get_identifier(AET_GENERIC_ARRAY), UNKNOWN_LOCATION,UNKNOWN_LOCATION);
       tree addrExpr = build1 (ADDR_EXPR, build_pointer_type(TREE_TYPE(componentRef)), componentRef);
       tree genericInfo=lookup_name(aet_utils_create_ident(AET_GENERIC_INFO_STRUCT_NAME));
       tree type=build_pointer_type(TREE_TYPE(genericInfo));

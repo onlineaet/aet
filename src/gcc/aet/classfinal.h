@@ -23,24 +23,22 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 #define __GCC_CLASS_FINAL_H__
 
 #include "nlib.h"
-#include "classinfo.h"
+#include "aetparser.h"
 
 
 typedef struct _ClassFinal ClassFinal;
 /* --- structures --- */
 struct _ClassFinal
 {
-	c_parser *parser;
-	nboolean isFinal;
-    location_t  loc ;
+   AetParser *parser;
+   NPtrArray *finalVarArray;//记录编译单元初始化的
 };
 
 
-ClassFinal *class_final_new();
+ClassFinal *class_final_get();
 void        class_final_parser(ClassFinal *self,ClassParserState state,struct c_declspecs *specs);
-nboolean    class_final_is_final(ClassFinal *self);
-void        class_final_set_final(ClassFinal *self,nboolean is);
-void        class_final_check_and_set(ClassFinal *self,ClassParserState state);
+void        class_final_check_modify(ClassFinal *self,location_t loc,tree lhs,tree rhs);
+void        class_final_check_var(ClassFinal *self,ClassName *className);
 
 
 

@@ -122,9 +122,14 @@ int      aet_utils_in_micro();
 //是不是在编译附加代码状态
 nboolean aet_utils_compile_additional_code_status();
 
-char   *aet_utils_get_keyword_string(c_token *token);//获取keyword类型的keyword的字符串
+char    *aet_utils_get_keyword_string(c_token *token);//获取keyword类型的keyword的字符串
 
 location_t  aet_utils_create_location(nuint lines,nuint cols);
+//获取类型的字符串，如果是指针 像这样 int *或int **
+char       *aet_utils_get_type_string(tree any);
+const char *aet_utils_get_type_string_and_pointer(tree any,char **pointerString);
+const char *aet_utils_get_const_type_string(tree any,int *pointer);
+
 
 
 #endif /* ! GCC_C_AET_H */

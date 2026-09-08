@@ -126,7 +126,7 @@ impl$  MtcsSystem {
    static void loadProviderFromLib(){
       void * lib = dlopen("libaet_cuda.so", RTLD_LAZY);
       if(lib == NULL){
-         //printf("dlopen failed_%s\n", dlerror());
+         //printf("dlopen failed %s\n", dlerror());
          return;
       }
       mtcs_plat_init mtcsPlatInit = (mtcs_plat_init)dlsym(lib, "mtcs_cuda_init");

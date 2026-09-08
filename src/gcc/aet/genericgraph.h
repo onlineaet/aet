@@ -38,12 +38,13 @@ struct _GenericGraph
 {
 	AetParser *aetParser;
    NPtrArray *collectGenArray;
-   char *saveContent;//保存到全局变量 LIB_GLOBAL_GENERIC_VAR_NAME_PREFIX 的内容
    NPtrArray *outputArray;//本项目输出的所有定义泛型对象。
    char *collectFileName;//保存new信息的文件，每个编译文件一个
    NPtrArray *origRootArray;//原始的root,现生成代码时作为文件代码级的起点
 
    NPtrArray *graphArray;//一个文件一个图
+
+   NString *strBuffer;
 
 };
 
@@ -68,7 +69,6 @@ typedef struct _GenericObj
    GenericModel *origModel;//泛型类或泛型函数的泛型模型。
    char *declClassFile;//类声明所在的文件.h或.c
    nboolean ref;//生成可达图是标注已经加入过。
-
 }GenericObj;
 
 
@@ -78,7 +78,7 @@ typedef struct _GraphData
    char *oFile;
    NPtrArray *root;
    NPtrArray *child;
-   //存结果
+   //存结果 out存放GenericObj
    char *str;
    NPtrArray *out;
 }GraphData;
@@ -92,18 +92,18 @@ void           generic_graph_add_func_call(GenericGraph *self,RunGenericInfo **i
 void           generic_graph_add_new_class(GenericGraph *self,RunGenericInfo **infos,
                            ClassInfo *info,ClassFunc* atFunc,ClassInfo *atClass,nboolean isParent);
 void           generic_graph_print(GenericGraph *self);
-void           generic_graph_save(GenericGraph *self);
-char          *generic_graph_get_output_string(GenericGraph *self);
+char *         generic_graph_save(GenericGraph *self);
 NPtrArray     *generic_graph_get_output_generic_obj(GenericGraph *self);
 NPtrArray     *generic_graph_read(char *content);
 
 void           generic_obj_free(GenericObj *self);
 void           generic_obj_print(GenericObj *self);
 //从文件列表中取出本项目的所有泛型对象
-nboolean       generic_graph_create_obj(GenericGraph *self,NPtrArray **root,NPtrArray **child);
 NPtrArray     *generic_graph_get_orig_root_array(GenericGraph *self);
-void           generic_graph_ready(GenericGraph *self);
 NPtrArray     *generic_graph_files_graph(GenericGraph *self);
+
+void           generic_graph_ready(GenericGraph *self,NPtrArray **arrays,int alen,int pos);
+int            generic_graph_get_max_generic_unit(GenericGraph *self);
 
 #endif
 

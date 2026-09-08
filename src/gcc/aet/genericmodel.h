@@ -107,7 +107,11 @@ char         *generic_unit_tostring(GenericUnit *self);
 nboolean      generic_model_class_or_func_decl_check(GenericModel *self);
 //根据unit中的decl找到声明的类型所在的.h文件或.c文件
 char         *generic_unit_get_decl_file(GenericUnit *self);
-
+/**
+ * 还原model为代码形式
+ * 例如 int <int> ,int * <int *>
+ */
+char *generic_model_create_codes(GenericModel *self);
 
 #endif
 

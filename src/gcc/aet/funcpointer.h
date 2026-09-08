@@ -23,16 +23,31 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 #define __GCC_FUNC_POINTER_H__
 
 #include "nlib.h"
-
+#include "c-aet.h"
+#include "aetparser.h"
 /**
  * 检查用类中的静态函数赋值给函数指针是否合法。
  * 1.参数个数
  * 2.返回值
  * 3.每个参数的比较
  */
+typedef struct _FuncPointer FuncPointer;
+/* --- structures --- */
+struct _FuncPointer
+{
+   AetParser *parser;
+   //收集调用函数指针
+   NPtrArray *collectFuncPointer;
+};
 
-int func_pointer_check(tree lhs,tree rhs,int *paramNum);
-int func_pointer_check_two(tree lhs,tree rhs,int *paramNum);
+FuncPointer *func_pointer_get();
+//加入函数指针调用，class_ctor_add_call加入的是构造函数调用
+void         func_pointer_add(FuncPointer *self,tree ref);
+void         func_pointer_optimize(FuncPointer *self);
+
+
+int          func_pointer_check(tree lhs,tree rhs,int *paramNum);
+int          func_pointer_check_two(tree lhs,tree rhs,int *paramNum);
 
 #endif
 

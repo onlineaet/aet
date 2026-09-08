@@ -63,7 +63,8 @@ struct _ALogField
 
 
 void a_log_structured(ALogLevelFlags log_level,...);
-void a_log_structured_standard (ALogLevelFlags log_level,const achar *object,const achar *file,const achar *line,const achar *func,const achar    *message_format,...) ;
+void a_log_structured_standard (ALogLevelFlags log_level,const achar *object,
+      const achar *file,const achar *line,const achar *func,const achar    *message_format,...) ;
 
 void  a_log_set_domain(char *domain);
 void  a_log_set_level(int level);

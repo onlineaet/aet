@@ -48,6 +48,15 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 #include "c/c-parser.h"
 #include "../libcpp/include/cpplib.h"
 #include <utime.h>
+#include <vector>
+#include <string>
+#include <queue>
+#include <thread>
+#include <future>
+#include <mutex>
+#include <condition_variable>
+#include <iostream>
+
 #include "aetutils.h"
 #include "aetprinttree.h"
 #include "aetinfo.h"
@@ -65,37 +74,12 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 #include "aetlib.h"
 #include "mtcslink.h"
 #include "mtcsparser.h"
-
-static char *getIfaceImplInfoSavedInLib(MiddleFile *self);
+#include "genericcode.h"
 
 static void middleFileInit(MiddleFile *self)
 {
-   self->action = 0;
    self->compileParam = NULL;
-   self->ifaceOFile = NULL;
-}
-
-/**
- * 第一次编译时，编译每个单元，当有如下情況时，会调用该方法，写入编译类型
- * 编译有接口的类
- * 编译有泛型块的类
- * 编译new 泛型类或调用泛型函数的文件
- * 写入标记到temp_func_track_45.c
- * 这是触发第二次编译的条件和编译第二次的内容导航
- * 保存在每个.o文件的最后 .aetprog section
- */
-void middle_file_modify(MiddleFile *self,CompileType type)
-{
-   int compileType=self->action;
-   n_debug("middle_file_modify --- %s type:%d\n",in_fnames[0],type);
-   if(!(compileType&type)){
-      compileType+=type;
-   }
-   if(self->compileParam==NULL){
-      char *aetEnv=getenv ("GCC_AET_ARGV");
-      self->compileParam=n_strdup(aetEnv);
-   }
-   self->action=compileType;
+   self->arrays = NULL;
 }
 
 /**
@@ -169,56 +153,6 @@ static void createGlobalGenericVar(char *varName,char *data,size_t length)
 }
 
 /**
- * 创建全局变量 LIB_GLOBAL_GENERIC_VAR_NAME_PREFIX 内容是泛型类的genericinfo,泛型类的genericobj
- * 当前所在的.c文件是 temp_func_track_45.c
- */
-void middle_file_create_global_var(MiddleFile *self)
-{
-    //LIB_GLOBAL_GENERIC_VAR_NAME_PREFIX
-    char *genericObj=generic_graph_get_output_string(generic_graph_get());
-    char *block=block_mgr_get_save(block_mgr_get());
-    NString *codes=n_string_new("");
-    if(genericObj && strlen(genericObj)>0){
-       n_debug("middle_file_create_global_var 11 泛型对象。\n%s\n",genericObj);
-       n_string_append(codes,genericObj);
-       n_string_append(codes,"\n");
-    }
-
-    if(block && strlen(block)>0){
-       n_debug("middle_file_create_global_var 22 块函数。\n%s\n",block);
-       n_string_append(codes,block);
-       n_string_append(codes,"\n");
-    }
-    //块所在函数
-    char *funcWithGb=generic_parser_get_fwg_source(generic_parser_get());
-    if(funcWithGb && strlen(funcWithGb)>0){
-       n_debug("middle_file_create_global_var 33 带泛型块的函数。\n%s\n",funcWithGb);
-       n_string_append(codes,funcWithGb);
-       n_string_append(codes,"\n");
-       n_free(funcWithGb);
-    }
-
-    char *ifaceImpl= getIfaceImplInfoSavedInLib(self);
-    if(ifaceImpl && strlen(ifaceImpl)>0){
-       n_debug("middle_file_create_global_var 44 接口实现。\n%s\n",ifaceImpl);
-       n_string_append(codes,ifaceImpl);
-       n_string_append(codes,"\n");
-    }
-
-    if(codes->len<=0){
-        n_string_free(codes,TRUE);
-        return;
-    }
-    n_debug("middlefile.c middle_file_create_global_var 55 全部保存的内容。\n%s\n",codes->str);
-    int newDataLen=0;
-    char *newData=compressData(codes->str,&newDataLen);
-    char varName[255];
-    nint number=class_util_get_random_number();
-    sprintf(varName,"%s_%d",LIB_GLOBAL_GENERIC_VAR_NAME_PREFIX,number>0?number:number*-1);
-    createGlobalGenericVar(varName,newData,newDataLen);
-}
-
-/**
  * 解压数据
  */
 char *middle_file_decode(char *value,int size)
@@ -245,415 +179,7 @@ static int file_exists (const char *name)
   return access (name, R_OK) == 0;
 }
 
-void middle_file_iface_impl_check(MiddleFile *self)
-{
-   ClassMgr *classMgr=class_mgr_get();
-   NString *codes=classMgr->ifaceCheckCodes;
-   char  *objfile=makefile_parm_get_object_file(makefile_parm_get());
-   char newName[255];
-   sprintf(newName,"%s.ifacecheck_new.o",objfile);
-   if(codes->len==0){
-      if(file_exists(newName)){
-         remove(newName);//删除文件 xxx.ifacecheck.o
-      }
-      return;
-   }
-   FILE *fp=fopen(newName,"w");
-   fwrite(codes->str,1,codes->len,fp);
-   fclose(fp);
-   self->ifaceOFile=n_strdup(newName);
-   middle_file_modify(self,COMPILE_IFACE_IMPL_CHECK);
-}
 
-/**
- * 读每个文件列表:
- * 文件名格式:
- * xxx.o.funccheck.o
- * 每个文件保存的内容是编译单元中类实现的函数信息，格式如下;
- * CLASS_FUNC_INFO_START:
- * TFirst
- * TFirst:Abc:_Z07setdataEv
- * CLASS_FUNC_INFO_END:
- * CLASS_FUNC_NEED_CHECK_START:
- * Txs
- * TFirst debug_AObject
- * Abc:_Z07setdataEv
- * CLASS_FUNC_NEED_CHECK_END:
- */
-static char * readLocalFile(char *localFileList)
-{
-   nchar **items=n_strsplit(localFileList,"\n",-1);
-   int length= n_strv_length(items);
-   int i;
-   NString *codes=n_string_new("");
-   for(i=0;i<length;i++){
-      char *fn=items[i];
-      FILE *fp=fopen(fn,"r");
-      if(fp){
-         char buffer[1024*150];
-         int rev=fread(buffer,1,1024*150,fp);
-         if(rev>0){
-            buffer[rev]='\0';
-            n_string_append(codes,buffer);
-            n_string_append(codes,"\n");
-         }
-         fclose(fp);
-      }
-   }
-   n_strfreev(items);
-   return n_string_free(codes,FALSE);
-}
-
-/**
- * 从字符串读出类中方法信息
- * 格式如下:
- * CLASS_FUNC_INFO_START:
- * TFirst                    类名
- * TFirst:Abc:_Z07setdataEv  实现的接口所在类+接口+接口方法 实现的接口所在类不一定就是类
- * CLASS_FUNC_INFO_END:
- * 或者
- * CLASS_FUNC_NEED_CHECK_START:
- * Txs
- * TFirst debug_AObject
- * Abc:_Z07setdataEv
- * CLASS_FUNC_NEED_CHECK_END:
- */
-static NPtrArray *readClassFuncInfoOrNeedCheckInfo(char *buffer,char *startTag,char *endTag)
-{
-   NPtrArray *array=n_ptr_array_new_with_free_func(n_free);
-   char *c=buffer;
-   while(strstr(c,startTag)){
-      char *start=strstr(c,startTag);
-      //printf("r0 is :%s\n",start);
-      char *n=start+strlen(startTag)+1;//加1跳过 CLASS_BLOCK_START 后的\n号
-      char *end=strstr(n,endTag);
-      int len=strlen(n);
-      int remain=strlen(end);
-      char *ret=xmalloc(len-remain+1);
-      memcpy(ret,n,len-remain);
-      ret[len-remain]='\0';
-      n_ptr_array_add(array,ret);
-      c = end+strlen(endTag);
-   }
-   return array;
-}
-
-/**
- * 在本项目中检查接口是否实现
- * compare参数格式:
- * TFirst:Abc:_Z07setdataEv  实现的接口所在类+接口+接口方法
- */
-static nboolean checkIfaceImpl(char *compare,NPtrArray *local,char *lib)
-{
-   int i;
-   if(local){
-      int len=local->len;
-      for(i=0;i<len;i++){
-         char *funcInfo=n_ptr_array_index(local,i);
-         if(strstr(funcInfo,compare))
-            return TRUE;
-      }
-   }
-   //库中是否有字匹配字符串 TFirst:Abc:_Z07setdataEv
-   return strstr(lib,compare)?TRUE:FALSE;
-}
-
-/**
- * 获取当前项目的接口实现信息
- * 格式如下:
- * CLASS_FUNC_INFO_START:
- * TFirst                    类名
- * TFirst:Abc:_Z07setdataEv  实现的接口所在类+接口+接口方法 实现的接口所在类不一定就是类
- * CLASS_FUNC_INFO_END:
- */
-static char *getIfaceImplInfoSavedInLib(MiddleFile *self)
-{
-   char *fileName = getenv("GCC_AET_CHECK_LIST_PATH");
-   if(fileName==NULL || strlen(fileName)==0){
-      n_warning("middlefile.c getIfaceImplInfoSavedInLib 不存在的文件 GCC_AET_CHECK_LIST_PATH\n");
-      return NULL;
-   }
-   FILE *fp=fopen(fileName,"r");
-   if(!fp)
-      return NULL;
-   char buffer[5*1024];
-   int rev = fread(buffer,1,5*1024,fp);
-   fclose(fp);
-   if(rev<=0)
-      return NULL;
-   buffer[rev]='\0';
-   char *content = readLocalFile(buffer);
-   NString *codes=n_string_new("");
-   char *c=content;
-   while(strstr(c,CLASS_IFACE_INFO_START)){
-      char *start=strstr(c,CLASS_IFACE_INFO_START);
-      //printf("r0 is :%s\n",start);
-      char *n=start+strlen(CLASS_IFACE_INFO_START)+1;//加1跳过 CLASS_BLOCK_START 后的\n号
-      char *end=strstr(n,CLASS_IFACE_INFO_END);
-      int len=strlen(n);
-      int remain=strlen(end);
-      char *ret=xmalloc(len-remain+1);
-      memcpy(ret,n,len-remain);
-      ret[len-remain]='\0';
-      n_string_append(codes,ret);
-      n_string_append(codes,"\n");
-      free(ret);
-      c = end+strlen(CLASS_IFACE_INFO_END);
-   }
-   return n_string_free(codes,FALSE);
-}
-
-/**
- * 映射如下字符串
- * Txs
- * TFirst debug_AObject
- * Abc:_Z07setdataEv
- */
-typedef struct _NeedCheckInfo
-{
-   char *sysName;
-   char **extendsClass;
-   int extendsClassCount;
-   char **checkIface;
-   int checkCount;
-}NeedCheckInfo;
-
-static void freeNeedCheckInfo(NeedCheckInfo *info)
-{
-   if(!info)
-      return;
-   n_free(info->sysName);
-   n_strfreev(info->extendsClass);
-   int i;
-   for(i=0;i<info->checkCount;i++)
-      free(info->checkIface[i]);
-   n_free(info->checkIface);
-   n_slice_free(NeedCheckInfo,info);
-
-}
-
-static NeedCheckInfo *createNeedInfo(char *str)
-{
-    char **items=n_strsplit(str,"\n",-1);
-    int checkIfaceCount=n_strv_length(items)-2;
-    NeedCheckInfo *info=n_slice_new0(NeedCheckInfo);
-    info->sysName=n_strdup(items[0]);
-    info->extendsClass=n_strsplit(items[1]," ",-1);
-    info->extendsClassCount=n_strv_length(info->extendsClass);
-    int checkCount=n_strv_length(items)-2;
-    info->checkIface=xmalloc(sizeof(char*)*checkCount);
-    int i;
-    for(i=0;i<checkCount;i++)
-       info->checkIface[i]=n_strdup(items[i+2]);
-    info->checkCount=checkCount;
-    n_strfreev(items);
-    return info;
-}
-
-static void findImpl( NeedCheckInfo *info,NPtrArray *locaIfaceInfo,char *libIfaceInfo,NString *errorCodes)
-{
-   int i,j;
-   for(i=0;i<info->checkCount;i++){
-      char *ifaceMethod=info->checkIface[i];//检查类item[0]是否实现接口方法 items[j+2]
-      if(!ifaceMethod || strlen(ifaceMethod)==0)
-         continue;
-      nboolean find=FALSE;
-      for(j=0;j<info->extendsClassCount;j++){
-         char compare[512];
-         sprintf(compare,"%s:%s",info->extendsClass[j],ifaceMethod);
-         if(checkIfaceImpl(compare,locaIfaceInfo,libIfaceInfo)){
-            find=TRUE;
-            break;
-         }
-      }
-      if(!find){
-         n_string_append_printf(errorCodes, "类 %s 必须实现继承的接口方法 %s 。\n",info->sysName,ifaceMethod);
-      }
-   }
-}
-
-extern FILE *asm_out_file;
-
-/*
- * 把文本按 byte 输出到汇编
- */
-static void write_bytes_text (FILE *fp,const char *content)
-{
-   const unsigned char *p;
-   if (fp == NULL)
-      return;
-   if (content == NULL)
-      return;
-   p = (const unsigned char *) content;
-   while (*p){
-      fprintf (fp,"\t.byte 0x%02x\n",(unsigned int)*p);
-      p++;
-   }
-   /*
-   * 字符串结束符
-   */
-   fprintf (fp,"\t.byte 0x00\n");
-}
-
-/*
- * 向 .s 文件追加一个文本 section
- */
-static void writeNote (const char *content)
-{
-    FILE *fp;
-    /*
-     * GCC 当前汇编文件名
-     */
-    if (asm_file_name == NULL)
-        return;
-    if (content == NULL)
-        return;
-    if (asm_out_file == NULL)
-        return;
-    fp=asm_out_file;
-    /*
-     * 防止和上一行粘连
-     */
-    fprintf (fp, "\n");
-    /*
-     * 普通 ELF section
-     *
-     * 不是 NOTE
-     */
-    fprintf (fp,".section .aetprog,\"a\"\n");
-    fprintf (fp,".align 1\n");
-    /*
-     * 写入文本
-     */
-    write_bytes_text (fp, content);
-    /*
-     * 回到 text section
-     * 防止影响后续汇编
-     */
-    fprintf (fp,".text\n");
-}
-
-/**
- * 重要功能：存储每个编译文件的信息到名字叫.aetarg的section中。这些数据在aetcollect中处理。
- * 调用到该函数是从
- * toplev.cc -->mtcscompile.cc-->aetmediator.cc
- */
-void middle_file_save_note(MiddleFile *self)
-{
-   if(makefile_parm_is_second_compile(makefile_parm_get())){
-      n_debug("middle_file_save_note 是第二次编译 %s,写入原aetprog。time:%llu\n",in_fnames[0]);
-      char *aetprog = makefile_parm_get_aetprog(makefile_parm_get());
-      if(aetprog!=NULL){
-         writeNote(aetprog);
-         return;
-      }
-   }
-   if(self->action==0 && !enter_aet)
-      return;
-   //没有 COMPILE_IFACE COMPILE_BLOCK、...、COMPILE_IFACE_IMPL_CHECK,但引用AET对象系统。
-   if(self->action==0 && enter_aet){
-      NString *content=n_string_new("");
-      n_string_append(content,"type=1\n");
-      n_string_append(content,"action=-1\n");
-      if(mtcs_parser_have_mtcs(mtcs_parser_get())){
-         n_string_append(content,"usemtcs=1\n");
-      }
-      n_string_append(content,"end;\n");
-      writeNote(content->str);
-      n_string_free(content,TRUE);
-      return;
-   }
-   n_debug("middlefile.c middle_file_save_note 11 %d %s\n",self->action,self->compileParam,self->ifaceOFile);
-   NString *content=n_string_new("");
-   n_string_append(content,"type=1\n");
-   n_string_append_printf(content,"action=%d\n",self->action);
-   n_string_append_printf(content,"params=%s\n",self->compileParam);
-   if(self->ifaceOFile!=NULL){
-      n_string_append_printf(content,"ifaceofile=%s\n",self->ifaceOFile);
-   }
-   IfaceImpl  *ifaceImpl=iface_impl_get();
-   if(ifaceImpl->saveIfaceFileName)
-      n_string_append_printf(content,"ifaceimplfile=%s\n",ifaceImpl->saveIfaceFileName);
-
-   BlockMgr *blockMgr=block_mgr_get();
-   if(blockMgr->blockFileName)
-       n_string_append_printf(content,"blockfile=%s\n",blockMgr->blockFileName);
-
-   GenericParser *genericParser = generic_parser_get();
-   if(genericParser->funcWithGBFileName!=NULL)
-      n_string_append_printf(content,"funcwithgbfile=%s\n",genericParser->funcWithGBFileName);
-
-   GenericGraph *genericGraph=generic_graph_get();
-   if(genericGraph->collectFileName)
-       n_string_append_printf(content,"newgenfile=%s\n",genericGraph->collectFileName);
-
-   MtcsLink *mtcsLink=mtcs_parser_get()->mtcsLink;
-   if(mtcsLink->collectMtcsLinkFile)
-       n_string_append_printf(content,"mtcslinkfile=%s\n",mtcsLink->collectMtcsLinkFile);
-
-   if(mtcs_parser_have_mtcs(mtcs_parser_get())){
-      n_string_append(content,"usemtcs=1\n");
-   }
-   n_string_append(content,"end;\n");
-   writeNote(content->str);
-   n_string_free(content,TRUE);
-}
-
-/**
- *进入这里属于编译temp_func_track_45.c 主要靠gcc.cc中传递的参数获取在aetcollect中收集的数据
- */
-void middle_file_func_check(MiddleFile *self)
-{
-   char *fileName = getenv("GCC_AET_CHECK_LIST_PATH");
-   if(fileName==NULL || strlen(fileName)==0){
-      printf("middle_file_func_check path 出错了:path:%s\n",fileName);
-      return;
-   }
-   FILE *fp=fopen(fileName,"r");
-   if(!fp)
-      return;
-   char buffer[5*1024];
-   int rev = fread(buffer,1,5*1024,fp);
-   fclose(fp);
-   if(rev<=0)
-      return;
-   buffer[rev]='\0';
-   char *content = readLocalFile(buffer);
-   NPtrArray *needCheckInfo=readClassFuncInfoOrNeedCheckInfo(content,
-         CLASS_IFACE_NEED_CHECK_START,CLASS_IFACE_NEED_CHECK_END);
-   if(needCheckInfo==NULL || needCheckInfo->len==0){
-      //printf("本次编译不需要检查类接口实现 middle_file_func_check。\n");
-      if(needCheckInfo)
-         n_ptr_array_unref(needCheckInfo);
-      n_free(content);
-      return;
-   }
-   NPtrArray *locaIfaceInfo=readClassFuncInfoOrNeedCheckInfo(content,CLASS_IFACE_INFO_START,CLASS_IFACE_INFO_END);
-   char  *libIfaceInfo = aet_lib_get_class_iface_impl_info(aet_lib_get());
-   NString *errorCodes=n_string_new("");
-   int errorCount=1;
-   int i;
-   for(i=0;i<needCheckInfo->len;i++){
-      char *check=n_ptr_array_index(needCheckInfo,i);
-      NeedCheckInfo *info=createNeedInfo(check);
-      findImpl(info,locaIfaceInfo,libIfaceInfo,errorCodes);
-      freeNeedCheckInfo(info);
-   }
-   if(errorCodes->len>0){
-      fatal_error(0,errorCodes->str);
-   }
-   n_ptr_array_unref(locaIfaceInfo);
-   n_ptr_array_unref(needCheckInfo);
-   n_free(content);
-}
-
-void middle_file_test(MiddleFile *self,char *codes)
-{
-//   char *ca="i love you\n";
-//   printf("middle_file_test ---\n");
-//   aet_utils_add_token(parse_in,ca,strlen(ca));
-
-}
 
 MiddleFile *middle_file_get()
 {
@@ -664,4 +190,426 @@ MiddleFile *middle_file_get()
    }
    return singleton;
 }
+
+//---------------------------------------新的处理方式---------------------
+
+void middle_file_delete_collect_file(MiddleFile *self)
+{
+   if(makefile_parm_is_second_compile(makefile_parm_get())){
+      n_debug("middle_file_delete_collect_file 是第二次编译 %s\n",in_fnames[0]);
+      return;
+   }
+   char  *objfile=makefile_parm_get_object_file(makefile_parm_get());
+   char newName[255];
+   sprintf(newName,"%s.collect.o",objfile);
+   if(file_exists(newName))
+      remove(newName);
+   sprintf(newName,"%s.mtcs_collect.o",objfile);
+   if(file_exists(newName))
+      remove(newName);
+}
+
+#define HEAD_START "HEAD_START:"
+#define HEAD_END "HEAD_END:"
+
+static void saveFile(NString *codes,nboolean useMtcs)
+{
+   char  *objfile=makefile_parm_get_object_file(makefile_parm_get());
+   char newName[255];
+   if(!useMtcs)
+      sprintf(newName,"%s.collect.o",objfile);
+   else
+      sprintf(newName,"%s.mtcs_collect.o",objfile);
+   FILE *fp=fopen(newName,"w");
+   fwrite(codes->str,1,codes->len,fp);
+   fclose(fp);
+}
+
+void middle_file_save_note(MiddleFile *self)
+{
+   if(makefile_parm_is_second_compile(makefile_parm_get())){
+      n_debug("middle_file_save_note 是第二次编译 %s,写入原aetprog。time:%llu\n",in_fnames[0]);
+      return;
+   }
+   NString *content=n_string_new("");
+   int action = 0;
+   //接口检查 接口信息是在一起的，来自classmgr中的ifaceCheckCodes
+   char *save=iface_impl_check(iface_impl_get());
+   if(save){
+      action+=COMPILE_IFACE_IMPL_CHECK;
+      n_string_append(content,save);
+      n_free(save);
+   }
+   //接口实现
+   save=iface_impl_save(iface_impl_get());
+   if(save){
+      action+=COMPILE_IFACE;
+      n_string_append(content,save);
+      n_free(save);
+   }
+
+   save=block_mgr_save(block_mgr_get());
+   if(save){
+      action+=COMPILE_BLOCK;
+      n_string_append(content,save);
+      n_free(save);
+   }
+
+   save=generic_graph_save(generic_graph_get());
+   if(save){
+      action+=COMPILE_NEW;
+      n_string_append(content,save);
+      n_free(save);
+   }
+
+   MtcsParser *mtcsParser = mtcs_parser_get();
+   save=mtcs_link_save(mtcsParser->mtcsLink);
+   if(save){
+      action+=COMPILE_MTCS_LINK;
+      n_string_append(content,save);
+      n_free(save);
+   }
+
+   GenericParser *genericParser = generic_parser_get();
+   if(genericParser->funcWithGBBuffer){
+      n_string_append(content,genericParser->funcWithGBBuffer->str);
+   }
+   nboolean haveMtcs = mtcs_parser_have_mtcs(mtcs_parser_get());
+   if(!enter_aet && action==0 && !haveMtcs){
+      n_string_free(content,TRUE);
+      return;
+   }
+   NString *codes=n_string_new("");
+   n_string_append(codes,HEAD_START);
+   n_string_append(codes,"\n");
+   n_string_append(codes,"type=1\n");
+   n_string_append_printf(codes,"action=%d\n",action==0?-1:action);
+   if(self->compileParam==NULL){
+      char *aetEnv=getenv ("GCC_AET_ARGV");
+      self->compileParam=n_strdup(aetEnv);
+   }
+   n_string_append_printf(codes,"params=%s\n",self->compileParam);
+   if(haveMtcs){
+      n_string_append(codes,"usemtcs=1\n");
+   }
+   n_string_append(codes,HEAD_END);
+   n_string_append(codes,"\n");
+
+   n_string_append(codes,content->str);
+   n_string_append(codes,"\n");
+   saveFile(codes,haveMtcs);
+}
+
+
+static NPtrArray  *readData(const char *content,char *startTag,char *endTag)
+{
+   char *c=content;
+   NPtrArray *array=n_ptr_array_new();
+     while(strstr(c,startTag)){
+        char *start=strstr(c,startTag);
+        //printf("r0 is :%s\n",start);
+        char *n=start+strlen(startTag)+1;//加1跳过 CLASS_BLOCK_START 后的\n号
+        char *end=strstr(n,endTag);
+        int len=strlen(n);
+        int remain=strlen(end);
+        char *ret=xmalloc(len-remain+1);
+        memcpy(ret,n,len-remain);
+        ret[len-remain]='\0';
+        n_ptr_array_add(array,ret);
+        c = end+strlen(endTag);
+     }
+     return array;
+}
+
+typedef enum
+{
+   HEAD_DATA,
+   IFACE_CHECK,
+   IFACE_INFO,
+   IFACE_IMPL,
+   GENERIC_GRAPH,
+   GENERIC_BLOCK,
+   GENERIC_FWGB,
+   MTCS_LINK,
+}DataIndx;
+
+/**
+ * 一个文件一个
+ */
+static NPtrArray **extractData(char *content)
+{
+   NPtrArray *head = readData(content,HEAD_START,HEAD_END);
+   if(head->len>1)
+      error("头只能有一个");
+   //对应 middle_file_func_check
+   NPtrArray *ifaceCheck = readData(content,CLASS_IFACE_NEED_CHECK_START,CLASS_IFACE_NEED_CHECK_END);
+   NPtrArray *locaIfaceInfo=readData(content,CLASS_IFACE_INFO_START,CLASS_IFACE_INFO_END);
+   //对应 iface_impl_compile_ready
+   NPtrArray *ifaceImpl=iface_impl_create_impl_codes(content);
+   //generic_graph_ready
+   NPtrArray *graphArray  = generic_graph_read(content);
+   //对应 block_mgr_ready
+   NPtrArray *block = generic_info_create_text(content);
+   //对应 generic_parser_ready
+   NPtrArray *fwgb = generic_parser_create_fwgb_text(content);
+   //对应 mtcs_parser_link_func
+   NPtrArray *mtcslinkArray =mtcs_link_create_array(content);
+
+   NPtrArray **ms=xmalloc(sizeof(void*)*8);
+   ms[HEAD_DATA]=head;
+   ms[IFACE_CHECK]=ifaceCheck;
+   ms[IFACE_INFO]=locaIfaceInfo;
+   ms[IFACE_IMPL]=ifaceImpl;
+   ms[GENERIC_GRAPH]=graphArray;
+   ms[GENERIC_BLOCK]=block;
+   ms[GENERIC_FWGB]=fwgb;
+   ms[MTCS_LINK]=mtcslinkArray;
+   return ms;
+}
+
+typedef struct _ThreadData
+{
+   int start;
+   int end;
+   char **fileList;
+   MiddleFile *self;
+}ThreadData;
+
+static void *readFile_cb(ThreadData *data)
+{
+   MiddleFile *self= data->self;
+   int i;
+   for(i=data->start;i<data->end;++i){
+      char *file=data->fileList[i];
+      char buffer[1024*150];
+      FILE *fp=fopen(file,"r");
+      int rev=fread(buffer,1,1024*150,fp);
+      buffer[rev]='\0';
+      fclose(fp);
+      NPtrArray **ret=(NPtrArray **)extractData(buffer);
+      self->arrays[i] =(NPtrArray *)ret;
+   }
+   return NULL;
+}
+
+/**
+ * 创建全局变量 LIB_GLOBAL_GENERIC_VAR_NAME_PREFIX 内容是泛型类的genericinfo,泛型类的genericobj
+ * 当前所在的.c文件是 temp_func_track_45.c
+ */
+static void createGlobalVar(MiddleFile *self,NPtrArray **arrays,int aLen,int pos)
+{
+   //LIB_GLOBAL_GENERIC_VAR_NAME_PREFIX
+   char *block=block_mgr_get_save(block_mgr_get());
+   NString *codes=n_string_new("");
+   if(block && strlen(block)>0){
+      n_debug("middlefile.c createGlobalVar 00 块函数。\n%s\n",block);
+      n_string_append(codes,block);
+      n_string_append(codes,"\n");
+   }
+   //块所在函数
+   char *funcWithGb=generic_parser_get_fwg_source(generic_parser_get());
+   if(funcWithGb && strlen(funcWithGb)>0){
+      n_debug("middlefile.c createGlobalVar 11 带泛型块的函数。\n%s\n",funcWithGb);
+      n_string_append(codes,funcWithGb);
+      n_string_append(codes,"\n");
+      n_free(funcWithGb);
+   }
+
+   //保存接口信息
+   int i,j;
+   for(i=0;i<aLen;i++){
+      NPtrArray **as=(NPtrArray**)arrays[i];
+      NPtrArray *content=as[pos];
+      if(content && content->len>0){
+         for(j=0;j<content->len;j++){
+            char *item=n_ptr_array_index(content,j);
+            n_string_append(codes,CLASS_IFACE_INFO_START);
+            n_string_append(codes,"\n");
+            n_string_append(codes,item);
+            n_string_append(codes,"\n");
+            n_string_append(codes,CLASS_IFACE_INFO_END);
+            n_string_append(codes,"\n");
+         }
+      }
+   }
+
+   if(codes->len<=0){
+      n_string_free(codes,TRUE);
+      return;
+   }
+   printf("middlefile.c createGlobalVar 33 全部保存的内容。\n%s\n",codes->str);
+   int newDataLen=0;
+   char *newData=compressData(codes->str,&newDataLen);
+   char varName[255];
+   nint number=class_util_get_random_number();
+   sprintf(varName,"%s_%d",LIB_GLOBAL_GENERIC_VAR_NAME_PREFIX,number>0?number:number*-1);
+   createGlobalGenericVar(varName,newData,newDataLen);
+}
+
+
+/*
+ * 创建 __aet_generic_zero
+ * is_shared == true  → 生成 weak 版本（给 .so 用）
+ * is_shared == false → 生成普通强符号（给可执行文件用）
+ */
+static void createGenericZero (bool is_shared,int maxsize)
+{
+  location_t loc = input_location;
+
+  /* 1. 类型 */
+  tree index_type = build_index_type (size_int (maxsize));
+  tree array_type = build_array_type (char_type_node, index_type);
+  array_type = build_qualified_type (array_type, TYPE_QUAL_CONST);
+
+  /* 2. 名字（必须和报错里的完全一致） */
+  tree name = get_identifier (GENERIC_ZERO_STORAGE);
+
+  tree decl = build_decl (loc, VAR_DECL, name, array_type);
+
+  /* 3. 属性 */
+  TREE_PUBLIC (decl)     = 1;
+  TREE_STATIC (decl)     = 1;
+  TREE_READONLY (decl)   = 1;
+  DECL_EXTERNAL (decl)   = 0;
+  DECL_CONTEXT (decl)    = NULL_TREE;          // 文件作用域
+  DECL_ARTIFICIAL (decl) = 1;                  // 建议加上
+
+  if (is_shared)
+    {
+      DECL_WEAK (decl) = 1;
+      tree attr = tree_cons (get_identifier ("weak"), NULL_TREE, NULL_TREE);
+      decl_attributes (&decl, attr, 0);
+    }
+
+  /* 4. 初始化器 */
+  tree init = build_constructor (array_type, NULL);
+  TREE_CONSTANT (init) = 1;
+  TREE_STATIC (init)   = 1;
+
+  /* ========== 关键步骤开始 ========== */
+
+  /* 5. 先 push 到全局作用域（非常重要！） */
+  tree pushed = pushdecl (decl);     // C 前端
+  // 或者：
+  // tree pushed = lang_hooks.decls.pushdecl (decl);
+
+  if (pushed != decl && pushed != NULL_TREE)
+    decl = pushed;                   // 发生了合并
+
+  /* 6. 完成声明 */
+  finish_decl (decl, loc, init, array_type, NULL_TREE);
+
+  /* 7. 强制保留 */
+  TREE_USED (decl)       = 1;
+  TREE_ADDRESSABLE (decl)= 1;
+  DECL_PRESERVE_P (decl) = 1;
+  DECL_IGNORED_P (decl)  = 0;
+
+  /* 8. 强制交给后端 */
+  rest_of_decl_compilation (decl, /*top_level=*/1, /*at_end=*/0);
+}
+
+void middle_file_collect(MiddleFile *self)
+{
+   char *fileName = getenv("GCC_AET_COLLECT_PATH");
+   if(fileName==NULL){
+      fatal_error (input_location, "GCC_AET_COLLECT_PATH 是空的");
+      return ;
+   }
+   char buffer[1024*150];
+   FILE *fp=fopen(fileName,"r");
+   int rev=fread(buffer,1,1024*150,fp);
+   if(rev<=0)
+      fatal_error (input_location, "GCC_AET_COLLECT_PATH %s 是空的",fileName);
+   buffer[rev]='\0';
+   fclose(fp);
+
+   nchar **items=n_strsplit(buffer,"\n",-1);
+   int length= n_strv_length(items);
+   if(items[length-1] == NULL || strlen(items[length-1])==0)
+      length--;
+   self->arrays=xmalloc(sizeof(void*)*length);
+   //如果链接文件小于5,单线程处理，否则多线程处理
+   if(length<5){
+      ThreadData threadData={0,length,items,self};
+      readFile_cb(&threadData);
+   }else{
+      size_t threads = std::thread::hardware_concurrency();
+      if(threads==0)
+         threads = 4;
+      int avg = length/threads;
+      while(avg<5 && threads>4){
+         threads--;
+         avg = length/threads;
+      }
+      int i;
+      pthread_t ps[threads];
+      ThreadData *td[threads];
+      for(i=0;i<threads;i++){
+         pthread_attr_t attr;
+         int start = i*avg;
+         int end = start+avg;
+         if(i==threads-1)
+            end = length;
+         ThreadData *threadData=xmalloc(sizeof(ThreadData));
+         threadData->start = start;
+         threadData->end = end;
+         threadData->fileList = items;
+         threadData->self = self;
+         td[i] = threadData;
+         int ret = pthread_create (&ps[i], &attr, readFile_cb, (void *)threadData);
+         if (ret == EAGAIN){
+            error("创建线程出错。");
+            return ;
+         }
+      }
+      for(i=0;i<threads;i++){
+         pthread_join(ps[i],NULL);
+      }
+      for(i=0;i<threads;i++){
+         free(td[i]);
+         td[i]=NULL;
+      }
+   }
+   char  *ofile = makefile_parm_get_object_file(makefile_parm_get());
+   NFile *f=n_file_new(ofile);
+   NFile *parent=n_file_get_parent_file(f);
+   NFile  *canonical=n_file_get_canonical_file(parent);
+   const  char *objectRootPath = n_file_get_absolute_path(canonical);
+   //对应 middle_file_func_check
+   //printf("检查接口数据 objpath:%s\n",objectRootPath);
+   iface_impl_valid(iface_impl_get(),self->arrays,length,IFACE_CHECK,IFACE_INFO);
+  // printf("实现接口\n");
+   //实现接口的文件列表
+   iface_impl_compile_ready(iface_impl_get(),objectRootPath,self->arrays,length,IFACE_IMPL);
+   //printf("泛型实现 generic_graph_ready_new %d\n",length);
+   generic_graph_ready(generic_graph_get(),self->arrays,length,GENERIC_GRAPH);
+  // printf("泛型实现 block_mgr_ready\n");
+   block_mgr_ready(block_mgr_get(),self->arrays,length,GENERIC_BLOCK);
+   //printf("泛型实现 generic_parser_ready\n");
+   generic_parser_ready(generic_parser_get(),self->arrays,length,GENERIC_FWGB);
+   generic_code_create_block_codes(generic_code_get(),objectRootPath);
+  // printf("实现 mtcs_parser_link_func_new\n");
+   mtcs_parser_link_func(mtcs_parser_get(),objectRootPath,self->arrays,length,MTCS_LINK);
+   //保存接口，泛型，mtcs
+   createGlobalVar(self,self->arrays,length,IFACE_INFO);
+   int  max = generic_graph_get_max_generic_unit(generic_graph_get());
+   char *targetTag = getenv("GCC_AET_TARGET");
+   int storageSizeAtLib = aet_lib_get_generic_zero_storage_size(aet_lib_get());
+   n_debug("targetTag is :%s max:%d lib:%d\n",targetTag,max,storageSizeAtLib);
+   max = storageSizeAtLib>max?storageSizeAtLib:max;
+   max = max>2048?max:2047;
+   if(!strcmp(targetTag,"0")){
+      //可执行文件
+      createGenericZero(false,max);
+   }else  if(!strcmp(targetTag,"1")){
+      //so
+      createGenericZero(true,max);
+   }else{
+      printf(".a文件不需要生成全局变量:%s\n",GENERIC_ZERO_STORAGE);
+   }
+
+
+}
+
 

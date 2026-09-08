@@ -313,33 +313,6 @@ static CandidateFunc *selectFunc(FuncCall *self,ClassName *className,char *orgiN
 /**
  * 把泛型形参对应的实参转化为:实参--中间形参:如<int>---void*
  */
-//static void convertParmForGenerics(FuncCall *self,CandidateFunc *candidate,vec<tree, va_gc> *exprlist,
-//        location_t expr_loc,nboolean allscope,GenericModel *generics)
-//{
-//        ClassName *className=class_mgr_get_class_name_by_sys(class_mgr_get(),candidate->sysName);
-//		tree decl=NULL_TREE;
-//		ClassFunc *item=candidate->classFunc;
-//		n_debug("convertParmForGenerics xxx %s allscope:%d  field?:%d exprlist:%d\n",
-//			className->sysName,allscope,aet_utils_valid_tree(item->fieldDecl),exprlist->length());
-//		if(allscope){
-//			if(aet_utils_valid_tree(item->fieldDecl)){
-//				decl=createTempFunction(item->fieldDecl);
-//			}else if(aet_utils_valid_tree(item->fromImplDefine)){
-//				decl=item->fromImplDefine;
-//			}else{
-//				decl=item->fromImplDecl;
-//			}
-//		}else{
-//			if(aet_utils_valid_tree(item->fieldDecl)){
-//				decl=createTempFunction(item->fieldDecl);
-//			}
-//		}
-//		if(decl==NULL_TREE){
-//			return;
-//		}
-//		int count=generic_call_replace_parm(generic_call_get(),expr_loc,decl, exprlist,className,generics);
-//	   // printf("泛型转化成功的个数:%d\n",count);
-//}
 
 /**
  * 加入self,从func调用
@@ -457,7 +430,8 @@ static CandidateFunc *selectStaticByRecursion(FuncCall *self,ClassName *classNam
    CandidateFunc *result=select_field_get_static_func(select_field_get(),className,orgiName,exprlist,origtypes,arg_loc,expr_loc,errors);
    if(result==NULL){
       ClassInfo *info=class_mgr_get_class_info_by_class_name(class_mgr_get(),className);
-      n_debug("func_help_select_static_func_by_recursion 再一次从父类找静态方法 selectFunc ---ttt %s %p",className->sysName,info);
+      n_debug("func_help_select_static_func_by_recursion 再一次从父类找静态方法 selectFunc ---ttt %s %p",
+            className->sysName,info);
       result=selectStaticByRecursion(self,&info->parentName,orgiName,exprlist,origtypes,arg_loc,expr_loc,errors);
    }
    return result;
@@ -480,7 +454,8 @@ tree func_call_deref_select(FuncCall *self,tree func,vec<tree, va_gc> *exprlist,
       return error_mark_node;
    char *fromLowClassName=getLowClassName(field);
    n_debug("func_call_deref_select 00 name:%s className:%s func:%s %d refVarClassName:%s func:%p %p\n",
-   IDENTIFIER_POINTER(id),currentClassName,funName,len,fromLowClassName,func,c_aet_get_func_generics_model(func));
+         IDENTIFIER_POINTER(id),currentClassName,funName,len,fromLowClassName,
+         func,c_aet_get_func_generics_model(func));
    tree indiect=TREE_OPERAND(func,0);
    ClassName *className=class_mgr_get_class_name_by_sys(class_mgr_get(),currentClassName);
    ClassName *lowClassName=class_mgr_get_class_name_by_sys(class_mgr_get(),fromLowClassName);

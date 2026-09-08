@@ -273,14 +273,9 @@ static nboolean createParamList(ImplicitlyCall *self,ImplicitlyData *item)
    int i;
    for(i=0;i<nargs;i++){
       tree arg=CALL_EXPR_ARG (call, i);
-      n_debug("createParamList 00 %d %d %d",item->exprList->length(),item->origtypes->length(),item->arg_loc.length());
-      aet_print_tree(arg);
+      //n_debug("createParamList 00 %d %d %d",item->exprList->length(),item->origtypes->length(),item->arg_loc.length());
       vec_safe_push (item->exprList, arg);
       vec_safe_push (item->origtypes, TREE_TYPE(arg));
-      //if(DECL_P(arg))
-       // item->arg_loc.safe_push (DECL_SOURCE_LOCATION(arg));
-   //   else
-      //  item->arg_loc.safe_push (item->loc);
    }
    return TRUE;
 }
@@ -456,10 +451,6 @@ static tree convertForReturn (ImplicitlyData *item,tree retval)
     location_t loc=item->loc;
     //item->lhsOrType已经通过 TREE_TYPE (TREE_TYPE (current_function_decl))获取到了函数返回值类型
     tree valtype = item->convertParm.lhsOrType;
-    printf("函数返回值-----\n");
-    aet_print_tree(item->convertParm.lhsOrType);
-
-    aet_print_tree(valtype);
     tree origtype=item->convertParm.rhsOrigType;
     tree ret_stmt;
     bool no_warning = false;
@@ -721,8 +712,6 @@ static tree getFndeclArgType(tree fndecl,int n)
       tree type=TREE_VALUE(al);
       if(i==n)
          return type;
-      printf("getFndeclArgType -----i:%d type:%s %d\n",i,get_tree_code_name(TREE_CODE(type)),TYPE_MODE(type));
-      aet_print_tree(type);
       i++;
    }
    return NULL_TREE;
@@ -803,7 +792,6 @@ static void test_add_list(tree replaceKernel)
 //
 //
 //   n_debug("test_add_list 00\n");
-//   aet_print_tree(fnbody);
 
    if(TREE_CODE(fnbody)!=BIND_EXPR)
       return;
@@ -830,9 +818,9 @@ static tree link_cb (tree *tp, int *walk_subtrees, void *data)
    tree t = *tp;
    if (TYPE_P (t))
       *walk_subtrees = 0;
-   else if (TREE_CODE (t) == BIND_EXPR){
-      walk_tree (&BIND_EXPR_BODY (t), link_cb, data, NULL);
-   }else if(TREE_CODE(t)==CALL_EXPR){
+   //else if (TREE_CODE (t) == BIND_EXPR){
+     // walk_tree (&BIND_EXPR_BODY (t), link_cb, data, NULL);
+   else if(TREE_CODE(t)==CALL_EXPR){
        tree func=CALL_EXPR_FN(t);
        if(TREE_CODE(func)==ADDR_EXPR){
            tree funcDecl=TREE_OPERAND (func, 0);
@@ -853,14 +841,11 @@ static tree link_cb (tree *tp, int *walk_subtrees, void *data)
                      *walk_subtrees = 0;
                      return NULL_TREE;
                   }
-                 n_debug("implicitly 替换调用的函数这是一个调用----00 %s %s %d",funcName,item->newFuncName,item->convertParm.implConv);
-                 aet_print_tree(newCallExpr);
+                 //n_debug("implicitly 替换调用的函数这是一个调用----00 %s %s %d",funcName,item->newFuncName,item->convertParm.implConv);
                  if(item->convertParm.implConv==ic_init || item->convertParm.implConv==ic_init_const){
-                     n_debug("implicitly 替换调用的函数这是一个调用----11 %s %s",funcName,item->newFuncName);
-                     aet_print_tree(item->convertParm.lhsOrType);
+                     //n_debug("implicitly 替换调用的函数这是一个调用----11 %s %s",funcName,item->newFuncName);
                      *tp=convertForInit(item,newCallExpr);
-                      n_debug("implicitly 替换调用的函数这是一个调用----22 %s %s",funcName,item->newFuncName);
-                      aet_print_tree(item->convertParm.lhsOrType);
+                     // n_debug("implicitly 替换调用的函数这是一个调用----22 %s %s",funcName,item->newFuncName);
                  }else if(item->convertParm.implConv==ic_assign){
                      *tp=convertForModify(item,newCallExpr);
                  }else if(item->convertParm.implConv==ic_return){
@@ -884,9 +869,9 @@ static tree kernel_replace_cb (tree *tp, int *walk_subtrees, void *data)
    tree t = *tp;
    if (TYPE_P (t))
       *walk_subtrees = 0;
-   else if (TREE_CODE (t) == BIND_EXPR){
-      walk_tree (&BIND_EXPR_BODY (t), kernel_replace_cb, data, NULL);
-   }else if(TREE_CODE(t)==CALL_EXPR){
+   //else if (TREE_CODE (t) == BIND_EXPR){
+     // walk_tree (&BIND_EXPR_BODY (t), kernel_replace_cb, data, NULL);
+   else if(TREE_CODE(t)==CALL_EXPR){
        tree func=CALL_EXPR_FN(t);
        if(TREE_CODE(func)==ADDR_EXPR){
            tree funcDecl=TREE_OPERAND (func, 0);
@@ -942,7 +927,6 @@ static void link(ImplicitlyCall *self ,ImplicitlyData *item)
       //恢复原名调用，由link器查找。
       nboolean isMtcs = func_mgr_is_mtcs_func(func_mgr_get(),item->caller);
       n_debug("start link  没有找到函数定义 恢复原函数调用。%s 所在函数是不是 Mtcs:%d\n",item->origFuncName,isMtcs);
-      aet_print_tree(ret);
       tree id=aet_utils_create_ident(item->origFuncName);
       tree type=NULL_TREE;
       tree ret = build_external_ref (item->loc, id,TRUE,&type);
@@ -1063,7 +1047,6 @@ tree  implicitly_call_call_from_static(ImplicitlyCall *self,struct c_expr *expr,
     if(!self->parser->isAet)
         return NULL_TREE;
     n_debug("有静态声明的函数，但参数不正确，归于隐藏的调用implicitly\n");
-    aet_print_tree(func);
     char currentClassName[256];
     char funcName[256];
     int len=aet_utils_get_orgi_func_and_class_name(IDENTIFIER_POINTER(DECL_NAME(func)),currentClassName,funcName);
@@ -1075,7 +1058,6 @@ tree  implicitly_call_call_from_static(ImplicitlyCall *self,struct c_expr *expr,
         n_debug("implicitly_call_call_from_static 00 是内建的。 %s",IDENTIFIER_POINTER(id));
     }else{
         n_debug("有静态声明的函数，但参数不正确，归于隐藏的调用implicitly funcName:%s\n",funcName);
-        aet_print_tree(func);
         ClassImpl *impl=class_impl_get();
         if(strcmp(impl->className->sysName,currentClassName)){
             n_warning("implicitly_call_call_from_static 11 不是本类的方法。 old:%s 所在类:%s 类方法：%s",
@@ -1153,7 +1135,8 @@ nboolean implicitly_call_set_init_or_modify_impl_conv(ImplicitlyCall *self,tree 
    return set_impl_conv(self,lhs,rhs,rhsOrigType,sysName,isModify?ic_assign:ic_init,0);
 }
 
-nboolean implicitly_call_set_return_impl_conv(ImplicitlyCall *self,tree lhsOrValue,tree rhs,tree rhsOrigType,char *sysName)
+nboolean implicitly_call_set_return_impl_conv(ImplicitlyCall *self,tree lhsOrValue,
+      tree rhs,tree rhsOrigType,char *sysName)
 {
    return set_impl_conv(self,lhsOrValue,rhs,rhsOrigType,sysName,ic_return,0);
 }
@@ -1163,7 +1146,8 @@ nboolean implicitly_call_set_return_impl_conv(ImplicitlyCall *self,tree lhsOrVal
  * arg 被调用函数的参数
  * pos 参数位置
  */
-nboolean implicitly_call_set_funcall_impl_conv(ImplicitlyCall *self,tree funcCall,tree arg,tree argOrigType,int pos,char *sysName)
+nboolean implicitly_call_set_funcall_impl_conv(ImplicitlyCall *self,tree funcCall,
+      tree arg,tree argOrigType,int pos,char *sysName)
 {
    return set_impl_conv(self,funcCall,arg,argOrigType,sysName,ic_argpass,pos);
 }
@@ -1211,10 +1195,10 @@ void   implicitly_call_set_call(ImplicitlyCall *self,tree callee,vec<location_t>
    if(item==NULL){
       error_at (EXPR_LOCATION (callee),"找不到隐藏函数调用记录！");
    }
-   if(self->parser->isAet && mtcs_parser_is_compiling(mtcs_parser_get())){
-      n_debug("implicitlycall 在 mtcs函数内\n");
-      aet_print_tree(current_function_decl);
-   }
+//   if(self->parser->isAet && mtcs_parser_is_compiling(mtcs_parser_get())){
+//      n_debug("implicitlycall 在 mtcs函数内\n");
+//      aet_print_tree(current_function_decl);
+//   }
    item->callee=callee;
    int i;
    item->arg_loc.safe_push (item->loc);//item->loc是被调函数的位置，相当于加self

@@ -17,12 +17,10 @@
  * If not see <http://www.gnu.org/licenses/>.
  * AET was originally developed  by the zclei@sina.com
  */
-
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <errno.h>
-
 #include "EventPoll.h"
 
 impl$ EventPoll{

@@ -53,7 +53,6 @@ struct _ClassParser
    ClassFinalize *classFinalize;
    ClassPackage *classPackage;
    ClassPermission *classPermission;
-   ClassFinal *classFinal;
    ClassBuild *classBuild;
    ClassParserState state;
    ClassName *currentClassName;

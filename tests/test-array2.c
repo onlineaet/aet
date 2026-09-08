@@ -1,5 +1,8 @@
-//#include "AArray.h"
+#ifdef LOCAL_HEAD
+#include "AArray.h"
+#else
 #include <aet/util/AArray.h>
+#endif
 #include <stdio.h>
 #include <time.h>
 #include <stdlib.h>
@@ -16,7 +19,7 @@ int main() {
     // ========== 1. 顺序添加（无预分配）==========
     {
         double s = now_ms();
-        AArray<int> *a = new$ AArray<int>(16);
+        AArray<int> *a = new$ AArray(16);
         for (int i = 0; i < N_PUSH; ++i)
             a->add(i);
         double e = now_ms();
@@ -27,10 +30,11 @@ int main() {
 
     // ========== 2. 预分配添加 ==========
     {
-        AArray<int> *a = new$ AArray<int>(N_PUSH);   // 直接指定容量
+        AArray<int> *a = new$ AArray(N_PUSH);   // 直接指定容量
+        a->resize(N_PUSH);
         double s = now_ms();
         for (int i = 0; i < N_PUSH; ++i)
-            a->addFast(i);
+            a->set(i,i);
         double e = now_ms();
         printf("[AArray] 预分配添加 %lu 个: %.1f us  (size=%u)\n",
                N_PUSH, e - s, a->size());
@@ -39,8 +43,9 @@ int main() {
 
     // ========== 3. 中间插入 ==========
     {
-        AArray<int> *a = new$ AArray<int>(10000);
-        for (int i = 0; i < 10000; ++i) a->add(i);
+        AArray<int> *a = new$ AArray(10000);
+        for (int i = 0; i < 10000; ++i)
+           a->add(i);
 
         double s = now_ms();
         for (int i = 0; i < N_INSERT; ++i) {
@@ -55,7 +60,7 @@ int main() {
 
     // ========== 4. 中间删除 ==========
     {
-        AArray<int> *a = new$ AArray<int>(N_DELETE + 100000);
+        AArray<int> *a = new$ AArray(N_DELETE + 100000);
         for (int i = 0; i < N_DELETE + 100000; ++i)
             a->add(i);
 
@@ -72,8 +77,9 @@ int main() {
 
     // ========== 5. 尾部删除 ==========
     {
-        AArray<int> *a = new$ AArray<int>(N_DELETE);
-        for (int  i = 0; i < N_DELETE; ++i) a->add(i);
+        AArray<int> *a = new$ AArray(N_DELETE);
+        for (int  i = 0; i < N_DELETE; ++i)
+           a->add(i);
         volatile int sum=0;
         double s = now_ms();
         while (!a->isEmpty()) {

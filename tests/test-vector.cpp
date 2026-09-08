@@ -21,7 +21,8 @@ int main() {
     {
         auto s = high_resolution_clock::now();
         vector<int> v;
-        for (size_t i = 0; i < N_PUSH; ++i) v.push_back((int)i);
+        for (size_t i = 0; i < N_PUSH; ++i)
+           v.push_back((int)i);
         auto e = high_resolution_clock::now();
         printf("[vector] 顺序添加 %zu 个: %lld us  (size=%zu, cap=%zu)\n",
                N_PUSH, ms(s,e), v.size(), v.capacity());
@@ -29,10 +30,13 @@ int main() {
 
     // ========== 2. 预分配添加 ==========
     {
-        auto s = high_resolution_clock::now();
         vector<int> v;
         v.reserve(N_PUSH);
-        for (size_t i = 0; i < N_PUSH; ++i) v.push_back((int)i);
+        v.resize(N_PUSH);
+        auto s = high_resolution_clock::now();
+        for (size_t i = 0; i < N_PUSH; ++i)
+                  v[i]= i;
+
         auto e = high_resolution_clock::now();
         printf("[vector] 预分配添加 %zu 个: %lld us  (size=%zu, cap=%zu)\n",
                N_PUSH, ms(s,e), v.size(), v.capacity());

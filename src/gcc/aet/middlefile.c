@@ -209,6 +209,63 @@ void middle_file_delete_collect_file(MiddleFile *self)
       remove(newName);
 }
 
+extern FILE *asm_out_file;
+
+/*
+ * 把文本按 byte 输出到汇编
+ */
+static void write_bytes_text (FILE *fp,const char *content)
+{
+   const unsigned char *p;
+   if (fp == NULL)
+      return;
+   if (content == NULL)
+      return;
+   p = (const unsigned char *) content;
+   while (*p){
+      fprintf (fp,"\t.byte 0x%02x\n",(unsigned int)*p);
+      p++;
+   }
+   /*
+   * 字符串结束符
+   */
+   fprintf (fp,"\t.byte 0x00\n");
+}
+
+/*
+ * 向 .s 文件追加一个文本 section
+ */
+static void writeNote (const char *content)
+{
+    FILE *fp;
+    /*
+     * GCC 当前汇编文件名
+     */
+    if (asm_file_name == NULL || content==NULL || asm_out_file == NULL)
+        return;
+    fp=asm_out_file;
+    /*
+     * 防止和上一行粘连
+     */
+    fprintf (fp, "\n");
+    /*
+     * 普通 ELF section
+     *
+     * 不是 NOTE
+     */
+    fprintf (fp,".section .aetprog,\"a\"\n");
+    fprintf (fp,".align 1\n");
+    /*
+     * 写入文本
+     */
+    write_bytes_text (fp, content);
+    /*
+     * 回到 text section
+     * 防止影响后续汇编
+     */
+    fprintf (fp,".text\n");
+}
+
 #define HEAD_START "HEAD_START:"
 #define HEAD_END "HEAD_END:"
 
@@ -228,7 +285,8 @@ static void saveFile(NString *codes,nboolean useMtcs)
 void middle_file_save_note(MiddleFile *self)
 {
    if(makefile_parm_is_second_compile(makefile_parm_get())){
-      n_debug("middle_file_save_note 是第二次编译 %s,写入原aetprog。time:%llu\n",in_fnames[0]);
+      printf("middle_file_save_note 是第二次编译 %s,写入原aetprog。time:%llu\n",in_fnames[0]);
+      writeNote(makefile_parm_get_object_file(makefile_parm_get()));
       return;
    }
    NString *content=n_string_new("");
@@ -247,21 +305,18 @@ void middle_file_save_note(MiddleFile *self)
       n_string_append(content,save);
       n_free(save);
    }
-
    save=block_mgr_save(block_mgr_get());
    if(save){
       action+=COMPILE_BLOCK;
       n_string_append(content,save);
       n_free(save);
    }
-
    save=generic_graph_save(generic_graph_get());
    if(save){
       action+=COMPILE_NEW;
       n_string_append(content,save);
       n_free(save);
    }
-
    MtcsParser *mtcsParser = mtcs_parser_get();
    save=mtcs_link_save(mtcsParser->mtcsLink);
    if(save){
@@ -269,7 +324,6 @@ void middle_file_save_note(MiddleFile *self)
       n_string_append(content,save);
       n_free(save);
    }
-
    GenericParser *genericParser = generic_parser_get();
    if(genericParser->funcWithGBBuffer){
       n_string_append(content,genericParser->funcWithGBBuffer->str);
@@ -279,6 +333,7 @@ void middle_file_save_note(MiddleFile *self)
       n_string_free(content,TRUE);
       return;
    }
+   writeNote(makefile_parm_get_object_file(makefile_parm_get()));
    NString *codes=n_string_new("");
    n_string_append(codes,HEAD_START);
    n_string_append(codes,"\n");
@@ -437,7 +492,7 @@ static void createGlobalVar(MiddleFile *self,NPtrArray **arrays,int aLen,int pos
       n_string_free(codes,TRUE);
       return;
    }
-   printf("middlefile.c createGlobalVar 33 全部保存的内容。\n%s\n",codes->str);
+   n_debug("middlefile.c createGlobalVar 33 全部保存的内容。\n%s\n",codes->str);
    int newDataLen=0;
    char *newData=compressData(codes->str,&newDataLen);
    char varName[255];
@@ -577,20 +632,15 @@ void middle_file_collect(MiddleFile *self)
    NFile  *canonical=n_file_get_canonical_file(parent);
    const  char *objectRootPath = n_file_get_absolute_path(canonical);
    //对应 middle_file_func_check
-   //printf("检查接口数据 objpath:%s\n",objectRootPath);
    iface_impl_valid(iface_impl_get(),self->arrays,length,IFACE_CHECK,IFACE_INFO);
-  // printf("实现接口\n");
    //实现接口的文件列表
    iface_impl_compile_ready(iface_impl_get(),objectRootPath,self->arrays,length,IFACE_IMPL);
-   //printf("泛型实现 generic_graph_ready_new %d\n",length);
    generic_graph_ready(generic_graph_get(),self->arrays,length,GENERIC_GRAPH);
-  // printf("泛型实现 block_mgr_ready\n");
    block_mgr_ready(block_mgr_get(),self->arrays,length,GENERIC_BLOCK);
-   //printf("泛型实现 generic_parser_ready\n");
    generic_parser_ready(generic_parser_get(),self->arrays,length,GENERIC_FWGB);
    generic_code_create_block_codes(generic_code_get(),objectRootPath);
-  // printf("实现 mtcs_parser_link_func_new\n");
    mtcs_parser_link_func(mtcs_parser_get(),objectRootPath,self->arrays,length,MTCS_LINK);
+
    //保存接口，泛型，mtcs
    createGlobalVar(self,self->arrays,length,IFACE_INFO);
    int  max = generic_graph_get_max_generic_unit(generic_graph_get());
@@ -608,8 +658,6 @@ void middle_file_collect(MiddleFile *self)
    }else{
       printf(".a文件不需要生成全局变量:%s\n",GENERIC_ZERO_STORAGE);
    }
-
-
 }
 
 

@@ -45,7 +45,7 @@ impl$  CudaLanucher {
    public$  void lanuch(char *funcName,auint gridX,auint gridY,auint gridZ,
          auint blockX,auint blockY,auint blockZ,auint sharedMemBytes,void *hStream,void **kernelParams,void **extra){
       //找到设备对应的驱动
-      //printf("CudaLanucher lanuch funcName 00 funcName:%s kernel:%p mtcsStreamData:%p\n",funcName,kernel,hStream);
+     // printf("CudaLanucher lanuch funcName 00 funcName:%s mtcsStreamData:%p\n",funcName,hStream);
       CUfunction kernel = funcHash->get(funcName);
       //printf("lanuch kernel--:%s %p\n",funcName,kernel);
       if(kernel==NULL){
@@ -59,7 +59,7 @@ impl$  CudaLanucher {
          stream=(cudaStream_t)data->getStream();
       }
       //printf("CudaLanucher lanuch funcName 11 funcName:%s kernel:%p stream:%p grid:%dx%dx%d block:%dx%dx%d\n",
-            //funcName,kernel,stream,gridX,  gridY, gridZ,blockX, blockY, blockZ);
+           // funcName,kernel,stream,gridX,  gridY, gridZ,blockX, blockY, blockZ);
       CUDA_DRIVER_CALL( cuLaunchKernel(kernel,
       gridX,  gridY, gridZ, // grid dim
       blockX, blockY, blockZ, // block dim

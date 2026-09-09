@@ -439,7 +439,7 @@ static void collectUseLibFile(const char *prog,char **ld_argv,
       trace_argv[count++] = appends[i];
 
    char *mainobj=compileMain(gcc,objectRootPath);
-   trace_argv[count++] = mainobj;
+   trace_argv[count++] = xstrdup(mainobj);
 
    for(i=1;i<argc;i++){
       char *item=ld_argv[i];
@@ -899,7 +899,7 @@ static void compileGeneric(char *gcc,char *objectRootPath)
    //这是与aetcollect的协议 在ifaceimpl.c中也有类似
    sprintf(fileName,"%s/%s",objectRootPath,AET_GENERIC_BLOCK_FWGB_FILE_LIST);
    if(!file_exists(fileName)){
-      printf("compileGeneric 第二次编译的文件不存在 %s\n",fileName);
+      //printf("compileGeneric 第二次编译的文件不存在 %s\n",fileName);
       return NULL;
    }
    char fileList[1024*10];
@@ -1055,6 +1055,132 @@ static int isSoOrStaticTarget()
    return 0;
 }
 
+
+/* callback data */
+typedef struct
+{
+   int fd;
+   char *content;
+} AetCallbackData;
+
+
+/* 读取 .aetprog section */
+static int process_aet_thread_safe (void *data,
+                         const char *name,
+                         off_t offset,
+                         off_t length)
+{
+   const char *noteName = ".aetprog";
+   AetCallbackData *cb_data = (AetCallbackData *) data;
+
+   if (strcmp (name, noteName) != 0)
+      return 1;
+   if (length <= 0)
+      return 0;
+   char *buf = (char *) xmalloc (length + 1);
+   if (!buf)
+      return 0;
+   buf[length] = '\0';
+   if (lseek (cb_data->fd, offset, SEEK_SET) < 0  || read (cb_data->fd, buf, length) != length){
+       free (buf);
+       return 0;
+   }
+
+   /* 如果之前已经有内容，先释放 */
+   cb_data->content = buf;
+   return 0;
+}
+
+
+/* 单个文件的解析函数 */
+static char *extract_aet_content_safe (const char *obj_file_path)
+{
+   const char *errmsg;
+   int err;
+   int fd;
+   simple_object_read *sobj;
+   AetCallbackData cb_data;
+   fd = open (obj_file_path, O_RDONLY | O_BINARY);
+   if (fd < 0)
+      return NULL;
+
+   sobj = simple_object_start_read (fd, 0, "gcc", &errmsg, &err);
+   if (!sobj){
+       close (fd);
+       return NULL;
+   }
+
+   cb_data.fd = fd;
+   cb_data.content = NULL;
+   simple_object_find_sections (sobj,
+                                process_aet_thread_safe,
+                                &cb_data,
+                                &err);
+   simple_object_release_read (sobj);
+   close (fd);
+   return cb_data.content;
+}
+
+
+static char *get_full_path (const char *name)
+{
+  struct stat st;
+  char *path;
+  char *p;
+
+  if (stat (name, &st) != 0)
+    return NULL;
+
+  path = realpath (name, NULL);
+  if (path == NULL)
+    return NULL;
+
+  if (S_ISDIR (st.st_mode))
+    return path;
+
+  if (S_ISREG (st.st_mode))
+    {
+      p = strrchr (path, '/');
+
+      if (p)
+        {
+          /* 根目录下的文件 */
+          if (p == path)
+            p[1] = '\0';
+          else
+            *p = '\0';
+        }
+
+      return path;
+    }
+
+  free (path);
+  return NULL;
+}
+
+typedef struct _FillData
+{
+   char newfile[256];
+   bool haveCollect;
+   bool useMtcs;
+}FillData;
+/**
+ * o文件的action内容
+ */
+static void fillData(char *arg,FillData *data)
+{
+   sprintf(data->newfile,"%s.collect.o",arg);//来自middlefile.c中的saveFile
+   if(!file_exists(data->newfile)){
+      sprintf(data->newfile,"%s.mtcs_collect.o",arg);
+      if(file_exists(data->newfile)){
+         data->haveCollect = true;
+         data->useMtcs = true;
+      }
+   }else{
+      data->haveCollect = true;
+   }
+}
+
 /**
  * 被collect2.c的do_link调用
  * 判断是不是编译aet
@@ -1072,39 +1198,56 @@ char **aet_collect(const char *prog,char **ld_argv,const char *atsuffix)
    unsigned long long maxtime = 0;
    char *objectRootPath = NULL;
    bool useMtcs = false;
+   FillData data;
    while(ld_argv[i]!=(char*)0){
       char *arg=ld_argv[i];
       if(endswith(arg,".o")){
-         char newfile[256];
-         sprintf(newfile,"%s.collect.o",arg);//来自middlefile.c中的saveFile
-         bool haveCollect=false;
-         if(!file_exists(newfile)){
-            sprintf(newfile,"%s.mtcs_collect.o",arg);
-            if(file_exists(newfile)){
-               haveCollect = true;
-               useMtcs = true;
+         memset(&data,0,sizeof(FillData));
+         fillData(arg,&data);
+         if(!data.haveCollect){
+            //从section找 .section .aetprog,
+            char *objfile = extract_aet_content_safe(arg);
+            if(objfile!=NULL){
+               //printf("找到了数据----%s %s\n",arg,objfile);
+               memset(&data,0,sizeof(FillData));
+               fillData(objfile,&data);
             }
-         }else{
-            haveCollect = true;
          }
-         if(haveCollect){
-            strcat(buffer,newfile);
+
+         if(data.haveCollect){
+            strcat(buffer,data.newfile);
             strcat(buffer,"\n");
-            unsigned long long lasttime =  getLastModified(newfile);
+            if(data.useMtcs)
+               useMtcs = true;
+            unsigned long long lasttime =  getLastModified(data.newfile);
             if(lasttime>maxtime)
                maxtime = lasttime;
-            if(!objectRootPath)
-               objectRootPath =  getObjRootPath(arg);
+            if(!objectRootPath){
+               //取第一个.o的路径作为对象路径。
+               //不能用/temp目录否则在编译中间文件temp_func_track_45时报错：
+              // Assembler messages:
+              //错误： can't open /tmp/xxx.s for reading: 没有那个文件或目录
+               char *path = get_full_path(data.newfile);
+               if(!path){
+                  fatal_error (input_location, "取文件的路径失败:%qs",data.newfile);
+               }
+               if(!endswith(path,"/")){
+                  char temp[256];
+                  sprintf(temp,"%s/",path);
+                  objectRootPath = xstrdup(temp);
+                  free(path);
+               }else{
+                  objectRootPath = path;//get_full_path(data.newfile);// getObjRootPath(arg);
+               }
+            }
             count++;
          }
       }
       i++;
    }
+
    if (count > 0){
       int target = isSoOrStaticTarget();
-      //取第一个.o的路径作为对象路径。
-      if(objectRootPath==NULL)
-         objectRootPath=xstrdup("/temp/");
       char *gcc=c_file_name;
       //1.生成所需要的库文件
       collectUseLibFile(prog,ld_argv, atsuffix,objectRootPath,useMtcs);

@@ -69,9 +69,9 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 
 static void makefileParmInit(MakefileParm *self)
 {
-	self->bufferFiles=n_ptr_array_new();
-	self->objectFile=NULL;
-	self->gccRootPath=NULL;
+   self->bufferFiles=n_ptr_array_new();
+   self->objectFile=NULL;
+   self->gccRootPath=NULL;
 }
 
 static char *getRootObjectPathOrObjectFile(char *src,char *dest,nboolean needRootPath)
@@ -141,9 +141,9 @@ static char *getRootObjectPathOrObjectFile(char *src,char *dest,nboolean needRoo
       char *sn=n_file_get_name(sp);
       char *dn=n_file_get_name(dp);
       if(strcmp(sn,dn)){
-         //		  printf("文件不相同了:%s %s\n",sn,dn);
-         //		  printf("文件不相同了 is :%p %p %s %s\n",sp,dp,n_file_get_absolute_path(sroot),n_file_get_absolute_path(droot));
-         //		  printf("文件不相同了 xx is :%p %p %s %s\n",sp,dp,n_file_get_absolute_path(sp),n_file_get_absolute_path(dp));
+         //      printf("文件不相同了:%s %s\n",sn,dn);
+         //      printf("文件不相同了 is :%p %p %s %s\n",sp,dp,n_file_get_absolute_path(sroot),n_file_get_absolute_path(droot));
+         //      printf("文件不相同了 xx is :%p %p %s %s\n",sp,dp,n_file_get_absolute_path(sp),n_file_get_absolute_path(dp));
          char *objectRootPath=n_strdup(n_file_get_absolute_path(dp));
          n_file_unref(sp);
          n_file_unref(dp);
@@ -155,9 +155,9 @@ static char *getRootObjectPathOrObjectFile(char *src,char *dest,nboolean needRoo
             return objectFile;
          }
       }else{
-         //		  printf("文件相同了:%s %s\n",sn,dn);
-         //		  printf("文件相同了 is :%p %p %s %s\n",sp,dp,n_file_get_absolute_path(sroot),n_file_get_absolute_path(droot));
-         //		  printf("文件相同了 xx is :%p %p %s %s\n",sp,dp,n_file_get_absolute_path(sp),n_file_get_absolute_path(dp));
+         //      printf("文件相同了:%s %s\n",sn,dn);
+         //      printf("文件相同了 is :%p %p %s %s\n",sp,dp,n_file_get_absolute_path(sroot),n_file_get_absolute_path(droot));
+         //      printf("文件相同了 xx is :%p %p %s %s\n",sp,dp,n_file_get_absolute_path(sp),n_file_get_absolute_path(dp));
          ;
       }
       if(sroot){
@@ -210,31 +210,31 @@ static cpp_buffer* getCompileFileBuffer(cpp_buffer *buffer)
  */
 static void initSecondCompileParm(MakefileParm *self)
 {
-	int i;
-	for(i=0;i<save_decoded_options_count;i++){
-		struct cl_decoded_option item=save_decoded_options[i];
-		if(item.arg){
-			char *argv=item.arg;
-		    if(strlen(argv)>strlen(MAKEFILE_PREFIX) && argv[0]=='-' && argv[1]=='D' && strstr(argv,MAKEFILE_PREFIX)){
-		    	//printf("initMakefileParm00--ddd----%s\n",argv);
-		    	self->isSecondCompile=TRUE;
-			   break;
-		   }
-		}
-		if(item.orig_option_with_args_text){
-			char *argv=item.orig_option_with_args_text;
-			if(strlen(argv)>strlen(MAKEFILE_PREFIX) && argv[0]=='-' && argv[1]=='D' && strstr(argv,MAKEFILE_PREFIX)){
-		    	if(strstr(argv,"nclcompilefile")){ //aetcollect.c中加入的块函数文件。
-	            char *file=strstr(argv,"nclcompilefile")+strlen("nclcompilefile");
-	            n_debug("makefileparm.c 加入要编译的泛型文件 %s\n",file);
+   int i;
+   for(i=0;i<save_decoded_options_count;i++){
+      struct cl_decoded_option item=save_decoded_options[i];
+      if(item.arg){
+         char *argv=item.arg;
+          if(strlen(argv)>strlen(MAKEFILE_PREFIX) && argv[0]=='-' && argv[1]=='D' && strstr(argv,MAKEFILE_PREFIX)){
+            //printf("initMakefileParm00--ddd----%s\n",argv);
+            self->isSecondCompile=TRUE;
+            break;
+         }
+      }
+      if(item.orig_option_with_args_text){
+         char *argv=item.orig_option_with_args_text;
+         if(strlen(argv)>strlen(MAKEFILE_PREFIX) && argv[0]=='-' && argv[1]=='D' && strstr(argv,MAKEFILE_PREFIX)){
+            if(strstr(argv,"nclcompilefile")){ //aetcollect.c中加入的块函数文件。
+               char *file=strstr(argv,"nclcompilefile")+strlen("nclcompilefile");
+               n_debug("makefileparm.c 加入要编译的泛型文件 %s\n",file);
                self->compileFileName=n_strdup(file);
-		    	}
-		    	self->isSecondCompile=TRUE;
-		    	makefile_parm_insert_block_func_codes(self);
-			   break;
-			}
-		}
-	}
+            }
+            self->isSecondCompile=TRUE;
+            makefile_parm_insert_block_func_codes(self);
+            break;
+         }
+      }
+   }
 }
 
 #define AETPROG_PREFIX "-Faetprog"
@@ -352,7 +352,6 @@ char  *makefile_parm_get_object_file(MakefileParm *self)
          if(dotOFile)
             break;
       }
-     // printf("makefile_parm_get_object_file 00 %s\n",dotOFile);
       if(dotOFile!=NULL)
          self->objectFile= dotOFile;
       else{
@@ -371,8 +370,6 @@ char  *makefile_parm_get_object_file(MakefileParm *self)
                snprintf(dotOFile, 512, "%s.o", base);
             }
             self->objectFile= dotOFile;
-            //printf("makefile_parm_get_object_file 11 %s\n",dotOFile);
-
          }else
             n_error("没有找到编译文件的输出.o文件,报告此错误。 %s\n",fileName);
       }
@@ -406,25 +403,25 @@ void makefile_parm_append_d_file(MakefileParm *self)
 {
    char *dfile=getDFile(self);
    if(dfile==NULL)
-	   return;
+      return;
 
    NPtrArray *sysNameArray=NULL;//generic_expand_get_ref_block_class_name(generic_expand_get());
    if(sysNameArray==NULL)
-	   return;
+      return;
    if(sysNameArray->len==0){
-	   n_ptr_array_unref(sysNameArray);
-	   return;
+      n_ptr_array_unref(sysNameArray);
+      return;
    }
    cpp_reader *pfile=parse_in;
    int i;
    int count=0;
    char *files[sysNameArray->len];
    for(i=0;i<sysNameArray->len;i++){
-	   char *sysName=n_ptr_array_index(sysNameArray,i);
-	   char *fileName=NULL;//generic_file_get_file_class_located(generic_file_get(),sysName);
-	   if(fileName!=NULL){
-		      deps_add_dep(pfile->deps,fileName);
-	   }
+      char *sysName=n_ptr_array_index(sysNameArray,i);
+      char *fileName=NULL;//generic_file_get_file_class_located(generic_file_get(),sysName);
+      if(fileName!=NULL){
+            deps_add_dep(pfile->deps,fileName);
+      }
    }
    n_ptr_array_unref(sysNameArray);
 }
@@ -479,7 +476,6 @@ const char *makefile_parm_get_aet_include_path(MakefileParm *self)
    n_file_unref(file);
    return aetinclude;
 }
-
 
 /**
  * 如果调用了makefileparm说明编译的是aet相关的源文件

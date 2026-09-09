@@ -360,9 +360,9 @@ static void removeIfaceFromLib(NPtrArray *ifaceDataArray)
          n_error("库中实现文件:%s中的接口并不完整。",item->file);
       }
       if(equal!=0 && equal==item->count){
-           printf("接口%s在库中已实现，不需要文件:%s再实现了。item->count:%d\n",item->sysName,item->file,item->count);
-           n_ptr_array_remove_index(ifaceDataArray,i);
-           i--;
+        n_debug("接口%s在库中已实现，不需要文件:%s再实现了。item->count:%d\n",item->sysName,item->file,item->count);
+        n_ptr_array_remove_index(ifaceDataArray,i);
+        i--;
       }
    }
 }
@@ -379,7 +379,7 @@ static void removeLackOFileOrCFile(char *parentPath)
    char oFileSuffix[256];
    sprintf(oFileSuffix,"%s.o",IFACE_FILE_SUFFIX);
    char cFileSuffix[256];
-   sprintf(oFileSuffix,"%s.c",IFACE_FILE_SUFFIX);
+   sprintf(cFileSuffix,"%s.c",IFACE_FILE_SUFFIX);
    for(i=0;i<len;i++){
       NFile *item=n_list_nth_data(list,i);
       char *fileName=n_file_get_absolute_path(item);

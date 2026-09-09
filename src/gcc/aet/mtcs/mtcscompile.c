@@ -740,7 +740,7 @@ static void writeNote(MtcsCompile *self)
 void mtcs_compile_compile(MtcsCompile *self)
 {
    if(!self->haveMtcsFuncOrVar){
-      n_debug("mtcscompile.c mtcs_compile_compile 没有任何函数和变量，返回。target:%d\n",self->targetCount);
+      //printf("mtcscompile.c mtcs_compile_compile 没有任何函数和变量，返回。target:%d\n",self->targetCount);
       writeNote(self);//重要方法
       return;
    }
@@ -790,7 +790,6 @@ void mtcs_compile_compile(MtcsCompile *self)
    in_lto_p=old_in_lto_p;
    writeNote(self);//重要方法
 }
-
 
 static void printBBEdge (basic_block bb)
 {

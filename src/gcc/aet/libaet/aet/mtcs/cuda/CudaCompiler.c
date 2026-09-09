@@ -140,10 +140,10 @@ impl$  CudaCompiler {
    AArray<char*> *getPtxCode(char *fileName){
       a_debug("获取文件的ptx汇编代码 :%s\n",fileName);
       ElfFile *elfFile=new$ ElfFile(fileName);
-      printf("getPtxCode 00 -- fileName:%s\n",fileName);
+      //printf("getPtxCode 00 -- fileName:%s\n",fileName);
 
       AArray<char*> *ret =elfFile->getCode("cuda");
-      printf("getPtxCode 11 -- fileName:%s array:%p\n",fileName,ret);
+      //printf("getPtxCode 11 -- fileName:%s array:%p\n",fileName,ret);
       elfFile->unref();
       return ret;
    }

@@ -386,8 +386,7 @@ nboolean generic_block_match_field_and_func(GenericBlock *self,tree funcdel,tree
 		tree functype=TREE_TYPE(pointer); //得到的是function_type
 		TREE_TYPE(functype)=type;
 		printf("把field的类型改成返回值的类型 %s\n",self->name);
-		aet_print_tree(field);
-        return TRUE;
+      return TRUE;
 	}
 	if(TREE_CODE(fieldRetn)!=VOID_TYPE && expr==NULL_TREE){
 		error_at(self->startLoc,"泛型块没有返回值。%qs",self->name);

@@ -158,9 +158,7 @@ static tree convertGeneric_1(tree realGenericType,location_t ploc, tree function
    tree parmval=error_mark_node;
    tree realParmType=valtype;//实参类型
    //n_debug("convertGeneric 33 --从实参转为用户设的类型:%s\n",get_tree_code_name(TREE_CODE(realParmType)));
-   //aet_print_tree(realParmType);
    if(TREE_CODE(realGenericType)==POINTER_TYPE){
-      //n_debug("convertGeneric 44 --泛型定义是一个指针:\n");
       if(TREE_CODE(realParmType)!=POINTER_TYPE){
          inform(loc,"泛型定义为指针%qE，但实参%qE类型并不是指针。",realGenericType,realParmType);
          n_warning("泛型定义为指针，但实参类型并不是指针。");
@@ -290,7 +288,6 @@ tree generic_call_replace_parm(GenericCall *self,location_t ploc, tree function,
     tree parmval=NULL_TREE;
     nboolean isGenericType=generic_util_is_generic_pointer(type);
     n_debug("generic_call_replace_parm 22  parmnum:%d  是不是泛型:%d\n",parmnum,isGenericType);
-    aet_print_tree(type);
     if(!isGenericType){
         error_at(ploc,"不是一个泛型参数%qE",type);
         return error_mark_node;
@@ -365,7 +362,6 @@ GenericModel * generic_call_get_generic_from_component_ref(GenericCall *self,tre
       return generic;
    }else {
 	   n_warning("从componentRef找不到泛型");
-	   aet_print_tree(var);
 	   return NULL;
    }
 }
@@ -397,11 +393,9 @@ static GenericModel *getGenericDefineByCallExpr(tree expr,char **sysName)
     if(TREE_CODE(fn)==COMPONENT_REF && nargs>0){
        //第一个参数应该是self,类型是class或interface
         tree arg = CALL_EXPR_ARG (expr, 0);
-        aet_print_tree(arg);
         if(TREE_CODE(arg)==VAR_DECL || TREE_CODE(arg)==PARM_DECL || TREE_CODE(arg)==ADDR_EXPR){
         	char *className=class_util_get_class_name(TREE_TYPE(arg));
         	//printf("getGenericDefineByCallExpr 33 %s\n",className);
-        	aet_print_tree(arg);
         	if(className!=NULL){
         		GenericModel *genericDefine=c_aet_get_generics_model(arg);
         		*sysName=n_strdup(className);
@@ -451,7 +445,6 @@ tree generic_call_convert_generic_to_user(GenericCall *self,tree expr)
    if(realGen==NULL)
       return expr;
    n_debug("generic_call_convert_generic_to_user %s\n",generic_unit_tostring(realGen));
-   aet_print_tree(realGen->decl);
    if(generic_util_valid_by_str(genericStr) && generic_unit_is_undefine(realGen)){
       return expr;
    }
@@ -678,7 +671,6 @@ tree  generic_call_build_call(GenericCall *self,ClassFunc *func,GenericModel *fu
       tree stmtListx = BIND_EXPR_BODY(compound);//或者 TREE_OPERAND (compound, 1) //获取bind_expr的stmt_list;
       tree_stmt_iterator iterx = tsi_last (stmtListx);
       tsi_link_before (&iterx, call, TSI_SAME_STMT);
-      aet_print_tree(compound);
       generic_graph_add_func_call(generic_graph_get(),infos,func,atFunc,atInfo);
       return compound;
    }

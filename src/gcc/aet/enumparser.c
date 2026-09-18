@@ -211,7 +211,6 @@ void enum_parser_create_decl(EnumParser *self,location_t loc,ClassName *classNam
    set_underlying_type (decl);
    c_c_decl_bind_file_scope(decl);//放在file_scope，c_c_decl_bind_file_scope是增加的,原本没有
    finish_decl (decl, loc, NULL_TREE,NULL_TREE, NULL_TREE);
-   aet_print_tree(decl);
    data->permission=permission;
    data->typeDecl=decl;
    createOrigDecl(self,loc,data->origName);

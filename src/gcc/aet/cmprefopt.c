@@ -256,7 +256,6 @@ static nboolean isSelfOrVarCall(tree func,char **funcName,GenericModel **model,t
          }
       }
    }else{
-      aet_print_tree(func);
       n_warning("在CmpRefOpt中有不支持的类型\n");
    }
 out:
@@ -341,7 +340,6 @@ static tree link_cb (tree *tp, int *walk_subtrees, void *data)
                         mangleName,funcWithGb,IDENTIFIER_POINTER(DECL_NAME(last)));
                   vec<tree, va_gc> *parms=createParm(t);
                   tree newCallExpr = c_build_function_call_vec (EXPR_LOCATION(t), vNULL,last,parms, NULL);
-                 // aet_print_tree(newCallExpr);
                   *tp=newCallExpr;
                   release_tree_vector (parms);
                }
@@ -596,8 +594,6 @@ static nboolean isSameType(tree trueVar,ClassFunc *func,tree currentFuncDecl)
 {
     tree ret = getInitExpr(trueVar,currentFuncDecl);
     //printf("isSameType  结果是----%p\n",ret);
-    //aet_print_tree(ret);
-   // aet_print_tree(trueVar);
     tree target=NULL_TREE;
     if(ret && TREE_CODE(ret)==NOP_EXPR){
        target =TREE_OPERAND(ret,0);

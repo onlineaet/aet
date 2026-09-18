@@ -526,18 +526,20 @@ struct c_expr  block_mgr_parser(BlockMgr *self)
    location_t startLoc=c_parser_peek_token (parser)->location;
    NString *body=n_string_new("");
    aet_print_token(c_parser_peek_token (parser));
+   printf("获取泛型块源代码\n");
    c_parser_skip_to_end_of_block_or_statement(parser,body);
    n_string_append(body,"\n");
    location_t endLoc=c_parser_peek_token (parser)->location;
-   aet_print_token(c_parser_peek_token (parser));
+   //aet_print_token(c_parser_peek_token (parser));
    //c_parser_skip_until_found (parser, CPP_SEMICOLON, "expected %<;%>");//加这句话 int gen=genericblock(){};出问题，但genericblock(){};不会
-   aet_print_token(c_parser_peek_token (parser));
-   char *body1=getBlockFromSourceCodes(startLoc,endLoc);
-   n_debug("block body 两种不同的源代码:%s\n 第二种： %s",body->str,body1);
+   //aet_print_token(c_parser_peek_token (parser));
+   //char *body1=getBlockFromSourceCodes(startLoc,endLoc);
+  // n_debug("block body 两种不同的源代码:%s\n 第二种： %s",body->str,body1);
    NString  *bodys=n_string_substring(body,1);//去除{
    n_string_free(body,TRUE);
    body=bodys;
    //生成名字和参数
+   printf("获取泛型块源代码 11 %s\n",body->str);
 
    GenericInfo *ginfo=getInfoAndCreate(self,className);
    GenericBlock *block=generic_info_add_block(ginfo,self->lhs,exprlist,
@@ -551,7 +553,7 @@ struct c_expr  block_mgr_parser(BlockMgr *self)
    //(2)泛型函数(*(setData_1_typedecl)self->_gen_blocks_array_897[0])(self,5);
    tree value=  generic_block_get_call(block);
    n_string_free(body,TRUE);
-   n_free(body1);
+   //n_free(body1);
    block_mgr_set_lhs(self,NULL_TREE);
    ret.value= value;
    set_c_expr_source_range (&ret, startLoc,endLoc);

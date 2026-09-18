@@ -265,7 +265,6 @@ tree generic_impl_create_generic_info_array_field(GenericImpl *self,ClassName *c
    unsigned HOST_WIDE_INT w;
    w=genericCount;
    tree indextype= build_index_type (build_int_cst (integer_type_node, w));
-   aet_print_tree(indextype);
    tree genericInfo=lookup_name(aet_utils_create_ident(AET_GENERIC_INFO_STRUCT_NAME));
    if(!aet_utils_valid_tree(genericInfo)){
       error("没找到aet_generic_info结构体，检查是否包含了头文件。");
@@ -953,7 +952,8 @@ void  generic_impl_check_and_set_func(GenericImpl *self,tree fndecl,GenericModel
 
 GenericModel *generic_impl_pop_generic_from_declspecs(GenericImpl *self,struct c_declspecs *specs)
 {
-   n_debug("generic_impl_pop_generic_from_declspecs 00 %p %p %d\n",specs,self->currentModelOfSpecs.specs,self->currentModelOfSpecs.specs==specs);
+   n_debug("generic_impl_pop_generic_from_declspecs 00 %p %p %d\n",
+         specs,self->currentModelOfSpecs.specs,self->currentModelOfSpecs.specs==specs);
    if(self->currentModelOfSpecs.specs && self->currentModelOfSpecs.specs==specs){
       GenericModel *ret=self->currentModelOfSpecs.genericModel;
       self->currentModelOfSpecs.genericModel=NULL;

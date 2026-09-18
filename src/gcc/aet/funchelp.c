@@ -416,7 +416,6 @@ tree  func_help_create_parent_deref(FuncHelp *self,tree func,ClassName *parent,t
              tree datum=build_indirect_ref (loc,castParent,RO_ARROW);
              componentRef= build_component_ref (loc, datum,DECL_NAME(parentField), loc,UNKNOWN_LOCATION);
              *firstParm=(hasNamelessCall==0)?castParent:null_pointer_node;
-             //aet_print_tree(componentRef);
          }else{
                char *sysName=class_util_get_class_name(valueType);
                ClassInfo *info=class_mgr_get_class_info(class_mgr_get(),sysName);

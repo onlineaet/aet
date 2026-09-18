@@ -289,22 +289,6 @@ static void testGenericTypeOf(GenericParser *self)
    aet_print_token_in_parser("在测试泛型块中testGenericOf xxxx----");
 }
 
-///////////////////////新版-------------------------
-static Directive **cloneDirective(GenericParser *self)
-{
-   int i;
-   Directive **dest=xmalloc(sizeof(Directive *)*self->directiveCount);
-   for(i=0;i<self->directiveCount;i++){
-      Directive *src = self->directives[i];
-      Directive *item=n_slice_new(Directive);
-      item->declName = n_strdup(src->declName);
-      item->defineTypeName = n_strdup(src->defineTypeName);
-      item->pointerCount = src->pointerCount;
-      item->size = src->size;
-      dest[i] = item;
-   }
-   return dest;
-}
 
 static void freeDirectives(GenericParser *self)
 {
@@ -500,6 +484,7 @@ static int getDirective(GenericParser *self,tree componentRef,int *fieldPointer)
 {
    int pointer=0;
    const char *str = aet_utils_get_const_type_string(componentRef,&pointer);
+   n_debug("getDirective ---- %s\n",str);
    if(!str)
       return -1;
    //str是 aet_generic_E
@@ -1408,10 +1393,6 @@ static tree convert_EP_EP_COMPONENT_REF(tree compref,tree trueType,tree rhsType)
    //3.再做间接引用，得到 int * (int**)queue --> *((int**)queue)
    //也可用 tree result = build1 (INDIRECT_REF, build_pointer_type (trueType), casted);
    tree result   = build_fold_indirect_ref (casted);    // *((int **)queue)
-   //4.转lhs类型
-   //if(lhsType && POINTER_TYPE_P(lhsType))
-   //  result = fold_convert(lhsType, result);
-   aet_print_tree(result);
    return result;
 }
 
@@ -1471,7 +1452,6 @@ static tree convert_E_E_INDIRECT_REF(tree indirect,tree trueType,tree rhsType)
       tree result = build1 (INDIRECT_REF, trueType, casted);
       // 也可以写成：
       // tree result = build_fold_indirect_ref (casted);
-      aet_print_tree(result);
       return result;
    }else{
       aet_print_tree_skip_debug(indirect);
@@ -1533,7 +1513,6 @@ static tree convert_EP_E_INDIRECT_REF(tree indirect,tree trueType,tree rhsType)
       tree result = build1 (INDIRECT_REF, trueType, casted);
       // 也可以写成：
       // tree result = build_fold_indirect_ref (casted);
-      aet_print_tree(result);
       return result;
    }else{
       aet_print_tree_skip_debug(indirect);
@@ -1574,6 +1553,7 @@ static tree convertLhs(GenericParser *self,tree lhs,tree rhs,tree rhsType)
    n_debug("convertLhs--- 泛型索引值:%d fieldPointerLhs:%d\n",p1,fieldPointerLhs);
    if(p1<0)
       return lhs;
+
    Directive *directive=(Directive *)self->directives[p1];
    if(TREE_CODE(lhs)==COMPONENT_REF)
      lhs = castComponentRef(directive->defineTypeName,directive->pointerCount,lhs,fieldPointerLhs,rhs,rhsType);
@@ -1591,8 +1571,6 @@ void generic_parser_modify(GenericParser *self,tree *mlhs,tree *mrhs)
    tree rhs = *mrhs;
    tree newlhs = lhs;
    tree newrhs = rhs;
-   n_debug("generic_parser_modify --- 00\n");
-   aet_print_tree(lhs);
    newlhs = convertLhs(self,lhs,rhs,TREE_TYPE(rhs));
    if(lhs==newlhs){
       //如果左值没改变，可以判断右值
@@ -1713,7 +1691,6 @@ static tree convert_E_E_INDIRECT_REF_RHS(tree indirect,tree trueType,tree lhsTyp
          tree result = fold_build2(POINTER_PLUS_EXPR, trueTypePointer, base, offset);
          // 4. 转成最终返回的 void*
          result = fold_convert(lhsType, result);
-         aet_print_tree(result);
          return result;
       }else{
          tree result = build_array_ref (EXPR_LOCATION (indirect), base, index);
@@ -1847,7 +1824,6 @@ static tree convert_EP_E_INDIRECT_REF_RHS(tree indirect,tree trueType,tree lhsTy
        result = build1 (INDIRECT_REF, trueType, casted);
       // 也可以写成：
       // tree result = build_fold_indirect_ref (casted);
-      aet_print_tree(result);
       return result;
    }else{
       aet_print_tree_skip_debug(indirect);
@@ -1887,8 +1863,6 @@ static tree convert_EP_EP_INDIRECT_REF_RHS(tree indirect,tree trueType,tree lhsT
       tree trueTypePointer = build_pointer_type (trueType);
       trueTypePointer = build_pointer_type (trueTypePointer);
       tree new_base = fold_convert (trueTypePointer, base);
-      aet_print_tree(index);
-
       // build_array_ref 已经返回 trueType 类型的左值（即 queue[index]）
       tree result = build_array_ref (EXPR_LOCATION (compref), new_base, index);
 
@@ -1916,7 +1890,6 @@ static tree convert_EP_EP_INDIRECT_REF_RHS(tree indirect,tree trueType,tree lhsT
       //4.转lhs类型
       if(lhsType && POINTER_TYPE_P(lhsType))
          result = fold_convert(lhsType, result);
-      aet_print_tree(result);
       return result;
    }else{
       aet_print_tree_skip_debug(indirect);
@@ -1951,36 +1924,40 @@ static tree castIndirectRefRhs(char *trueTypeName,int truePointer,tree indirectr
  */
 static tree convertRhs(GenericParser *self,tree rhs,tree lhsType)
 {
-   if(TREE_CODE(rhs)!=COMPONENT_REF && TREE_CODE(rhs)!=INDIRECT_REF)
+   if(TREE_CODE(rhs)!=COMPONENT_REF && TREE_CODE(rhs)!=INDIRECT_REF && TREE_CODE(rhs)!=VAR_DECL)
       return rhs;
    tree compref = rhs;
    if(TREE_CODE(rhs)==INDIRECT_REF)
       compref = TREE_OPERAND(rhs,0);
    if(TREE_CODE(compref)==POINTER_PLUS_EXPR)
       compref = TREE_OPERAND(compref,0);
-   int fieldPointerLhs = 0;
-   int p1 = getDirective(self,compref,&fieldPointerLhs);
-   n_debug("convertLhs--- 泛型索引值:%d fieldPointerLhs:%d\n",p1,fieldPointerLhs);
+   if(TREE_CODE(rhs)==VAR_DECL)
+      compref = rhs;
+   int fieldPointerRhs = 0;
+   int p1 = getDirective(self,compref,&fieldPointerRhs);
+   n_debug("convertRhs--- 泛型索引值:%d fieldPointerLhs:%d\n",p1,fieldPointerRhs);
    if(p1<0)
       return rhs;
+
    Directive *directive=(Directive *)self->directives[p1];
    if(TREE_CODE(rhs)==COMPONENT_REF)
-      rhs = castComponentRefRhs(directive->defineTypeName,directive->pointerCount,rhs,fieldPointerLhs,lhsType);
+      rhs = castComponentRefRhs(directive->defineTypeName,directive->pointerCount,rhs,fieldPointerRhs,lhsType);
    else
-      rhs = castIndirectRefRhs(directive->defineTypeName,directive->pointerCount,rhs,fieldPointerLhs,lhsType);
+      rhs = castIndirectRefRhs(directive->defineTypeName,directive->pointerCount,rhs,fieldPointerRhs,lhsType);
    return rhs;
 }
 
 
 //判断返回表达式是否需要转化
-void generic_parser_return (GenericParser *self,tree *expr)
+tree generic_parser_return (GenericParser *self,tree expr)
 {
    if(!atCompileGenericBlock(self) || !expr)
-       return;
-   tree rhs = *expr;
+       return expr;
+   tree rhs = expr;
    tree type = TREE_TYPE(TREE_TYPE(current_function_decl));
+   n_debug("generic_parser_return 00\n");
    tree newrhs = convertRhs(self,rhs,type);
-   *expr = newrhs;
+   return newrhs;
 }
 
 /**

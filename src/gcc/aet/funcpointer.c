@@ -543,8 +543,6 @@ static tree catchCtorFuncPointer(FuncPointerCall *item,ClassFunc *func,int pos)
          //找出泛型参数声明是第几个 得到了传给类中final$ funcpointer的实参
          //比较调用的构造函数的引用的泛型定义与item中的dirtive是否相同
          tree funcpointer = CALL_EXPR_ARG(call, pos);
-         aet_print_tree(call);
-         aet_print_tree(funcpointer);
          GenericModel *m1=c_aet_get_generics_model(indirect);
          if(m1==NULL)
             m1=c_aet_get_generics_model(TREE_OPERAND(indirect,0));
@@ -603,7 +601,6 @@ void func_pointer_add(FuncPointer *self,tree call)
       //E tysw = 5;
       //lastcompare(&a,&tysw);
       tree init = DECL_INITIAL(fn);
-      aet_print_tree(init);
       if(!init)
          return ;
       if(!(TREE_CODE(init)==NOP_EXPR && TREE_CODE(TREE_OPERAND(init,0))==COMPONENT_REF))

@@ -658,7 +658,6 @@ static void checkVarSize(MtcsParser *self,tree decl,nboolean finishDecl)
     if(!finishDecl)
        return;
     n_debug("mtcsparser.c checkVarSize 00 检查变量大小\n");
-    aet_print_tree(decl);
     tree type=TREE_TYPE(decl);
     if(TREE_CODE(type)==ARRAY_TYPE){
        tree arrayType = TREE_TYPE (type);
@@ -791,7 +790,6 @@ void mtcs_parser_check(MtcsParser *self,tree decl,nboolean finishDecl)
          //记录局部变量是 shared managed constant 可能提升为全局变量
          bool vmP=variably_modified_type_p (TREE_TYPE (decl), current_function_decl);
          n_debug("mtcsparser.c 声明是一个共享变量并在mtcs函数内 是局部变量，可能要提升。类型是:%d vmP:%d\n",type,vmP);
-         aet_print_tree(decl);
          if(vmP){
             //大多数情况不能提升,特别处理类型是 ARRAY_TYPE
             nboolean ret=FALSE;

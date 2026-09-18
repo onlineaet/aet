@@ -268,7 +268,6 @@ tree mtcs_builtin_tree_parser(MtcsBuiltinTree *self,location_t loc,tree id)
                   tree call = createDimCall(self,loc,self->builtinVars[i].region,pos);
                   n_debug("mtcsbuiltintree.c 解析 name:%s pos:%s 内置变量转成函数调用了。region:%d pos(x,y,z):%d\n",
                         name,str,self->builtinVars[i].region,pos);
-                  aet_print_tree(call);
                   return call;
                }
             }

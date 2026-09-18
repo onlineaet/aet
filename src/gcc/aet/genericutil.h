@@ -30,7 +30,7 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 nboolean    generic_util_is_generic_ident(char *name);
 nboolean    generic_util_is_generic_pointer(tree type);
 int         generic_util_get_generic_type(tree type);
-tree        generic_util_get_generic_type_by_str(const char *genericStr);
+tree        generic_util_get_type_by_decl_string(const char *genericStr);
 //返回 E F泛型声明字符串，genericStr = aet_generic_E
 const char *generic_util_get_generic_decl_string(char *genericStr);
 const char *generic_util_get_generic_decl_string(tree type);
@@ -40,12 +40,12 @@ char       *generic_util_create_block_func_name(char *sysName,int index);
 
 static   inline nboolean  generic_util_valid_by_str(char *str)
 {
-      if(str==NULL || strlen(str)!=1 )
-        return FALSE;
-      char min='A';
-      char max='Z';
-      char v=str[0];
-      return (v>=min && v<=max);
+   if(str==NULL || strlen(str)!=1 )
+      return FALSE;
+   char min='A';
+   char max='Z';
+   char v=str[0];
+   return (v>=min && v<=max);
 }
 
 
@@ -85,7 +85,7 @@ char   *generic_util_sys_name_from_block_func(char *funcName);
 //用类型名和指针数创建块函数的前缀
 static inline void   generic_unit_create_block_func_prefix(char *typeName,int pointerCount,char *buffer)
 {
-     sprintf(buffer,"_%s_%d",typeName,pointerCount);
+   sprintf(buffer,"_%s_%d",typeName,pointerCount);
 }
 
 /**
@@ -101,9 +101,9 @@ nboolean generic_util_start_with_generic(char *str);
 const char * generic_util_get_start_with_generic(char *str);
 
 //如果参数是泛型类型，需要改变为新的名字
-char *generic_util_create_param_new_name(char *origName);
+char   *generic_util_create_param_new_name(char *origName);
 //_aetGenNewParamPrefix_atcs取出原来的名字
-char *generic_util_get_block_orig_param_name(char *newName);
+char   *generic_util_get_block_orig_param_name(char *newName);
 /**
  * 判断是不是泛型块函数
  */

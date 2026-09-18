@@ -498,8 +498,6 @@ static void createParentSuperVar(SuperCall *self,location_t loc,ClassName *class
          tree dataType=long_unsigned_type_node;
          tree type = build_array_type (dataType,build_index_type (size_int (2000)));//先设一个大小，在初始化时再改
          decl =buildSuperVar(loc,varName,type);
-         printf("创建 _superDeviceAddressArray--- :%s\n",varName);
-         aet_print_tree(decl);
          DECL_ATTRIBUTES (decl) = tree_cons (get_identifier ("managed"), NULL, DECL_ATTRIBUTES (decl));
          DECL_PRESERVE_P (decl) = 1;
          TREE_USED(decl)=1;
@@ -623,7 +621,6 @@ tree super_call_replace_super_call(SuperCall *self,location_t expr_loc,tree expr
    }
 
    n_debug("supercall 在本类创建三个接收父类方法的变量:本类:%s toFunc:%s\n",currentClassName->sysName,toFunc->mangleFunName);
-   aet_print_tree(exprValue);
    tree typeDecl=createTypeDecl(toFunc->className,toFunc);
    struct c_expr expr;
    if(!class_func_is_mtcs(toFunc)){

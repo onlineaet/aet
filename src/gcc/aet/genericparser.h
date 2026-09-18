@@ -99,7 +99,7 @@ void        generic_parser_modify(GenericParser *self,tree *mlhs,tree *mrhs);
 void        generic_parser_parm(GenericParser *self,vec<tree, va_gc> *params, vec<tree, va_gc> *origtypes);
 tree        generic_parser_initializer(GenericParser *self,tree decl,tree init);
 void        generic_parser_binary_op(GenericParser *self,enum tree_code code,tree *lhs,tree *rhs);
-void        generic_parser_return (GenericParser *self,tree *expr);
+tree        generic_parser_return (GenericParser *self,tree expr);
 
 void        generic_parser_record_const_decl(GenericParser *self,location_t loc,tree id,tree ref);
 //新加匹配读取fwgb内容

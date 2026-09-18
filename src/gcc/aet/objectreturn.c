@@ -598,66 +598,6 @@ static int aggregate_value_class(const_tree exp, const_tree fntype)
    return 0;
 }
 
-static void  build_return_expr (ObjectReturn *self,tree ret_obj, tree ret_val)
-{
-   if (ret_val){
-      /* The gimplifier explicitly enforces the following invariant:
-
-      RETURN_EXPR
-      |
-      INIT_EXPR
-      /        \
-      /          \
-      RET_OBJ        ...
-
-      As a consequence, type consistency dictates that we use the type
-      of the RET_OBJ as the operation type.  */
-      tree operation_type = TREE_TYPE (ret_obj);
-      tree old=ret_val;
-      /* Convert the right operand to the operation type.  Note that this is
-      the transformation applied in the INIT_EXPR case of build_binary_op,
-      with the assumption that the type cannot involve a placeholder.  */
-      if (operation_type != TREE_TYPE (ret_val)){
-         n_debug("build_return_expr 00 operation_type != TREE_TYPE (ret_val)");
-         ret_val = convert (operation_type, ret_val);
-      }
-
-      /* We always can use an INIT_EXPR for the return object.  */
-      /* If the function returns an aggregate type, find out whether this is
-      a candidate for Named Return Value.  If so, record it.  Otherwise,
-      if this is an expression of some kind, record it elsewhere.  */
-      if (AGGREGATE_TYPE_P (operation_type)
-            && aggregate_value_class (operation_type, current_function_decl)){
-         /* Strip useless conversions around the return value.  */
-         if (gnat_useless_type_conversion (ret_val))
-            ret_val = TREE_OPERAND (ret_val, 0);
-         /* Now apply the test to the return value.  */
-         if (return_value_ok_for_nrv_p (ret_obj, ret_val)){
-            n_debug("加入的返回值是class对象变量 ，并且是一个可以优化的变量00 \
-                  Id:%d ret_val:%p old:%p current_function_decl:%p",
-                  DECL_UID (ret_val),ret_val,old,current_function_decl);
-            DataReturn *data=getDataReturn(self,current_function_decl);
-            if(data==NULL)
-               data=addDataReturn(self,current_function_decl);
-            bitmap_set_bit (data->named_ret_val, DECL_UID (ret_val));
-         }else if (EXPR_P (ret_val)){
-            /* Note that we need not care about CONSTRUCTORs here, as they are
-            totally transparent given the read-compose-write semantics of
-            assignments from CONSTRUCTORs.  */
-            n_debug("加入的返回值是class对象变量 ，但不是一个变量11，可以是一个target表达式 \
-                  ret_val:%p old:%p current_function_decl:%p\n",
-                  ret_val,old,current_function_decl);
-            DataReturn *data=getDataReturn(self,current_function_decl);
-            if(data==NULL){
-               data=addDataReturn(self,current_function_decl);
-            }
-            vec_safe_push (data->other_ret_val, ret_val);
-         }
-      }
-   }
-}
-
-
 static tree getClearup(tree decl)
 {
    tree attr = lookup_attribute ("cleanup", DECL_ATTRIBUTES (decl));
@@ -833,7 +773,6 @@ static tree readyCleanup_cb (tree *tp, int *walk_subtrees, void *data)
 	  if(is0 && is1){
 		  if (TREE_CODE (rhs)==CALL_EXPR){
 			   n_debug("变量声明是一个类对象。并且被函数调用赋值。");
-			   aet_print_tree(t);
 			   n_ptr_array_add(dp->dataArray,lhs);
 		  }
 	  }
@@ -917,10 +856,64 @@ void  object_return_finish_function(ObjectReturn *self,tree fndecl)
    }
 }
 
-void object_return_add_return(ObjectReturn *self,tree retExpr)
+void object_return_add_return(ObjectReturn *self,tree ret_val)
 {
-    tree  decl = DECL_RESULT (current_function_decl);
-    build_return_expr(self,decl,retExpr);
+   tree  ret_obj = DECL_RESULT (current_function_decl);
+   if (ret_val){
+      /* The gimplifier explicitly enforces the following invariant:
+
+      RETURN_EXPR
+      |
+      INIT_EXPR
+      /        \
+      /          \
+      RET_OBJ        ...
+
+      As a consequence, type consistency dictates that we use the type
+      of the RET_OBJ as the operation type.  */
+      tree operation_type = TREE_TYPE (ret_obj);
+      tree old=ret_val;
+      /* Convert the right operand to the operation type.  Note that this is
+      the transformation applied in the INIT_EXPR case of build_binary_op,
+      with the assumption that the type cannot involve a placeholder.  */
+      if (operation_type != TREE_TYPE (ret_val)){
+         n_debug("build_return_expr 00 operation_type != TREE_TYPE (ret_val)");
+         ret_val = convert (operation_type, ret_val);
+      }
+
+      /* We always can use an INIT_EXPR for the return object.  */
+      /* If the function returns an aggregate type, find out whether this is
+      a candidate for Named Return Value.  If so, record it.  Otherwise,
+      if this is an expression of some kind, record it elsewhere.  */
+      if (AGGREGATE_TYPE_P (operation_type)
+      && aggregate_value_class (operation_type, current_function_decl)){
+         /* Strip useless conversions around the return value.  */
+         if (gnat_useless_type_conversion (ret_val))
+            ret_val = TREE_OPERAND (ret_val, 0);
+         /* Now apply the test to the return value.  */
+         if (return_value_ok_for_nrv_p (ret_obj, ret_val)){
+         n_debug("加入的返回值是class对象变量 ，并且是一个可以优化的变量00 \
+         Id:%d ret_val:%p old:%p current_function_decl:%p",
+         DECL_UID (ret_val),ret_val,old,current_function_decl);
+         DataReturn *data=getDataReturn(self,current_function_decl);
+         if(data==NULL)
+            data=addDataReturn(self,current_function_decl);
+            bitmap_set_bit (data->named_ret_val, DECL_UID (ret_val));
+         }else if (EXPR_P (ret_val)){
+            /* Note that we need not care about CONSTRUCTORs here, as they are
+            totally transparent given the read-compose-write semantics of
+            assignments from CONSTRUCTORs.  */
+            n_debug("加入的返回值是class对象变量 ，但不是一个变量11，可以是一个target表达式 \
+            ret_val:%p old:%p current_function_decl:%p\n",
+            ret_val,old,current_function_decl);
+            DataReturn *data=getDataReturn(self,current_function_decl);
+            if(data==NULL){
+               data=addDataReturn(self,current_function_decl);
+            }
+            vec_safe_push (data->other_ret_val, ret_val);
+         }
+      }
+   }
 }
 
 /**
@@ -966,10 +959,8 @@ static bool expr_is_pointer_p (tree expr)
    if (!type || type == error_mark_node)
       return false;
 
-   /* 去掉 typedef 糖衣 */
    type = TYPE_MAIN_VARIANT (type);
    n_debug("expr_is_pointer_p 00\n");
-   aet_print_tree(type);
    return POINTER_TYPE_P (type);
 }
 
@@ -1150,7 +1141,6 @@ tree object_return_convert_block(ObjectReturn *self,tree expr)
    /* 再正常结束 return，返回 &tls_var */
    tree addr = build_fold_addr_expr (tlsvar);
    tree trueType = lookup_name (get_identifier (trueTypeName));
-   aet_print_tree(trueType);
    if (trueType == NULL_TREE)
       trueType = integer_type_node; /* 或报错 */
    if (TREE_CODE (trueType) == TYPE_DECL)

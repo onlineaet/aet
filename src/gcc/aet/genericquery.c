@@ -485,12 +485,9 @@ static nboolean have_query_by_declarator(struct c_declarator *declarator)
     nboolean find=FALSE;
     for (parm = args; parm; parm = DECL_CHAIN (parm)){
         //printf("have_query_by_declarator ----\n");
-        //aet_print_tree(parm);
         GenericModel *gen=c_aet_get_generics_model(parm);
         if(gen && count>0){ //跳过self
             //printf("找到带有问号作为参数的函数了:%d\n",count);
-            //aet_print_tree(parm);
-            //aet_print_tree(gen);
             find=generic_model_have_query(gen);
             if(find)
               break;
@@ -850,7 +847,6 @@ void  generic_query_check_var_and_parm(GenericQuery *self,tree decl,tree initOrR
        GenericModel *rhsModel=c_aet_get_generics_model(last);//声明的返回值泛型
        n_debug("generic_query_check_var_and_parm 11 变量:%s的泛型声明是:%s initOrRhs:%s rhsModel:%p\n",
                          name,generic_model_tostring(lhsModel),get_tree_code_name(TREE_CODE(initOrRhs)),rhsModel);
-       aet_print_tree(last);
        if(rhsModel==NULL){
            if(TREE_CODE(last)==VAR_DECL || TREE_CODE(last)==PARM_DECL){
                char *sysName=class_util_get_class_name(TREE_TYPE(last));

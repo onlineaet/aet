@@ -286,7 +286,7 @@ int generic_util_get_generic_type(tree type)
 /**
  * 通过泛型声明 E 获取 aet_generic_E 类型
  */
-tree generic_util_get_generic_type_by_str(const char *genericStr)
+tree generic_util_get_type_by_decl_string(const char *genericStr)
 {
    if(!genericStr || strlen(genericStr)!=1)
       return NULL_TREE;
@@ -617,12 +617,6 @@ nboolean gneric_util_have_generic_type (tree expr)
    vec<tree> out = vNULL;
    walk_tree (&expr, find_aet_generic_vars, &out, NULL);
    int len = out.length ();
-//   /* 现在 vars 里就是所有类型为 aet_generic_E 的变量 */
-//   for (unsigned i = 0; i < out.length (); i++){
-//       tree v = out[i];
-//       aet_print_tree(v);
-//       /* 对 v 做你需要的处理 */
-//   }
    out.release ();
    return len>0;
 }

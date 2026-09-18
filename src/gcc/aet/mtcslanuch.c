@@ -348,7 +348,6 @@ static tree createVoidPointerArray(location_t loc,tree call)
       tree lhs = build4 (ARRAY_REF, TREE_TYPE(TREE_TYPE(decl)), decl, refIndex0, NULL_TREE,NULL_TREE);
       n_debug("mtcslanuch.c 参数的数据类型:%s\n",get_tree_code_name(TREE_CODE(TREE_TYPE(arg))));
       tree argType=TREE_TYPE(arg);
-      aet_print_tree(arg);
       if(!POINTER_TYPE_P(argType)){
          n_debug("mtcslanuch.c 不是指针参数---- count:%d lvalue_p (arg)：%d\n",count,lvalue_p (arg));
          if(!lvalue_p (arg)){
@@ -803,7 +802,6 @@ static tree createDim3Var_implicitly(location_t loc,tree x,tree caller,tree impl
    DECL_SEEN_IN_BIND_EXPR_P(decl) = 1;
 
    printf("createDim3Var_implicitly 00 调用函数:%p callee:%p\n",caller,impliciCallee);
-   aet_print_tree(caller);
    FindBindAndList data={impliciCallee,NULL_TREE,NULL_TREE};
    walk_tree_without_duplicates (&DECL_SAVED_TREE (caller), print_statement_cb, &data);
    if(!data.bindExpr){
@@ -853,7 +851,6 @@ static tree createDim3Var_implicitly(location_t loc,tree x,tree caller,tree impl
    DECL_CHAIN(decl) = old_vars;
    BIND_EXPR_VARS(data.bindExpr) = decl;
    printf("createDim3Var_implicitly 22 调用函数:%p callee:%p\n",caller,impliciCallee);
-   aet_print_tree(caller);
    return decl;
 }
 
@@ -970,7 +967,6 @@ static tree createDim3Var_implicitly_ok(location_t loc, tree x, tree caller, tre
     print_generic_stmt(stderr, block, 0);
 
     printf("createDim3Var_implicitly 00 加变量后函数定义乌 调用函数:%p callee:%p\n",caller,impliciCallee);
-         aet_print_tree(caller);
     return decl;
 }
 

@@ -442,7 +442,6 @@ static tree process(tree call)
                     int continueRef=0;
                     tree newCallOrNewRef=processComponentRef(call,prevVal,item,loc,&continueRef);
                     n_debug("引用 COMPONENT_REF 生成函数调用call_expr i:%d\n",i);
-                    aet_print_tree(newCallOrNewRef);
                     if(i!=0){
                         if(continueRef==1)
                            prevVal=createVarDeclStmt(newCallOrNewRef,&bufs,loc,&stmtList);

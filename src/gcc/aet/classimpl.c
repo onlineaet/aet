@@ -1680,11 +1680,11 @@ tree   class_impl_add_return(ClassImpl *self,location_t loc,tree retExpr,tree ex
             exprOrigType,self->className->sysName);
    }
    //解析泛型块中的返回语句
-   generic_parser_return(generic_parser_get(),&retExpr);
+   retExpr = generic_parser_return(generic_parser_get(),retExpr);
+   retExpr = object_return_convert_block(object_return_get(),retExpr);
    object_return_add_return(object_return_get(),retExpr);
-   tree expr=object_return_convert(object_return_get(),loc,retExpr);
-   expr=object_return_convert_block(object_return_get(),expr);
-   return expr;
+   retExpr = object_return_convert(object_return_get(),loc,retExpr);
+   return retExpr;
 }
 
 /**

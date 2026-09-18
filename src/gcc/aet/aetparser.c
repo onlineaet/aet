@@ -27995,13 +27995,12 @@ static int aet_parser_c_parser_declspecs_c_id (AetParser *self,struct c_typespec
    int ret=0;
    if(generic_util_valid_id(ident)){
       //zclei
-      tree value=generic_util_get_generic_type_by_str(IDENTIFIER_POINTER(ident));
-      printf("c_parser_declspecs 在这里处理泛型 %p  %s\n",(void*)value,IDENTIFIER_POINTER(ident));
-      if(value!=NULL_TREE){
-         t->kind = ctsk_typedef;
-         t->spec = value;
-         ret=1;
-      }
+      tree value=generic_util_get_type_by_decl_string(IDENTIFIER_POINTER(ident));
+      n_debug("aet_parser_c_parser_declspecs_c_id token是泛型声明:%s\n",IDENTIFIER_POINTER(ident));
+      t->kind = ctsk_typedef;
+      t->spec = value;
+      ret=1;
+
    }else{
       n_debug("特别的:是不是在AObject声明中，并且是方法 “AClass *getClass()“,如果是返回void *");
       if(class_parser_exception(classParser,ident)){

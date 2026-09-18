@@ -490,7 +490,6 @@ static char* getClassFromNopExpr(tree nopexpr)
 			return class_util_get_class_name_by_pointer(TREE_TYPE(nopexpr));
 	   }else  if(nopexprTypeCode==POINTER_TYPE && TREE_CODE(op)==TARGET_EXPR){
 		    printf("class_util 从设setNopExpr 再设setTargetExpr----- 不处理\n");
-	       aet_print_tree(nopexpr);
 	   }else  if(nopexprTypeCode==POINTER_TYPE && TREE_CODE(op)==VAR_DECL){
 		    printf("class_util 从设setNopExpr 再设setVarDecl---eee--\n");
 			return class_util_get_class_name_by_pointer(TREE_TYPE(nopexpr));
@@ -498,7 +497,6 @@ static char* getClassFromNopExpr(tree nopexpr)
 			return class_util_get_class_name_by_pointer(TREE_TYPE(nopexpr));
 	   }else if(nopexprTypeCode==POINTER_TYPE && TREE_CODE(op)==POINTER_PLUS_EXPR){
 		    printf("class_util 从设setNopExpr POINTER_PLUS_EXPR-----不处理 \n");
-		    aet_print_tree(nopexpr);
 	   }else if(nopexprTypeCode==POINTER_TYPE && TREE_CODE(op)==ADDR_EXPR){
 			return class_util_get_class_name_by_pointer(TREE_TYPE(nopexpr));
 	   }

@@ -185,7 +185,6 @@ static nboolean createByUserDefine(ClassFunc *func,GenericModel *funcGenericDefi
 		GenericUnit *id=generic_model_get(funcGen,i);
 		GenericUnit *unit=generic_model_get(funcGenericDefine,i);
 		n_debug("createByUserDefine 00 gen: %s unit name:%s\n",generic_model_tostring(funcGenericDefine),unit->name);
-		aet_print_tree(unit->decl);
 		defineData->from[count]=USER_DEFINE;
 		defineData->units[count]=unit;
 		if(!aet_utils_valid_tree(TREE_TYPE(unit->decl))){
@@ -252,14 +251,14 @@ static tree getActualParmType(ClassFunc *func,NPtrArray *array,vec<tree, va_gc> 
             if(generic_unit_is_query(unit)){
                n_debug("是问号泛型单元用ParmGenInfo中的参数代替 %s\n",item->str);
                if(generic_util_valid_by_str(item->str)){
-                  tree type=generic_util_get_generic_type_by_str(item->str);
+                  tree type=generic_util_get_type_by_decl_string(item->str);
                   actual= build_decl (0,PARM_DECL,NULL_TREE, TREE_TYPE(type));
                }else{
                   aet_print_tree_skip_debug(item->object);
                   n_error("参数中定义的类中泛型不是A-Z在泛型声明。而是:%s\n",item->str);
                }
             }else{
-               tree type=generic_util_get_generic_type_by_str(unit->name);
+               tree type=generic_util_get_type_by_decl_string(unit->name);
                actual= build_decl (0,PARM_DECL,NULL_TREE, TREE_TYPE(type));
             }
          }else{
@@ -432,8 +431,6 @@ nboolean generic_func_check(GenericFunc *self,ClassFunc *func,ClassName *classNa
       return FALSE;
    n_debug("generic_func_check 11 收集用户定义的泛型 %s\n",func->orgiName);
    tree actual=(*exprlist)[0];
-   aet_print_tree(actual);
-
    GenDefineData userDefine;
    memset(&userDefine,0,sizeof(GenDefineData));
    if(!createByUserDefine(func,funcGenericDefine,&userDefine))
@@ -810,7 +807,6 @@ static void check_new(GenericModel **models,tree formal,GenericModel *formalMode
 
    n_debug("generic_check_parm----00 最后检查 %s %s\n",generic_model_tostring(formalModel),generic_model_tostring(actualModel));
    tree type=formal;//TREE_TYPE(formal);
-   aet_print_tree(type);
    char *sysName=class_util_get_class_name(type);
    int re=compare(funcGenDecl,funcGenDefine,formalModel,actualModel,callObject,func,sysName,TRUE);
    if(re==0){

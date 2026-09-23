@@ -42,8 +42,9 @@ public$ enum$ MtcsCpyKind{
 
 
 public$  class$ MtcsMem{
-
+   //在设备上分配内存
    public$ static void *malloc(size_t size);
+   //deviceMem=FALSE,分配托管内存
    public$ static void *malloc(size_t size,aboolean deviceMem);
    public$ static void *malloc(size_t size,MtcsMallocAttribute att);
    public$ static void *calloc(size_t size);

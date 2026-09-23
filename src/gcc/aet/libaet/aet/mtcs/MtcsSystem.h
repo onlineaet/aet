@@ -65,5 +65,5 @@ public$ final$  class$ MtcsSystem{
    public$ static int           setDevice(int provider,int devNum);
 };
 
-#endif /* __N_MEM_H__ */
+#endif /* __AET_MTCS_SYSTEM_H__ */
 

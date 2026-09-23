@@ -27,12 +27,16 @@
 
 impl$  MtcsMem {
 
+   /**
+    * alloctor->malloc(size,TRUE);
+    * 默认分配设备内存
+    */
    public$ static void *malloc(size_t size){
       //获取缺省的供应商
       MtcsProvider *provider = MtcsSystem.getDefaultProvider();
       MtcsDevice *device=provider->getDefaultDevice();
       MtcsMemAlloctor *alloctor = device->getMemAlloctor();
-      return alloctor->malloc(size,FALSE);
+      return alloctor->malloc(size,TRUE);
    }
 
    public$ static void *malloc(size_t size,aboolean useDeviceMem){
@@ -51,13 +55,16 @@ impl$  MtcsMem {
       return alloctor->malloc(size,att.isDevice);
    }
 
-
+   /**
+    * alloctor->malloc(size,TRUE);
+    * 默认分配设备内存
+    */
    public$ static void *calloc(size_t size){
       //获取缺省的供应商
       MtcsProvider *provider = MtcsSystem.getDefaultProvider();
       MtcsDevice *device=provider->getDefaultDevice();
       MtcsMemAlloctor *alloctor = device->getMemAlloctor();
-      return alloctor->calloc(size,FALSE);
+      return alloctor->calloc(size,TRUE);
    }
 
    public$ static void *calloc(size_t size,aboolean useDeviceMem){

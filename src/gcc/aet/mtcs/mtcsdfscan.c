@@ -947,19 +947,19 @@ bool mtcs_dfscan_df_insn_rescan (MtcsDfscan *self,rtx_insn *insn)
    /* The client has disabled rescanning and plans to do it itself.  */
    if (df->changeable_flags & DF_NO_INSN_RESCAN)
       return false;
-   n_debug("mtcsdfscan.c mtcs_dfscan_df_insn_rescan 00 %p\n",df?df->def_regs[0]->reg_chain:NULL);
+  // n_debug("mtcsdfscan.c mtcs_dfscan_df_insn_rescan 00 %p\n",df?df->def_regs[0]->reg_chain:NULL);
    mtcs_dfcore_df_grow_bb_info/*!df_grow_bb_info*/(mtcsDfcore,df_scan);
-   n_debug("mtcsdfscan.c mtcs_dfscan_df_insn_rescan 00ttxx %p\n",df?df->def_regs[0]->reg_chain:NULL);
+  // n_debug("mtcsdfscan.c mtcs_dfscan_df_insn_rescan 00ttxx %p\n",df?df->def_regs[0]->reg_chain:NULL);
 
    mtcs_dfsan_df_grow_reg_info/*!df_grow_reg_info*/(self);
-   n_debug("mtcsdfscan.c mtcs_dfscan_df_insn_rescan 00xx %p\n",df?df->def_regs[0]->reg_chain:NULL);
+   //n_debug("mtcsdfscan.c mtcs_dfscan_df_insn_rescan 00xx %p\n",df?df->def_regs[0]->reg_chain:NULL);
 
    insn_info = DF_INSN_UID_SAFE_GET (uid);
 
    /* The client has deferred rescanning.  */
    if (df->changeable_flags & DF_DEFER_INSN_RESCAN){
       if (!insn_info){
-         n_debug("mtcsdfscan.c mtcs_dfscan_df_insn_rescan 11 %p\n",df?df->def_regs[0]->reg_chain:NULL);
+         //n_debug("mtcsdfscan.c mtcs_dfscan_df_insn_rescan 11 %p\n",df?df->def_regs[0]->reg_chain:NULL);
 
          insn_info = df_insn_create_insn_record(self,insn);
          insn_info->defs = 0;
@@ -981,10 +981,10 @@ bool mtcs_dfscan_df_insn_rescan (MtcsDfscan *self,rtx_insn *insn)
    bitmap_clear_bit (&df->insns_to_notes_rescan, uid);
    if (insn_info){
       int luid;
-      n_debug("mtcsdfscan.c mtcs_dfscan_df_insn_rescan 11xz:%p\n",df?df->def_regs[0]->reg_chain:NULL);
+      //n_debug("mtcsdfscan.c mtcs_dfscan_df_insn_rescan 11xz:%p\n",df?df->def_regs[0]->reg_chain:NULL);
 
       bool the_same = df_insn_refs_verify(self,&collection_rec, bb, insn, false);
-      n_debug("mtcsdfscan.c mtcs_dfscan_df_insn_rescan 22 bb:%p the_same:%d\n",bb,the_same);
+      //n_debug("mtcsdfscan.c mtcs_dfscan_df_insn_rescan 22 bb:%p the_same:%d\n",bb,the_same);
 
       /* If there's no change, return false. */
       if (the_same){
@@ -1003,19 +1003,19 @@ bool mtcs_dfscan_df_insn_rescan (MtcsDfscan *self,rtx_insn *insn)
       df_insn_info_init_fields (insn_info, insn);
       DF_INSN_LUID (insn) = luid;
    }else{
-      n_debug("mtcsdfscan.c mtcs_dfscan_df_insn_rescan 33 bb:%p\n",bb);
+      //n_debug("mtcsdfscan.c mtcs_dfscan_df_insn_rescan 33 bb:%p\n",bb);
 
       struct df_insn_info *insn_info = df_insn_create_insn_record(self,insn);
       df_insn_refs_collect(self,&collection_rec, bb, insn_info);
       if (dump_file)
          fprintf (dump_file, "scanning new insn with uid = %d.\n", uid);
    }
-   n_debug("mtcsdfscan.c mtcs_dfscan_df_insn_rescan 44 bb:%p %p\n",bb,df?df->def_regs[0]->reg_chain:NULL);
+   //n_debug("mtcsdfscan.c mtcs_dfscan_df_insn_rescan 44 bb:%p %p\n",bb,df?df->def_regs[0]->reg_chain:NULL);
 
    df_refs_add_to_chains(self,&collection_rec, bb, insn, copy_all);
    if (!DEBUG_INSN_P (insn))
       mtcs_dfcore_df_set_bb_dirty/*!df_set_bb_dirty*/(mtcsDfcore,bb);
-   n_debug("mtcsdfscan.c mtcs_dfscan_df_insn_rescan 55 bb:%p\n",bb);
+   //n_debug("mtcsdfscan.c mtcs_dfscan_df_insn_rescan 55 bb:%p\n",bb);
 
    return true;
 }
@@ -2984,25 +2984,22 @@ static void df_bb_refs_collect (MtcsDfscan *self,class df_collection_rec *collec
    collection_rec->mw_vec.truncate (0);
 
    if (bb->index == ENTRY_BLOCK){
-      n_debug("mtcsdfscan.c df_bb_refs_collect 收集 00 是 ENTRY_BLOCK bb:%p\n",bb);
+      //n_debug("mtcsdfscan.c df_bb_refs_collect 收集 00 是 ENTRY_BLOCK bb:%p\n",bb);
       df_entry_block_defs_collect(self,collection_rec, df->entry_block_defs);
       return;
    }else if (bb->index == EXIT_BLOCK){
-      n_debug("mtcsdfscan.c df_bb_refs_collect 收集 11 是 EXIT_BLOCK bb:%p\n",bb);
-
+      //n_debug("mtcsdfscan.c df_bb_refs_collect 收集 11 是 EXIT_BLOCK bb:%p\n",bb);
       df_exit_block_uses_collect(self,collection_rec, df->exit_block_uses);
       return;
    }
 
    if (bb_has_eh_pred (bb)){
-      n_debug("mtcsdfscan.c df_bb_refs_collect 收集 22 bb_has_eh_pred bb:%p\n",bb);
-
+      //n_debug("mtcsdfscan.c df_bb_refs_collect 收集 22 bb_has_eh_pred bb:%p\n",bb);
       unsigned int i;
       /* Mark the registers that will contain data for the handler.  */
       for (i = 0; ; ++i){
          unsigned regno = mtcs_reg_get_eh_return_data_regno/*!EH_RETURN_DATA_REGNO*/(mtcsReg,i);
-         n_debug("mtcsdfscan.c df_bb_refs_collect 收集 33 bb_has_eh_pred i:%d regno:%d bb:%p\n",i,regno,bb);
-
+         //n_debug("mtcsdfscan.c df_bb_refs_collect 收集 33 bb_has_eh_pred i:%d regno:%d bb:%p\n",i,regno,bb);
          if (regno == INVALID_REGNUM)
             break;
          df_ref_record(self,DF_REF_ARTIFICIAL, collection_rec,
@@ -3013,23 +3010,20 @@ static void df_bb_refs_collect (MtcsDfscan *self,class df_collection_rec *collec
    /* Add the hard_frame_pointer if this block is the target of a
    non-local goto.  */
    if (bb->flags & BB_NON_LOCAL_GOTO_TARGET){
-      n_debug("mtcsdfscan.c df_bb_refs_collect 收集 44 bb->flags:%d bb:%p\n",bb->flags,bb);
-
+      //n_debug("mtcsdfscan.c df_bb_refs_collect 收集 44 bb->flags:%d bb:%p\n",bb->flags,bb);
       df_ref_record(self,DF_REF_ARTIFICIAL, collection_rec,
             mtcs_rtl_get_hard_frame_pointer_rtx/*!hard_frame_pointer_rtx*/(mtcsRTL), NULL,bb, NULL, DF_REF_REG_DEF, DF_REF_AT_TOP);
    }
 
    /* Add the artificial uses.  */
    if (bb->index >= NUM_FIXED_BLOCKS){
-      n_debug("mtcsdfscan.c df_bb_refs_collect 收集 55 bb->index >= NUM_FIXED_BLOCKS bb->flags:%d bb:%p\n",bb->flags,bb);
-
+      //n_debug("mtcsdfscan.c df_bb_refs_collect 收集 55 bb->index >= NUM_FIXED_BLOCKS bb->flags:%d bb:%p\n",bb->flags,bb);
       bitmap_iterator bi;
       unsigned int regno;
       bitmap au = bb_has_eh_pred (bb)? &df->eh_block_artificial_uses: &df->regular_block_artificial_uses;
 
       EXECUTE_IF_SET_IN_BITMAP (au, 0, regno, bi){
-         n_debug("mtcsdfscan.c df_bb_refs_collect 收集 66 bb->index >= NUM_FIXED_BLOCKS bb->flags:%d bb:%p\n",bb->flags,bb);
-
+         //n_debug("mtcsdfscan.c df_bb_refs_collect 收集 66 bb->index >= NUM_FIXED_BLOCKS bb->flags:%d bb:%p\n",bb->flags,bb);
          df_ref_record(self,DF_REF_ARTIFICIAL, collection_rec,
                mtcsRtlData->regno_reg_rtx/*!regno_reg_rtx*/[regno], NULL,bb, NULL, DF_REF_REG_USE, 0);
       }
@@ -3667,8 +3661,8 @@ static unsigned int df_reg_chain_mark (df_ref refs, unsigned int regno,
 
       /* If there are no def-use or use-def chains, make sure that all
       of the chains are clear.  */
-      n_debug("mtcsdfscan.c df_reg_chain_mark 00 ref:%p flags:%d is_def:%d is_eq_use:%d df_chain:%p regno:%d %d\n",
-            ref,ref->base.flags,is_def,is_eq_use,df_chain,regno,DF_REF_REGNO (ref));
+      //n_debug("mtcsdfscan.c df_reg_chain_mark 00 ref:%p flags:%d is_def:%d is_eq_use:%d df_chain:%p regno:%d %d\n",
+            //ref,ref->base.flags,is_def,is_eq_use,df_chain,regno,DF_REF_REGNO (ref));
 
       if (!df_chain)
          gcc_assert (!DF_REF_CHAIN (ref));
@@ -3789,30 +3783,30 @@ static bool df_insn_refs_verify (MtcsDfscan *self,class df_collection_rec *colle
   bool ret1, ret2, ret3;
   unsigned int uid = INSN_UID (insn);
   struct df_insn_info *insn_info = DF_INSN_INFO_GET (insn);
-  n_debug("mtcsdfscan.c df_insn_refs_verify 00 reg_chain:%p\n",df?df->def_regs[0]->reg_chain:NULL);
+ // n_debug("mtcsdfscan.c df_insn_refs_verify 00 reg_chain:%p\n",df?df->def_regs[0]->reg_chain:NULL);
 
   df_insn_refs_collect(self,collection_rec, bb, insn_info);
-  n_debug("mtcsdfscan.c df_insn_refs_verify 11 reg_chain:%p\n",df?df->def_regs[0]->reg_chain:NULL);
+ // n_debug("mtcsdfscan.c df_insn_refs_verify 11 reg_chain:%p\n",df?df->def_regs[0]->reg_chain:NULL);
 
   /* Unfortunately we cannot opt out early if one of these is not
      right and abort_if_fail is set because the marks will not get cleared.  */
   ret1 = df_refs_verify (&collection_rec->def_vec, DF_INSN_UID_DEFS (uid),abort_if_fail);
   if (!ret1 && !abort_if_fail)
     return false;
-  n_debug("mtcsdfscan.c df_insn_refs_verify 22 reg_chain:%p\n",df?df->def_regs[0]->reg_chain:NULL);
+ // n_debug("mtcsdfscan.c df_insn_refs_verify 22 reg_chain:%p\n",df?df->def_regs[0]->reg_chain:NULL);
 
   ret2 = df_refs_verify (&collection_rec->use_vec, DF_INSN_UID_USES (uid),abort_if_fail);
   if (!ret2 && !abort_if_fail)
     return false;
-  n_debug("mtcsdfscan.c df_insn_refs_verify 33 reg_chain:%p\n",df?df->def_regs[0]->reg_chain:NULL);
+  //n_debug("mtcsdfscan.c df_insn_refs_verify 33 reg_chain:%p\n",df?df->def_regs[0]->reg_chain:NULL);
 
   ret3 = df_refs_verify (&collection_rec->eq_use_vec, DF_INSN_UID_EQ_USES (uid),abort_if_fail);
   if (!ret3 && !abort_if_fail)
     return false;
-  n_debug("mtcsdfscan.c df_insn_refs_verify 44 reg_chain:%p\n",df?df->def_regs[0]->reg_chain:NULL);
+  //n_debug("mtcsdfscan.c df_insn_refs_verify 44 reg_chain:%p\n",df?df->def_regs[0]->reg_chain:NULL);
 
   if (! df_mws_verify (&collection_rec->mw_vec, DF_INSN_UID_MWS (uid),abort_if_fail)){
-     n_debug("mtcsdfscan.c df_insn_refs_verify 55 reg_chain:%p\n",df?df->def_regs[0]->reg_chain:NULL);
+  //   n_debug("mtcsdfscan.c df_insn_refs_verify 55 reg_chain:%p\n",df?df->def_regs[0]->reg_chain:NULL);
     return false;
   }
   return (ret1 && ret2 && ret3);
@@ -3820,6 +3814,7 @@ static bool df_insn_refs_verify (MtcsDfscan *self,class df_collection_rec *colle
 
 static void printfFlags(basic_block bb)
 {
+   return;
    struct df_scan_bb_info *bbinfo= df_scan_get_bb_info (bb->index);
    df_ref adef=bbinfo->artificial_defs;
    n_debug("mtcsdfscan.c printfFlags 00 bb:%p bb->index:%d adef:%p\n",bb,bb->index,adef);
@@ -3841,23 +3836,23 @@ static bool df_bb_verify (MtcsDfscan *self,basic_block bb)
    class df_collection_rec collection_rec;
 
    gcc_assert (bb_info);
-   n_debug("mtcsdfscan.c df_bb_verify 00 bb:%p bb->index:%d\n",bb,bb->index);
-   printfFlags(bb);
+   //n_debug("mtcsdfscan.c df_bb_verify 00 bb:%p bb->index:%d\n",bb,bb->index);
+  // printfFlags(bb);
    /* Scan the block, one insn at a time, from beginning to end.  */
    FOR_BB_INSNS_REVERSE (bb, insn){
       if (!INSN_P (insn))
          continue;
-      n_debug("mtcsdfscan.c df_bb_verify 开始refs 认证 bb:%p bb->index:%d insn:%p\n",bb,bb->index,insn);
-      mtcs_print_rtl_single(stderr,insn);
+      //n_debug("mtcsdfscan.c df_bb_verify 开始refs 认证 bb:%p bb->index:%d insn:%p\n",bb,bb->index,insn);
+     // mtcs_print_rtl_single(stderr,insn);
       df_insn_refs_verify(self,&collection_rec, bb, insn, true);
       df_free_collection_rec (&collection_rec);
    }
-   n_debug("mtcsdfscan.c df_bb_verify 11 bb:%p bb->index:%d\n",bb,bb->index);
-   printfFlags(bb);
+   //n_debug("mtcsdfscan.c df_bb_verify 11 bb:%p bb->index:%d\n",bb,bb->index);
+   //printfFlags(bb);
    /* Do the artificial defs and uses.  */
    df_bb_refs_collect(self,&collection_rec, bb);
-   n_debug("mtcsdfscan.c df_bb_verify 22 bb:%p bb->index:%d\n",bb,bb->index);
-   printfFlags(bb);
+   //n_debug("mtcsdfscan.c df_bb_verify 22 bb:%p bb->index:%d\n",bb,bb->index);
+   //printfFlags(bb);
 
    df_refs_verify (&collection_rec.def_vec, df_get_artificial_defs (bb->index), true);
    df_refs_verify (&collection_rec.use_vec, df_get_artificial_uses (bb->index), true);
@@ -4046,16 +4041,16 @@ void mtcs_dfsan_df_grow_reg_info (MtcsDfscan *self)
 
    unsigned int max_reg = mtcs_func_max_reg_num/*!max_reg_num*/(mtcsFunc);
    unsigned int new_size = max_reg;
-   if(df && df->def_regs)
-      n_debug("mtcsdfscan.c mtcs_dfsan_df_grow_reg_info 00 max_reg:%d df->regs_size:%d reg_chain:%p\n",
-           max_reg,df->regs_size,df->def_regs[0]?df->def_regs[0]->reg_chain:NULL);
+//   if(df && df->def_regs)
+//      n_debug("mtcsdfscan.c mtcs_dfsan_df_grow_reg_info 00 max_reg:%d df->regs_size:%d reg_chain:%p\n",
+//           max_reg,df->regs_size,df->def_regs[0]?df->def_regs[0]->reg_chain:NULL);
    struct df_scan_problem_data *problem_data = (struct df_scan_problem_data *) df_scan->problem_data;
    unsigned int i;
 
    if (df->regs_size < new_size){
-      if(df && df->def_regs)
-         n_debug("mtcsdfscan.c mtcs_dfsan_df_grow_reg_info 11 max_reg:%d df->regs_size:%d reg_chain:%p\n",
-              max_reg,df->regs_size,df->def_regs[0]?df->def_regs[0]->reg_chain:NULL);
+//      if(df && df->def_regs)
+//         n_debug("mtcsdfscan.c mtcs_dfsan_df_grow_reg_info 11 max_reg:%d df->regs_size:%d reg_chain:%p\n",
+//              max_reg,df->regs_size,df->def_regs[0]?df->def_regs[0]->reg_chain:NULL);
       new_size += new_size / 4;
       df->def_regs = XRESIZEVEC (struct df_reg_info *, df->def_regs, new_size);
       df->use_regs = XRESIZEVEC (struct df_reg_info *, df->use_regs, new_size);
@@ -4090,7 +4085,7 @@ void mtcs_dfsan_df_grow_reg_info (MtcsDfscan *self)
       df->use_info.count[i] = 0;
    }
 
-   n_debug("mtcsdfscan.c mtcs_dfsan_df_grow_reg_info 44 max_reg:%d df:%p\n",max_reg,df);
+   //n_debug("mtcsdfscan.c mtcs_dfsan_df_grow_reg_info 44 max_reg:%d df:%p\n",max_reg,df);
    df->regs_inited = max_reg;
 }
 

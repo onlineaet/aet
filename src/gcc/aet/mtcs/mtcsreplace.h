@@ -45,5 +45,7 @@ MtcsReplace  *mtcs_replace_new(MtcsMode *mtcsMode);
 //gimple_assign <array_ref, _1, _TSecond_parent__superDeviceAddressArray[4], NULL, NULL>
 void          mtcs_replace_parent_device_func_array(MtcsReplace *self,struct cgraph_node *newNode);
 void          mtcs_replace_switch(MtcsReplace *self,struct cgraph_node *newNode);
+//void          mtcs_replace_replace_intrinsic(MtcsReplace *self,gcall *call);
+nuint mtcs_replace_replace_intrinsic(MtcsReplace *self,gimple_stmt_iterator *gsi,gcall *call);
 
 #endif

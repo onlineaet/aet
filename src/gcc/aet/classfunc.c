@@ -521,7 +521,6 @@ int class_func_get_generic_param_count(ClassFunc *self)
       for (parm = args; parm; parm = DECL_CHAIN (parm)){
          GenericModel *genModel=(GenericModel *)c_aet_get_generics_model(parm);
          n_debug("class_func_get_generic_param_count 00 获取泛型参数个数 %p\n",genModel);
-         aet_print_tree(parm);
          if(genModel!=NULL)
             count++;
          else{

@@ -200,34 +200,33 @@ static edge redirect_edge_and_branch_cb (MtcsCfgState *self, edge e, basic_block
    MtcsDfcore *mtcsDfcore=mtcs_target_get_dfcore(mtcsTarget);
    basic_block src = e->src;
    edge ret;
-   n_debug("mtcscfglayoutstate.c redirect_edge_and_branch_cb 00 e:%p dest:%p\n",e,dest);
+   //n_debug("mtcscfglayoutstate.c redirect_edge_and_branch_cb 00 e:%p dest:%p\n",e,dest);
 
    if (e->flags & (EDGE_ABNORMAL_CALL | EDGE_EH))
       return NULL;
-   n_debug("mtcscfglayoutstate.c redirect_edge_and_branch_cb 11 e:%p dest:%p\n",e,dest);
+   //n_debug("mtcscfglayoutstate.c redirect_edge_and_branch_cb 11 e:%p dest:%p\n",e,dest);
 
    if (e->dest == dest)
       return e;
-   n_debug("mtcscfglayoutstate.c redirect_edge_and_branch_cb 22 e:%p dest:%p\n",e,dest);
-   printbb(dest);
+   //n_debug("mtcscfglayoutstate.c redirect_edge_and_branch_cb 22 e:%p dest:%p\n",e,dest);
+  // printbb(dest);
    if (e->flags & EDGE_CROSSING
    && BB_PARTITION (e->src) == BB_PARTITION (dest)
    && simplejump_p (BB_END (src))){
       if (dump_file)
          fprintf (dump_file, "Removing crossing jump while redirecting edge form %i to %i\n",
       e->src->index, dest->index);
-      n_debug("mtcscfglayoutstate.c redirect_edge_and_branch_cb 33 e:%p dest:%p\n",e,dest);
-
+      //n_debug("mtcscfglayoutstate.c redirect_edge_and_branch_cb 33 e:%p dest:%p\n",e,dest);
       mtcs_cfg_rtl_delete_insn/*!delete_insn*/(mtcsCfgRtl,BB_END (src));
       mtcs_cfg_rtl_remove_barriers_from_footer/*!remove_barriers_from_footer*/(mtcsCfgRtl,src);
       e->flags |= EDGE_FALLTHRU;
    }
-   n_debug("mtcscfglayoutstate.c redirect_edge_and_branch_cb 44 e:%p dest:%p\n",e,dest);
-   printbb(dest);
+   //n_debug("mtcscfglayoutstate.c redirect_edge_and_branch_cb 44 e:%p dest:%p\n",e,dest);
+   //printbb(dest);
 
    if (e->src != ENTRY_BLOCK_PTR_FOR_FN (cfun)
    && (ret = mtcs_cfg_rtl_try_redirect_by_replacing_jump/*!try_redirect_by_replacing_jump*/(mtcsCfgRtl,e, dest, true))){
-      n_debug("mtcscfglayoutstate.c redirect_edge_and_branch_cb 55 e:%p dest:%p\n",e,dest);
+      //n_debug("mtcscfglayoutstate.c redirect_edge_and_branch_cb 55 e:%p dest:%p\n",e,dest);
       mtcs_dfcore_df_set_bb_dirty/*!df_set_bb_dirty*/(mtcsDfcore,src);
       return ret;
    }
@@ -237,7 +236,7 @@ static edge redirect_edge_and_branch_cb (MtcsCfgState *self, edge e, basic_block
       if (dump_file)
          fprintf (dump_file, "Redirecting entry edge from bb %i to %i\n",
       e->src->index, dest->index);
-      n_debug("mtcscfglayoutstate.c redirect_edge_and_branch_cb 66 e:%p dest:%p\n",e,dest);
+      //n_debug("mtcscfglayoutstate.c redirect_edge_and_branch_cb 66 e:%p dest:%p\n",e,dest);
 
       mtcs_dfcore_df_set_bb_dirty/*!df_set_bb_dirty*/(mtcsDfcore,e->src);
       mtcs_cfg_redirect_edge_succ/*!redirect_edge_succ*/(mtcsCfg,e, dest);
@@ -277,8 +276,8 @@ static edge redirect_edge_and_branch_cb (MtcsCfgState *self, edge e, basic_block
    }else
       ret = mtcs_cfg_state_redirect_branch_edge/*!redirect_branch_edge*/(self,e, dest);
 
-   n_debug("mtcscfglayoutstate.c redirect_edge_and_branch_cb 77 e:%p dest:%p ret:%p\n",e,dest,ret);
-   printbb(dest);
+   //n_debug("mtcscfglayoutstate.c redirect_edge_and_branch_cb 77 e:%p dest:%p ret:%p\n",e,dest,ret);
+   //printbb(dest);
 
    if (!ret)
       return NULL;
@@ -287,8 +286,8 @@ static edge redirect_edge_and_branch_cb (MtcsCfgState *self, edge e, basic_block
    /* We don't want simplejumps in the insn stream during cfglayout.  */
    gcc_assert (!simplejump_p (BB_END (src)) || CROSSING_JUMP_P (BB_END (src)));
    mtcs_dfcore_df_set_bb_dirty/*!df_set_bb_dirty*/(mtcsDfcore,src);
-   n_debug("mtcscfglayoutstate.c redirect_edge_and_branch_cb 88 e:%p dest:%p ret:%p\n",e,dest,ret);
-   printbb(dest);
+  // n_debug("mtcscfglayoutstate.c redirect_edge_and_branch_cb 88 e:%p dest:%p ret:%p\n",e,dest,ret);
+  // printbb(dest);
    return ret;
 }
 

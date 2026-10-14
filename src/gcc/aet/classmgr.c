@@ -56,6 +56,7 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 #include "classparser.h"
 #include "classimpl.h"
 #include "ifaceimpl.h"
+#include "aetprinttree.h"
 
 
 static void classMgrInit(ClassMgr *self)
@@ -82,7 +83,6 @@ nboolean class_mgr_add(ClassMgr *self,char *sysClassName,char *userClassName,cha
    if(file!=NULL)
       class_info_set_file(info,file);
    n_hash_table_insert (self->mgrHash, n_strdup(sysClassName),info);
-
    return TRUE;
 }
 
@@ -113,6 +113,8 @@ nboolean class_mgr_set_type(ClassMgr *self,location_t loc,char *sysClassName,
       error_at(loc,"接口%qs的名字不能含有%qs或%qs。",sysClassName,AET_ROOT_OBJECT,AET_ROOT_CLASS);
       return FALSE;
    }
+   //是否带属性mtcs intrinsic
+   class_info_set_intrinsic_class(info);
    return TRUE;
 }
 
@@ -293,7 +295,7 @@ ClassInfo *class_mgr_get_class_info_by_class_name(ClassMgr *self,ClassName *clas
 
 nboolean   class_mgr_set_record(ClassMgr *self,ClassName *className,tree record)
 {
-    ClassInfo *info=n_hash_table_lookup(self->mgrHash,className->sysName);
+   ClassInfo *info=n_hash_table_lookup(self->mgrHash,className->sysName);
 	if(info==NULL){
 		printf("class_mgr_set_record 00 找不到classinfo %s\n",className->sysName);
 		return FALSE;

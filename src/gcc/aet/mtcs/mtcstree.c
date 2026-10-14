@@ -317,6 +317,8 @@ void  mtcs_tree_init(MtcsTree *self)
    self->int_cst_hash_table = hash_table<mtcs_int_cst_hasher>::create_ggc (1024);
    self->poly_int_cst_hash_table = hash_table<mtcs_poly_int_cst_hasher>::create_ggc (64);
    self->int_cst_node = make_int_cst (1, 1);
+   self->haveBackup =FALSE;//是否备份了主机tree
+
 }
 
 /* Set the type qualifiers for TYPE to TYPE_QUALS, which is a bitmask
@@ -532,7 +534,8 @@ static void initializeSizeTypes (MtcsTree *self)
    SET_TYPE_ALIGN (sizetype0, mtcs_mode_get_alignment/*!GET_MODE_ALIGNMENT*/(mtcsMode,TYPE_MODE (sizetype0)));
    TYPE_SIZE (sizetype0) =mtcs_tree_bitsize_int/*!bitsize_int*/(self,precision);
    TYPE_SIZE_UNIT (sizetype0) = mtcs_tree_size_int/*!size_int*/(self,mtcs_mode_get_size/*!GET_MODE_SIZE*/(mtcsMode,mode));
-   set_min_and_max_values_for_integral_type (sizetype0, precision, UNSIGNED);
+   mtcs_stor_layout_set_min_and_max_values_for_integral_type/*!set_min_and_max_values_for_integral_type*/
+         (mtcsStorLayout,sizetype0, precision, UNSIGNED);
    n_debug("mtcstree.c initializeSizeTypes 00 sizetype:%p %d\n",sizetype0,mode);
 
    mode = mtcs_mode_smallest_int_mode_for_size/*!smallest_int_mode_for_size*/(mtcsMode,bprecision);
@@ -540,7 +543,8 @@ static void initializeSizeTypes (MtcsTree *self)
    SET_TYPE_ALIGN (bitsizetype0, mtcs_mode_get_alignment/*!GET_MODE_ALIGNMENT*/(mtcsMode,TYPE_MODE (bitsizetype0)));
    TYPE_SIZE (bitsizetype0) = mtcs_tree_bitsize_int/*!bitsize_int*/(self,bprecision);
    TYPE_SIZE_UNIT (bitsizetype0) = mtcs_tree_size_int/*!size_int*/(self,mtcs_mode_get_size/*!GET_MODE_SIZE*/(mtcsMode,mode));
-   set_min_and_max_values_for_integral_type (bitsizetype0, bprecision, UNSIGNED);
+   mtcs_stor_layout_set_min_and_max_values_for_integral_type/*!set_min_and_max_values_for_integral_type*/
+         (mtcsStorLayout,bitsizetype0, bprecision, UNSIGNED);
    n_debug("mtcstree.c initializeSizeTypes 11 bitsizetype0:%p %d\n",bitsizetype0,mode);
 
    /* Create the signed variants of *sizetype.  */
@@ -1410,27 +1414,18 @@ static void def_builtin_1 (MtcsTree *self,enum built_in_function fncode, const c
    if (fntype == mtcs_error_mark_node)
       return;
    libname = name + strlen ("__builtin_");
-   if(strcmp(name,"__builtin_exp2f")==0){
-      n_debug("mtcstree.c def_builtin_1 00 fncode:%d name:%s,fnclass:%d fntype:%p libtype:%p %d %d  %d %p %d %s %d\n",
-      fncode,name,fnclass,fntype,libtype,both_p,fallback_p,nonansi_p,fnattrs,implicit_p,get_tree_code_name(TREE_CODE(fnattrs)),ATTR_LAST);
-      aet_print_tree(fntype);
-      aet_print_tree(TREE_TYPE(fntype));
-   }
+
    decl = mtcs_tree_add_builtin_function/*!add_builtin_function*/(self,
          name, fntype, fncode, fnclass, (fallback_p ? libname : NULL), fnattrs);
-   if(strcmp(name,"__builtin_exp2f")==0)
-      n_debug("mtcstree.c  def_builtin_1 11 fncode:%d name:%s,fnclass:%d fntype:%p libtype:%p %d %d  %d %p %d decl:%p\n",
-         fncode,name,fnclass,fntype,libtype,both_p,fallback_p,nonansi_p,fnattrs,implicit_p,decl);
+
    if (both_p   && !mtcsOptionsItem->x_flag_no_builtin
          && !(nonansi_p && mtcsOptionsItem->x_flag_no_nonansi_builtin)){
-      if(strcmp(name,"__builtin_exp2f")==0)
-         n_debug("mtcstree.c def_builtin_1 22 fncode:%d name:%s,fnclass:%d fntype:%p libtype:%p %d %d  %d %p %d\n",
-            fncode,name,fnclass,fntype,libtype,both_p,fallback_p,nonansi_p,fnattrs,implicit_p);
+
       mtcs_tree_add_builtin_function/*!add_builtin_function*/(self,
             libname, libtype, fncode, fnclass, NULL, fnattrs);
-      if(strcmp(name,"__builtin_exp2f")==0)
-         n_debug("mtcstree.c def_builtin_1 33 fncode:%d name:%s,fnclass:%d fntype:%p libtype:%p %d %d  %d %p %d\n",
-            fncode,name,fnclass,fntype,libtype,both_p,fallback_p,nonansi_p,fnattrs,implicit_p);
+//      if(strcmp(name,"__builtin_exp2f")==0)
+//         n_debug("mtcstree.c def_builtin_1 33 fncode:%d name:%s,fnclass:%d fntype:%p libtype:%p %d %d  %d %p %d\n",
+//            fncode,name,fnclass,fntype,libtype,both_p,fallback_p,nonansi_p,fnattrs,implicit_p);
    }
    mtcs_tree_set_builtin_decl/*!set_builtin_decl*/(self,fncode, decl, implicit_p);
 }
@@ -3861,7 +3856,6 @@ static   void backup_cb(MtcsBackupRestore *iface)
    MtcsMachine *mtcsMachine=mtcs_target_get_machine(mtcsTarget);
 
    MtcsTreeBackup *backup=(MtcsTreeBackup *)self->backup;
-
    int i;
    for(i=0;i<TI_MAX;i++){
       backup->back_global_trees[i]=global_trees[i];
@@ -3869,16 +3863,13 @@ static   void backup_cb(MtcsBackupRestore *iface)
    }
 
    for(i=0;i<itk_none;i++){
-         backup->back_integer_types[i]=integer_types[i];
-         integer_types[i]=self->integer_types[i];
+      backup->back_integer_types[i]=integer_types[i];
+      integer_types[i]=self->integer_types[i];
    }
 
    for(i=0;i<(int) stk_type_kind_last;i++){
-         backup->back_sizetype_tab[i]=sizetype_tab[i];
-       //  fprintf(stderr,"mtcstree.c backup sizetype aa i:%d %p\n",i,sizetype_tab[i]);
-         sizetype_tab[i]=self->sizetype_tab[i];
-       //  fprintf(stderr,"mtcstree.c backup sizetype bb i:%d %p %p\n",i,sizetype_tab[i],bitsizetype);
-
+      backup->back_sizetype_tab[i]=sizetype_tab[i];
+      sizetype_tab[i]=self->sizetype_tab[i];
    }
 
    backup->back_targetm_floatn_builtin_p=targetm.floatn_builtin_p;
@@ -3907,7 +3898,7 @@ static   void backup_cb(MtcsBackupRestore *iface)
    //node = lang_hooks.expr_to_decl (node, &tc, &se); 指向mtcs中，所以在mtcstree.c的backup restore中加入对lang_hooks的操作
    backup->back_lang_hooks_expr_to_decl = lang_hooks.expr_to_decl;
    lang_hooks.expr_to_decl= replace_lang_hooks_expr_to_decl;
-
+   self->haveBackup =TRUE;//是否备份了主机tree
 }
 
 static   void restore_cb(MtcsBackupRestore *iface)
@@ -3935,6 +3926,7 @@ static   void restore_cb(MtcsBackupRestore *iface)
    targetm.unwind_word_mode =  backup->back_targetm_unwind_word_mode;
    lang_hooks.types.type_for_mode= backup->back_lang_hooks_types_type_for_mode;
    lang_hooks.expr_to_decl=backup->back_lang_hooks_expr_to_decl;
+   self->haveBackup =FALSE;//是否备份了主机tree
 }
 
 /* Builds a signed or unsigned integer type of precision PRECISION.
@@ -4134,3 +4126,284 @@ void mtcs_tree_restore_builtin_info(MtcsTree *self)
       builtin_info[i].declared_p = backup->back_builtin_info[i].declared_p;
    }
 }
+
+/* Construct, lay out and return the type of arrays of elements with ELT_TYPE
+   and number of elements specified by the range of values of INDEX_TYPE.
+   If TYPELESS_STORAGE is true, TYPE_TYPELESS_STORAGE flag is set on the type.
+   If SHARED is true, reuse such a type that has already been constructed.
+   If SET_CANONICAL is true, compute TYPE_CANONICAL from the element type.  */
+//原型 build_array_type_1 tree.h tree.cc
+tree mtcs_tree_build_array_type_1 (MtcsTree *self,tree elt_type, tree index_type,
+      bool typeless_storage,bool shared, bool set_canonical)
+{
+   MtcsMode *mtcsMode=MTCS_GET_MODE_OBJECT(self);
+   MtcsTarget *mtcsTarget=(MtcsTarget *)mtcsMode->target;
+   MtcsStorLayout *mtcsStorLayout=mtcs_target_get_stor_layout(mtcsTarget);
+   MtcsMachine *mtcsMachine=mtcs_target_get_machine(mtcsTarget);
+   MtcsTree *mtcsTree=self;
+
+   tree t;
+
+   if (TREE_CODE (elt_type) == FUNCTION_TYPE){
+      error ("arrays of functions are not meaningful");
+      elt_type = integer_type_node;
+   }
+
+   t = make_node (ARRAY_TYPE);
+   TREE_TYPE (t) = elt_type;
+   TYPE_DOMAIN (t) = index_type;
+   TYPE_ADDR_SPACE (t) = TYPE_ADDR_SPACE (elt_type);
+   TYPE_TYPELESS_STORAGE (t) = typeless_storage;
+
+   /* Set TYPE_STRUCTURAL_EQUALITY_P.  */
+   if (set_canonical && (TYPE_STRUCTURAL_EQUALITY_P (elt_type)
+   || (index_type && TYPE_STRUCTURAL_EQUALITY_P (index_type))
+   || in_lto_p))
+      SET_TYPE_STRUCTURAL_EQUALITY (t);
+
+   mtcs_stor_layout_layout_type/*!layout_type*/(mtcsStorLayout,t);
+
+   if (shared){
+      hashval_t hash = mtcs_tree_type_hash_canon_hash/*!type_hash_canon_hash*/(self,t);
+      tree probe_type = t;
+      t = mtcs_tree_type_hash_canon/*!type_hash_canon*/(self,hash, t);
+      if (t != probe_type)
+         return t;
+   }
+
+   if (TYPE_CANONICAL (t) == t && set_canonical){
+   if (TYPE_STRUCTURAL_EQUALITY_P (elt_type)
+   || (index_type && TYPE_STRUCTURAL_EQUALITY_P (index_type))
+   || in_lto_p)
+      gcc_unreachable ();
+   else if (TYPE_CANONICAL (elt_type) != elt_type || (index_type && TYPE_CANONICAL (index_type) != index_type))
+      TYPE_CANONICAL (t)  = mtcs_tree_build_array_type_1/*!build_array_type_1*/(self,TYPE_CANONICAL (elt_type),
+      index_type
+      ? TYPE_CANONICAL (index_type) : NULL_TREE,
+      typeless_storage, shared, set_canonical);
+   }
+
+   return t;
+}
+
+/* Wrapper around build_array_type_1 with SHARED set to true.  */
+//原型 build_array_type tree.h tree.cc
+tree mtcs_tree_build_array_type (MtcsTree *self,tree elt_type, tree index_type, bool typeless_storage)
+{
+  return  mtcs_tree_build_array_type_1/*!build_array_type_1*/(self,
+        elt_type, index_type, typeless_storage, true, true);
+}
+
+/* Create a range of some discrete type TYPE (an INTEGER_TYPE, ENUMERAL_TYPE
+   or BOOLEAN_TYPE) with low bound LOWVAL and high bound HIGHVAL.  If SHARED
+   is true, reuse such a type that has already been constructed.  */
+
+static tree build_range_type_1 (MtcsTree *self,tree type, tree lowval, tree highval, bool shared)
+{
+   MtcsMode *mtcsMode=MTCS_GET_MODE_OBJECT(self);
+   MtcsTarget *mtcsTarget=(MtcsTarget *)mtcsMode->target;
+   MtcsConst *mtcsConst=mtcs_target_get_const(mtcsTarget);
+
+   tree itype = make_node (INTEGER_TYPE);
+
+   TREE_TYPE (itype) = type;
+   n_debug("mtcstree.c build_range_type_1 type:%p lowval:%p highval:%p itype\n",type,lowval,highval,itype);
+
+   TYPE_MIN_VALUE (itype) = mtcs_const_fold_convert/*!fold_convert*/(mtcsConst,type, lowval);
+   TYPE_MAX_VALUE (itype) = highval ? mtcs_const_fold_convert/*!fold_convert*/(mtcsConst,type, highval) : NULL;
+
+   TYPE_PRECISION (itype) = TYPE_PRECISION (type);
+   SET_TYPE_MODE (itype, TYPE_MODE (type));
+   TYPE_SIZE (itype) = TYPE_SIZE (type);
+   TYPE_SIZE_UNIT (itype) = TYPE_SIZE_UNIT (type);
+   SET_TYPE_ALIGN (itype, TYPE_ALIGN (type));
+   TYPE_USER_ALIGN (itype) = TYPE_USER_ALIGN (type);
+   SET_TYPE_WARN_IF_NOT_ALIGN (itype, TYPE_WARN_IF_NOT_ALIGN (type));
+
+   if (!shared)
+      return itype;
+
+   if ((TYPE_MIN_VALUE (itype)
+   && TREE_CODE (TYPE_MIN_VALUE (itype)) != INTEGER_CST)
+   || (TYPE_MAX_VALUE (itype)
+   && TREE_CODE (TYPE_MAX_VALUE (itype)) != INTEGER_CST)){
+      /* Since we cannot reliably merge this type, we need to compare it using
+      structural equality checks.  */
+      SET_TYPE_STRUCTURAL_EQUALITY (itype);
+      return itype;
+   }
+
+   hashval_t hash = mtcs_tree_type_hash_canon_hash/*!type_hash_canon_hash*/(self,itype);
+   itype = mtcs_tree_type_hash_canon/*!type_hash_canon*/(self,hash, itype);
+
+   return itype;
+}
+
+/* Wrapper around build_range_type_1 with SHARED set to true.  */
+//原型 build_range_type tree.h tree.cc
+tree mtcs_tree_build_range_type (MtcsTree *self,tree type, tree lowval, tree highval)
+{
+  return build_range_type_1(self,type, lowval, highval, true);
+}
+
+/* Create a type of integers to be the TYPE_DOMAIN of an ARRAY_TYPE.
+   MAXVAL should be the maximum value in the domain
+   (one less than the length of the array).
+
+   The maximum value that MAXVAL can have is INT_MAX for a HOST_WIDE_INT.
+   We don't enforce this limit, that is up to caller (e.g. language front end).
+   The limit exists because the result is a signed type and we don't handle
+   sizes that use more than one HOST_WIDE_INT.  */
+//原型 build_index_type tree.h tree.cc
+tree mtcs_tree_build_index_type (MtcsTree *self,tree maxval)
+{
+  return mtcs_tree_build_range_type/*!build_range_type*/(self,sizetype, size_zero_node, maxval);
+}
+
+/**
+ * 从主机类型找到设备类型
+ * mtcs_tree_build_common_tree_nodes已完成tree的创建
+ */
+tree mtcs_tree_host_to_device(MtcsTree *self,tree hostType)
+{
+   gcc_assert(!self->haveBackup);
+   int i;
+   for(i=0;i<TI_MAX;i++){
+      if(hostType==global_trees[i]){
+         n_debug("mtcstree.c  global_trees 找到类型 00 i:%d 主机:%p  MTCS:%p %s\n",
+         i,hostType,self->global_trees[i],get_tree_code_name(TREE_CODE(global_trees[i])));
+         //aet_print_tree(global_trees[i]);
+         return self->global_trees[i];
+      }
+   }
+
+   for(i=0;i<itk_none;i++)
+      if(hostType==integer_types[i]){
+         n_debug("mtcstree.c 在integer_types 找到类型 11 i:%d 主机:%p MTCS:%p %s\n",
+         i,hostType,self->integer_types[i],get_tree_code_name(TREE_CODE(integer_types[i])));
+         // aet_print_tree(integer_types[i]);
+         return self->integer_types[i];
+      }
+
+   for(i=0;i<(int) stk_type_kind_last;i++)
+      if(hostType==sizetype_tab[i])
+         return self->sizetype_tab[i];
+
+   if(TREE_CODE(hostType)==INTEGER_TYPE){
+      tree newtype = build_nonstandard_integer_type (TYPE_PRECISION (hostType), TYPE_UNSIGNED (hostType));
+      if(newtype==hostType){
+         n_debug("mtcstree.c  mtcsclones hostToDeviceTree 找到一个非标准的整形:%p\n",hostType);
+         tree newtype = mtcs_tree_build_nonstandard_integer_type (self,
+               TYPE_PRECISION (hostType), TYPE_UNSIGNED (hostType));
+         return newtype;
+      }else{
+         n_error("不合逻辑 hostToDeviceTree hostType:%p",hostType);
+      }
+   }
+   return NULL_TREE;
+}
+
+nboolean mtcs_tree_is_host_global(MtcsTree *self,tree type)
+{
+   gcc_assert(!self->haveBackup);
+   int i;
+   for(i=0;i<TI_MAX;i++)
+      if(type==global_trees[i])
+         return true;
+
+   for(i=0;i<itk_none;i++)
+      if(type==integer_types[i])
+         return true;
+
+   for(i=0;i<(int) stk_type_kind_last;i++)
+      if(type==sizetype_tab[i])
+         return true;
+
+   if(TREE_CODE(type)==INTEGER_TYPE){
+      tree newtype = build_nonstandard_integer_type (TYPE_PRECISION (type), TYPE_UNSIGNED (type));
+      if(newtype==type){
+         n_debug("mtcstree.c isHostGlobalTree 找到一个非标准的整形:%p\n",type);
+         return true;
+      }
+   }
+
+   return false;
+}
+
+nboolean mtcs_tree_is_device_global(MtcsTree *self,tree type)
+{
+   gcc_assert(!self->haveBackup);
+   int i;
+   for(i=0;i<TI_MAX;i++)
+      if(type==self->global_trees[i])
+         return true;
+
+   for(i=0;i<itk_none;i++)
+      if(type==self->integer_types[i])
+         return true;
+
+   for(i=0;i<(int) stk_type_kind_last;i++)
+      if(type==self->sizetype_tab[i])
+         return true;
+
+   if(TREE_CODE(type)==INTEGER_TYPE){
+      tree newtype =  mtcs_tree_build_nonstandard_integer_type/*!build_nonstandard_integer_type*/(self,
+            TYPE_PRECISION (type), TYPE_UNSIGNED (type));
+      if(newtype==type){
+         n_debug("mtcstree.c isHostGlobalTree 找到一个非标准的整形:%p\n",type);
+         return true;
+      }
+   }
+
+   return false;
+}
+
+static tree device2Host(MtcsTree *self,tree deviceType)
+{
+   gcc_assert(!self->haveBackup);
+   int i;
+   for(i=0;i<TI_MAX;i++){
+      if(deviceType==self->global_trees[i]){
+         n_debug("mtcstree.c d2h global_trees 找到类型 00 i:%d 主机:%p  MTCS:%p %s\n",
+         i,deviceType,self->global_trees[i],get_tree_code_name(TREE_CODE(self->global_trees[i])));
+         //aet_print_tree(global_trees[i]);
+         return global_trees[i];
+      }
+   }
+
+   for(i=0;i<itk_none;i++)
+      if(deviceType==self->integer_types[i]){
+         n_debug("mtcstree.c d2h 在integer_types 找到类型 11 i:%d 主机:%p MTCS:%p %s\n",
+               i,deviceType,self->integer_types[i],get_tree_code_name(TREE_CODE(self->integer_types[i])));
+         // aet_print_tree(integer_types[i]);
+         return integer_types[i];
+      }
+
+   for(i=0;i<(int) stk_type_kind_last;i++)
+      if(deviceType==self->sizetype_tab[i])
+         return sizetype_tab[i];
+
+   if(TREE_CODE(deviceType)==INTEGER_TYPE){
+      tree newtype = mtcs_tree_build_nonstandard_integer_type/*!build_nonstandard_integer_type*/(self,
+            TYPE_PRECISION (deviceType), TYPE_UNSIGNED (deviceType));
+      if(newtype==deviceType){
+         n_debug("mtcstree.c d2h mtcsclones hostToDeviceTree 找到一个非标准的整形:%p\n",deviceType);
+         tree newtype = build_nonstandard_integer_type (TYPE_PRECISION (deviceType), TYPE_UNSIGNED (deviceType));
+         return newtype;
+      }else{
+         n_error("不合逻辑 mtcs_tree_device_to_host deviceType:%p",deviceType);
+      }
+   }
+   return NULL_TREE;
+}
+
+tree mtcs_tree_device_to_host(MtcsTree *self,tree deviceType)
+{
+   gcc_assert(!self->haveBackup);
+  // self->mtcsBackupRestore.restore(&self->mtcsBackupRestore);//恢复主机的global_trees
+   tree ret = device2Host(self,deviceType);
+   //self->mtcsBackupRestore.backup(&self->mtcsBackupRestore);//备份设备的tree覆盖主机的global_trees
+   return ret;
+}
+
+

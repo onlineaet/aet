@@ -157,16 +157,14 @@ static void count_reg_usage (MtcsCse *self,rtx x, int *counts, rtx dest, int inc
 
    if (x == 0)
       return;
-   n_debug("mtcscse.c count_reg_usage  00 x:%p dest:%p name:%s\n",x,dest,GET_RTX_NAME(GET_CODE (x)));
-
+   //n_debug("mtcscse.c count_reg_usage  00 x:%p dest:%p name:%s\n",x,dest,GET_RTX_NAME(GET_CODE (x)));
    switch (code = GET_CODE (x)){
       case REG:
          if (x != dest){
-            n_debug("mtcscse.c count_reg_usage  11 设counts x:%p dest:%p name:%s REGNO (x):%d\n",x,dest,GET_RTX_NAME(code),REGNO (x));
+            //n_debug("mtcscse.c count_reg_usage  11 设counts x:%p dest:%p name:%s REGNO (x):%d\n",x,dest,GET_RTX_NAME(code),REGNO (x));
             counts[REGNO (x)] += incr;
-            mtcs_print_rtl_single(stderr,x);
-            mtcs_print_rtl_single(stderr,dest);
-
+            //mtcs_print_rtl_single(stderr,x);
+            //mtcs_print_rtl_single(stderr,dest);
          }
          return;
 
@@ -175,7 +173,7 @@ static void count_reg_usage (MtcsCse *self,rtx x, int *counts, rtx dest, int inc
       CASE_CONST_ANY:
       case SYMBOL_REF:
       case LABEL_REF:
-         n_debug("mtcscse.c count_reg_usage  22 x:%p dest:%p name:%s\n",x,dest,GET_RTX_NAME(code));
+         //n_debug("mtcscse.c count_reg_usage  22 x:%p dest:%p name:%s\n",x,dest,GET_RTX_NAME(code));
          return;
 
       case CLOBBER:
@@ -6856,14 +6854,14 @@ int mtcs_cse_delete_trivially_dead_insns (MtcsCse *self,rtx_insn *insns, int nre
 
       for (insn = insns; insn; insn = NEXT_INSN (insn))
          if (INSN_P (insn)){
-            n_debug("mtcscse.c mtcs_cse_delete_trivially_dead_insns 33 nreg:%d insns:%p \n",nreg,insn);
-            mtcs_print_rtl_single(stderr,insn);
+            //n_debug("mtcscse.c mtcs_cse_delete_trivially_dead_insns 33 nreg:%d insns:%p \n",nreg,insn);
+            //mtcs_print_rtl_single(stderr,insn);
             count_reg_usage(self,insn, counts, NULL_RTX, 1);
          }
       /* If no debug insns can be present, COUNTS is just an array
       which counts how many times each pseudo is used.  */
    }
-   n_debug("mtcscse.c mtcs_cse_delete_trivially_dead_insns 44 nreg:%d insns:%p reload_completed:%d\n",nreg,insns,reload_completed);
+   //n_debug("mtcscse.c mtcs_cse_delete_trivially_dead_insns 44 nreg:%d insns:%p reload_completed:%d\n",nreg,insns,reload_completed);
 
    /* Pseudo PIC register should be considered as used due to possible
    new usages generated.  */
@@ -6897,9 +6895,9 @@ int mtcs_cse_delete_trivially_dead_insns (MtcsCse *self,rtx_insn *insns, int nre
 
       /* If this is a dead insn, delete it and show registers in it aren't
       being used.  */
-      n_debug("mtcscse.c mtcs_cse_delete_trivially_dead_insns 55 nreg:%d insn:%p live_insn:%d %d\n",
-               nreg,insn,live_insn ,dbg_cnt (delete_trivial_dead));
-      mtcs_print_rtl_single(stderr,insn);
+     // n_debug("mtcscse.c mtcs_cse_delete_trivially_dead_insns 55 nreg:%d insn:%p live_insn:%d %d\n",
+               //nreg,insn,live_insn ,dbg_cnt (delete_trivial_dead));
+      //mtcs_print_rtl_single(stderr,insn);
       if (! live_insn && dbg_cnt (delete_trivial_dead)){
          if (DEBUG_INSN_P (insn)){
             if (DEBUG_BIND_INSN_P (insn))
@@ -6920,8 +6918,8 @@ int mtcs_cse_delete_trivially_dead_insns (MtcsCse *self,rtx_insn *insns, int nre
 
                /* Create DEBUG_EXPR (and DEBUG_EXPR_DECL).  */
                dval = make_debug_expr_from_rtl (SET_DEST (set));
-               n_debug("mtcscse.c mtcs_cse_delete_trivially_dead_insns 66 nreg:%d insn:%p dval:%p\n",
-                     nreg,insn,dval);
+               //n_debug("mtcscse.c mtcs_cse_delete_trivially_dead_insns 66 nreg:%d insn:%p dval:%p\n",
+                     //nreg,insn,dval);
 
                /* Emit a debug bind insn before the insn in which
                reg dies.  */
@@ -6954,8 +6952,8 @@ int mtcs_cse_delete_trivially_dead_insns (MtcsCse *self,rtx_insn *insns, int nre
    }
 
    if (MAY_HAVE_DEBUG_BIND_INSNS){
-      n_debug("mtcscse.c mtcs_cse_delete_trivially_dead_insns 77 nreg:%d insns:%p ndead:%d\n",
-                      nreg,insns,ndead);
+      //n_debug("mtcscse.c mtcs_cse_delete_trivially_dead_insns 77 nreg:%d insns:%p ndead:%d\n",
+                      //nreg,insns,ndead);
       for (insn = mtcs_rtl_data_get_last_insn/*!get_last_insn*/(mtcsRtlData); insn; insn = PREV_INSN (insn))
          if (DEBUG_BIND_INSN_P (insn)){
             /* If this debug insn references a dead register that wasn't replaced
@@ -6974,15 +6972,14 @@ int mtcs_cse_delete_trivially_dead_insns (MtcsCse *self,rtx_insn *insns, int nre
          }
       free (replacements);
    }
-   n_debug("mtcscse.c mtcs_cse_delete_trivially_dead_insns 88 nreg:%d insns:%p ndead:%d\n",
-                   nreg,insns,ndead);
+   //n_debug("mtcscse.c mtcs_cse_delete_trivially_dead_insns 88 nreg:%d insns:%p ndead:%d\n",
+                   //nreg,insns,ndead);
    if (dump_file && ndead)
       fprintf (dump_file, "Deleted %i trivially dead insns\n",ndead);
    /* Clean up.  */
    free (counts);
    return ndead;
 }
-
 
 MtcsCse *mtcs_cse_new(MtcsMode *mtcsMode)
 {

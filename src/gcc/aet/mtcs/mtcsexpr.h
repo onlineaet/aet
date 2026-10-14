@@ -70,8 +70,6 @@ bool mtcs_expr_can_move_by_pieces (MtcsExpr *self,unsigned HOST_WIDE_INT len, un
 //原型 by_pieces_ninsns target.h expr.cc
 unsigned HOST_WIDE_INT mtcs_expr_by_pieces_ninsns(MtcsExpr *self,unsigned HOST_WIDE_INT l, unsigned int align,
           unsigned int max_size, by_pieces_operation op);
-//原型 emit_block_copy_via_libcall expr.h
-rtx mtcs_expr_emit_block_copy_via_libcall (MtcsExpr *self,rtx dst, rtx src, rtx size, bool tailcall = false);
 //原型 emit_block_op_via_libcall expr.h expr.cc
 rtx mtcs_expr_emit_block_op_via_libcall (MtcsExpr *self,enum built_in_function fncode, rtx dst, rtx src,
                rtx size, bool tailcall);
@@ -262,5 +260,7 @@ void mtcs_expr_expand_reversed_crc_table_based (MtcsExpr *self,rtx op0, rtx op1,
 void mtcs_expr_generate_reflecting_code_standard (MtcsExpr *self,rtx *op);
 //原型 get_personality_function expr.h expr.cc
 rtx mtcs_expr_get_personality_function (MtcsExpr *self,tree decl);
+//原型 set_storage_via_libcall expr.h expr.cc
+rtx mtcs_expr_set_storage_via_libcall (MtcsExpr *self,rtx object, rtx size, rtx val, bool tailcall=false);
 
 #endif

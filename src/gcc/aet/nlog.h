@@ -82,6 +82,8 @@ void             n_log_set_param_from_env();
 void             n_log_enter_front();
 void             n_log_enter_end();
 void             n_log_enter_mtcs();
+void             n_log_enter_force_front(nboolean enter);
+
 /**
  * 设置获取正在编译的文件回调函数，由classparser.c调用。
  */

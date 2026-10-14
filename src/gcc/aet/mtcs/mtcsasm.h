@@ -243,6 +243,7 @@ rtx      mtcs_asm_output_constant_def (MtcsAsm *self,tree exp, int defer);
 void     mtcs_asm_place_block_symbol (MtcsAsm *self,rtx symbol);
 //原型 align_variable output.h varasm.cc
 void     mtcs_asm_align_variable (MtcsAsm *self,tree decl, bool dont_output_data);
+//原型 compute_reloc_for_constant output.h varasm.cc
 int      mtcs_asm_compute_reloc_for_constant (MtcsAsm *self,tree exp);
 //原型 decl_binds_to_current_def_p varasm.h varasm.cc
 bool     mtcs_asm_decl_binds_to_current_def_p (MtcsAsm *self,const_tree decl);
@@ -303,6 +304,8 @@ void mtcs_asm_output_dwarf_table_ref(MtcsAsm *self,char * frame_table_labe);
 rtx mtcs_asm_make_decl_rtl_for_debug (MtcsAsm *self,tree decl);
 //保存编译好的ptx到变量
 void mtcs_asm_create_asm_var(MtcsAsm *self);
+//原型 compute_reloc_for_var output.h varasm.cc
+int mtcs_asm_compute_reloc_for_var (MtcsAsm *self,tree decl);
 
 /* Holds the RTL expression for the value of a variable or function.
    This value can be evaluated lazily for functions, variables with

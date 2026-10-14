@@ -564,16 +564,16 @@ bool mtcs_cfg_state_patch_jump_insn (MtcsCfgState *self,rtx_insn *insn, rtx_insn
 
   rtx_jump_table_data *table;
   rtx tmp;
-  n_debug("mtcscfgstate.c mtcs_cfg_state_patch_jump_insn 00\n");
-  mtcs_print_rtl_single(stderr,insn);
-  n_debug("mtcscfgstate.c mtcs_cfg_state_patch_jump_insn 11\n");
-  mtcs_print_rtl_single(stderr,old_label);
+  //n_debug("mtcscfgstate.c mtcs_cfg_state_patch_jump_insn 00\n");
+  //mtcs_print_rtl_single(stderr,insn);
+  //n_debug("mtcscfgstate.c mtcs_cfg_state_patch_jump_insn 11\n");
+  //mtcs_print_rtl_single(stderr,old_label);
 
   /* Recognize a tablejump and adjust all matching cases.  */
   if (tablejump_p (insn, NULL, &table)){
       rtvec vec;
       int j;
-      n_debug("mtcscfgstate.c mtcs_cfg_state_patch_jump_insn 22\n");
+      //n_debug("mtcscfgstate.c mtcs_cfg_state_patch_jump_insn 22\n");
 
       rtx_code_label *new_label = mtcs_cfg_rtl_block_label/*!block_label*/(mtcsCfgRtl,new_bb);
       if (new_bb == EXIT_BLOCK_PTR_FOR_FN (cfun))
@@ -595,7 +595,7 @@ bool mtcs_cfg_state_patch_jump_insn (MtcsCfgState *self,rtx_insn *insn, rtx_insn
           ++LABEL_NUSES (new_label);
       }
   }else if ((tmp = extract_asm_operands (PATTERN (insn))) != NULL){
-     n_debug("mtcscfgstate.c mtcs_cfg_state_patch_jump_insn 33\n");
+     //n_debug("mtcscfgstate.c mtcs_cfg_state_patch_jump_insn 33\n");
 
       int i, n = ASM_OPERANDS_LABEL_LENGTH (tmp);
       rtx note;
@@ -628,7 +628,7 @@ bool mtcs_cfg_state_patch_jump_insn (MtcsCfgState *self,rtx_insn *insn, rtx_insn
       while ((note = find_reg_note (insn, REG_LABEL_OPERAND, old_label)) != NULL_RTX)
           XEXP (note, 0) = new_label;
   }else{
-     n_debug("mtcscfgstate.c mtcs_cfg_state_patch_jump_insn 44\n");
+     //n_debug("mtcscfgstate.c mtcs_cfg_state_patch_jump_insn 44\n");
 
       /* ?? We may play the games with moving the named labels from
      one basic block to the other in case only one computed_jump is
@@ -637,10 +637,10 @@ bool mtcs_cfg_state_patch_jump_insn (MtcsCfgState *self,rtx_insn *insn, rtx_insn
       /* A return instruction can't be redirected.  */
       || returnjump_p (insn))
           return false;
-      n_debug("mtcscfgstate.c mtcs_cfg_state_patch_jump_insn 55\n");
+      //n_debug("mtcscfgstate.c mtcs_cfg_state_patch_jump_insn 55\n");
 
       if (!mtcsExpand->currently_expanding_to_rtl || JUMP_LABEL (insn) == old_label){
-         n_debug("mtcscfgstate.c mtcs_cfg_state_patch_jump_insn 66\n");
+         //n_debug("mtcscfgstate.c mtcs_cfg_state_patch_jump_insn 66\n");
 
           /* If the insn doesn't go where we think, we're confused.  */
           gcc_assert (JUMP_LABEL (insn) == old_label);
@@ -650,8 +650,8 @@ bool mtcs_cfg_state_patch_jump_insn (MtcsCfgState *self,rtx_insn *insn, rtx_insn
              jumps.  */
           if (!mtcs_dojump_redirect_jump/*!redirect_jump*/(mtcsDojump,
                 as_a <rtx_jump_insn *> (insn),mtcs_cfg_rtl_block_label/*!block_label*/(mtcsCfgRtl,new_bb), 0)){
-             n_debug("mtcscfgstate.c patch_jump_insn 77\n");
-              mtcs_print_rtl(stderr,insn);
+             //n_debug("mtcscfgstate.c patch_jump_insn 77\n");
+              //mtcs_print_rtl(stderr,insn);
               gcc_assert (new_bb == EXIT_BLOCK_PTR_FOR_FN (cfun) || CROSSING_JUMP_P (insn));
               return false;
           }

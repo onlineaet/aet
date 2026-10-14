@@ -109,5 +109,7 @@ int mtcs_align_get_label_align_after_barrier(MtcsAlign *self,rtx_insn *table);
 int mtcs_align_get_insn_length_alignment(MtcsAlign *self,rtx_insn *table);
 //原型 #define DWARF_CIE_DATA_ALIGNMENT (-((int) UNITS_PER_WORD))
 int mtcs_align_get_dwarf_cie_data_alignment(MtcsAlign *self);
+//原型 get_mem_align_offset emit-rtl.h emit-rtl.cc
+int mtcs_align_get_mem_align_offset (MtcsAlign *self,rtx mem, unsigned int align);
 
 #endif

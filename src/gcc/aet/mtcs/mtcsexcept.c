@@ -1811,7 +1811,8 @@ void mtcs_except_init_eh (MtcsExcept *self)
       DECL_FIELD_CONTEXT (f_cs) = self->sjlj_fc_type_node;
 
       tmp = build_index_type (size_int (4 - 1));
-      tmp = build_array_type (lang_hooks.types.type_for_mode(targetm.unwind_word_mode (), 1),tmp);
+      tmp = mtcs_tree_build_array_type/*!build_array_type*/(mtcsTree,
+            lang_hooks.types.type_for_mode(targetm.unwind_word_mode (), 1),tmp);
       f_data = mtcs_tree_build_decl/*!build_decl*/(mtcsTree,BUILTINS_LOCATION,FIELD_DECL, get_identifier ("__data"), tmp);
       DECL_FIELD_CONTEXT (f_data) = self->sjlj_fc_type_node;
 
@@ -1849,8 +1850,9 @@ void mtcs_except_init_eh (MtcsExcept *self)
 #endif
 
       tmp = build_index_type (tmp);
-      tmp = build_array_type (ptr_type_node, tmp);
-      f_jbuf = mtcs_tree_build_decl/*!build_decl*/(mtcsTree,BUILTINS_LOCATION,FIELD_DECL, get_identifier ("__jbuf"), tmp);
+      tmp = mtcs_tree_build_array_type/*!build_array_type*/(mtcsTree,ptr_type_node, tmp);
+      f_jbuf = mtcs_tree_build_decl/*!build_decl*/(mtcsTree,BUILTINS_LOCATION,FIELD_DECL,
+            get_identifier ("__jbuf"), tmp);
 #ifdef DONT_USE_BUILTIN_SETJMP //host=0 nvptx=0
       /* We don't know what the alignment requirements of the
     runtime's jmp_buf has.  Overestimate.  */

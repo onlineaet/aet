@@ -28,11 +28,13 @@
 
 char        *ptx_tool_replace_dot (const char *name);
 const char  *ptx_tool_section_for_sym (rtx sym);
-nboolean     ptx_tool_get_isa_and_version(char *first,char *second,int *result);
 nboolean     ptx_tool_valid_isa_version (PtxIsa isa,PtxVersion version);
 const char  *ptx_tool_sm_version_to_string (PtxIsa sm);
 const char  *ptx_tool_version_to_string (PtxVersion v);
 PtxVersion   ptx_tool_get_first_version_supporting_sm (PtxIsa sm);
+nboolean     ptx_tool_get_isa_and_version(char *isaStr,int major,int minor,int *pisa,int *pversion);
+int          ptx_tool_get_isa (const char *sm);
+const char  *ptx_tool_get_sm_string (PtxIsa sm);
 
 #endif
 

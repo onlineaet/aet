@@ -2731,4 +2731,50 @@
   ""
   "%.\\trsqrt.approx%t0\\t%0, %1;")
   
+;;加入cpymem 2026-10-12
+(define_expand "cpymem<mode>"
+  [(use (match_operand:BLK 0 "memory_operand"))
+   (use (match_operand:BLK 1 "memory_operand"))
+   (use (match_operand:SDIM 2 "nvptx_nonmemory_operand"))
+   (use (match_operand:SDIM 3 "const_int_operand"))
+   (use (match_operand:SI 4 "const_int_operand"))
+   (use (match_operand:SI 5 "const_int_operand"))
+   (use (match_operand:SI 6 ""))
+   (use (match_operand:SI 7 ""))
+   (use (match_operand:SI 8 ""))]
+  ""
+{
+ if (mtcs_ptx_builtins_expand_set_or_cpymem ((MtcsPtxBuiltins *)mtcsTarget->mtcsBuiltins,
+                 operands[0], operands[1],
+                 operands[2], NULL, operands[3],
+                 operands[4], operands[5],
+            operands[6], operands[7],
+            operands[8], false))
+   DONE;
+ else
+   FAIL;
+})
 
+;;加入memset 2026-10-13
+(define_expand "setmem<mode>"
+  [(use (match_operand:BLK  0 "memory_operand"))
+   (use (match_operand:SDIM 1 "nvptx_nonmemory_operand"))
+   (use (match_operand:QI   2 "nvptx_nonmemory_operand"))
+   (use (match_operand      3 "const_int_operand"))
+   (use (match_operand:SI   4 "const_int_operand"))
+   (use (match_operand:SI   5 "const_int_operand"))
+   (use (match_operand:SI   6 ""))
+   (use (match_operand:SI   7 ""))
+   (use (match_operand:SI   8 ""))]
+  ""
+{
+ if (mtcs_ptx_builtins_expand_set_or_cpymem ((MtcsPtxBuiltins *)mtcsTarget->mtcsBuiltins,
+                 operands[0], NULL,
+                 operands[1], operands[2], operands[3],
+                 operands[4], operands[5],
+                 operands[6], operands[7],
+                 operands[8], true))
+   DONE;
+ else
+   FAIL;
+})

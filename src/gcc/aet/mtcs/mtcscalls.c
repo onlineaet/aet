@@ -4091,7 +4091,6 @@ rtx mtcs_calls_expand_call (MtcsCalls *self,tree exp, rtx target, int ignore)
   }else{
       mtcs_emit_emit_insn/*!emit_insn*/(mtcsEmit,normal_call_insns);
       n_debug("mtcscalls.c expand_call 197 %s try_tail_call:%p\n",fnName,try_tail_call);
-
       if (try_tail_call)
         /* Ideally we'd emit a message for all of the ways that it could
            have failed.  */
@@ -4100,7 +4099,6 @@ rtx mtcs_calls_expand_call (MtcsCalls *self,tree exp, rtx target, int ignore)
 
   currently_expanding_call--;
   n_debug("mtcscalls.c expand_call 198  %s 结束 currently_expanding_call:%d\n",fnName,currently_expanding_call);
-
   free (stack_usage_map_buf);
   free (args);
   mtcs_arg_free_cumulative_args(mtcsArgs,args_so_far_v);

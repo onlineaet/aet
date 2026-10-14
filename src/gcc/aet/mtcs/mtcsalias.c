@@ -2600,8 +2600,12 @@ static tree decl_for_component_ref (tree x)
    for the offset of the field reference.  *KNOWN_P says whether the
    offset is known.  */
 
-static void adjust_offset_for_component_ref (tree x, bool *known_p,poly_int64 *offset)
+static void adjust_offset_for_component_ref(MtcsAlias *self,tree x, bool *known_p,poly_int64 *offset)
 {
+   MtcsMode *mtcsMode=MTCS_GET_MODE_OBJECT(self);
+   MtcsTarget *mtcsTarget=(MtcsTarget *)mtcsMode->target;
+   MtcsTree  *mtcsTree=mtcs_target_get_tree(mtcsTarget);
+
    if (!*known_p)
       return;
    do{
@@ -2661,7 +2665,7 @@ bool mtcs_alias_nonoverlapping_memrefs_p (MtcsAlias *self,const_rtx x, const_rtx
       tree t = decl_for_component_ref (exprx);//不移植
       if (! t)
          return false;
-      adjust_offset_for_component_ref (exprx, &moffsetx_known_p, &moffsetx);
+      adjust_offset_for_component_ref(self,exprx, &moffsetx_known_p, &moffsetx);
       exprx = t;
    }
 
@@ -2672,7 +2676,7 @@ bool mtcs_alias_nonoverlapping_memrefs_p (MtcsAlias *self,const_rtx x, const_rtx
       tree t = decl_for_component_ref (expry);
       if (! t)
          return false;
-      adjust_offset_for_component_ref (expry, &moffsety_known_p, &moffsety);
+      adjust_offset_for_component_ref(self,expry, &moffsety_known_p, &moffsety);
       expry = t;
    }
 

@@ -30,14 +30,16 @@ typedef struct _MtcsPort MtcsPort;
 struct _MtcsPort
 {
     MtcsComponent parent;
+    nboolean hostToDevice;//从主机的tree移到设备
     int processing_debug_stmt;
-    NPtrArray *bufferArray;
 };
 
 
 MtcsPort *mtcs_port_new(MtcsMode *mtcsMode);
 void      mtcs_port_port(MtcsPort *self);
-void      mtcs_port_replace_bitsizetype(MtcsPort *self);
-void      mtcs_port_restore_bitsizetype(MtcsPort *self);
+tree      mtcs_port_host_to_device(MtcsPort *self,tree hostTree);
+void      mtcs_port_host_to_device(MtcsPort *self,tree *hostTree,int count);
+tree      mtcs_port_device_to_host(MtcsPort *self,tree hostTree);
+void      mtcs_port_device_to_host(MtcsPort *self,tree *hostTree,int count);
 
 #endif

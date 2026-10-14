@@ -59,7 +59,7 @@
 #include "../mtcscompile.h"
 #include "../mtcsprintrtl.h"
 
-static int debug_subst=1;
+static int debug_subst=0;
 static void printsubst(char *explain,rtx x,rtx from, rtx to,bool in_dest, bool in_cond, bool unique_copy);
 
 
@@ -2155,7 +2155,7 @@ static int count_auto_inc (rtx, rtx, rtx, rtx, rtx, void *arg)
 
 static void printbb(char *explain,rtx_insn *i3, rtx_insn *i2)
 {
-  // return;
+   return;
    if(!cfun)
        return ;
     basic_block bb;
@@ -2266,11 +2266,11 @@ static rtx_insn * try_combine (MtcsCombine *self,rtx_insn *i3, rtx_insn *i2, rtx
    int i;
    scalar_int_mode dest_mode, temp_mode;
    bool has_non_call_exception = false;
-   n_debug("mtcscombine.c  try_combine 00\n");
-      mtcs_print_rtl_single(stderr,i3);
-      mtcs_print_rtl_single(stderr,i2);
-      mtcs_print_rtl_single(stderr,i1);
-      mtcs_print_rtl_single(stderr,i0);
+//   n_debug("mtcscombine.c  try_combine 00\n");
+//      mtcs_print_rtl_single(stderr,i3);
+//      mtcs_print_rtl_single(stderr,i2);
+//      mtcs_print_rtl_single(stderr,i1);
+//      mtcs_print_rtl_single(stderr,i0);
 
    /* Immediately return if any of I0,I1,I2 are the same insn (I3 can
    never be).  */
@@ -13578,8 +13578,8 @@ static rtx gen_lowpart_for_combine (machine_mode omode, rtx x)
 
    machine_mode imode = GET_MODE (x);
    rtx result;
-   n_debug("mtcscombine.c gen_lowpart_for_combine 00 omode:%d imode:%d\n",omode,imode);
-   mtcs_print_rtl_single(stderr,x);
+   ///n_debug("mtcscombine.c gen_lowpart_for_combine 00 omode:%d imode:%d\n",omode,imode);
+  // mtcs_print_rtl_single(stderr,x);
 
    if (omode == imode)
       return x;
@@ -13638,12 +13638,12 @@ static rtx gen_lowpart_for_combine (machine_mode omode, rtx x)
 
       if (imode == VOIDmode){
          imode = mtcs_mode_int_mode_for_mode/*!int_mode_for_mode*/(mtcsMode,omode).require ();
-         n_debug("mtcscombine.c gen_lowpart_for_combine 11 omode:%d imode:%d\n",omode,imode);
+         //n_debug("mtcscombine.c gen_lowpart_for_combine 11 omode:%d imode:%d\n",omode,imode);
          x = mtcs_rtl_gen_lowpart_common/*!gen_lowpart_common*/(mtcsRTL,imode, x);
          if (x == NULL)
             goto fail;
       }
-      n_debug("mtcscombine.c gen_lowpart_for_combine 22 omode:%d imode:%d\n",omode,imode);
+      //n_debug("mtcscombine.c gen_lowpart_for_combine 22 omode:%d imode:%d\n",omode,imode);
       res = mtcs_simplify_rtx_lowpart_subreg/*!lowpart_subreg*/(mtcsSimplifyRtx,omode, x, imode);
       if (res)
          return res;

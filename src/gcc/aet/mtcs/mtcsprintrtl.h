@@ -188,5 +188,8 @@ void mtcs_print_rtx_insn_vec (FILE *file, const vec<rtx_insn *> &vec);
 void mtcs_print_func_rtl(struct function *fn);
 //重载函数
 void mtcs_print_func_rtl(struct function *fn,const char *explain);
+//原型 print_rtl rtl.h print-rtl.cc
+void mtcs_print_rtl_skip_debug (FILE *outf, const_rtx rtx_first);
+void mtcs_print_rtl_single_skip_debug(FILE *outf, const_rtx x);
 
 #endif

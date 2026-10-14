@@ -526,7 +526,6 @@ struct c_expr  block_mgr_parser(BlockMgr *self)
    location_t startLoc=c_parser_peek_token (parser)->location;
    NString *body=n_string_new("");
    aet_print_token(c_parser_peek_token (parser));
-   printf("获取泛型块源代码\n");
    c_parser_skip_to_end_of_block_or_statement(parser,body);
    n_string_append(body,"\n");
    location_t endLoc=c_parser_peek_token (parser)->location;
@@ -539,7 +538,7 @@ struct c_expr  block_mgr_parser(BlockMgr *self)
    n_string_free(body,TRUE);
    body=bodys;
    //生成名字和参数
-   printf("获取泛型块源代码 11 %s\n",body->str);
+   n_debug("获取泛型块源代码  %s\n",body->str);
 
    GenericInfo *ginfo=getInfoAndCreate(self,className);
    GenericBlock *block=generic_info_add_block(ginfo,self->lhs,exprlist,

@@ -367,13 +367,12 @@ static void parser_var_or_fun_declaration(ParserStatic *self,struct c_declspecs 
       should diagnose if there were no declaration specifiers) or a
       function definition (in which case the diagnostic for
       implicit int suffices).  */
-      aet_print_token(c_parser_peek_token (parser));
       declarator = aet_parser_c_parser_declarator/*!c_parser_declarator*/(self->parser,
             specs->typespec_kind != ctsk_none,C_DTR_NORMAL, &dummy);
-      aet_print_token(c_parser_peek_token (parser));
       if (declarator == NULL){
          n_debug("静态声明分析 55： count:%d declarator == NULL ", testcount);
-         aet_parser_c_parser_skip_to_end_of_block_or_statement/*!c_parser_skip_to_end_of_block_or_statement*/(self->parser);
+         aet_parser_c_parser_skip_to_end_of_block_or_statement
+            /*!c_parser_skip_to_end_of_block_or_statement*/(self->parser);
          return;
       }
       if (c_parser_next_token_is (parser, CPP_EQ)
@@ -398,7 +397,8 @@ static void parser_var_or_fun_declaration(ParserStatic *self,struct c_declspecs 
          if (c_parser_next_token_is_keyword (parser, RID_ATTRIBUTE)){
             n_debug("静态声明分析 88： count:%d ", testcount);
             error_at (here, "不能有attributes should be specified before the declarator in a function definition");
-            aet_parser_c_parser_skip_to_end_of_block_or_statement/*!c_parser_skip_to_end_of_block_or_statement*/(self->parser);
+            aet_parser_c_parser_skip_to_end_of_block_or_statement
+               /*!c_parser_skip_to_end_of_block_or_statement*/(self->parser);
             return;
          }
          if (c_parser_next_token_is (parser, CPP_EQ)){
@@ -431,12 +431,11 @@ static void parser_var_or_fun_declaration(ParserStatic *self,struct c_declspecs 
                flag_sanitize = flag_sanitize_save;
                finish_init ();
             }
-            aet_print_token(c_parser_peek_token (parser));
             n_debug("静态声明分析 99：完成初始化 token是等号 count:%d init:%p ",testcount,init.value);
             if (d != error_mark_node){
                maybe_warn_string_init (init_loc, TREE_TYPE (d), init);
-               n_debug("静态声明分析 100 这里是关键，静态变量被声明成extern 但是定义要留到impl$中实现，所以把初始化保存起来。init:%p isStaticVarDecl:%d\n",
-               init.value,isStaticVarDecl);
+               n_debug("静态声明分析 100 关键，变量是 extern 但定义要留到impl$实现，所以保存初始化。init:%p isStaticVarDecl:%d\n",
+                     init.value,isStaticVarDecl);
                //finish_decl (d, init_loc, init.value,init.original_type, asm_name);
                finish_decl (d, UNKNOWN_LOCATION, NULL_TREE,NULL_TREE, asm_name);
                if(isStaticVarDecl){
@@ -489,6 +488,8 @@ static void parser_var_or_fun_declaration(ParserStatic *self,struct c_declspecs 
                if(isFuncOk){
                   func_mgr_set_static_func_decl(func_mgr_get(),d,className,FALSE);
                   func_mgr_set_static_func_premission(func_mgr_get(),className,d,permi,isFinal);
+                  if(self->tqrgetIntrinsicFunc)
+                     self->tqrgetIntrinsicFunc(d,self->userData);
                }
                if(isStaticVarDecl){
                   var_mgr_set_static_decl(var_mgr_get(),className,d,NULL,permi,isFinal);
@@ -498,7 +499,7 @@ static void parser_var_or_fun_declaration(ParserStatic *self,struct c_declspecs 
          }// end c_parser_next_token_is (parser, CPP_EQ)
 
          if(c_parser_next_token_is (parser, CPP_COMMA)){
-            n_debug("静态声明分析 eee： count:%d declarator:%p ", testcount,declarator);
+            n_debug("静态声明分析 104： count:%d declarator:%p ", testcount,declarator);
             c_parser_consume_token (parser);
             if (c_parser_next_token_is_keyword (parser, RID_ATTRIBUTE))
                all_prefix_attrs = chainon (aet_parser_c_parser_gnu_attributes/*!c_c_parser_gnu_attributes*/(self->parser),prefix_attrs);
@@ -506,29 +507,31 @@ static void parser_var_or_fun_declaration(ParserStatic *self,struct c_declspecs 
                all_prefix_attrs = prefix_attrs;
             continue;
          }else if (c_parser_next_token_is (parser, CPP_SEMICOLON)){
-            n_debug("静态声明分析 token是 CPP_SEMICOLON 返回 104： count:%d ", testcount);
+            n_debug("静态声明分析 105 token是 CPP_SEMICOLON 返回 count:%d ", testcount);
             //c_parser_consume_token (parser); //不屏掉，会报 "警告：结构或联合后没有分号"
             return;
          }else{
             c_parser_error (parser, "expected %<,%> or %<;%>");
-            aet_parser_c_parser_skip_to_end_of_block_or_statement/*!c_parser_skip_to_end_of_block_or_statement*/(self->parser);
+            aet_parser_c_parser_skip_to_end_of_block_or_statement
+               /*!c_parser_skip_to_end_of_block_or_statement*/(self->parser);
             return;
          }//end c_parser_next_token_is (parser, CPP_COMMA 分析完所有的EQ COMMA SEMICOLON RID_IN...
       }else if(c_parser_next_token_is (parser, CPP_OPEN_BRACE) ){
-         n_debug("静态声明分析 105： 这是一个内联函数 count:%d ", testcount);
+         n_debug("静态声明分析 106： 这是一个内联函数 count:%d ", testcount);
          specs->inline_p=TRUE;
          specs->storage_class = csc_static;
       }else{
-         n_debug("静态声明分析 106： 出错了 ,出错的符号是 count:%d ", testcount);
+         n_debug("静态声明分析 107： 出错了 ,出错的符号是 count:%d ", testcount);
          c_parser_error (parser, "expected %<=%>, %<,%>, %<;%>, %<asm%> or %<__attribute__%>");
-         aet_parser_c_parser_skip_to_end_of_block_or_statement/*!c_parser_skip_to_end_of_block_or_statement*/(self->parser);
+         aet_parser_c_parser_skip_to_end_of_block_or_statement
+            /*!c_parser_skip_to_end_of_block_or_statement*/(self->parser);
          return;
       }
 
       nboolean  isFuncOk=func_mgr_change_static_func_decl(func_mgr_get(),declarator,className,structTree);
-      n_debug("静态声明分析 107： 分析函数定义 count:%d declarator:%p isFuncOk:%d ",testcount,declarator,isFuncOk);
+      n_debug("静态声明分析 108： 分析函数定义 count:%d declarator:%p isFuncOk:%d ",testcount,declarator,isFuncOk);
       if (!start_function (specs, declarator, all_prefix_attrs)){
-         n_debug("静态声明分析 108：函数定义出错了 count:%d declarator:%p ", testcount,declarator);
+         n_debug("静态声明分析 109：函数定义出错了 count:%d declarator:%p ", testcount,declarator);
          gcc_assert (!c_parser_next_token_is (parser, CPP_SEMICOLON));
          if (c_parser_next_token_starts_declspecs (parser)) {
             /* If we have
@@ -540,7 +543,7 @@ static void parser_var_or_fun_declaration(ParserStatic *self,struct c_declspecs 
             ;
             <~~~~~~~~~ declaration ~~~~~~~~~~>
             Use c_parser_require to get an error with a fix-it hint.  */
-            n_debug("静态声明分析 109： count:%d ", testcount);
+            n_debug("静态声明分析 110： count:%d ", testcount);
             c_parser_require (parser, CPP_SEMICOLON, "expected %<;%>");
             parser->error = false;
          }else{
@@ -551,7 +554,7 @@ static void parser_var_or_fun_declaration(ParserStatic *self,struct c_declspecs 
          }
          break;
       }
-      n_debug("静态声明分析 110： count:%d declarator:%p ", testcount,declarator);
+      n_debug("静态声明分析 111： count:%d declarator:%p ", testcount,declarator);
       if(isFuncOk){
          tree currentFnDecl = current_function_decl;
          mtcs_parser_check(mtcs_parser_get(),currentFnDecl,TRUE);
@@ -561,15 +564,15 @@ static void parser_var_or_fun_declaration(ParserStatic *self,struct c_declspecs 
       tree fnbody = NULL_TREE;
 
       while (c_parser_next_token_is_not (parser, CPP_EOF)  && c_parser_next_token_is_not (parser, CPP_OPEN_BRACE)){
-         n_debug("静态声明分析 111 循环了 count:%d declarator:%p ", testcount,declarator);
+         n_debug("静态声明分析 112 循环了 count:%d declarator:%p ", testcount,declarator);
          parser_var_or_fun_declaration (self,specs, className,structTree,permi,isFinal);
       }
-      n_debug("静态声明分析 112：保存函数定义的参数据 count:%d declarator:%p ", testcount,declarator);
+      n_debug("静态声明分析 113：保存函数定义的参数据 count:%d declarator:%p ", testcount,declarator);
       store_parm_decls ();
       location_t startloc = c_parser_peek_token (parser)->location;
       DECL_STRUCT_FUNCTION (current_function_decl)->function_start_locus= startloc;
       location_t endloc = startloc;
-      n_debug("静态声明分析 113：对函数内部的复合语句进行分析 count:%d declarator:%p ", testcount,declarator);
+      n_debug("静态声明分析 114：对函数内部的复合语句进行分析 count:%d declarator:%p ", testcount,declarator);
       aet_print_token(c_parser_peek_token(parser));
       fnbody = aet_parser_c_parser_compound_statement/*!c_c_parser_compound_statement*/(self->parser, &endloc);
       tree fndecl = current_function_decl;
@@ -585,7 +588,6 @@ static void parser_var_or_fun_declaration(ParserStatic *self,struct c_declspecs 
       /* Get rid of the empty stmt list for GIMPLE/RTL.  */
       if (specs->declspec_il != cdil_none)
          DECL_SAVED_TREE (fndecl) = NULL_TREE;
-      aet_print_token(c_parser_peek_token(parser));
       break;
    }//end while
 }
@@ -649,7 +651,6 @@ static tree  staticDeclaration (ParserStatic *self,char *sysName,ClassPermission
 
    n_debug("新----staticDeclaration 内的声明 00 建立空的声明说明符 sysClassName:%s permission:%d CPP_LESS:%d\n",
          className->sysName,permission,c_parser_next_token_is (parser, CPP_LESS));
-   aet_print_token(c_parser_peek_token (parser));
    aet_parser_c_parser_declspecs/*!c_parser_declspecs*/(self->parser,
          specs, true, true, true,true, false, true, true, cla_nonabstract_decl);
    if (parser->error)
@@ -753,6 +754,13 @@ void parser_static_compile(ParserStatic *self,char *sysName,ClassPermissionType 
 {
    staticDeclaration(self,sysName,permission,isFinal);
 }
+
+void     parser_static_set_func(ParserStatic *self,TargetIntrinsicFunc func,void *userData)
+{
+   self->tqrgetIntrinsicFunc = func;
+   self->userData = userData;
+}
+
 
 ParserStatic *parser_static_get()
 {

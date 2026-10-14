@@ -647,27 +647,27 @@ static rtx expand_builtin_interclass_mathfn (MtcsBuiltins *self,tree exp, rtx ta
    MtcsExpr   *mtcsExpr=mtcs_target_get_expr(mtcsTarget);
    MtcsOptabs *mtcsOptabs=mtcs_target_get_optabs(mtcsTarget);
 
-  enum insn_code icode = CODE_FOR_nothing;
-  rtx op0;
-  tree fndecl = get_callee_fndecl (exp);
-  machine_mode mode;
-  tree arg;
+   enum insn_code icode = CODE_FOR_nothing;
+   rtx op0;
+   tree fndecl = get_callee_fndecl (exp);
+   machine_mode mode;
+   tree arg;
 
-  if (!validate_arglist (exp, REAL_TYPE, VOID_TYPE))
-    return NULL_RTX;
+   if (!validate_arglist (exp, REAL_TYPE, VOID_TYPE))
+      return NULL_RTX;
 
-  arg = CALL_EXPR_ARG (exp, 0);
-  icode = interclass_mathfn_icode(self,arg, fndecl);
-  mode = TYPE_MODE (TREE_TYPE (arg));
-  mode=mtcs_mode_host2device_by_tree(mtcsMode,TREE_TYPE (arg),mode);
+   arg = CALL_EXPR_ARG (exp, 0);
+   icode = interclass_mathfn_icode(self,arg, fndecl);
+   mode = TYPE_MODE (TREE_TYPE (arg));
+   mode=mtcs_mode_host2device_by_tree(mtcsMode,TREE_TYPE (arg),mode);
 
-  if (icode != CODE_FOR_nothing){
+   if (icode != CODE_FOR_nothing){
       class expand_operand ops[1];
       rtx_insn *last = mtcs_rtl_data_get_last_insn/*!get_last_insn*/(mtcsRtlData);
       tree orig_arg = arg;
       /* Wrap the computation of the argument in a SAVE_EXPR, as we may
-    need to expand the argument again.  This way, we will not perform
-    side-effects more the once.  */
+      need to expand the argument again.  This way, we will not perform
+      side-effects more the once.  */
       CALL_EXPR_ARG (exp, 0) = arg = builtin_save_expr (arg);
       op0 = mtcs_expr_expand_expr/*!expand_expr*/(mtcsExpr,arg, NULL_RTX, VOIDmode, EXPAND_NORMAL);
       if (mode != GET_MODE (op0))
@@ -676,13 +676,13 @@ static rtx expand_builtin_interclass_mathfn (MtcsBuiltins *self,tree exp, rtx ta
 
       create_output_operand (&ops[0], target, exprMode/*!TYPE_MODE (TREE_TYPE (exp))*/);
       if (mtcs_optabs_maybe_legitimize_operands/*!maybe_legitimize_operands*/(mtcsOptabs,icode, 0, 1, ops)
-         && mtcs_optabs_maybe_emit_unop_insn/*!maybe_emit_unop_insn*/(mtcsOptabs,icode, ops[0].value, op0, UNKNOWN))
+      && mtcs_optabs_maybe_emit_unop_insn/*!maybe_emit_unop_insn*/(mtcsOptabs,icode, ops[0].value, op0, UNKNOWN))
          return ops[0].value;
 
       mtcs_rtl_data_delete_insns_since/*!delete_insns_since*/(mtcsRtlData,last);
       CALL_EXPR_ARG (exp, 0) = orig_arg;
-  }
-  return NULL_RTX;
+   }
+   return NULL_RTX;
 }
 
 
@@ -2316,6 +2316,8 @@ rtx mtcs_builtins_expand_builtin_memset (MtcsBuiltins *self,tree exp, rtx target
    tree dest = CALL_EXPR_ARG (exp, 0);
    tree val = CALL_EXPR_ARG (exp, 1);
    tree len = CALL_EXPR_ARG (exp, 2);
+   fprintf(stderr,"mtcs_builtins_expand_builtin_memset--\n");
+   aet_print_tree(val);
    return expand_builtin_memset_args(self,dest, val, len, target, mode, exp);
 }
 
@@ -3418,11 +3420,12 @@ static void determine_block_size (MtcsBuiltins *self,tree len, rtx len_rtx,
       if (tree_fits_uhwi_p (TYPE_MAX_VALUE (TREE_TYPE (len))))
          *probable_max_size = *max_size  = tree_to_uhwi (TYPE_MAX_VALUE (TREE_TYPE (len)));
       else
-         *probable_max_size = *max_size = GET_MODE_MASK (GET_MODE (len_rtx));
+         *probable_max_size = *max_size = mtcs_mode_get_mask/*!GET_MODE_MASK*/(mtcsMode,GET_MODE (len_rtx));
 
       if (TREE_CODE (len) == SSA_NAME){
-         value_range r;
+         int_range_max r;
          tree tmin, tmax;
+         n_debug("mtcsbuiltins.c determine_block_size 00 %p %p\n",get_global_range_query (),&r);
          get_global_range_query ()->range_of_expr (r, len);
          range_type = get_legacy_range (r, tmin, tmax);
          if (range_type != VR_UNDEFINED){
@@ -3543,14 +3546,18 @@ static rtx expand_builtin_memory_copy_args (MtcsBuiltins *self,tree dest, tree s
    if (CALL_EXPR_TAILCALL (exp)  && (retmode == RETURN_BEGIN || target == const0_rtx))
       method = BLOCK_OP_TAILCALL;
 
-   bool use_mempcpy_call = (mtcsTarget/*!targetm.libc_has_fast_function*/->libc_has_fast_function(mtcsTarget,BUILT_IN_MEMPCPY)
-   && retmode == RETURN_END  && !might_overlap && target != const0_rtx);
+   bool use_mempcpy_call = (mtcsTarget/*!targetm.libc_has_fast_function*/->libc_has_fast_function(
+         mtcsTarget,BUILT_IN_MEMPCPY) && retmode == RETURN_END  && !might_overlap && target != const0_rtx);
+   n_debug("mbcsbuiltins.c expand_builtin_memory_copy_args 00-- %d method:%d\n",use_mempcpy_call,method);
    if (use_mempcpy_call)
       method = BLOCK_OP_NO_LIBCALL_RET;
 
    dest_addr = mtcs_expr_emit_block_move_hints/*!emit_block_move_hints*/(mtcsExpr,
-   dest_mem, src_mem, len_rtx, method, expected_align, expected_size,
-   min_size, max_size, probable_max_size,use_mempcpy_call, &is_move_done,  might_overlap, tree_ctz (len));
+      dest_mem, src_mem, len_rtx, method, expected_align, expected_size,
+      min_size, max_size, probable_max_size,use_mempcpy_call, &is_move_done,  might_overlap, tree_ctz (len));
+
+   n_debug("mbcsbuiltins.c expand_builtin_memory_copy_args 11-- %d pc_rtx:%p\n",is_move_done,pc_rtx);
+
    /* Bail out when a mempcpy call would be expanded as libcall and when
    we have a target that provides a fast implementation
    of mempcpy routine.  */
@@ -3559,10 +3566,13 @@ static rtx expand_builtin_memory_copy_args (MtcsBuiltins *self,tree dest, tree s
    if (dest_addr == pc_rtx)
       return NULL_RTX;
 
+   n_debug("mbcsbuiltins.c expand_builtin_memory_copy_args 22-- %p\n",dest_addr);
+
    if (dest_addr == 0) {
       dest_addr = mtcs_expr_force_operand/*!force_operand*/(mtcsExpr,XEXP (dest_mem, 0), target);
       dest_addr = mtcs_explow_convert_memory_address/*!convert_memory_address*/(mtcsExplow,ptr_mode, dest_addr);
    }
+   n_debug("mbcsbuiltins.c expand_builtin_memory_copy_args 33-- %p\n",dest_addr);
 
    if (retmode != RETURN_BEGIN && target != const0_rtx){
       dest_addr = gen_rtx_PLUS (ptr_mode, dest_addr, len_rtx);
@@ -3570,11 +3580,9 @@ static rtx expand_builtin_memory_copy_args (MtcsBuiltins *self,tree dest, tree s
       if (retmode == RETURN_END_MINUS_ONE)
          dest_addr = gen_rtx_MINUS (ptr_mode, dest_addr, const1_rtx);
    }
-
+   n_debug("mbcsbuiltins.c expand_builtin_memory_copy_args 44-- %p\n",dest_addr);
    return dest_addr;
 }
-
-
 
 /* Expand a call EXP to the memcpy builtin.
    Return NULL_RTX if we failed, the caller should emit a normal call,
@@ -3869,11 +3877,13 @@ static rtx expand_builtin_memset_args (MtcsBuiltins *self,tree dest, tree val, t
    dest = builtin_save_expr (dest);
    val = builtin_save_expr (val);
    len = builtin_save_expr (len);
+   fprintf(stderr,"expand_builtin_memset_args 00\n");
+   aet_print_tree(val);
 
    len_rtx = mtcs_expr_expand_normal/*!expand_normal*/(mtcsExpr,len);
    determine_block_size(self,len, len_rtx, &min_size, &max_size, &probable_max_size);
    dest_mem = mtcs_builtins_get_memory_rtx/*!get_memory_rtx*/(self,dest, len);
-   val_mode=mtcs_mode_host2device_by_tree(mtcsMode,unsigned_char_type_node,val_mode);
+   val_mode = TYPE_MODE (unsigned_char_type_node);
 
    if (TREE_CODE (val) != INTEGER_CST  || target_char_cast (val, &c)){
       rtx val_rtx;
@@ -3908,7 +3918,7 @@ static rtx expand_builtin_memset_args (MtcsBuiltins *self,tree dest, tree val, t
 
    if (c) {
       BuiltinReadStrData userData={self,&c};
-
+      fprintf(stderr,"expand_builtin_memset_args 11 %d\n",c);
       if (tree_fits_uhwi_p (len) && mtcs_expr_can_store_by_pieces/*!can_store_by_pieces*/(mtcsExpr,tree_to_uhwi (len),
             mtcs_builtins_builtin_memset_read_str/*!builtin_memset_read_str*/, &userData/*!&c*/, dest_align,true))
          mtcs_expr_store_by_pieces/*!store_by_pieces*/(mtcsExpr,dest_mem, tree_to_uhwi (len),
@@ -6608,8 +6618,8 @@ rtx mtcs_builtins_expand_builtin (MtcsBuiltins *self,tree exp, rtx target, rtx s
    machine_mode target_mode = TYPE_MODE (TREE_TYPE (exp));
    int flags;
 
-   n_debug("mtcsbuiltins.c expand_builtin 00 mode:%d ignore:%d target:%p %s %s\n",
-         mode,ignore,target,get_tree_code_name(TREE_CODE(exp)),IDENTIFIER_POINTER(DECL_NAME(fndecl)));
+   n_debug("mtcsbuiltins.c expand_builtin 00 mode:%d target_mode:%d ignore:%d target:%p %s %s\n",
+         mode,target_mode,ignore,target,get_tree_code_name(TREE_CODE(exp)),IDENTIFIER_POINTER(DECL_NAME(fndecl)));
 
    if (DECL_BUILT_IN_CLASS (fndecl) == BUILT_IN_MD)
       return mtcsTarget/*!targetm.expand_builtin*/->expand_builtin(mtcsTarget,exp, target, subtarget, mode, ignore);
@@ -6644,7 +6654,6 @@ rtx mtcs_builtins_expand_builtin (MtcsBuiltins *self,tree exp, rtx target, rtx s
    if (sanitize_flags_p (SANITIZE_ADDRESS | SANITIZE_HWADDRESS) && asan_intercepted_p (fcode))
       return mtcs_calls_expand_call/*!expand_call*/(mtcsCalls,exp, target, ignore);
 
-   n_debug("mtcsbuiltins.c expand_builtin 33 built_in_function:\n");
    /* When not optimizing, generate calls to library functions for a certain
    set of builtins.  */
    if (!mtcsOptionsItem->x_optimize
@@ -6669,7 +6678,6 @@ rtx mtcs_builtins_expand_builtin (MtcsBuiltins *self,tree exp, rtx target, rtx s
    || !(mtcsOptionsItem->x_flag_inline_stringops & ILSOP_MEMCMP)))
       return mtcs_calls_expand_call/*!expand_call*/(mtcsCalls,exp, target, ignore);
 
-   n_debug("mtcsbuiltins.c expand_builtin 44 built_in_function:\n");
    /* The built-in function expanders test for target == const0_rtx
    to determine whether the function's result will be ignored.  */
    if (ignore)
@@ -6697,7 +6705,6 @@ rtx mtcs_builtins_expand_builtin (MtcsBuiltins *self,tree exp, rtx target, rtx s
          return const0_rtx;
       }
    }
-   n_debug("mtcsbuiltins.c expand_builtin 55 built_in_function:\n");
 
    switch (fcode){
       CASE_FLT_FN (BUILT_IN_FABS):
@@ -7851,9 +7858,13 @@ rtx mtcs_builtins_get_memory_rtx (MtcsBuiltins *self,tree exp, tree len)
 
    /* Build a MEM_REF representing the whole accessed area as a byte blob,
    (as builtin stringops may alias with anything).  */
-   exp = mtcs_const_fold_build2(mtcsConst,MEM_REF, build_array_type (char_type_node,
-   build_range_type (sizetype, size_one_node, len)),
-   exp, mtcs_tree_build_int_cst/*!build_int_cst*/(mtcsTree,ptr_type_node, 0));
+   n_debug("mtcsbuiltins.c get_memory_rtx 00 exp:%p len:%p\n",exp,len);
+
+   exp = mtcs_const_fold_build2/*!fold_build2*/(mtcsConst,MEM_REF,
+            mtcs_tree_build_array_type/*!build_array_type*/(mtcsTree,char_type_node,
+            mtcs_tree_build_range_type/*!build_range_type*/(mtcsTree,sizetype, size_one_node, len)),
+            exp, mtcs_tree_build_int_cst/*!build_int_cst*/(mtcsTree,ptr_type_node, 0));
+   n_debug("mtcsbuiltins.c get_memory_rtx 11 exp:%p len:%p\n",exp,len);
 
    /* If the MEM_REF has no acceptable address, try to get the base object
    from the original address we got, and build an all-aliasing
@@ -7864,8 +7875,10 @@ rtx mtcs_builtins_get_memory_rtx (MtcsBuiltins *self,tree exp, tree len)
      && (base = get_base_address (TREE_OPERAND (TREE_OPERAND (exp, 0),0)))){
       unsigned int align = get_pointer_alignment (TREE_OPERAND (exp, 0));
       exp = mtcs_const_build_fold_addr_expr/*!build_fold_addr_expr*/(mtcsConst,base);
-      exp = mtcs_const_fold_build2(mtcsConst,MEM_REF, build_array_type (char_type_node,
-      build_range_type (sizetype,size_zero_node,NULL)),exp, mtcs_tree_build_int_cst/*!build_int_cst*/(mtcsTree,ptr_type_node, 0));
+      exp = mtcs_const_fold_build2(mtcsConst,MEM_REF,
+            mtcs_tree_build_array_type/*!build_array_type*/(mtcsTree,char_type_node,
+      mtcs_tree_build_array_type/*!build_array_type*/(mtcsTree,sizetype,size_zero_node,NULL)),
+            exp, mtcs_tree_build_int_cst/*!build_int_cst*/(mtcsTree,ptr_type_node, 0));
       mtcs_rtl_set_mem_attributes/*!set_mem_attributes*/(mtcsRTL,mem, exp, 0);
       /* Since we stripped parts make sure the offset is unknown and the
       alignment is computed from the original address.  */
@@ -8933,9 +8946,11 @@ static tree fold_builtin_classify (MtcsBuiltins *self,location_t loc, tree fndec
    switch (builtin_index){
       case BUILT_IN_ISINF:
          if (tree_expr_infinite_p (arg))
-            return omit_one_operand_loc (loc, type, integer_one_node, arg);
+            return mtcs_const_omit_one_operand_loc/*!omit_one_operand_loc*/(mtcsConst,
+                  loc, type, integer_one_node, arg);
          if (!tree_expr_maybe_infinite_p (arg))
-            return omit_one_operand_loc (loc, type, integer_zero_node, arg);
+            return mtcs_const_omit_one_operand_loc/*!omit_one_operand_loc*/(mtcsConst,
+                  loc, type, integer_zero_node, arg);
          return NULL_TREE;
 
       case BUILT_IN_ISINF_SIGN:
@@ -8966,16 +8981,20 @@ static tree fold_builtin_classify (MtcsBuiltins *self,location_t loc, tree fndec
 
       case BUILT_IN_ISFINITE:
          if (tree_expr_finite_p (arg))
-            return omit_one_operand_loc (loc, type, integer_one_node, arg);
+            return mtcs_const_omit_one_operand_loc/*!omit_one_operand_loc*/(mtcsConst,
+                  loc, type, integer_one_node, arg);
          if (tree_expr_nan_p (arg) || tree_expr_infinite_p (arg))
-            return omit_one_operand_loc (loc, type, integer_zero_node, arg);
+            return mtcs_const_omit_one_operand_loc/*!omit_one_operand_loc*/(mtcsConst,
+                  loc, type, integer_zero_node, arg);
          return NULL_TREE;
 
       case BUILT_IN_ISNAN:
          if (tree_expr_nan_p (arg))
-            return omit_one_operand_loc (loc, type, integer_one_node, arg);
+            return mtcs_const_omit_one_operand_loc/*!omit_one_operand_loc*/(mtcsConst,
+                  loc, type, integer_one_node, arg);
          if (!tree_expr_maybe_nan_p (arg))
-            return omit_one_operand_loc (loc, type, integer_zero_node, arg);
+            return mtcs_const_omit_one_operand_loc/*!omit_one_operand_loc*/(mtcsConst,
+                  loc, type, integer_zero_node, arg);
 
          {
             bool is_ibm_extended = mtcs_mode_is_composite_p/*!MODE_COMPOSITE_P*/(mtcsMode,TYPE_MODE (TREE_TYPE (arg)));
@@ -8996,7 +9015,8 @@ static tree fold_builtin_classify (MtcsBuiltins *self,location_t loc, tree fndec
          without -fsignaling-nans.  Especially when -fno-signaling-nans is
          the default.  */
          if (!tree_expr_maybe_nan_p (arg))
-            return omit_one_operand_loc (loc, type, integer_zero_node, arg);
+            return mtcs_const_omit_one_operand_loc/*!omit_one_operand_loc*/(mtcsConst,
+                  loc, type, integer_zero_node, arg);
          return NULL_TREE;
 
       default:
@@ -9577,7 +9597,8 @@ static tree fold_builtin_strcspn (MtcsBuiltins *self,location_t loc, tree expr, 
    if (p1 && *p1 == '\0'){
       /* Evaluate and ignore argument s2 in case it has
       side-effects.  */
-      return omit_one_operand_loc (loc, type, size_zero_node, s2);
+      return mtcs_const_omit_one_operand_loc/*!omit_one_operand_loc*/(mtcsConst,
+            loc, type, size_zero_node, s2);
    }
    /* If the second argument is "", return __builtin_strlen(s1).  */
    const char *p2 = c_getstr (s2);
@@ -9643,7 +9664,8 @@ static tree fold_builtin_strpbrk (MtcsBuiltins *self,location_t loc, tree, tree 
    if (p2[0] == '\0')
       /* strpbrk(x, "") == NULL.
       Evaluate and ignore s1 in case it had side-effects.  */
-      return omit_one_operand_loc (loc, type, integer_zero_node, s1);
+      return mtcs_const_omit_one_operand_loc/*!omit_one_operand_loc*/(mtcsConst,
+            loc, type, integer_zero_node, s1);
 
    if (p2[1] != '\0')
       return NULL_TREE;  /* Really call strpbrk.  */
@@ -9946,7 +9968,8 @@ static tree fold_builtin_memcmp (MtcsBuiltins *self,location_t loc, tree arg1, t
 
    /* If ARG1 and ARG2 are the same (and not volatile), return zero.  */
    if (operand_equal_p (arg1, arg2, 0))
-      return omit_one_operand_loc (loc, integer_type_node, integer_zero_node, len);
+      return mtcs_const_omit_one_operand_loc/*!omit_one_operand_loc*/(mtcsConst,
+            loc, integer_type_node, integer_zero_node, len);
 
    /* If len parameter is one, return an expression corresponding to
    (*(const unsigned char*)arg1 - (const unsigned char*)arg2).  */
@@ -10046,7 +10069,8 @@ static tree fold_builtin_arith_overflow (MtcsBuiltins *self,location_t loc, enum
    && TREE_CODE (arg0) == INTEGER_CST
    && TREE_CODE (arg1) == INTEGER_CST)
    /* Perform the computation in the target type and check for overflow.  */
-      return omit_one_operand_loc (loc, boolean_type_node,
+      return mtcs_const_omit_one_operand_loc/*!omit_one_operand_loc*/(mtcsConst,
+               loc, boolean_type_node,
                arith_overflowed_p (opcode, type, arg0, arg1)
                ? boolean_true_node : boolean_false_node,
                arg2);
@@ -10081,10 +10105,12 @@ static tree fold_builtin_arith_overflow (MtcsBuiltins *self,location_t loc, enum
    }
 
    if (ovf_only)
-      return omit_one_operand_loc (loc, boolean_type_node, ovfres, arg2);
+      return mtcs_const_omit_one_operand_loc/*!omit_one_operand_loc*/(mtcsConst,
+            loc, boolean_type_node, ovfres, arg2);
 
    tree mem_arg2 = build_fold_indirect_ref_loc (loc, arg2);
-   tree store = mtcs_const_fold_build2_loc/*!fold_build2_loc*/(mtcsConst,loc, MODIFY_EXPR, void_type_node, mem_arg2, intres);
+   tree store = mtcs_const_fold_build2_loc/*!fold_build2_loc*/(mtcsConst,
+         loc, MODIFY_EXPR, void_type_node, mem_arg2, intres);
    return build2_loc (loc, COMPOUND_EXPR, boolean_type_node, store, ovfres);
 }
 

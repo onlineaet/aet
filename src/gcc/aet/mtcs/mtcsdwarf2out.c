@@ -26916,13 +26916,18 @@ static void move_marked_base_types (MtcsDwarf2Out *self)
    SYMBOL_REFs refer to variables emitted in the current CU.  */
 static bool resolve_one_addr (MtcsDwarf2Out *self,rtx *addr)
 {
+   MtcsMode *mtcsMode=MTCS_GET_MODE_OBJECT(self);
+   MtcsTarget *mtcsTarget=(MtcsTarget *)mtcsMode->target;
+   MtcsTree *mtcsTree=mtcs_target_get_tree(mtcsTarget);
+
    rtx rtl = *addr;
 
    if (GET_CODE (rtl) == CONST_STRING){
       size_t len = strlen (XSTR (rtl, 0)) + 1;
       tree t = build_string (len, XSTR (rtl, 0));
       tree tlen = size_int (len - 1);
-      TREE_TYPE (t) = build_array_type (char_type_node, build_index_type (tlen));
+      TREE_TYPE (t) = mtcs_tree_build_array_type/*!build_array_type*/(mtcsTree,
+            char_type_node, build_index_type (tlen));
       rtl = lookup_constant_def (t);
       if (!rtl || !MEM_P (rtl))
          return false;
@@ -26996,6 +27001,10 @@ static rtx string_cst_pool_decl (MtcsDwarf2Out *self,tree t)
    and return true, if unsuccessful, return false.  */
 static bool optimize_one_addr_into_implicit_ptr (MtcsDwarf2Out *self,dw_loc_descr_ref loc)
 {
+   MtcsMode *mtcsMode=MTCS_GET_MODE_OBJECT(self);
+   MtcsTarget *mtcsTarget=(MtcsTarget *)mtcsMode->target;
+   MtcsTree *mtcsTree=mtcs_target_get_tree(mtcsTarget);
+
    rtx rtl = loc->dw_loc_oprnd1.v.val_addr;
    HOST_WIDE_INT offset = 0;
    dw_die_ref ref = NULL;
@@ -27010,7 +27019,8 @@ static bool optimize_one_addr_into_implicit_ptr (MtcsDwarf2Out *self,dw_loc_desc
       tree t = build_string (len, XSTR (rtl, 0));
       tree tlen = size_int (len - 1);
 
-      TREE_TYPE (t) = build_array_type (char_type_node, build_index_type (tlen));
+      TREE_TYPE (t) = mtcs_tree_build_array_type/*!build_array_type*/(mtcsTree,
+            char_type_node, build_index_type (tlen));
       rtl = string_cst_pool_decl(self,t);
       if (!rtl)
          return false;

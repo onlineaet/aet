@@ -439,8 +439,8 @@ static bool try_fwprop_subst_pattern (MtcsFwprop *self,obstack_watermark &attemp
    insn_info *use_insn = use_change.insn ();
    rtx_insn *use_rtl = use_insn->rtl ();
    insn_info *def_insn = def->insn ();
-   n_debug("mtcsfwprop.c try_fwprop_subst_pattern 00 *loc:%p dest:%p src:%p\n",*loc,dest,src);
-   testprint();
+  // n_debug("mtcsfwprop.c try_fwprop_subst_pattern 00 *loc:%p dest:%p src:%p\n",*loc,dest,src);
+   //testprint();
    mtcs_insn_change_watermark watermark(mtcsRecog);
    fwprop_propagation prop (use_insn, def, dest, src,self);
    if (!prop.apply_to_pattern (loc)){
@@ -449,8 +449,8 @@ static bool try_fwprop_subst_pattern (MtcsFwprop *self,obstack_watermark &attemp
                def_insn->uid (), use_insn->uid (),prop.failure_reason);
       return false;
    }
-   n_debug("mtcsfwprop.c try_fwprop_subst_pattern 11 *loc:%p dest:%p src:%p\n",*loc,dest,src);
-   testprint();
+   //n_debug("mtcsfwprop.c try_fwprop_subst_pattern 11 *loc:%p dest:%p src:%p\n",*loc,dest,src);
+   //testprint();
    if (prop.num_replacements == 0)
       return false;
 
@@ -824,7 +824,7 @@ static bool forward_propagate_into (MtcsFwprop *self,use_info *use, bool reg_pro
    MtcsMode *mtcsMode=MTCS_GET_MODE_OBJECT(self);
    MtcsTarget *mtcsTarget=(MtcsTarget *)mtcsMode->target;
    MtcsRtlanal *mtcsRtlanal=mtcs_target_get_rtlanal(mtcsTarget);
-   n_debug("mtcsfwprop.c forward_propagate_into 00\n");
+   //n_debug("mtcsfwprop.c forward_propagate_into 00\n");
    if (use->includes_read_writes ())
       return false;
 
@@ -859,9 +859,9 @@ static bool forward_propagate_into (MtcsFwprop *self,use_info *use, bool reg_pro
    rtx src = SET_SRC (def_set);
    if (volatile_refs_p (src))
       return false;
-   n_debug("mtcsfwprop.c forward_propagate_into 11 dest:%p src:%p\n",dest,src);
-   mtcs_print_rtl_single(stderr,dest);
-   mtcs_print_rtl_single(stderr,src);
+   //n_debug("mtcsfwprop.c forward_propagate_into 11 dest:%p src:%p\n",dest,src);
+   //mtcs_print_rtl_single(stderr,dest);
+   //mtcs_print_rtl_single(stderr,src);
    /* Allow propagations into a loop only for reg-to-reg copies, since
    replacing one register by another shouldn't increase the cost.
    Propagations from inner loop to outer loop should also be ok.  */
@@ -921,22 +921,20 @@ static void fwprop_done (MtcsFwprop *self)
 
    mtcsRtlData/*!crtl*/->ssa->perform_pending_updates ();
    free_dominance_info (CDI_DOMINATORS);
-   n_debug("mtcsfwprop.c fwprop_done 00\n");
-   testprint();
+   //n_debug("mtcsfwprop.c fwprop_done 00\n");
+   //testprint();
    mtcs_cfg_cleanup_cleanup_cfg/*!cleanup_cfg*/(mtcsCfgCleanup,0);
-   n_debug("mtcsfwprop.c fwprop_done 11\n");
+   //n_debug("mtcsfwprop.c fwprop_done 11\n");
    delete mtcsRtlData/*!crtl*/->ssa;
-   n_debug("mtcsfwprop.c fwprop_done 22\n");
-   testprint();
+   //n_debug("mtcsfwprop.c fwprop_done 22\n");
+   //testprint();
    mtcsRtlData/*!crtl*/->ssa = nullptr;
-   n_debug("mtcsfwprop.c fwprop_done 33\n");
+   //n_debug("mtcsfwprop.c fwprop_done 33\n");
 
    mtcs_cse_delete_trivially_dead_insns/*!delete_trivially_dead_insns*/(mtcsCse,
    mtcs_rtl_data_get_insns/*!get_insns*/(mtcsRtlData), mtcs_func_max_reg_num/*!max_reg_num*/(mtcsFunc));
-   testprint();
-   n_debug("mtcsfwprop.c fwprop_done 44\n");
-
-
+   //testprint();
+   //n_debug("mtcsfwprop.c fwprop_done 44\n");
    if (dump_file)
       fprintf (dump_file,"\nNumber of successful forward propagations: %d\n\n", self->num_changes);
 }

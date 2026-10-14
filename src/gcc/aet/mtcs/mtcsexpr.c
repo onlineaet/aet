@@ -82,6 +82,7 @@
 #include "aet/aetprintgimple.h"
 #include "mtcsprintrtl.h"
 #include "../mtcsinfo.h"
+#include "../aetmicro.h"
 
 
 static rtx_insn *emit_move_via_integer (MtcsExpr *self,machine_mode mode, rtx x, rtx y, bool force);
@@ -2142,12 +2143,12 @@ static rtx_insn *emit_move_multi_word (MtcsExpr *self,machine_mode mode, rtx x, 
           continue;
 
       ypart = mtcs_rtl_operand_subword (mtcsRTL,y, i, 1, mode);
-
       /* If we can't get a part of Y, put Y into memory if it is a
      constant.  Otherwise, force it into a register.  Then we must
      be able to get a part of Y.  */
       if (ypart == 0 && CONSTANT_P (y)){
-          y = mtcs_explow_use_anchored_address/*!use_anchored_address*/(mtcsExplow,mtcs_asm_force_const_mem/*!force_const_mem*/(mtcsAsm,mode, y));
+          y = mtcs_explow_use_anchored_address/*!use_anchored_address*/(mtcsExplow,
+                mtcs_asm_force_const_mem/*!force_const_mem*/(mtcsAsm,mode, y));
           ypart = mtcs_rtl_operand_subword (mtcsRTL,y, i, 1, mode);
       }else if (ypart == 0)
           ypart = mtcs_rtl_operand_subword_force/*!operand_subword_force*/(mtcsRTL,y, i, mode);
@@ -3734,7 +3735,8 @@ static bool emit_block_move_via_pattern (MtcsExpr *self,rtx x, rtx y, rtx size, 
       if ((unsigned HOST_WIDE_INT)expected_size < min_size)
           expected_size = min_size;
   }
-  n_debug("mtcsexpr.c emit_block_move_via_pattern 设 volatile_ok---\n");
+  n_debug("mtcsexpr.c emit_block_move_via_pattern 设 volatile_ok---min:%llu max:%llu probable_max_size:%llu\n",
+        min_size,max_size,probable_max_size);
   /* Since this is a move insn, we don't care about volatility.  */
   mtcs_temporary_volatile_ok v (mtcsRecog,true);
   /* Try the most limited insn first, because there's no point
@@ -3750,7 +3752,8 @@ static bool emit_block_move_via_pattern (MtcsExpr *self,rtx x, rtx y, rtx size, 
           code = mtcs_opinit_direct_optab_handler/*!direct_optab_handler*/(mtcsOpinit,movmem_optab, mode);
       else
           code = mtcs_opinit_direct_optab_handler/*!direct_optab_handler*/(mtcsOpinit,cpymem_optab, mode);
-
+      n_debug("mtcsexpr.c emit_block_move_via_pattern 00 code:%d mode:%d %s\n",
+            code,mode,mtcs_mode_get_name(mtcsMode,mode));
       if (code != CODE_FOR_nothing
       /* We don't need MODE to be narrower than BITS_PER_HOST_WIDE_INT
          here because if SIZE is less than the mode mask, as it is
@@ -3758,10 +3761,11 @@ static bool emit_block_move_via_pattern (MtcsExpr *self,rtx x, rtx y, rtx size, 
          actual mode mask.  Since SIZE is within the Pmode address
          space, we limit MODE to Pmode.  */
       && ((CONST_INT_P (size)
-           && ((unsigned HOST_WIDE_INT) INTVAL (size)
-           <= (mtcs_mode_get_mask/*!GET_MODE_MASK*/(mtcsMode,mode) >> 1)))
-          || max_size <= (mtcs_mode_get_mask/*!GET_MODE_MASK*/(mtcsMode,mode) >> 1)
-          || mtcs_mode_get_bitsize/*!GET_MODE_BITSIZE*/(mtcsMode,mode) >= mtcs_mode_get_bitsize/*!GET_MODE_BITSIZE*/(mtcsMode,pMode))){
+                 && ((unsigned HOST_WIDE_INT) INTVAL (size)
+                 <= (mtcs_mode_get_mask/*!GET_MODE_MASK*/(mtcsMode,mode) >> 1)))
+                || max_size <= (mtcs_mode_get_mask/*!GET_MODE_MASK*/(mtcsMode,mode) >> 1)
+                || mtcs_mode_get_bitsize/*!GET_MODE_BITSIZE*/(mtcsMode,mode) >=
+                mtcs_mode_get_bitsize/*!GET_MODE_BITSIZE*/(mtcsMode,pMode))){
           class expand_operand ops[9];
           unsigned int nops;
 
@@ -3769,35 +3773,42 @@ static bool emit_block_move_via_pattern (MtcsExpr *self,rtx x, rtx y, rtx size, 
              nice if there were some way to inform the backend, so
              that it doesn't fail the expansion because it thinks
              emitting the libcall would be more efficient.  */
-          nops =mtcs_output_get_n_generator_args(mtcsOutput,code)/*!insn_data[(int) code].n_generator_args*/;
+          nops = mtcs_output_get_n_generator_args(mtcsOutput,code)/*!insn_data[(int) code].n_generator_args*/;
           gcc_assert (nops == 4 || nops == 6 || nops == 8 || nops == 9);
-
+          n_debug("mtcsexpr.c emit_block_move_via_pattern 11 code:%d mode:%d %s %d\n",
+                     code,mode,mtcs_mode_get_name(mtcsMode,mode),nops);
           create_fixed_operand (&ops[0], x);
           create_fixed_operand (&ops[1], y);
           /* The check above guarantees that this size conversion is valid.  */
           create_convert_operand_to (&ops[2], size, mode, true);
           mtcs_optabs_create_integer_operand/*!create_integer_operand*/(mtcsOptabs,&ops[3], align / BITS_PER_UNIT);
           if (nops >= 6){
-              mtcs_optabs_create_integer_operand/*!create_integer_operand*/(mtcsOptabs,&ops[4], expected_align / BITS_PER_UNIT);
-              mtcs_optabs_create_integer_operand/*!create_integer_operand*/(mtcsOptabs,&ops[5], expected_size);
+              mtcs_optabs_create_integer_operand/*!create_integer_operand*/(mtcsOptabs,&ops[4],
+                    expected_align / BITS_PER_UNIT);
+              mtcs_optabs_create_integer_operand/*!create_integer_operand*/(mtcsOptabs,&ops[5],
+                    expected_size);
           }
           if (nops >= 8){
               mtcs_optabs_create_integer_operand/*!create_integer_operand*/(mtcsOptabs,&ops[6], min_size);
               /* If we cannot represent the maximal size,
              make parameter NULL.  */
-              if ((HOST_WIDE_INT) max_size != -1)
+              if ((HOST_WIDE_INT) max_size != -1){
+                 n_debug("mtcsexpr.c emit_block_move_via_pattern 11 aa\n");
                   mtcs_optabs_create_integer_operand/*!create_integer_operand*/(mtcsOptabs,&ops[7], max_size);
-              else
+              }else
                   create_fixed_operand (&ops[7], NULL);
           }
           if (nops == 9){
               /* If we cannot represent the maximal size,
              make parameter NULL.  */
-              if ((HOST_WIDE_INT) probable_max_size != -1)
-                  mtcs_optabs_create_integer_operand/*!create_integer_operand*/(mtcsOptabs,&ops[8], probable_max_size);
-              else
-                  create_fixed_operand (&ops[8], NULL);
+              if ((HOST_WIDE_INT) probable_max_size != -1){
+                 mtcs_optabs_create_integer_operand/*!create_integer_operand*/(mtcsOptabs,&ops[8], probable_max_size);
+              }else{
+                 create_fixed_operand (&ops[8], NULL);
+              }
           }
+          n_debug("mtcsexpr.c emit_block_move_via_pattern 22 code:%d mode:%d %s\n",
+                code,mode,mtcs_mode_get_name(mtcsMode,mode));
           if (mtcs_optabs_maybe_expand_insn/*!maybe_expand_insn*/(mtcsOptabs,code, nops, ops))
             return true;
       }
@@ -3893,8 +3904,11 @@ rtx mtcs_expr_emit_block_move_hints (MtcsExpr *self,rtx x, rtx y, rtx size, enum
       mtcs_rtl_set_mem_size/*!set_mem_size*/(mtcsRTL,x, const_size);
       mtcs_rtl_set_mem_size/*!set_mem_size*/(mtcsRTL,y, const_size);
   }
+
   bool pieces_ok = CONST_INT_P (size) && mtcs_expr_can_move_by_pieces(self,INTVAL (size), align);
   bool pattern_ok = false;
+  n_debug("mtcsexpr.c mtcs_expr_emit_block_move_hints 00 pieces_ok:%d might_overlap:%d\n",
+        pieces_ok,might_overlap);
   if (!pieces_ok || might_overlap){
       pattern_ok = emit_block_move_via_pattern(self,x, y, size, align,
                        expected_align, expected_size,min_size, max_size, probable_max_size,might_overlap);
@@ -3912,7 +3926,8 @@ rtx mtcs_expr_emit_block_move_hints (MtcsExpr *self,rtx x, rtx y, rtx size, enum
       may_use_call = 0;
       dynamic_direction = might_overlap;
   }
-
+  n_debug("mtcsexpr.c mtcs_expr_emit_block_move_hints 11 pieces_ok:%d pattern_ok:%d\n",
+        pieces_ok,pattern_ok);
   if (pattern_ok)
     ;
   else if (pieces_ok)
@@ -3920,6 +3935,8 @@ rtx mtcs_expr_emit_block_move_hints (MtcsExpr *self,rtx x, rtx y, rtx size, enum
   else if (may_use_call && !might_overlap
        && ADDR_SPACE_GENERIC_P (mtcs_rtl_get_mem_addr_space/*!MEM_ADDR_SPACE*/(mtcsRTL,x))
        && ADDR_SPACE_GENERIC_P (mtcs_rtl_get_mem_addr_space/*!MEM_ADDR_SPACE*/(mtcsRTL,y))){
+     fprintf(stderr,"mtcsexpr.c mtcs_expr_emit_block_move_hints 22 pieces_ok:%d bail_out_libcall:%d\n",
+           pieces_ok,bail_out_libcall);
       if (bail_out_libcall){
           if (is_move_done)
             *is_move_done = false;
@@ -3928,15 +3945,21 @@ rtx mtcs_expr_emit_block_move_hints (MtcsExpr *self,rtx x, rtx y, rtx size, enum
 
       if (may_use_call < 0)
           return pc_rtx;
-
-      retval = mtcs_expr_emit_block_copy_via_libcall/*!emit_block_copy_via_libcall*/(self,x, y, size,method == BLOCK_OP_TAILCALL);
-  }else if (dynamic_direction)
+      n_debug("mtcsexpr.c mtcs_expr_emit_block_move_hints 33 pieces_ok:%d may_use_call:%d\n",
+            pieces_ok,may_use_call);
+      retval = mtcs_expr_emit_block_copy_via_libcall/*!emit_block_copy_via_libcall*/
+            (self,x, y, size,method == BLOCK_OP_TAILCALL);
+  }else if (dynamic_direction){
+     n_debug("mtcsexpr.c mtcs_expr_emit_block_move_hints 44 pieces_ok:%d dynamic_direction:%d\n",
+              pieces_ok,dynamic_direction);
     emit_block_move_via_oriented_loop(self,x, y, size, align, ctz_size);
-  else if (might_overlap)
+  }else if (might_overlap)
     *is_move_done = false;
-  else
+  else{
+     n_debug("mtcsexpr.c mtcs_expr_emit_block_move_hints 55 pieces_ok:%d dynamic_direction:%d\n",
+              pieces_ok,dynamic_direction);
     emit_block_move_via_sized_loop(self,x, y, size, align, ctz_size);
-
+  }
   if (method == BLOCK_OP_CALL_PARM)
       /*!OK_DEFER_POP;expr.h 定义*/
       mtcsRtlData/*!crtl*/->expr.x_inhibit_defer_pop-=1;
@@ -4021,18 +4044,10 @@ rtx mtcs_expr_emit_block_op_via_libcall (MtcsExpr *self,enum built_in_function f
 {
   MtcsMode *mtcsMode=MTCS_GET_MODE_OBJECT(self);
   MtcsTarget *mtcsTarget=(MtcsTarget *)mtcsMode->target;
-  MtcsOpinit *mtcsOpinit=mtcs_target_get_opinit(mtcsTarget);
-  MtcsRTL *mtcsRTL=mtcs_target_get_rtl(mtcsTarget);
-  MtcsReg *mtcsReg=mtcs_target_get_reg(mtcsTarget);
-  MtcsEmit *mtcsEmit=mtcs_target_get_emit(mtcsTarget);
   MtcsExplow *mtcsExplow=mtcs_target_get_explow(mtcsTarget);
-  MtcsOptabs *mtcsOptabs=mtcs_target_get_optabs(mtcsTarget);
-  MtcsAsm *mtcsAsm=mtcs_target_get_asm(mtcsTarget);
-  MtcsReal *mtcsReal=mtcs_target_get_real(mtcsTarget);
-  MtcsFunc *mtcsFunc=mtcs_target_get_func(mtcsTarget);
-  MtcsRtlData *mtcsRtlData=mtcs_func_get_rtl_data(mtcsFunc);
   MtcsCalls *mtcsCalls=mtcs_target_get_calls(mtcsTarget);
   MtcsExpmed *mtcsExpmed=mtcs_target_get_expmed(mtcsTarget);
+  MtcsRTL *mtcsRTL=mtcs_target_get_rtl(mtcsTarget);
   MtcsTree  *mtcsTree=mtcs_target_get_tree(mtcsTarget);
 
   rtx dst_addr, src_addr;
@@ -4066,7 +4081,6 @@ rtx mtcs_expr_emit_block_op_via_libcall (MtcsExpr *self,enum built_in_function f
   tree fn = builtin_decl_implicit (fncode);
   call_expr = mtcs_tree_build_call_expr/*!build_call_expr*/(mtcsTree,fn, 3, dst_tree, src_tree, size_tree);
   CALL_EXPR_TAILCALL (call_expr) = tailcall;
-
   return mtcs_calls_expand_call(mtcsCalls,call_expr, NULL_RTX, false);
 }
 
@@ -4077,17 +4091,17 @@ rtx mtcs_expr_emit_block_op_via_libcall (MtcsExpr *self,enum built_in_function f
 //原型 emit_group_load expr.h expr.cc
 void mtcs_expr_emit_group_load (MtcsExpr *self,rtx dst, rtx src, tree type, poly_int64 ssize)
 {
-  rtx *tmps;
-  int i;
-  tmps = XALLOCAVEC (rtx, XVECLEN (dst, 0));
-  emit_group_load_1(self,tmps, dst, src, type, ssize);
-  /* Copy the extracted pieces into the proper (probable) hard regs.  */
-  for (i = 0; i < XVECLEN (dst, 0); i++){
+   rtx *tmps;
+   int i;
+   tmps = XALLOCAVEC (rtx, XVECLEN (dst, 0));
+   emit_group_load_1(self,tmps, dst, src, type, ssize);
+   /* Copy the extracted pieces into the proper (probable) hard regs.  */
+   for (i = 0; i < XVECLEN (dst, 0); i++){
       rtx d = XEXP (XVECEXP (dst, 0, i), 0);
       if (d == NULL)
-          continue;
+         continue;
       mtcs_expr_emit_move_insn/*!emit_move_insn*/(self,d, tmps[i]);
-  }
+   }
 }
 
 /* Generate code to push X onto the stack, assuming it has mode MODE and
@@ -4146,7 +4160,8 @@ bool mtcs_expr_emit_push_insn(MtcsExpr *self,rtx x, machine_mode mode, tree type
 
   machine_mode pMode=mtcs_mode_get_Pmode(mtcsMode);
   rtx xinner;
-  pad_direction stack_direction= mtcs_func_get_stack_grows_downward/*!STACK_GROWS_DOWNWARD*/(mtcsFunc)? PAD_DOWNWARD : PAD_UPWARD;
+  pad_direction stack_direction= mtcs_func_get_stack_grows_downward/*!STACK_GROWS_DOWNWARD*/(mtcsFunc)
+        ? PAD_DOWNWARD : PAD_UPWARD;
 
   /* Decide where to pad the argument: PAD_DOWNWARD for below,
      PAD_UPWARD for above, or PAD_NONE for don't pad it.
@@ -6319,12 +6334,12 @@ rtx mtcs_expr_expand_expr_real_1 (MtcsExpr *self,tree exp, rtx target, machine_m
             return mtcs_builtins_expand_builtin/*!expand_builtin*/(mtcsBuiltins,exp, target, subtarget, tmode, ignore);
         }
         if(fndecl && mtcs_builtins_is_builtin_fn(fndecl)){
-           n_debug("mtcsexpr.c mtcs_expr_expand_expr_real_1 44 这是一个内建的mtcs函数------%s ignore:%d tmode:%d target:%p\n",
+           n_debug("mtcsexpr.c mtcs_expr_expand_expr_real_1 44 这是一个内建的mtcs函数 %s ignore:%d tmode:%d target:%p\n",
                  IDENTIFIER_POINTER(DECL_NAME(fndecl)),ignore,tmode,target);
            return mtcs_builtins_expand_mtcs_builtin(mtcsBuiltins,exp, target, subtarget, tmode, ignore);
         }
         if(fndecl && mtcs_builtins_is_internal_fn(fndecl)){
-                n_debug("mtcsexpr.c mtcs_expr_expand_expr_real_1 55 这是一个内部的mtcs函数------%s ignore:%d tmode:%d target:%p\n",
+           n_debug("mtcsexpr.c mtcs_expr_expand_expr_real_1 55 这是一个内部的mtcs函数 %s ignore:%d tmode:%d target:%p\n",
                       IDENTIFIER_POINTER(DECL_NAME(fndecl)),ignore,tmode,target);
            return mtcs_builtins_expand_mtcs_internal(mtcsBuiltins,exp, target, subtarget, tmode, ignore);
         }
@@ -8037,6 +8052,7 @@ rtx mtcs_expr_store_expr (MtcsExpr *self,tree exp, rtx target, int call_param_p,
   MtcsAlias *mtcsAlias=mtcs_target_get_alias(mtcsTarget);
   MtcsConst  *mtcsConst=mtcs_target_get_const(mtcsTarget);
   MtcsMachine  *mtcsMachine=mtcs_target_get_machine(mtcsTarget);
+  MtcsTree *mtcsTree=mtcs_target_get_tree(mtcsTarget);
 
   rtx temp;
   rtx alt_rtl = NULL_RTX;
@@ -8216,7 +8232,8 @@ normal_expr:
               tmp_target = NULL_RTX;
               rexp = copy_node (exp);
               tree index= build_index_type (size_int (TREE_STRING_LENGTH (exp) - 1));
-              TREE_TYPE (rexp) = build_array_type (TREE_TYPE (TREE_TYPE (exp)),index);
+              TREE_TYPE (rexp) =mtcs_tree_build_array_type/*!build_array_type*/(mtcsTree,
+                    TREE_TYPE (TREE_TYPE (exp)),index);
               shortened_string_cst = true;
             }
       }
@@ -12589,7 +12606,8 @@ static rtx assemble_crc_table (MtcsExpr *self,unsigned HOST_WIDE_INT polynom, un
    MtcsTree *mtcsTree=mtcs_target_get_tree(mtcsTarget);
 
    unsigned table_el_n = 0x100;
-   tree ar = build_array_type (mtcs_stor_layout_make_unsigned_type/*!make_unsigned_type*/(mtcsStorLayout,
+   tree ar = mtcs_tree_build_array_type/*!build_array_type*/(mtcsTree,
+         mtcs_stor_layout_make_unsigned_type/*!make_unsigned_type*/(mtcsStorLayout,
          crc_bits),build_index_type (mtcs_tree_get_size_int/*!size_int*/(mtcsTree,table_el_n - 1)));
 
    /* Initialize the table.  */
@@ -12890,6 +12908,43 @@ rtx mtcs_expr_get_personality_function (MtcsExpr *self,tree decl)
       gcc_assert (personality != NULL_TREE);
 
    return XEXP (DECL_RTL (personality), 0);
+}
+
+/* A subroutine of clear_storage.  Expand a call to memset.
+   Return the return value of memset, 0 otherwise.  */
+//原型 set_storage_via_libcall expr.h expr.cc
+rtx mtcs_expr_set_storage_via_libcall (MtcsExpr *self,rtx object, rtx size, rtx val, bool tailcall)
+{
+   MtcsMode *mtcsMode=MTCS_GET_MODE_OBJECT(self);
+   MtcsTarget *mtcsTarget=(MtcsTarget *)mtcsMode->target;
+   MtcsRTL *mtcsRTL=mtcs_target_get_rtl(mtcsTarget);
+   MtcsExplow *mtcsExplow=mtcs_target_get_explow(mtcsTarget);
+   MtcsCalls *mtcsCalls=mtcs_target_get_calls(mtcsTarget);
+   MtcsExpmed *mtcsExpmed=mtcs_target_get_expmed(mtcsTarget);
+   MtcsTree  *mtcsTree=mtcs_target_get_tree(mtcsTarget);
+
+   tree call_expr, fn, object_tree, size_tree, val_tree;
+   machine_mode size_mode;
+
+   object = mtcs_explow_copy_addr_to_reg/*!copy_addr_to_reg*/(mtcsExplow,XEXP (object, 0));
+   object_tree = mtcs_expmed_make_tree/*!make_tree*/(mtcsExpmed,ptr_type_node, object);
+
+   if (!CONST_INT_P (val))
+      val = mtcs_expr_convert_to_mode/*!convert_to_mode*/(self,TYPE_MODE (integer_type_node), val, 1);
+   val_tree = mtcs_expmed_make_tree/*!make_tree*/(mtcsExpmed,integer_type_node, val);
+
+   size_mode = TYPE_MODE (sizetype);
+   size = mtcs_expr_convert_to_mode/*!convert_to_mode*/(self,size_mode, size, 1);
+   size = mtcs_explow_copy_to_mode_reg/*!copy_to_mode_reg*/(mtcsExplow,size_mode, size);
+   size_tree = mtcs_expmed_make_tree/*!make_tree*/(mtcsExpmed,sizetype, size);
+
+   /* It is incorrect to use the libcall calling conventions for calls to
+   memset because it can be provided by the user.  */
+   fn = builtin_decl_implicit (BUILT_IN_MEMSET);
+   call_expr = mtcs_tree_build_call_expr/*!build_call_expr*/(mtcsTree,fn, 3, object_tree, val_tree, size_tree);
+   CALL_EXPR_TAILCALL (call_expr) = tailcall;
+
+   return mtcs_calls_expand_call(mtcsCalls,call_expr, NULL_RTX, false);
 }
 
 

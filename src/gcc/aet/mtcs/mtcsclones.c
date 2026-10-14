@@ -537,11 +537,13 @@ static void replaceCallFndecl(MtcsClones *self,struct cgraph_node *newNode)
    MtcsTarget *mtcsTarget=(MtcsTarget *)mtcsMode->target;
    MtcsBuiltins  *mtcsBuiltins =mtcs_target_get_builtins(mtcsTarget);
 
-   tree fndecl=newNode->decl;
-   struct function *nodeFun = DECL_STRUCT_FUNCTION (fndecl);
+   tree call=newNode->decl;
+   struct function *nodeFun = DECL_STRUCT_FUNCTION (call);
    basic_block bb;
    gimple_stmt_iterator gsi;
    tree  newDecl;
+
+label1:
    FOR_EACH_BB_FN (bb, nodeFun){
       for (gsi = gsi_start_bb (bb); !gsi_end_p (gsi); gsi_next (&gsi)){
          gimple *stmt = gsi_stmt (gsi);
@@ -550,18 +552,18 @@ static void replaceCallFndecl(MtcsClones *self,struct cgraph_node *newNode)
          if (!is_gimple_call (stmt))
             continue;
          gcall *call_stmt = dyn_cast <gcall *> (stmt);
-         tree origDecl = gimple_call_fndecl (call_stmt);
-         if(!origDecl)
+         tree callee = gimple_call_fndecl (call_stmt);
+         if(!callee)
             continue;
          location_t loc = gimple_location(call_stmt);
-         if(fndecl_built_in_p (origDecl)){
+         if(fndecl_built_in_p (callee)){
             nboolean convert= mtcs_builtins_replace_call(mtcsBuiltins,stmt);
             if(!convert){
                //判断是否支持内置函数 例如 strstr 转成了 __builtin_strchr 在这里判断平台是否支持 __builtin_strchr
                n_debug("mtcsclones.c replaceCallFndecl 11 不成功 nodeFun:%p newNode:%s\n",nodeFun,newNode->name());
-               if(!mtcs_builtins_support_builtin_fn(mtcsBuiltins,origDecl)){
+               if(!mtcs_builtins_support_builtin_fn(mtcsBuiltins,callee)){
                   error_at(loc,"核函数或设备函数不能调用主机函数 00x。");
-                  aet_print_tree_skip_debug(origDecl);
+                  aet_print_tree_skip_debug(callee);
                   return;
                }
             }
@@ -571,24 +573,34 @@ static void replaceCallFndecl(MtcsClones *self,struct cgraph_node *newNode)
             }
          }else{
             //判断是不是核函数或设备函数
-            MtcsFuncType mtcsFuncType =  mtcs_info_get_func_type(origDecl);
-            MtcsFuncType callType =mtcs_info_get_func_type(fndecl);
-            if(mtcsFuncType==MTCS_FUNC_NOT
-            && !mtcs_info_is_internal_fn(origDecl)
-            && !mtcs_info_is_builtin_fn(origDecl)){
-               error_at(loc,"核函数或设备函数不能调用主机函数 11y 。");
-               aet_print_tree_skip_debug(origDecl);
+            MtcsFuncType callleeType =  mtcs_info_get_func_type(callee);
+            MtcsFuncType callType =      mtcs_info_get_func_type(call);
+            if(callleeType==MTCS_FUNC_NOT
+            && !mtcs_info_is_internal_fn(callee)
+            && !mtcs_info_is_builtin_fn(callee)){
+               error_at(loc,"核函数或设备函数不能调用主机函数 。");
+               aet_print_tree_skip_debug(callee);
                return;
             }
-            if(callType==MTCS_FUNC_KERNEL && mtcsFuncType==MTCS_FUNC_KERNEL){
+            if(callType==MTCS_FUNC_KERNEL && callleeType==MTCS_FUNC_KERNEL){
                error_at(loc,"核函数不能调用核函数 。");
                return ;
             }
 
             if((callType==MTCS_FUNC_DEVICE || callType == MTCS_FUNC_DEVICE_HOST)
-                  && mtcsFuncType==MTCS_FUNC_KERNEL){
+                  && callleeType==MTCS_FUNC_KERNEL){
                error_at(loc,"设备函数不能调用核函数 。");
                return ;
+            }
+            //被调函数是设备函数并且是声明在mic类中的内部函数
+            if(callleeType==MTCS_FUNC_DEVICE
+                  && mtcs_info_is_intrinsic_function_decl(callee)){
+               printf("找实现mic中的fndcl %p %p \n",call,current_function_decl);
+               int ret = mtcs_replace_replace_intrinsic(self->mtcsReplace,&gsi,call_stmt);
+               if(ret)
+                  goto label1;
+               else
+                  break;
             }
          }
       }
@@ -897,7 +909,6 @@ static void cleanParamOrig(tree fndecl)
    }
 }
 
-
 /* If the function in NODE is tagged as an elemental SIMD function,
    create the appropriate SIMD clones.  */
 //原型 expand_simd_clones omp-simd-clone.cc
@@ -913,7 +924,6 @@ static struct cgraph_node *cloneKernel (MtcsClones *self,struct cgraph_node *ori
    DECL_ATTRIBUTES (origNode->decl)=remove_attributes(DECL_ATTRIBUTES (origNode->decl),"noclone");
    gcc_assert(mtcsFuncType!=MTCS_FUNC_NOT);
    n_debug("mtcsclones.c cloneKernel 00 函数属性 原结点块数:%d\n",n_basic_blocks_for_fn (DECL_STRUCT_FUNCTION (origNode->decl)));
-   aet_print_tree( DECL_ATTRIBUTES (origNode->decl));
    char *name=function_name(DECL_STRUCT_FUNCTION (origNode->decl));
    // explicit_p = false;
    /* Ignore
@@ -930,8 +940,8 @@ static struct cgraph_node *cloneKernel (MtcsClones *self,struct cgraph_node *ori
       n_debug("mtcsclones.c cloneKernel 22 节点获取函数体 origNode->get_body ();%s\n",name);
       origNode->get_body ();
    }
-    n_debug("mtcsclones.c cloneKernel 33 printSymbolNode name:%s num_ssa_names:%d \n",name,num_ssa_names);
-    printSymbolNode();
+   n_debug("mtcsclones.c cloneKernel 33 printSymbolNode name:%s num_ssa_names:%d \n",name,num_ssa_names);
+   printSymbolNode();
     //n_debug("mtcsclones.c cloneKernel 44 printNodeBB name:%s num_ssa_names:%d \n",name,num_ssa_names);
    // printNodeBB(origNode);
 

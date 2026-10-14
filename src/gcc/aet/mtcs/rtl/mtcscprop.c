@@ -922,7 +922,7 @@ static bool cprop_insn (MtcsCprop *self,rtx_insn *insn)
       changed_this_round = 0;
       self->reg_use_count = 0;
       note_uses (&PATTERN (insn), find_used_regs, (void *)self/*!NULL*/);
-      n_debug("mtcscprop.c cprop_insn 00 %d\n",self->reg_use_count);
+     // n_debug("mtcscprop.c cprop_insn 00 %d\n",self->reg_use_count);
       /* We may win even when propagating constants into notes.  */
       note = find_reg_equal_equiv_note (insn);
       if (note)
@@ -933,7 +933,7 @@ static bool cprop_insn (MtcsCprop *self,rtx_insn *insn)
          unsigned int regno = REGNO (reg_used);
          rtx src_cst = NULL, src_reg = NULL;
          struct cprop_expr *set[2];
-         n_debug("mtcscprop.c cprop_insn 11 %d regno:%d\n",self->reg_use_count,regno);
+        // n_debug("mtcscprop.c cprop_insn 11 %d regno:%d\n",self->reg_use_count,regno);
 
          /* If the register has already been set in this block, there's
          nothing we can do.  */
@@ -948,15 +948,15 @@ static bool cprop_insn (MtcsCprop *self,rtx_insn *insn)
          if (set[1])
             src_cst = set[1]->src;
 
-         n_debug("mtcscprop.c cprop_insn 22 %d regno:%d src_cst:%p src_reg:%p %d %d %d\n",
-               self->reg_use_count,regno,src_cst,src_reg,src_cst?cprop_constant_p(src_cst):0,src_reg?cprop_reg_p(self,src_reg):0,
-                      src_reg?REGNO (src_reg) != regno:0);
+         //n_debug("mtcscprop.c cprop_insn 22 %d regno:%d src_cst:%p src_reg:%p %d %d %d\n",
+              // self->reg_use_count,regno,src_cst,src_reg,src_cst?cprop_constant_p(src_cst):0,src_reg?cprop_reg_p(self,src_reg):0,
+                      //src_reg?REGNO (src_reg) != regno:0);
 
          /* Constant propagation.  */
          if (src_cst && cprop_constant_p (src_cst) && constprop_register(self,reg_used, src_cst, insn)){
             changed = true;
             changed_this_round = 1;
-            n_debug("mtcscprop.c cprop_insn 33 %d regno:%d\n",self->global_const_prop_count,regno);
+            //n_debug("mtcscprop.c cprop_insn 33 %d regno:%d\n",self->global_const_prop_count,regno);
 
             self->global_const_prop_count++;
             if (dump_file != NULL){
@@ -972,7 +972,7 @@ static bool cprop_insn (MtcsCprop *self,rtx_insn *insn)
          && REGNO (src_reg) != regno   && try_replace_reg(self,reg_used, src_reg, insn)){
             changed = true;
             changed_this_round = 1;
-            n_debug("mtcscprop.c cprop_insn 44 %d regno:%d\n",self->global_const_prop_count,regno);
+            //n_debug("mtcscprop.c cprop_insn 44 %d regno:%d\n",self->global_const_prop_count,regno);
             self->global_copy_prop_count++;
             if (dump_file != NULL){
                fprintf (dump_file,"GLOBAL COPY-PROP: Replacing reg %d in insn %d",regno, INSN_UID (insn));
@@ -1569,12 +1569,13 @@ static bool one_cprop_pass (MtcsCprop *self)
 
    bool changed = false;
    int i;
-   n_debug("mtcscprop.c one_cprop_pass 00 mtcsRecog->num_changes:%d\n",mtcsRecog->num_changes);
+   //n_debug("mtcscprop.c one_cprop_pass 00 mtcsRecog->num_changes:%d\n",mtcsRecog->num_changes);
    /* Return if there's nothing to do, or it is too expensive.  */
    if (n_basic_blocks_for_fn (cfun) <= NUM_FIXED_BLOCKS + 1
-   || mtcs_gcse_gcse_or_cprop_is_too_expensive/*!gcse_or_cprop_is_too_expensive*/(mtcsGcse,_ ("const/copy propagation disabled")))
+   || mtcs_gcse_gcse_or_cprop_is_too_expensive/*!gcse_or_cprop_is_too_expensive*/(mtcsGcse,
+         _ ("const/copy propagation disabled")))
       return false;
-   n_debug("mtcscprop.c one_cprop_pass 11 mtcsRecog->num_changes:%d\n",mtcsRecog->num_changes);
+  // n_debug("mtcscprop.c one_cprop_pass 11 mtcsRecog->num_changes:%d\n",mtcsRecog->num_changes);
 
    self->global_const_prop_count = self->local_const_prop_count = 0;
    self->global_copy_prop_count = self->local_copy_prop_count = 0;
@@ -1610,7 +1611,7 @@ static bool one_cprop_pass (MtcsCprop *self)
    if (find_implicit_sets(self))
       changed = true;
 
-   n_debug("mtcscprop.c one_cprop_pass 22 changed:%d mtcsRecog->num_changes:%d\n",changed,mtcsRecog->num_changes);
+   //n_debug("mtcscprop.c one_cprop_pass 22 changed:%d mtcsRecog->num_changes:%d\n",changed,mtcsRecog->num_changes);
 
    /* If local_cprop_pass() or find_implicit_sets() changed something,
    run df_analyze() to bring all insn caches up-to-date, and to take
@@ -1642,8 +1643,8 @@ static bool one_cprop_pass (MtcsCprop *self)
 
       free (self->implicit_set_indexes);
       self->implicit_set_indexes = NULL;
-      n_debug("mtcscprop.c one_cprop_pass 33 n_elems:%d mtcsRecog->num_changes:%d\n",
-            self->set_hash_table.n_elems,mtcsRecog->num_changes);
+      //n_debug("mtcscprop.c one_cprop_pass 33 n_elems:%d mtcsRecog->num_changes:%d\n",
+            //self->set_hash_table.n_elems,mtcsRecog->num_changes);
 
       /* Allocate vars to track sets of regs.  */
       self->reg_set_bitmap = ALLOC_REG_SET (NULL);
@@ -1651,7 +1652,7 @@ static bool one_cprop_pass (MtcsCprop *self)
       FOR_BB_BETWEEN (bb, ENTRY_BLOCK_PTR_FOR_FN (cfun)->next_bb->next_bb,EXIT_BLOCK_PTR_FOR_FN (cfun), next_bb){
          bool seen_uncond_trap = false;
          rtx_insn *insn;
-         n_debug("mtcscprop.c one_cprop_pass 44 num_changes:%d\n",mtcsRecog->num_changes);
+         //n_debug("mtcscprop.c one_cprop_pass 44 num_changes:%d\n",mtcsRecog->num_changes);
 
          /* Reset tables used to keep track of what's still valid [since
          the start of the block].  */
@@ -1660,14 +1661,14 @@ static bool one_cprop_pass (MtcsCprop *self)
          FOR_BB_INSNS (bb, insn)
             if (INSN_P (insn)){
                bool was_uncond_trap = (GET_CODE (PATTERN (insn)) == TRAP_IF  && XEXP (PATTERN (insn), 0) == const1_rtx);
-               n_debug("mtcscprop.c one_cprop_pass 55aa change:%d num_changes:%d was_uncond_trap:%d\n",
-                     changed,mtcsRecog->num_changes,was_uncond_trap);
-               mtcs_print_rtl_single(stderr,insn);
+               //n_debug("mtcscprop.c one_cprop_pass 55aa change:%d num_changes:%d was_uncond_trap:%d\n",
+                     //changed,mtcsRecog->num_changes,was_uncond_trap);
+               //mtcs_print_rtl_single(stderr,insn);
 
 
                if (cprop_insn(self,insn))
                   changed = true;
-               n_debug("mtcscprop.c one_cprop_pass 55 change:%d num_changes:%d\n",changed,mtcsRecog->num_changes);
+               //n_debug("mtcscprop.c one_cprop_pass 55 change:%d num_changes:%d\n",changed,mtcsRecog->num_changes);
 
                /* Keep track of everything modified by this insn.  */
                /* ??? Need to be careful w.r.t. mods done to INSN.
@@ -1684,8 +1685,8 @@ static bool one_cprop_pass (MtcsCprop *self)
                   as unreachable.  Just turn it into a note, so that
                   RTL verification doesn't complain about it before
                   it is finally removed.  */
-                  n_debug("mtcscprop.c one_cprop_pass 66 change:%d seen_uncond_trap:%d num_changes:%d\n",
-                        changed,seen_uncond_trap,mtcsRecog->num_changes);
+                  //n_debug("mtcscprop.c one_cprop_pass 66 change:%d seen_uncond_trap:%d num_changes:%d\n",
+                        //changed,seen_uncond_trap,mtcsRecog->num_changes);
 
                   if (seen_uncond_trap)
                      mtcs_rtl_set_insn_deleted/*!set_insn_deleted*/(mtcsRTL,insn);
@@ -1697,7 +1698,7 @@ static bool one_cprop_pass (MtcsCprop *self)
             }//end   if (INSN_P (insn)){
       }
 
-      n_debug("mtcscprop.c one_cprop_pass 77 mtcsRecog->num_changes:%d\n",mtcsRecog->num_changes);
+      //n_debug("mtcscprop.c one_cprop_pass 77 mtcsRecog->num_changes:%d\n",mtcsRecog->num_changes);
 
 
       /* Make sure bypass_conditional_jumps will ignore not just its new
@@ -1725,7 +1726,7 @@ static bool one_cprop_pass (MtcsCprop *self)
 
    free_hash_table (&self->set_hash_table);
    obstack_free (&self->cprop_obstack, NULL);
-   n_debug("mtcscprop.c one_cprop_pass 88 changed:%d mtcsRecog->num_changes:%d\n",changed,mtcsRecog->num_changes);
+   //n_debug("mtcscprop.c one_cprop_pass 88 changed:%d mtcsRecog->num_changes:%d\n",changed,mtcsRecog->num_changes);
 
    if (dump_file){
       fprintf (dump_file, "CPROP of %s, %d basic blocks, %d bytes needed, ",
@@ -1754,24 +1755,24 @@ static unsigned int execute_rtl_cprop (MtcsCprop *self)
    MtcsTarget *mtcsTarget=(MtcsTarget *)mtcsMode->target;
    MtcsCfgCleanup *mtcsCfgCleanup=mtcs_target_get_cfg_cleanup(mtcsTarget);
    MtcsDfcore *mtcsDfcore=mtcs_target_get_dfcore(mtcsTarget);
-   n_debug("mtcscprop.c execute_rtl_cprop 00\n");
+   //n_debug("mtcscprop.c execute_rtl_cprop 00\n");
    int changed;
    mtcs_cfg_cleanup_delete_unreachable_blocks/*!delete_unreachable_blocks*/(mtcsCfgCleanup);
-   n_debug("mtcscprop.c execute_rtl_cprop 11\n");
+  // n_debug("mtcscprop.c execute_rtl_cprop 11\n");
    mtcs_dfcore_df_set_flags/*!df_set_flags*/(mtcsDfcore,DF_LR_RUN_DCE);
-   n_debug("mtcscprop.c execute_rtl_cprop 22\n");
-   testprint();
+   //n_debug("mtcscprop.c execute_rtl_cprop 22\n");
+  // testprint();
    mtcs_dfcore_df_analyze/*!df_analyze*/(mtcsDfcore);
-   n_debug("mtcscprop.c execute_rtl_cprop 33\n");
-   testprint();
+  // n_debug("mtcscprop.c execute_rtl_cprop 33\n");
+  // testprint();
    changed = one_cprop_pass(self);
-   n_debug("mtcscprop.c execute_rtl_cprop 44\n");
-   testprint();
+  // n_debug("mtcscprop.c execute_rtl_cprop 44\n");
+  // testprint();
    flag_rerun_cse_after_global_opts |= changed;
    if (changed)
       mtcs_cfg_cleanup_cleanup_cfg/*!cleanup_cfg*/(mtcsCfgCleanup,CLEANUP_CFG_CHANGED);
-   n_debug("mtcscprop.c execute_rtl_cprop 55\n");
-   testprint();
+  // n_debug("mtcscprop.c execute_rtl_cprop 55\n");
+   //testprint();
    return 0;
 }
 

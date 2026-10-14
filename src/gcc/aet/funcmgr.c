@@ -819,9 +819,8 @@ nboolean  func_mgr_change_static_func_decl(FuncMgr *self,struct c_declarator *de
       item->className = class_name_clone(className);
       NPtrArray *array=n_ptr_array_sized_new(2);
       n_ptr_array_add(array,item);
-      n_debug("func_mgr_change_static_func_decl 33 第一次加 class:%s mangle:%s\
-             org:%s code:%d item:%p NPtrArray:%p self:%p\n",
-      className->sysName,newSysName,orgiName,STRUCT_DECL,item,array,self);
+      n_debug("func_mgr_change_static_func_decl 33 第一次加 class:%s mangle:%s org:%s code:%d item:%p\n",
+            className->sysName,newSysName,orgiName,STRUCT_DECL,item);
       n_hash_table_insert (self->staticHashTable, n_strdup(className->sysName),array);
    }else{
       NPtrArray *array=(NPtrArray *)n_hash_table_lookup(self->staticHashTable,className->sysName);
@@ -1516,6 +1515,33 @@ nboolean func_mgr_can_use_outside(FuncMgr *self,tree decl)
    !ret->isFinalized &&
    !ret->isUnref &&
    !ret->isMtcsFunc);
+}
+
+/**
+ * 根据mic fndecl 找出 mii fndecl
+ */
+ClassFunc *func_mgr_get_mii_func(FuncMgr *self,ClassFunc *micFunc)
+{
+   NHashTableIter iter;
+   npointer key, value;
+   n_hash_table_iter_init(&iter, self->staticHashTable);
+   while (n_hash_table_iter_next(&iter, &key, &value)) {
+      char *sysName = (char *)key;
+      ClassInfo *info=class_mgr_get_class_info(class_mgr_get(),sysName);
+      if(class_info_is_mii(info)){
+         NPtrArray *funcs = (NPtrArray *)value;
+         int i;
+         for(i=0;i<funcs->len;i++){
+            ClassFunc *f=n_ptr_array_index(funcs,i);
+            if(class_func_is_device(f) && !class_func_is_host(f)){
+               if(!strcmp(micFunc->orgiName,f->orgiName)
+               && !strcmp(micFunc->rawMangleName,f->rawMangleName))
+                  return f;
+            }
+         }
+      }
+   }
+   return NULL;
 }
 
 FuncMgr *func_mgr_get()

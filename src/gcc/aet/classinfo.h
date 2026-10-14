@@ -86,6 +86,9 @@ struct _ClassInfo
    location_t declLoc;//声明的位置  class A
    location_t implLoc; //实现的位置 impl$ A
    location_t parentLoc;//父类的位置
+   nboolean isMIC;//是一个目标内在类
+   nboolean isMII;//是一个intrinsic的实现类
+
 };
 
 ClassInfo *class_info_new();
@@ -133,5 +136,11 @@ nboolean      class_info_decl_equal_impl(ClassInfo *self,NPtrArray *implParent,N
 nboolean      class_info_check_generic_decl(ClassInfo *self);
 //class$ A extends$ B loc是B的位置。
 void          class_info_set_parent_location(ClassInfo *self,location_t loc);
+//设置是不是一个内在目标的类
+void          class_info_set_intrinsic_class(ClassInfo *self);
+nboolean      class_info_is_mic(ClassInfo *self);
+nboolean      class_info_is_mii(ClassInfo *self);
+tree          class_info_get_mic_attribute(ClassInfo *self);
+tree          class_info_get_mii_attribute(ClassInfo *self);
 
 #endif

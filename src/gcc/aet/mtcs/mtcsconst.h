@@ -108,5 +108,8 @@ tree mtcs_const_fold_binary_to_constant (MtcsConst *self,enum tree_code code, tr
 //原型 fold_build_call_array_loc fold-const.h fold-const.cc
 tree mtcs_const_fold_build_call_array_loc (MtcsConst *self,location_t loc, tree type, tree fn,
             int nargs, tree *argarray);
+//原型 omit_one_operand_loc fold-const.h fold-const.cc
+tree mtcs_const_omit_one_operand_loc (MtcsConst *self,location_t loc, tree type, tree result, tree omitted);
+
 #endif
 

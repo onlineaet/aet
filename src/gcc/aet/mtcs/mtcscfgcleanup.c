@@ -415,8 +415,8 @@ static void test_rtl_verify_edges ()
                n_branch++;
          }
          bool re= BB_END (bb)?any_uncondjump_p (BB_END (bb)):false;
-         n_debug("mtcscfgcleanup.c rtl_verify_edges 00 bb:%p index:%d n_branch:%d BB_END (bb):%p any_uncondjump_p:%d\n",
-               bb,bb->index,n_branch,BB_END (bb),re);
+        // n_debug("mtcscfgcleanup.c rtl_verify_edges 00 bb:%p index:%d n_branch:%d BB_END (bb):%p any_uncondjump_p:%d\n",
+               //bb,bb->index,n_branch,BB_END (bb),re);
       }
   }
 }
@@ -472,7 +472,7 @@ static bool try_forward_edges (MtcsCfgCleanup *self,int mode, basic_block b)
       int nthreaded_edges = 0;
       bool may_thread = self->first_pass || (b->flags & BB_MODIFIED) != 0;
       bool new_target_threaded = false;
-      n_debug("mtcscfgcleanup.c try_forward_edges 00 b:%p\n",b);
+      //n_debug("mtcscfgcleanup.c try_forward_edges 00 b:%p\n",b);
 
       /* Skip complex edges because we don't know how to update them.
 
@@ -491,14 +491,14 @@ static bool try_forward_edges (MtcsCfgCleanup *self,int mode, basic_block b)
       while (counter < n_basic_blocks_for_fn (cfun)){
          basic_block new_target = NULL;
          may_thread |= (target->flags & BB_MODIFIED) != 0;
-         n_debug("mtcscfgcleanup.c try_forward_edges 11 may_thread:%d %d\n",may_thread,FORWARDER_BLOCK_P (target));
-         printbb(target);
-         printbb(b);
+        // n_debug("mtcscfgcleanup.c try_forward_edges 11 may_thread:%d %d\n",may_thread,FORWARDER_BLOCK_P (target));
+        // printbb(target);
+        // printbb(b);
 
          if (FORWARDER_BLOCK_P (target) && single_succ (target) != EXIT_BLOCK_PTR_FOR_FN (cfun)){
             /* Bypass trivial infinite loops.  */
             new_target = single_succ (target);
-            n_debug("mtcscfgcleanup.c try_forward_edges 22 may_thread:%d new_target:%p target:%p\n",may_thread,new_target,target);
+           // n_debug("mtcscfgcleanup.c try_forward_edges 22 may_thread:%d new_target:%p target:%p\n",may_thread,new_target,target);
 
             if (target == new_target)
                counter = n_basic_blocks_for_fn (cfun);
@@ -511,7 +511,7 @@ static bool try_forward_edges (MtcsCfgCleanup *self,int mode, basic_block b)
                if (LOCATION_LOCUS (new_locus) != UNKNOWN_LOCATION
                && LOCATION_LOCUS (locus) != UNKNOWN_LOCATION
                && new_locus != locus){
-                  n_debug("mtcscfgcleanup.c try_forward_edges 33 设 new_target为空\n");
+                //  n_debug("mtcscfgcleanup.c try_forward_edges 33 设 new_target为空\n");
                   new_target = NULL;
                }else{
                   if (LOCATION_LOCUS (new_locus) != UNKNOWN_LOCATION)
@@ -528,7 +528,7 @@ static bool try_forward_edges (MtcsCfgCleanup *self,int mode, basic_block b)
                   if (LOCATION_LOCUS (new_locus) != UNKNOWN_LOCATION
                   && LOCATION_LOCUS (locus) != UNKNOWN_LOCATION
                   && new_locus != locus){
-                    n_debug("mtcscfgcleanup.c try_forward_edges 44 设 new_target为空\n");
+                    //n_debug("mtcscfgcleanup.c try_forward_edges 44 设 new_target为空\n");
                      new_target = NULL;
                   }else{
                      if (LOCATION_LOCUS (new_locus) != UNKNOWN_LOCATION)
@@ -542,8 +542,8 @@ static bool try_forward_edges (MtcsCfgCleanup *self,int mode, basic_block b)
          /* Allow to thread only over one edge at time to simplify updating
          of probabilities.  */
          else if ((mode & CLEANUP_THREADING) && may_thread){
-            n_debug("mtcscfgcleanup.c try_forward_edges 33xx \n");
-            printbb(b);
+            //n_debug("mtcscfgcleanup.c try_forward_edges 33xx \n");
+           // printbb(b);
             edge t = thread_jump(self,e, target);
             if (t){
                if (!threaded_edges)
@@ -571,8 +571,8 @@ static bool try_forward_edges (MtcsCfgCleanup *self,int mode, basic_block b)
 
                new_target = t->dest;
                new_target_threaded = true;
-               n_debug("mtcscfgcleanup.c try_forward_edges 55 设 new_target= t->dest :%p\n",new_target);
-               printbb(b);
+               //n_debug("mtcscfgcleanup.c try_forward_edges 55 设 new_target= t->dest :%p\n",new_target);
+               //printbb(b);
 
             }
          }
@@ -590,7 +590,7 @@ static bool try_forward_edges (MtcsCfgCleanup *self,int mode, basic_block b)
             threaded |= new_target_threaded;
          }
       }//end while
-      n_debug("mtcscfgcleanup.c try_forward_edges 77 %d %d\n",counter >= n_basic_blocks_for_fn (cfun),target == first);
+      //n_debug("mtcscfgcleanup.c try_forward_edges 77 %d %d\n",counter >= n_basic_blocks_for_fn (cfun),target == first);
 
       if (counter >= n_basic_blocks_for_fn (cfun)){
          if (dump_file)
@@ -606,21 +606,21 @@ static bool try_forward_edges (MtcsCfgCleanup *self,int mode, basic_block b)
 
          /* Don't force if target is exit block.  */
          if (threaded && target != EXIT_BLOCK_PTR_FOR_FN (cfun)){
-            n_debug("mtcscfgcleanup.c try_forward_edges 88\n");
+            //n_debug("mtcscfgcleanup.c try_forward_edges 88\n");
             notice_new_block(self,mtcs_cfg_context_redirect_edge_and_branch_force/*!redirect_edge_and_branch_force*/
                   (mtcsCfgContext,e, target));
             if (dump_file)
                fprintf (dump_file, "Conditionals threaded.\n");
          }else if (!mtcs_cfg_context_redirect_edge_and_branch/*!redirect_edge_and_branch*/(mtcsCfgContext,e, target)){
-            n_debug("mtcscfgcleanup.c try_forward_edges 88xcc\n");
-            printbb(b);
+            //n_debug("mtcscfgcleanup.c try_forward_edges 88xcc\n");
+            //printbb(b);
 
             if (dump_file)
                fprintf (dump_file,"Forwarding edge %i->%i to %i failed.\n",b->index, e->dest->index, target->index);
             ei_next (&ei);
             continue;
          }
-         n_debug("mtcscfgcleanup.c try_forward_edges 88xcceeee\n");
+         //n_debug("mtcscfgcleanup.c try_forward_edges 88xcceeee\n");
          /* We successfully forwarded the edge.  Now update profile
          data: for each edge we traversed in the chain, remove
          the original edge's execution count.  */
@@ -631,7 +631,7 @@ static bool try_forward_edges (MtcsCfgCleanup *self,int mode, basic_block b)
                gcc_assert (n < nthreaded_edges);
                t = threaded_edges [n++];
                gcc_assert (t->src == first);
-               n_debug("mtcscfgcleanup.c try_forward_edges 99xx\n");
+               //n_debug("mtcscfgcleanup.c try_forward_edges 99xx\n");
 
                update_bb_profile_for_threading (first, edge_count, t);
                mtcs_cfg_rtl_update_br_prob_note/*!update_br_prob_note*/(mtcsCfgRtl,first);
@@ -2629,7 +2629,7 @@ static bool try_optimize_cfg (MtcsCfgCleanup *self,int mode)
          self->block_was_dirty = false;
          changed = false;
          iterations++;
-         n_debug("mtcscfgcleanup.c  try_optimize_cfg 00 iterations:%d mode:%d changed:%d\n",iterations,mode,changed);
+         //n_debug("mtcscfgcleanup.c  try_optimize_cfg 00 iterations:%d mode:%d changed:%d\n",iterations,mode,changed);
 
          if (dump_file)
             fprintf (dump_file,"\n\ntry_optimize_cfg iteration %i\n\n",iterations);
@@ -2638,8 +2638,8 @@ static bool try_optimize_cfg (MtcsCfgCleanup *self,int mode)
             basic_block c;
             edge s;
             bool changed_here = false;
-            n_debug("mtcscfgcleanup.c  try_optimize_cfg 11 mode:%d b:%p ENTRY_BB:%p changed:%d\n",
-                  mode,b,ENTRY_BLOCK_PTR_FOR_FN (cfun),changed);
+            //n_debug("mtcscfgcleanup.c  try_optimize_cfg 11 mode:%d b:%p ENTRY_BB:%p changed:%d\n",
+                 // mode,b,ENTRY_BLOCK_PTR_FOR_FN (cfun),changed);
 
             /* Delete trivially dead basic blocks.  This is either
             blocks with no predecessors, or empty blocks with no
@@ -2652,15 +2652,15 @@ static bool try_optimize_cfg (MtcsCfgCleanup *self,int mode)
             if (EDGE_COUNT (b->preds) == 0 || (EDGE_COUNT (b->succs) == 0
             && trivially_empty_bb_p (b) && single_succ_edge (ENTRY_BLOCK_PTR_FOR_FN (cfun))->dest != b)){
                c = b->prev_bb;
-               n_debug("mtcscfgcleanup.c  try_optimize_cfg 22 mode:%d b:%p c:%p EDGE_COUNT (b->preds):%d\n",
-                          mode,b,c,EDGE_COUNT (b->preds));
+               //n_debug("mtcscfgcleanup.c  try_optimize_cfg 22 mode:%d b:%p c:%p EDGE_COUNT (b->preds):%d\n",
+                          //mode,b,c,EDGE_COUNT (b->preds));
                if (EDGE_COUNT (b->preds) > 0){
                   edge e;
                   edge_iterator ei;
-                  n_debug("mtcscfgcleanup.c  try_optimize_cfg 33 mode:%d b:%p c:%p \n",mode,b,c);
+                  //n_debug("mtcscfgcleanup.c  try_optimize_cfg 33 mode:%d b:%p c:%p \n",mode,b,c);
 
                   if (mtcs_cfg_context_get_state/*!current_ir_type ()*/(mtcsCfgContext) == IR_RTL_CFGLAYOUT){
-                     n_debug("mtcscfgcleanup.c  try_optimize_cfg 44 mode:%d b:%p c:%p \n",mode,b,c);
+                     //n_debug("mtcscfgcleanup.c  try_optimize_cfg 44 mode:%d b:%p c:%p \n",mode,b,c);
                      rtx_insn *insn;
                      for (insn = BB_FOOTER (b);insn; insn = NEXT_INSN (insn))
                         if (BARRIER_P (insn))
@@ -2675,7 +2675,7 @@ static bool try_optimize_cfg (MtcsCfgCleanup *self,int mode)
                                  mtcs_cfg_rtl_emit_barrier_after_bb/*!emit_barrier_after_bb*/(mtcsCfgRtl,e->src);
                            }
                   }else{
-                     n_debug("mtcscfgcleanup.c  try_optimize_cfg 55 mode:%d b:%p c:%p \n",mode,b,c);
+                     //n_debug("mtcscfgcleanup.c  try_optimize_cfg 55 mode:%d b:%p c:%p \n",mode,b,c);
                      rtx_insn *last = get_last_bb_insn (b);
                      if (last && BARRIER_P (last))
                         FOR_EACH_EDGE (e, ei, b->preds)
@@ -2687,7 +2687,7 @@ static bool try_optimize_cfg (MtcsCfgCleanup *self,int mode)
                changed = true;
                /* Avoid trying to remove the exit block.  */
                b = (c == ENTRY_BLOCK_PTR_FOR_FN (cfun) ? c->next_bb : c);
-               n_debug("mtcscfgcleanup.c  try_optimize_cfg 66 mode:%d b:%p c:%p \n",mode,b,c);
+               //n_debug("mtcscfgcleanup.c  try_optimize_cfg 66 mode:%d b:%p c:%p \n",mode,b,c);
                continue;
             }
             //n_debug("mtcscfgcleanup.c  try_optimize_cfg 66 mode:%d b:%p c:%p \n",mode,b,c);
@@ -2708,12 +2708,12 @@ static bool try_optimize_cfg (MtcsCfgCleanup *self,int mode)
             || !JUMP_P (BB_END (single_pred (b)))
             || ! label_is_jump_target_p (BB_HEAD (b),
             BB_END (single_pred (b))))){
-               n_debug("mtcscfgcleanup.c  try_optimize_cfg 77 mode:%d b:%p c:%p \n",mode,b,c);
+               //n_debug("mtcscfgcleanup.c  try_optimize_cfg 77 mode:%d b:%p c:%p \n",mode,b,c);
                mtcs_cfg_rtl_delete_insn/*!delete_insn*/(mtcsCfgRtl,BB_HEAD (b));
                if (dump_file)
                   fprintf (dump_file, "Deleted label in block %i.\n",b->index);
             }
-            n_debug("mtcscfgcleanup.c  try_optimize_cfg 88 mode:%d b:%p c:%p \n",mode,b,c);
+            //n_debug("mtcscfgcleanup.c  try_optimize_cfg 88 mode:%d b:%p c:%p \n",mode,b,c);
             /* If we fall through an empty block, we can remove it.  */
             if (!(mode & (CLEANUP_CFGLAYOUT | CLEANUP_NO_INSN_DEL))
             && single_pred_p (b)
@@ -2724,7 +2724,7 @@ static bool try_optimize_cfg (MtcsCfgCleanup *self,int mode)
             there is a successor for this block.  */
             && (single_succ_edge (b)->flags & EDGE_FALLTHRU)
             && n_basic_blocks_for_fn (cfun) > NUM_FIXED_BLOCKS + 1){
-               n_debug("mtcscfgcleanup.c  try_optimize_cfg 99 mode:%d b:%p c:%p \n",mode,b,c);
+               //n_debug("mtcscfgcleanup.c  try_optimize_cfg 99 mode:%d b:%p c:%p \n",mode,b,c);
 
                if (dump_file)
                   fprintf (dump_file,"Deleting fallthru block %i.\n", b->index);
@@ -2737,7 +2737,7 @@ static bool try_optimize_cfg (MtcsCfgCleanup *self,int mode)
                b = c;
                continue;
             }
-            n_debug("mtcscfgcleanup.c  try_optimize_cfg 100 mode:%d b:%p c:%p edge_count:%d\n",mode,b,c,EDGE_COUNT (b->succs));
+           // n_debug("mtcscfgcleanup.c  try_optimize_cfg 100 mode:%d b:%p c:%p edge_count:%d\n",mode,b,c,EDGE_COUNT (b->succs));
             /* Merge B with its single successor, if any.  */
             if (single_succ_p (b)
             && (s = single_succ_edge (b))
@@ -2750,11 +2750,11 @@ static bool try_optimize_cfg (MtcsCfgCleanup *self,int mode)
                does not fit merge_blocks interface and is kept here in
                hope that it will become useless once more of compiler
                is transformed to use cfg_layout mode.  */
-               n_debug("mtcscfgcleanup.c  try_optimize_cfg 101 mode:%d b:%p c:%p \n",mode,b,c);
+               //n_debug("mtcscfgcleanup.c  try_optimize_cfg 101 mode:%d b:%p c:%p \n",mode,b,c);
 
                if ((mode & CLEANUP_CFGLAYOUT)
                && mtcs_cfg_context_can_merge_blocks_p/*!can_merge_blocks_p*/(mtcsCfgContext,b, c)){
-                  n_debug("mtcscfgcleanup.c  try_optimize_cfg 102 mode:%d b:%p c:%p \n",mode,b,c);
+                 // n_debug("mtcscfgcleanup.c  try_optimize_cfg 102 mode:%d b:%p c:%p \n",mode,b,c);
 
                   mtcs_cfg_context_merge_blocks/*!merge_blocks*/(mtcsCfgContext,b, c);
                   update_forwarder_flag(self,b);
@@ -2769,16 +2769,16 @@ static bool try_optimize_cfg (MtcsCfgCleanup *self,int mode)
                && !tablejump_p (BB_END (b),
                NULL, NULL))))
                && (next = merge_blocks_move(self,s, b, c, mode))){
-                  n_debug("mtcscfgcleanup.c  try_optimize_cfg 103 mode:%d b:%p c:%p \n",mode,b,c);
-                  printbb(b);
-                  n_debug("mtcscfgcleanup.c  try_optimize_cfg 103aa 打印c mode:%d b:%p c:%p \n",mode,b,c);
-                  printbb(c);
+                  //n_debug("mtcscfgcleanup.c  try_optimize_cfg 103 mode:%d b:%p c:%p \n",mode,b,c);
+                  //printbb(b);
+                 // n_debug("mtcscfgcleanup.c  try_optimize_cfg 103aa 打印c mode:%d b:%p c:%p \n",mode,b,c);
+                 // printbb(c);
                   b = next;
                   changed_here = true;
                }
             }
-            n_debug("mtcscfgcleanup.c  try_optimize_cfg 104 mode:%d b:%p c:%p \n",mode,b,c);
-            printbb(b);
+            //n_debug("mtcscfgcleanup.c  try_optimize_cfg 104 mode:%d b:%p c:%p \n",mode,b,c);
+            //printbb(b);
 
             /* Try to change a branch to a return to just that return.  */
             rtx_insn *ret, *use;
@@ -2797,8 +2797,8 @@ static bool try_optimize_cfg (MtcsCfgCleanup *self,int mode)
                   changed_here = true;
                }
             }
-            n_debug("mtcscfgcleanup.c  try_optimize_cfg 105 mode:%d b:%p c:%p \n",mode,b,c);
-            printbb(b);
+            //n_debug("mtcscfgcleanup.c  try_optimize_cfg 105 mode:%d b:%p c:%p \n",mode,b,c);
+            //printbb(b);
 
             /* Try to change a conditional branch to a return to the
             respective conditional return.  */
@@ -2814,8 +2814,8 @@ static bool try_optimize_cfg (MtcsCfgCleanup *self,int mode)
                   changed_here = true;
                }
             }
-            n_debug("mtcscfgcleanup.c  try_optimize_cfg 106 mode:%d b:%p c:%p \n",mode,b,c);
-            printbb(b);
+            //n_debug("mtcscfgcleanup.c  try_optimize_cfg 106 mode:%d b:%p c:%p \n",mode,b,c);
+            //printbb(b);
 
             /* Try to flip a conditional branch that falls through to
             a return so that it becomes a conditional return and a
@@ -2855,8 +2855,8 @@ static bool try_optimize_cfg (MtcsCfgCleanup *self,int mode)
                   }
                }
             }
-            n_debug("mtcscfgcleanup.c try_optimize_cfg 107 mode:%d b:%p c:%p \n",mode,b,c);
-            printbb(b);
+            //n_debug("mtcscfgcleanup.c try_optimize_cfg 107 mode:%d b:%p c:%p \n",mode,b,c);
+            //printbb(b);
 
             /* Simplify branch over branch.  */
             if ((mode & CLEANUP_EXPENSIVE) && !(mode & CLEANUP_CFGLAYOUT) && try_simplify_condjump(self,b))
@@ -2872,19 +2872,17 @@ static bool try_optimize_cfg (MtcsCfgCleanup *self,int mode)
             && !CROSSING_JUMP_P (BB_END (b))
             && mtcs_cfg_rtl_try_redirect_by_replacing_jump/*!try_redirect_by_replacing_jump*/(mtcsCfgRtl,
                   single_succ_edge (b),single_succ (b),(mode & CLEANUP_CFGLAYOUT) != 0)){
-               n_debug("mtcscfgcleanup.c  try_optimize_cfg 108 mode:%d b:%p c:%p \n",mode,b,c);
+               //n_debug("mtcscfgcleanup.c  try_optimize_cfg 108 mode:%d b:%p c:%p \n",mode,b,c);
                update_forwarder_flag(self,b);
                changed_here = true;
             }
-            n_debug("mtcscfgcleanup.c try_optimize_cfg 107xx mode:%d b:%p c:%p \n",mode,b,c);
-                 printbb(b);
+            //n_debug("mtcscfgcleanup.c try_optimize_cfg 107xx mode:%d b:%p c:%p \n",mode,b,c);
+            //printbb(b);
             /* Simplify branch to branch.  */
             if (try_forward_edges(self,mode, b)){
-               n_debug("mtcscfgcleanup.c  try_optimize_cfg 109 mode:%d b:%p c:%p \n",mode,b,c);
-               printbb(b);
-
+               //n_debug("mtcscfgcleanup.c  try_optimize_cfg 109 mode:%d b:%p c:%p \n",mode,b,c);
+              // printbb(b);
                update_forwarder_flag(self,b);
-
                changed_here = true;
             }
 
@@ -2897,8 +2895,8 @@ static bool try_optimize_cfg (MtcsCfgCleanup *self,int mode)
             reload.  */
             && reload_completed  && try_head_merge_bb(self,b)){
                changed_here = true;
-            n_debug("mtcscfgcleanup.c  try_optimize_cfg 110 mode:%d b:%p c:%p changed_here:%d b:%p changed:%d\n",
-                  mode,b,c,changed_here,b,changed);
+            //n_debug("mtcscfgcleanup.c  try_optimize_cfg 110 mode:%d b:%p c:%p changed_here:%d b:%p changed:%d\n",
+                  //mode,b,c,changed_here,b,changed);
 
             }
 
@@ -2908,23 +2906,23 @@ static bool try_optimize_cfg (MtcsCfgCleanup *self,int mode)
                b = b->next_bb;
             else
                changed = true;
-            n_debug("mtcscfgcleanup.c  try_optimize_cfg 111 mode:%d b:%p c:%p changed_here:%d b:%p changed:%d\n",
-                  mode,b,c,changed_here,b,changed);
-            printbb(b);
+            //n_debug("mtcscfgcleanup.c  try_optimize_cfg 111 mode:%d b:%p c:%p changed_here:%d b:%p changed:%d\n",
+                  //mode,b,c,changed_here,b,changed);
+            //printbb(b);
 
 
          }
-         n_debug("mtcscfgcleanup.c  try_optimize_cfg 112 (mode & CLEANUP_CROSSJUMP):%d changed:%d\n",
-               (mode & CLEANUP_CROSSJUMP),changed);
-         printbb(b);
-         test_rtl_verify_edges();
+        // n_debug("mtcscfgcleanup.c  try_optimize_cfg 112 (mode & CLEANUP_CROSSJUMP):%d changed:%d\n",
+              // (mode & CLEANUP_CROSSJUMP),changed);
+         //printbb(b);
+         //test_rtl_verify_edges();
 
          if ((mode & CLEANUP_CROSSJUMP) && try_crossjump_bb(self,mode, EXIT_BLOCK_PTR_FOR_FN (cfun))){
             changed = true;
-            n_debug("mtcscfgcleanup.c  try_optimize_cfg 113 self->block_was_dirty:%d\n",self->block_was_dirty);
+           // n_debug("mtcscfgcleanup.c  try_optimize_cfg 113 self->block_was_dirty:%d\n",self->block_was_dirty);
          }
          if (self->block_was_dirty){
-            n_debug("mtcscfgcleanup.c  try_optimize_cfg 114 self->block_was_dirty:%d changed:%d\n",self->block_was_dirty,changed);
+            //n_debug("mtcscfgcleanup.c  try_optimize_cfg 114 self->block_was_dirty:%d changed:%d\n",self->block_was_dirty,changed);
             /* This should only be set by head-merging.  */
             gcc_assert (mode & CLEANUP_CROSSJUMP);
             mtcs_dfcore_df_analyze/*!df_analyze*/(mtcsDfcore);
@@ -2939,10 +2937,10 @@ static bool try_optimize_cfg (MtcsCfgCleanup *self,int mode)
             is only visible after newly unreachable blocks are deleted,
             which will be done in fixup_partitions.  */
             if ((mode & CLEANUP_NO_PARTITIONING) == 0){
-               n_debug("mtcscfgcleanup.c  try_optimize_cfg 115 self->block_was_dirty:%d changed:%d\n",self->block_was_dirty,changed);
-               test_rtl_verify_edges();
+               //n_debug("mtcscfgcleanup.c  try_optimize_cfg 115 self->block_was_dirty:%d changed:%d\n",self->block_was_dirty,changed);
+               //test_rtl_verify_edges();
                mtcs_cfg_rtl_fixup_partitions/*!fixup_partitions*/(mtcsCfgRtl);
-               test_rtl_verify_edges();
+               //test_rtl_verify_edges();
                mtcs_cfg_context_checking_verify_flow_info/*!checking_verify_flow_info*/(mtcsCfgContext);
             }
          }
@@ -2968,7 +2966,7 @@ bool mtcs_cfg_cleanup_delete_unreachable_blocks (MtcsCfgCleanup *self)
 
    bool changed = false;
    basic_block b, prev_bb;
-   n_debug("mtcscfgcleanup.c mtcs_cfg_cleanup_delete_unreachable_blocks 00 \n");
+   //n_debug("mtcscfgcleanup.c mtcs_cfg_cleanup_delete_unreachable_blocks 00 \n");
 
    find_unreachable_blocks ();
 
@@ -3011,7 +3009,7 @@ bool mtcs_cfg_cleanup_delete_unreachable_blocks (MtcsCfgCleanup *self)
          prev_bb = b->prev_bb;
 
          if (!(b->flags & BB_REACHABLE)){
-            n_debug("mtcscfgcleanup.c mtcs_cfg_cleanup_delete_unreachable_blocks 11 bb:%p index:%d\n",b,b->index);
+            //n_debug("mtcscfgcleanup.c mtcs_cfg_cleanup_delete_unreachable_blocks 11 bb:%p index:%d\n",b,b->index);
             mtcs_cfg_context_delete_basic_block/*!delete_basic_block*/(mtcsCfgContext,b);
             changed = true;
          }
@@ -3079,27 +3077,27 @@ bool mtcs_cfg_cleanup_cleanup_cfg (MtcsCfgCleanup *self,int mode)
    want to have cfglayout mode as the default.  */
    if (mtcs_cfg_context_get_state/*!current_ir_type ()*/(mtcsCfgContext) == IR_RTL_CFGLAYOUT){
       mode |= CLEANUP_CFGLAYOUT;
-      n_debug("mtcscfgcleanup.c mtcs_cfg_cleanup_cleanup_cfg 00 mode:%d\n",mode);
+      //n_debug("mtcscfgcleanup.c mtcs_cfg_cleanup_cleanup_cfg 00 mode:%d\n",mode);
    }
 
    if (mtcs_cfg_cleanup_delete_unreachable_blocks/*!delete_unreachable_blocks*/(self)){
       changed = true;
-      n_debug("mtcscfgcleanup.c mtcs_cfg_cleanup_cleanup_cfg 11 mode:%d reload_completed:%d\n",mode,reload_completed);
+      //n_debug("mtcscfgcleanup.c mtcs_cfg_cleanup_cleanup_cfg 11 mode:%d reload_completed:%d\n",mode,reload_completed);
 
       /* We've possibly created trivially dead code.  Cleanup it right
       now to introduce more opportunities for try_optimize_cfg.  */
       if (!(mode & (CLEANUP_NO_INSN_DEL)) && !reload_completed){
-         n_debug("mtcscfgcleanup.c mtcs_cfg_cleanup_cleanup_cfg 22 mode:%d reload_completed:%d\n",mode,reload_completed);
+        // n_debug("mtcscfgcleanup.c mtcs_cfg_cleanup_cleanup_cfg 22 mode:%d reload_completed:%d\n",mode,reload_completed);
          mtcs_cse_delete_trivially_dead_insns/*!delete_trivially_dead_insns*/(mtcsCse,
                mtcs_rtl_data_get_insns/*!get_insns*/(mtcsRtlData), mtcs_func_max_reg_num/*!max_reg_num*/(mtcsFunc));
       }
    }
-   n_debug("mtcscfgcleanup.c mtcs_cfg_cleanup_cleanup_cfg 00AA mode:%d\n",mode);
-   printbb(NULL);
+  // n_debug("mtcscfgcleanup.c mtcs_cfg_cleanup_cleanup_cfg 00AA mode:%d\n",mode);
+   //printbb(NULL);
 
    mtcs_cfg_compact_blocks/*!compact_blocks*/(mtcsCfg);
-   n_debug("mtcscfgcleanup.c mtcs_cfg_cleanup_cleanup_cfg 00BB mode:%d\n",mode);
-   printbb(NULL);
+   //n_debug("mtcscfgcleanup.c mtcs_cfg_cleanup_cleanup_cfg 00BB mode:%d\n",mode);
+   //printbb(NULL);
    /* To tail-merge blocks ending in the same noreturn function (e.g.
    a call to abort) we have to insert fake edges to exit.  Do this
    here once.  The fake edges do not interfere with any other CFG
@@ -3113,15 +3111,14 @@ bool mtcs_cfg_cleanup_cleanup_cfg (MtcsCfgCleanup *self,int mode)
 
    //printbb(NULL);
    while (try_optimize_cfg(self,mode)){
-      n_debug("mtcscfgcleanup.c mtcs_cfg_cleanup_cleanup_cfg 33\n");
+      //n_debug("mtcscfgcleanup.c mtcs_cfg_cleanup_cleanup_cfg 33\n");
      // printbb(NULL);
       mtcs_cfg_cleanup_delete_unreachable_blocks/*!delete_unreachable_blocks*/(self), changed = true;
      // n_debug("mtcscfgcleanup.c mtcs_cfg_cleanup_cleanup_cfg mtcs_cfg_cleanup_delete_unreachable_blocks 33aa\n");
-
       //printbb(NULL);
 
       if (!(mode & CLEANUP_NO_INSN_DEL)){
-         n_debug("mtcscfgcleanup.c mtcs_cfg_cleanup_cleanup_cfg 44\n");
+         //n_debug("mtcscfgcleanup.c mtcs_cfg_cleanup_cleanup_cfg 44\n");
 
          /* Try to remove some trivially dead insns when doing an expensive
          cleanup.  But delete_trivially_dead_insns doesn't work after
@@ -3139,7 +3136,7 @@ bool mtcs_cfg_cleanup_cleanup_cfg (MtcsCfgCleanup *self,int mode)
          && ! mtcs_cse_delete_trivially_dead_insns/*!delete_trivially_dead_insns*/(mtcsCse,
                mtcs_rtl_data_get_insns/*!get_insns*/(mtcsRtlData), mtcs_func_max_reg_num/*!max_reg_num*/(mtcsFunc)))
             break;
-         n_debug("mtcscfgcleanup.c mtcs_cfg_cleanup_cleanup_cfg 55 self->crossjumps_occurred:%d\n",self->crossjumps_occurred);
+         //n_debug("mtcscfgcleanup.c mtcs_cfg_cleanup_cleanup_cfg 55 self->crossjumps_occurred:%d\n",self->crossjumps_occurred);
 
          if ((mode & CLEANUP_CROSSJUMP) && self->crossjumps_occurred){
             mtcs_dce_run_fast_dce/*!run_fast_dce*/(mtcsDce);
@@ -3150,11 +3147,11 @@ bool mtcs_cfg_cleanup_cleanup_cfg (MtcsCfgCleanup *self,int mode)
    }
 
    if (mode & CLEANUP_CROSSJUMP){
-      n_debug("mtcscfgcleanup.c mtcs_cfg_cleanup_cleanup_cfg 66 \n");
+      //n_debug("mtcscfgcleanup.c mtcs_cfg_cleanup_cleanup_cfg 66 \n");
       remove_fake_exit_edges ();
    }
    if (mode & CLEANUP_FORCE_FAST_DCE){
-      n_debug("mtcscfgcleanup.c mtcs_cfg_cleanup_cleanup_cfg 77 \n");
+      //n_debug("mtcscfgcleanup.c mtcs_cfg_cleanup_cleanup_cfg 77 \n");
       mtcs_dce_run_fast_dce/*!run_fast_dce*/(mtcsDce);
    }
    /* Don't call delete_dead_jumptables in cfglayout mode, because
@@ -3164,12 +3161,12 @@ bool mtcs_cfg_cleanup_cleanup_cfg (MtcsCfgCleanup *self,int mode)
    not in a basic block.  Dead jumptables are cleaned up when
    going out of cfglayout mode.  */
    if (!(mode & CLEANUP_CFGLAYOUT)){
-      n_debug("mtcscfgcleanup.c mtcs_cfg_cleanup_cleanup_cfg 88 \n");
+      //n_debug("mtcscfgcleanup.c mtcs_cfg_cleanup_cleanup_cfg 88 \n");
       mtcs_cfg_cleanup_delete_dead_jumptables/*!delete_dead_jumptables*/(self);
    }
    /* ???  We probably do this way too often.  */
    if (current_loops && (changed || (mode & CLEANUP_CFG_CHANGED))){
-      n_debug("mtcscfgcleanup.c mtcs_cfg_cleanup_cleanup_cfg 99 \n");
+     // n_debug("mtcscfgcleanup.c mtcs_cfg_cleanup_cleanup_cfg 99 \n");
       /* The above doesn't preserve dominance info if available.  */
       gcc_assert (!dom_info_available_p (CDI_DOMINATORS));
       calculate_dominance_info (CDI_DOMINATORS);

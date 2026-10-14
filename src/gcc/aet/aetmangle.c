@@ -568,67 +568,62 @@ static void write_nested_name (AetMangle *self,const tree decl)
 
 static void write_name (AetMangle *self,tree decl, const int ignore_local_scope)
 {
-    tree context;
-    if (TREE_CODE (decl) == TYPE_DECL){
+   tree context;
+   if (TREE_CODE (decl) == TYPE_DECL){
       /* In case this is a typedef, fish out the corresponding
-	  TYPE_DECL for the main variant.  */
-      n_debug("write_name 00 TREE_CODE (decl) == TYPE_DECL %s",get_tree_code_name(TREE_CODE(decl)));
+      TYPE_DECL for the main variant.  */
+      //n_debug("write_name 00 TREE_CODE (decl) == TYPE_DECL %s",get_tree_code_name(TREE_CODE(decl)));
       decl = TYPE_NAME (TYPE_MAIN_VARIANT (TREE_TYPE (decl)));
-    }
-    context = decl_mangling_context (self,decl);
-    //gcc_assert (context != NULL_TREE);
+   }
+   context = decl_mangling_context (self,decl);
+   //gcc_assert (context != NULL_TREE);
 
-
-  /* A decl in :: or ::std scope is treated specially.  The former is
-     mangled using <unscoped-name> or <unscoped-template-name>, the
-     latter with a special substitution.  Also, a name that is
-     directly in a local function scope is also mangled with
-     <unscoped-name> rather than a full <nested-name>.  */
+   /* A decl in :: or ::std scope is treated specially.  The former is
+   mangled using <unscoped-name> or <unscoped-template-name>, the
+   latter with a special substitution.  Also, a name that is
+   directly in a local function scope is also mangled with
+   <unscoped-name> rather than a full <nested-name>.  */
    if(/*context == global_namespace || DECL_NAMESPACE_STD_P (context) || */
-		   (ignore_local_scope && (TREE_CODE (context) == FUNCTION_DECL || TREE_CODE (context) == PARM_DECL ) )){
-	   n_debug("write_name 11 ignore_local_scope %s",get_tree_code_name(TREE_CODE(decl)));
-
-	/* Everything else gets an <unqualified-name>.  */
-	    write_unscoped_name (self,decl);
+   (ignore_local_scope && (TREE_CODE (context) == FUNCTION_DECL || TREE_CODE (context) == PARM_DECL ) )){
+      //n_debug("write_name 11 ignore_local_scope %s",get_tree_code_name(TREE_CODE(decl)));
+      /* Everything else gets an <unqualified-name>.  */
+      write_unscoped_name (self,decl);
    }else{
-       /* Handle local names, unless we asked not to (that is, invoked
-	     under <local-name>, to handle only the part of the name under
-	     the local scope).  */
-       if (!ignore_local_scope){
-    	 // n_debug("write_name 22 %s",get_tree_code_name(TREE_CODE(decl)));
+      /* Handle local names, unless we asked not to (that is, invoked
+      under <local-name>, to handle only the part of the name under
+      the local scope).  */
+      if (!ignore_local_scope){
+         // n_debug("write_name 22 %s",get_tree_code_name(TREE_CODE(decl)));
 
-		  /* Scan up the list of scope context, looking for a
-			 function.  If we find one, this entity is in local
-			 function scope.  local_entity tracks context one scope
-			 level down, so it will contain the element that's
-			 directly in that function's scope, either decl or one of
-			 its enclosing scopes.  */
-		  tree local_entity = decl;
-		  while (context != NULL_TREE/*zclei global_namespace*/){
-			  /* Make sure we're always dealing with decls.  */
-			  if (TYPE_P (context))
-				  context = TYPE_NAME (context);
-			  /* Is this a function?  */
-			  if (TREE_CODE (context) == FUNCTION_DECL || TREE_CODE (context) == PARM_DECL){
-			  /* Yes, we have local scope.  Use the <local-name>
-				 production for the innermost function scope.  */
-					n_debug("write_name 44 %s",get_tree_code_name(TREE_CODE(decl)));
-
-				 write_local_name (self,context, local_entity, decl);
-				 return;
-			  }
-			  /* Up one scope level.  */
-			  local_entity = context;
-			  context = decl_mangling_context (self,context);
-			}
-
-	      /* No local scope found?  Fall through to <nested-name>.  */
-	    }
-
+         /* Scan up the list of scope context, looking for a
+         function.  If we find one, this entity is in local
+         function scope.  local_entity tracks context one scope
+         level down, so it will contain the element that's
+         directly in that function's scope, either decl or one of
+         its enclosing scopes.  */
+         tree local_entity = decl;
+         while (context != NULL_TREE/*zclei global_namespace*/){
+            /* Make sure we're always dealing with decls.  */
+            if (TYPE_P (context))
+               context = TYPE_NAME (context);
+            /* Is this a function?  */
+            if (TREE_CODE (context) == FUNCTION_DECL || TREE_CODE (context) == PARM_DECL){
+               /* Yes, we have local scope.  Use the <local-name>
+               production for the innermost function scope.  */
+               //n_debug("write_name 44 %s",get_tree_code_name(TREE_CODE(decl)));
+               write_local_name (self,context, local_entity, decl);
+               return;
+            }
+            /* Up one scope level.  */
+            local_entity = context;
+            context = decl_mangling_context (self,context);
+         }
+         /* No local scope found?  Fall through to <nested-name>.  */
+      }
       /* Other decls get a <nested-name> to encode their scope.  */
-      n_debug("write_name 55 %s",decl?get_tree_code_name(TREE_CODE(decl)):"null");
-        write_nested_name (self,decl);
-    }
+      //n_debug("write_name 55 %s",decl?get_tree_code_name(TREE_CODE(decl)):"null");
+      write_nested_name (self,decl);
+   }
 }
 
 static tree skip_artificial_parms_for (const_tree fn, tree list)
@@ -637,12 +632,6 @@ static tree skip_artificial_parms_for (const_tree fn, tree list)
     list = TREE_CHAIN (list);
   else
     return list;
-
-//  if (DECL_HAS_IN_CHARGE_PARM_P (fn))
-//    list = TREE_CHAIN (list);
-//  if (DECL_HAS_VTT_PARM_P (fn))
-//    list = TREE_CHAIN (list);
-  return list;
 }
 
 /* Given a FUNCTION_DECL, returns the first TREE_LIST out of TYPE_ARG_TYPES
@@ -650,123 +639,105 @@ static tree skip_artificial_parms_for (const_tree fn, tree list)
 
 static void write_method_parms (AetMangle *self,tree parm_types, const int method_p, const tree decl)
 {
-  tree first_parm_type;
-  tree parm_decl = decl ? DECL_ARGUMENTS (decl) : NULL_TREE;
+   tree first_parm_type;
+   tree parm_decl = decl ? DECL_ARGUMENTS (decl) : NULL_TREE;
+   /* Assume this parameter type list is variable-length.  If it ends
+   with a void type, then it's not.  */
+   int varargs_p = 1;
 
-  /* Assume this parameter type list is variable-length.  If it ends
-     with a void type, then it's not.  */
-  int varargs_p = 1;
+   /* If this is a member function, skip the first arg, which is the
+   this pointer.
+   "Member functions do not encode the type of their implicit this
+   parameter."
 
-  /* If this is a member function, skip the first arg, which is the
-     this pointer.
-       "Member functions do not encode the type of their implicit this
-       parameter."
-
-     Similarly, there's no need to mangle artificial parameters, like
-     the VTT parameters for constructors and destructors.  */
-  if (method_p)
-    {
+   Similarly, there's no need to mangle artificial parameters, like
+   the VTT parameters for constructors and destructors.  */
+   if (method_p){
       parm_types = TREE_CHAIN (parm_types);
       parm_decl = parm_decl ? DECL_CHAIN (parm_decl) : NULL_TREE;
 
-      while (parm_decl && DECL_ARTIFICIAL (parm_decl))
-	{
-	  parm_types = TREE_CHAIN (parm_types);
-	  parm_decl = DECL_CHAIN (parm_decl);
-	}
+      while (parm_decl && DECL_ARTIFICIAL (parm_decl)){
+         parm_types = TREE_CHAIN (parm_types);
+         parm_decl = DECL_CHAIN (parm_decl);
+      }
 
       if (decl /*zclei&& ctor_omit_inherited_parms (decl)*/)
-	/* Bring back parameters omitted from an inherited ctor.  */
-	parm_types = FUNCTION_FIRST_USER_PARMTYPE (DECL_ORIGIN (decl));
-    }
+         /* Bring back parameters omitted from an inherited ctor.  */
+         parm_types = FUNCTION_FIRST_USER_PARMTYPE (DECL_ORIGIN (decl));
+   }
 
-  for (first_parm_type = parm_types;
-       parm_types;
-       parm_types = TREE_CHAIN (parm_types))
-    {
+   for (first_parm_type = parm_types; parm_types; parm_types = TREE_CHAIN (parm_types)){
       tree parm = TREE_VALUE (parm_types);
-      if (parm == void_type_node)
-	{
-	  /* "Empty parameter lists, whether declared as () or
-	     conventionally as (void), are encoded with a void parameter
-	     (v)."  */
-	  if (parm_types == first_parm_type)
-	    write_type (self,parm);
-	  /* If the parm list is terminated with a void type, it's
-	     fixed-length.  */
-	  varargs_p = 0;
-	  /* A void type better be the last one.  */
-	  gcc_assert (TREE_CHAIN (parm_types) == NULL);
-	}
-      else
-	write_type (self,parm);
-    }
+      if (parm == void_type_node){
+         /* "Empty parameter lists, whether declared as () or
+         conventionally as (void), are encoded with a void parameter
+         (v)."  */
+         if (parm_types == first_parm_type)
+            write_type (self,parm);
+         /* If the parm list is terminated with a void type, it's
+         fixed-length.  */
+         varargs_p = 0;
+         /* A void type better be the last one.  */
+         gcc_assert (TREE_CHAIN (parm_types) == NULL);
+      }else
+         write_type (self,parm);
+   }
 
-  if (varargs_p)
-    /* <builtin-type> ::= z  # ellipsis  */
-    write_char (self,'z');
+   if (varargs_p)
+      /* <builtin-type> ::= z  # ellipsis  */
+      write_char (self,'z');
 }
 
 
 static void write_bare_function_type (AetMangle *self,const tree type, const int include_return_type_p,
 			  const tree decl)
 {
+   /* Mangle the return type, if requested.  */
+   if (include_return_type_p)
+      write_type (self,TREE_TYPE (type));
 
-  /* Mangle the return type, if requested.  */
-  if (include_return_type_p)
-    write_type (self,TREE_TYPE (type));
-
-  /* Now mangle the types of the arguments.  */
-  ++self->parm_depth;
-  write_method_parms (self,TYPE_ARG_TYPES (type),TREE_CODE (type) == METHOD_TYPE,decl);
-  --self->parm_depth;
+   /* Now mangle the types of the arguments.  */
+   ++self->parm_depth;
+   write_method_parms (self,TYPE_ARG_TYPES (type),TREE_CODE (type) == METHOD_TYPE,decl);
+   --self->parm_depth;
 }
 
 static bool mangle_return_type_p (tree decl)
 {
-//  return (!DECL_CONSTRUCTOR_P (decl)
-//	  && !DECL_DESTRUCTOR_P (decl)
-//	  && !DECL_CONV_FN_P (decl)
-//	  && decl_is_template_id (decl, NULL));
-	return true;
+   //  return (!DECL_CONSTRUCTOR_P (decl)
+   //	  && !DECL_DESTRUCTOR_P (decl)
+   //	  && !DECL_CONV_FN_P (decl)
+   //	  && decl_is_template_id (decl, NULL));
+   return true;
 }
 
 static void write_encoding (AetMangle *self,const tree decl)
 {
    if (DECL_LANG_SPECIFIC (decl) /*&& DECL_EXTERN_C_FUNCTION_P (decl)*/){
       /* For overloaded operators write just the mangled name
-	 without arguments.  */
+      without arguments.  */
       //zclei if (DECL_OVERLOADED_OPERATOR_P (decl))
-	   //   write_name (self,decl, /*ignore_local_scope=*/0);
-     // else
+      //   write_name (self,decl, /*ignore_local_scope=*/0);
+      // else
 
-    	  n_info("这是一个 write_encoding 00 %s",IDENTIFIER_POINTER (DECL_NAME (decl)));
-
-	     write_source_name (self,DECL_NAME (decl));
-   	  n_info("这是一个 write_encoding 11 %s",IDENTIFIER_POINTER (DECL_NAME (decl)));
-
+      n_info("这是一个 write_encoding 00 %s",IDENTIFIER_POINTER (DECL_NAME (decl)));
+      write_source_name (self,DECL_NAME (decl));
+      n_info("这是一个 write_encoding 11 %s",IDENTIFIER_POINTER (DECL_NAME (decl)));
       return;
    }
-	  n_info("这是一个 write_encoding 33 %s",IDENTIFIER_POINTER (DECL_NAME (decl)));
-
-  write_name (self,decl, /*ignore_local_scope=*/0);
-  n_info("这是一个 write_encoding 44 %s",IDENTIFIER_POINTER (DECL_NAME (decl)));
-
-  if (TREE_CODE (decl) == FUNCTION_DECL)
-    {
+   n_info("这是一个 write_encoding 33 %s",IDENTIFIER_POINTER (DECL_NAME (decl)));
+   write_name (self,decl, /*ignore_local_scope=*/0);
+   n_info("这是一个 write_encoding 44 %s",IDENTIFIER_POINTER (DECL_NAME (decl)));
+   if (TREE_CODE (decl) == FUNCTION_DECL){
       tree fn_type;
       tree d;
 
-	  fn_type = TREE_TYPE (decl);
-	  d = decl;
-
-   	  n_info("这是一个 write_encoding 55 %s",IDENTIFIER_POINTER (DECL_NAME (decl)));
-
+      fn_type = TREE_TYPE (decl);
+      d = decl;
+      n_info("这是一个 write_encoding 55 %s",IDENTIFIER_POINTER (DECL_NAME (decl)));
       write_bare_function_type (self,fn_type,mangle_return_type_p (decl),d);
-    }
+   }
 }
-
-
 
 /**
  * 内部建立的VOID_TYPE BOOLEAN_TYPE INTEGER_TYPE
@@ -914,48 +885,47 @@ static void write_builtin_type (AetMangle *self,tree type)
     }
 }
 
-
 static int cp_type_quals (const_tree type)
 {
-  int quals;
-  /* This CONST_CAST is okay because strip_array_types returns its
-     argument unmodified and we assign it to a const_tree.  */
-  type = strip_array_types (CONST_CAST_TREE (type));
-  if (type == error_mark_node
-      /* Quals on a FUNCTION_TYPE are memfn quals.  */
-      || TREE_CODE (type) == FUNCTION_TYPE)
-    return TYPE_UNQUALIFIED;
-  quals = TYPE_QUALS (type);
-  /* METHOD and REFERENCE_TYPEs should never have quals.  */
-  gcc_assert ((TREE_CODE (type) != METHOD_TYPE
-	       && !TYPE_REF_P (type))
-	      || ((quals & (TYPE_QUAL_CONST|TYPE_QUAL_VOLATILE))
-		  == TYPE_UNQUALIFIED));
-  return quals;
+   int quals;
+   /* This CONST_CAST is okay because strip_array_types returns its
+   argument unmodified and we assign it to a const_tree.  */
+   type = strip_array_types (CONST_CAST_TREE (type));
+   if (type == error_mark_node
+   /* Quals on a FUNCTION_TYPE are memfn quals.  */
+   || TREE_CODE (type) == FUNCTION_TYPE)
+      return TYPE_UNQUALIFIED;
+
+   quals = TYPE_QUALS (type);
+   /* METHOD and REFERENCE_TYPEs should never have quals.  */
+   gcc_assert ((TREE_CODE (type) != METHOD_TYPE
+         && !TYPE_REF_P (type)) || ((quals & (TYPE_QUAL_CONST|TYPE_QUAL_VOLATILE)) == TYPE_UNQUALIFIED));
+
+   return quals;
 }
 
 
 static void dump_substitution_candidates (AetMangle *self)
 {
-  unsigned i;
-  tree el;
+   unsigned i;
+   tree el;
 
-  fprintf (stderr, "  ++ substitutions  ");
-  FOR_EACH_VEC_ELT (*self->substitutions, i, el){
+   fprintf (stderr, "  ++ substitutions  ");
+   FOR_EACH_VEC_ELT (*self->substitutions, i, el){
       const char *name = "???";
       if (i > 0)
-	    fprintf (stderr, "                    ");
+         fprintf (stderr, "                    ");
       if (DECL_P (el))
-	    name = IDENTIFIER_POINTER (DECL_NAME (el));
+         name = IDENTIFIER_POINTER (DECL_NAME (el));
       else if (TREE_CODE (el) == TREE_LIST)
-	    name = IDENTIFIER_POINTER (DECL_NAME (TREE_VALUE (el)));
+         name = IDENTIFIER_POINTER (DECL_NAME (TREE_VALUE (el)));
       else if (TYPE_NAME (el))
-	    name = TYPE_NAME_STRING (el);
+         name = TYPE_NAME_STRING (el);
       fprintf (stderr, " S%d_ = ", i - 1);
       if (TYPE_P (el) && (CP_TYPE_RESTRICT_P (el)  || CP_TYPE_VOLATILE_P (el)  || CP_TYPE_CONST_P (el)))
-	     fprintf (stderr, "CV-");
+         fprintf (stderr, "CV-");
       fprintf (stderr, "%s (%s at %p)\n",name, get_tree_code_name (TREE_CODE (el)), (void *) el);
-  }
+   }
 }
 
 #define same_type_p(TYPE1, TYPE2)   comptypes ((TYPE1), (TYPE2))
@@ -1040,10 +1010,10 @@ static inline tree canonicalize_for_substitution (tree node)
 
 static void write_substitution (AetMangle *self,const int seq_id)
 {
-  write_char (self,'S');
-  if (seq_id > 0)
-    write_number (self,seq_id - 1, /*unsigned=*/1, 36);
-  write_char (self,'_');
+   write_char (self,'S');
+   if (seq_id > 0)
+      write_number (self,seq_id - 1, /*unsigned=*/1, 36);
+   write_char (self,'_');
 }
 
 static int find_substitution (AetMangle *self,tree node)
@@ -1053,98 +1023,96 @@ static int find_substitution (AetMangle *self,tree node)
    tree decl;
    tree type;
    const char *abbr = NULL;
-   fprintf (stderr, "  ++ find_substitution (%s at %p)\n",get_tree_code_name (TREE_CODE (node)), (void *) node);
+   fprintf (stderr, "  ++ find_substitution (%s at %p)\n",
+         get_tree_code_name (TREE_CODE (node)), (void *) node);
 
-  /* Obtain the canonicalized substitution representation for NODE.
-     This is what we'll compare against.  */
+   /* Obtain the canonicalized substitution representation for NODE.
+   This is what we'll compare against.  */
    node = canonicalize_for_substitution (node);
 
-  /* Check for builtin substitutions.  */
+   /* Check for builtin substitutions.  */
 
    decl = TYPE_P (node) ? TYPE_NAME (node) : node;
    type = TYPE_P (node) ? node : TREE_TYPE (node);
 
-  /* Check for std::allocator.  */
-//zclei   if (decl && is_std_substitution (decl, SUBID_ALLOCATOR)  && !CLASSTYPE_USE_TEMPLATE (TREE_TYPE (decl)))
-//      abbr = "Sa";
-//  /* Check for std::basic_string.  */
-//  else if (decl && is_std_substitution (decl, SUBID_BASIC_STRING)){
-//      if (TYPE_P (node)){
-//	  /* If this is a type (i.e. a fully-qualified template-id),
-//	     check for
-//		 std::basic_string <char,
-//				    std::char_traits<char>,
-//				    std::allocator<char> > .  */
-//	      if (cp_type_quals (type) == TYPE_UNQUALIFIED && CLASSTYPE_USE_TEMPLATE (type)){
-//	           tree args = CLASSTYPE_TI_ARGS (type);
-//	           if (TREE_VEC_LENGTH (args) == 3  && (TREE_CODE (TREE_VEC_ELT (args, 0)) == TREE_CODE (char_type_node))
-//		           && same_type_p (TREE_VEC_ELT (args, 0), char_type_node)  && is_std_substitution_char (TREE_VEC_ELT (args, 1),SUBID_CHAR_TRAITS)
-//		            && is_std_substitution_char (TREE_VEC_ELT (args, 2),SUBID_ALLOCATOR))
-//		       abbr = "Ss";
-//	      }
-//	   } else
-//	      /* Substitute for the template name only if this isn't a type.  */
-//	      abbr = "Sb";
-//  }  /* Check for basic_{i,o,io}stream.  */ else
-//   if (TYPE_P (node)  && cp_type_quals (type) == TYPE_UNQUALIFIED  && CLASS_TYPE_P (type)
-//       && CLASSTYPE_USE_TEMPLATE (type) && CLASSTYPE_TEMPLATE_INFO (type) != NULL){
-//         /* First, check for the template
-//	    args <char, std::char_traits<char> > .  */
-//        tree args = CLASSTYPE_TI_ARGS (type);
-//         if (TREE_VEC_LENGTH (args) == 2 && TREE_CODE (TREE_VEC_ELT (args, 0)) == TREE_CODE (char_type_node)
-//	            && same_type_p (TREE_VEC_ELT (args, 0), char_type_node)
-//	               && is_std_substitution_char (TREE_VEC_ELT (args, 1),SUBID_CHAR_TRAITS)){
-//	          /* Got them.  Is this basic_istream?  */
-//	         if (is_std_substitution (decl, SUBID_BASIC_ISTREAM))
-//	            abbr = "Si";
-//	              /* Or basic_ostream?  */
-//	         else if (is_std_substitution (decl, SUBID_BASIC_OSTREAM))
-//	           abbr = "So";
-//	         /* Or basic_iostream?  */
-//	         else if (is_std_substitution (decl, SUBID_BASIC_IOSTREAM))
-//	            abbr = "Sd";
-//	    }
-//    }
-//
-//  /* Check for namespace std.  */
-//  else
-//   if (decl && DECL_NAMESPACE_STD_P (decl))
-//    {
-//      write_string (self,"St");
-//      return 1;
-//    }
+   /* Check for std::allocator.  */
+   //zclei   if (decl && is_std_substitution (decl, SUBID_ALLOCATOR)  && !CLASSTYPE_USE_TEMPLATE (TREE_TYPE (decl)))
+   //      abbr = "Sa";
+   //  /* Check for std::basic_string.  */
+   //  else if (decl && is_std_substitution (decl, SUBID_BASIC_STRING)){
+   //      if (TYPE_P (node)){
+   //	  /* If this is a type (i.e. a fully-qualified template-id),
+   //	     check for
+   //		 std::basic_string <char,
+   //				    std::char_traits<char>,
+   //				    std::allocator<char> > .  */
+   //	      if (cp_type_quals (type) == TYPE_UNQUALIFIED && CLASSTYPE_USE_TEMPLATE (type)){
+   //	           tree args = CLASSTYPE_TI_ARGS (type);
+   //	           if (TREE_VEC_LENGTH (args) == 3  && (TREE_CODE (TREE_VEC_ELT (args, 0)) == TREE_CODE (char_type_node))
+   //		           && same_type_p (TREE_VEC_ELT (args, 0), char_type_node)  && is_std_substitution_char (TREE_VEC_ELT (args, 1),SUBID_CHAR_TRAITS)
+   //		            && is_std_substitution_char (TREE_VEC_ELT (args, 2),SUBID_ALLOCATOR))
+   //		       abbr = "Ss";
+   //	      }
+   //	   } else
+   //	      /* Substitute for the template name only if this isn't a type.  */
+   //	      abbr = "Sb";
+   //  }  /* Check for basic_{i,o,io}stream.  */ else
+   //   if (TYPE_P (node)  && cp_type_quals (type) == TYPE_UNQUALIFIED  && CLASS_TYPE_P (type)
+   //       && CLASSTYPE_USE_TEMPLATE (type) && CLASSTYPE_TEMPLATE_INFO (type) != NULL){
+   //         /* First, check for the template
+   //	    args <char, std::char_traits<char> > .  */
+   //        tree args = CLASSTYPE_TI_ARGS (type);
+   //         if (TREE_VEC_LENGTH (args) == 2 && TREE_CODE (TREE_VEC_ELT (args, 0)) == TREE_CODE (char_type_node)
+   //	            && same_type_p (TREE_VEC_ELT (args, 0), char_type_node)
+   //	               && is_std_substitution_char (TREE_VEC_ELT (args, 1),SUBID_CHAR_TRAITS)){
+   //	          /* Got them.  Is this basic_istream?  */
+   //	         if (is_std_substitution (decl, SUBID_BASIC_ISTREAM))
+   //	            abbr = "Si";
+   //	              /* Or basic_ostream?  */
+   //	         else if (is_std_substitution (decl, SUBID_BASIC_OSTREAM))
+   //	           abbr = "So";
+   //	         /* Or basic_iostream?  */
+   //	         else if (is_std_substitution (decl, SUBID_BASIC_IOSTREAM))
+   //	            abbr = "Sd";
+   //	    }
+   //    }
+   //
+   //  /* Check for namespace std.  */
+   //  else
+   //   if (decl && DECL_NAMESPACE_STD_P (decl))
+   //    {
+   //      write_string (self,"St");
+   //      return 1;
+   //    }
 
-  tree tags = NULL_TREE;
-//  if (OVERLOAD_TYPE_P (node) || DECL_CLASS_TEMPLATE_P (node))
-//    tags = get_abi_tags (type);
-  /* Now check the list of available substitutions for this mangling
-     operation.  */
-  if (!abbr || tags) for (i = 0; i < size; ++i)
-    {
+   tree tags = NULL_TREE;
+   //  if (OVERLOAD_TYPE_P (node) || DECL_CLASS_TEMPLATE_P (node))
+   //    tags = get_abi_tags (type);
+   /* Now check the list of available substitutions for this mangling
+   operation.  */
+   if (!abbr || tags) for (i = 0; i < size; ++i){
       tree candidate = (*self->substitutions)[i];
       /* NODE is a matched to a candidate if it's the same decl node or
-	 if it's the same type.  */
-      if (decl == candidate	  || (TYPE_P (candidate) && type && TYPE_P (node)   && same_type_p (type, candidate))
-	  || NESTED_TEMPLATE_MATCH (node, candidate))
-	{
-	  write_substitution (self,i);
-	  return 1;
-	}
-    }
+      if it's the same type.  */
+      if (decl == candidate	  || (TYPE_P (candidate) && type && TYPE_P (node)
+      && same_type_p (type, candidate)) || NESTED_TEMPLATE_MATCH (node, candidate)){
+         write_substitution (self,i);
+         return 1;
+      }
+   }
 
-  if (!abbr)
-    /* No substitution found.  */
-    return 0;
+   if (!abbr)
+      /* No substitution found.  */
+      return 0;
 
-  write_string (self,abbr);
-  if (tags)
-    {
+   write_string (self,abbr);
+   if (tags){
       /* If there are ABI tags on the abbreviation, it becomes
-	 a substitution candidate.  */
+      a substitution candidate.  */
       //write_abi_tags (tags);
       add_substitution (self,node);
-    }
-  return 1;
+   }
+   return 1;
 }
 
 static int write_CV_qualifiers_for_type (AetMangle *self,const tree type)

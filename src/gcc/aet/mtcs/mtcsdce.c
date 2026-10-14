@@ -208,7 +208,7 @@ static bool deletable_insn_p (MtcsDce *self,rtx_insn *insn, bool fast, bitmap ar
    rtx body, x;
    int i;
    df_ref def;
-   n_debug("mtcsdce.c deletable_insn_p 00 insn:%p fast:%d\n",insn,fast);
+  // n_debug("mtcsdce.c deletable_insn_p 00 insn:%p fast:%d\n",insn,fast);
 
    if (CALL_P (insn)
    /* We cannot delete calls inside of the recursive dce because
@@ -224,7 +224,7 @@ static bool deletable_insn_p (MtcsDce *self,rtx_insn *insn, bool fast, bitmap ar
    && !RTL_LOOPING_CONST_OR_PURE_CALL_P (insn))
    /* Don't delete calls that may throw if we cannot do so.  */
    && can_delete_call(self,insn)){
-      n_debug("mtcsdce.c deletable_insn_p 11 insn:%p\n",insn);
+      //n_debug("mtcsdce.c deletable_insn_p 11 insn:%p\n",insn);
       return find_call_stack_args(self,as_a <rtx_call_insn *> (insn), false,fast, arg_stores);
    }
 
@@ -235,11 +235,11 @@ static bool deletable_insn_p (MtcsDce *self,rtx_insn *insn, bool fast, bitmap ar
    /* Don't delete insns that may throw if we cannot do so.  */
    if (!(cfun->can_delete_dead_exceptions && self->can_alter_cfg) && !insn_nothrow_p (insn))
       return false;
-   n_debug("mtcsdce.c deletable_insn_p 22 insn:%p fast:%d\n",insn,fast);
+   //n_debug("mtcsdce.c deletable_insn_p 22 insn:%p fast:%d\n",insn,fast);
 
    /* If INSN sets a global_reg, leave it untouched.  */
    FOR_EACH_INSN_DEF (def, insn){
-      n_debug("mtcsdce.c deletable_insn_p 33 insn:%p fast:%d DF_REF_REGNO (def):%d\n",insn,fast,DF_REF_REGNO (def));
+      //n_debug("mtcsdce.c deletable_insn_p 33 insn:%p fast:%d DF_REF_REGNO (def):%d\n",insn,fast,DF_REF_REGNO (def));
 
       if (mtcs_reg_is_hard/*!HARD_REGISTER_NUM_P*/(mtcsReg,DF_REF_REGNO (def))
       && mtcsReg->global_regs/*!global_regs*/[DF_REF_REGNO (def)]){
@@ -254,7 +254,7 @@ static bool deletable_insn_p (MtcsDce *self,rtx_insn *insn, bool fast, bitmap ar
    /* Callee-save restores are needed.  */
    if (RTX_FRAME_RELATED_P (insn)  && mtcsRtlData/*!crtl*/->shrink_wrapped_separate && find_reg_note (insn, REG_CFA_RESTORE, NULL))
       return false;
-   n_debug("mtcsdce.c deletable_insn_p 44 insn:%p fast:%d\n",insn,fast);
+   //n_debug("mtcsdce.c deletable_insn_p 44 insn:%p fast:%d\n",insn,fast);
 
    body = PATTERN (insn);
    switch (GET_CODE (body)){
@@ -268,7 +268,7 @@ static bool deletable_insn_p (MtcsDce *self,rtx_insn *insn, bool fast, bitmap ar
             That is not necessarily true for hard registers until
             after reload.  */
             x = XEXP (body, 0);
-            n_debug("mtcsdce.c deletable_insn_p 55 insn:%p reload_completed:%d\n",insn,reload_completed);
+            //n_debug("mtcsdce.c deletable_insn_p 55 insn:%p reload_completed:%d\n",insn,reload_completed);
 
             return REG_P (x) && (!mtcs_reg_is_hard_rtx/*!HARD_REGISTER_P*/(mtcsReg,x) || reload_completed);
          }else
@@ -281,13 +281,10 @@ static bool deletable_insn_p (MtcsDce *self,rtx_insn *insn, bool fast, bitmap ar
          for (i = XVECLEN (body, 0) - 1; i >= 0; i--)
             if (!deletable_insn_p_1(self,XVECEXP (body, 0, i)))
                return false;
-         n_debug("mtcsdce.c deletable_insn_p 66 insn:%p\n",insn);
-
+         //n_debug("mtcsdce.c deletable_insn_p 66 insn:%p\n",insn);
          return true;
-
       default:
-         n_debug("mtcsdce.c deletable_insn_p 77 insn:%p body:%p\n",insn,body);
-
+         //n_debug("mtcsdce.c deletable_insn_p 77 insn:%p body:%p\n",insn,body);
          return deletable_insn_p_1(self,body);
    }
 }
@@ -308,7 +305,7 @@ static void mark_insn (MtcsDce *self,rtx_insn *insn, bool fast)
    if (!marked_insn_p(self,insn)){
       if (!fast)
          self->worklist.safe_push (insn);
-      n_debug("mtcsdce.c mark_insn 00 insn:%p fast:%d\n",insn,fast);
+    //  n_debug("mtcsdce.c mark_insn 00 insn:%p fast:%d\n",insn,fast);
       bitmap_set_bit (self->marked, INSN_UID (insn));
       if (dump_file)
          fprintf (dump_file, "  Adding insn %d to worklist\n", INSN_UID (insn));
@@ -318,8 +315,7 @@ static void mark_insn (MtcsDce *self,rtx_insn *insn, bool fast)
       && (RTL_CONST_OR_PURE_CALL_P (insn)
       && !RTL_LOOPING_CONST_OR_PURE_CALL_P (insn))
       && can_delete_call(self,insn)){
-         n_debug("mtcsdce.c mark_insn 11 insn:%p fast:%d\n",insn,fast);
-
+         //n_debug("mtcsdce.c mark_insn 11 insn:%p fast:%d\n",insn,fast);
          find_call_stack_args(self,as_a <rtx_call_insn *> (insn), true, fast, NULL);
       }
    }
@@ -337,7 +333,8 @@ static void mark_nonreg_stores_1 (rtx dest, const_rtx pattern, void *userData)
 {
    MarkData *markDataInfo=(MarkData *)userData;
    MtcsDce *self=markDataInfo->mtcsDce;
-   n_debug("mtcsdce.c mark_nonreg_stores_1 %d %d dest:%p value:%p\n",GET_CODE (pattern) != CLOBBER,REG_P (dest),dest, markDataInfo->value);
+   //n_debug("mtcsdce.c mark_nonreg_stores_1 %d %d dest:%p value:%p\n",
+   //GET_CODE (pattern) != CLOBBER,REG_P (dest),dest, markDataInfo->value);
    if (GET_CODE (pattern) != CLOBBER && !REG_P (dest))
       mark_insn(self,(rtx_insn *) markDataInfo->value, true);
 }
@@ -349,7 +346,8 @@ static void mark_nonreg_stores_2 (rtx dest, const_rtx pattern, void *userData)
 {
    MarkData *markDataInfo=(MarkData *)userData;
    MtcsDce *self=markDataInfo->mtcsDce;
-   n_debug("mtcsdce.c mark_nonreg_stores_2 %d %d dest:%p value:%p\n",GET_CODE (pattern) != CLOBBER,REG_P (dest),dest, markDataInfo->value);
+  // n_debug("mtcsdce.c mark_nonreg_stores_2 %d %d dest:%p value:%p\n",
+       //  GET_CODE (pattern) != CLOBBER,REG_P (dest),dest, markDataInfo->value);
 
    if (GET_CODE (pattern) != CLOBBER && !REG_P (dest))
       mark_insn(self,(rtx_insn *) markDataInfo->value, false);
@@ -675,11 +673,11 @@ static void delete_unmarked_insns (MtcsDce *self)
       FOR_BB_INSNS_REVERSE_SAFE (bb, insn, next)
          if (NONDEBUG_INSN_P (insn)){
             rtx turn_into_use = NULL_RTX;
-            n_debug("mtcsdec.c delete_unmarked_insns 00 NONDEBUG_INSN_P %d %d %d %d\n",
-                  cfun->can_throw_non_call_exceptions,
-                  cfun->can_delete_dead_exceptions,
-                  self->can_alter_cfg,
-                  insn_nothrow_p (insn));
+//            n_debug("mtcsdec.c delete_unmarked_insns 00 NONDEBUG_INSN_P %d %d %d %d\n",
+//                  cfun->can_throw_non_call_exceptions,
+//                  cfun->can_delete_dead_exceptions,
+//                  self->can_alter_cfg,
+//                  insn_nothrow_p (insn));
 
             /* Always delete no-op moves.  */
             if (mtcs_rtlanal_noop_move_p/*!noop_move_p*/(mtcsRtlanal,insn)
@@ -688,7 +686,7 @@ static void delete_unmarked_insns (MtcsDce *self)
             && (!cfun->can_throw_non_call_exceptions
             || (cfun->can_delete_dead_exceptions && self->can_alter_cfg)
             || insn_nothrow_p (insn))){
-               n_debug("mtcsdec.c delete_unmarked_insns 11 NONDEBUG_INSN_P\n");
+               //n_debug("mtcsdec.c delete_unmarked_insns 11 NONDEBUG_INSN_P\n");
                if (RTX_FRAME_RELATED_P (insn))
                   turn_into_use = find_reg_note (insn, REG_CFA_RESTORE, NULL);
                if (turn_into_use && REG_P (XEXP (turn_into_use, 0)))
@@ -698,7 +696,7 @@ static void delete_unmarked_insns (MtcsDce *self)
             }
             /* Otherwise rely only on the DCE algorithm.  */
             else if (marked_insn_p(self,insn)){
-               n_debug("mtcsdec.c delete_unmarked_insns 22 NONDEBUG_INSN_P\n");
+               //n_debug("mtcsdec.c delete_unmarked_insns 22 NONDEBUG_INSN_P\n");
 
                continue;
             }
@@ -726,7 +724,7 @@ static void delete_unmarked_insns (MtcsDce *self)
 
             if (dump_file)
                fprintf (dump_file, "DCE: Deleting insn %d\n", INSN_UID (insn));
-            n_debug("mtcsdec.c delete_unmarked_insns 33 NONDEBUG_INSN_P\n");
+            //n_debug("mtcsdec.c delete_unmarked_insns 33 NONDEBUG_INSN_P\n");
 
             /* Before we delete the insn we have to remove the REG_EQUAL notes
             for the destination regs in order to avoid dangling notes.  */
@@ -736,14 +734,14 @@ static void delete_unmarked_insns (MtcsDce *self)
                /* Don't remove frame related noop moves if they cary
                REG_CFA_RESTORE note, while we don't need to emit any code,
                we need it to emit the CFI restore note.  */
-               n_debug("mtcsdec.c delete_unmarked_insns 44 NONDEBUG_INSN_P\n");
+               //n_debug("mtcsdec.c delete_unmarked_insns 44 NONDEBUG_INSN_P\n");
 
                PATTERN (insn) = gen_rtx_USE (GET_MODE (turn_into_use), turn_into_use);
                INSN_CODE (insn) = -1;
                mtcs_dfscan_df_insn_rescan/*!df_insn_rescan*/(mtcsDfscan,insn);
             }else{
                /* Now delete the insn.  */
-               n_debug("mtcsdec.c delete_unmarked_insns 55 NONDEBUG_INSN_P delete insn\n");
+               //n_debug("mtcsdec.c delete_unmarked_insns 55 NONDEBUG_INSN_P delete insn\n");
                mtcs_print_rtl_single(stderr,insn);
 
                must_clean |= mtcs_cfg_rtl_delete_insn_and_edges/*!delete_insn_and_edges*/(mtcsCfgRtl,insn);
@@ -752,7 +750,7 @@ static void delete_unmarked_insns (MtcsDce *self)
 
    /* Deleted a pure or const call.  */
    if (must_clean){
-      n_debug("mtcsdce.c delete_unmarked_insns 66\n");
+      //n_debug("mtcsdce.c delete_unmarked_insns 66\n");
       gcc_assert (self->can_alter_cfg);
       mtcs_cfg_cleanup_delete_unreachable_blocks/*!delete_unreachable_blocks*/(mtcsCfgCleanup);
       free_dominance_info (CDI_DOMINATORS);
@@ -841,8 +839,8 @@ static void mark_reg_dependencies (MtcsDce *self,rtx_insn *insn)
 
    if (DEBUG_INSN_P (insn))
       return;
-   n_debug("mtcsdce.c mark_reg_dependencies 00 insn: %d\n", INSN_UID (insn));
-   mtcs_print_rtl_single(stderr,insn);
+   //n_debug("mtcsdce.c mark_reg_dependencies 00 insn: %d\n", INSN_UID (insn));
+   //mtcs_print_rtl_single(stderr,insn);
 
    FOR_EACH_INSN_USE (use, insn){
       if (dump_file){
@@ -850,17 +848,17 @@ static void mark_reg_dependencies (MtcsDce *self,rtx_insn *insn)
          print_simple_rtl (dump_file, DF_REF_REG (use));
          fprintf (dump_file, " in insn %d:\n", INSN_UID (insn));
       }
-      n_debug("mtcsdce.c Processing use of in insn %d\n",INSN_UID (insn));
-      mtcs_print_rtl_single(stderr,DF_REF_REG (use));
+      //n_debug("mtcsdce.c Processing use of in insn %d\n",INSN_UID (insn));
+      //mtcs_print_rtl_single(stderr,DF_REF_REG (use));
       for (defs = DF_REF_CHAIN (use); defs; defs = defs->next){
-         n_debug("mtcsdce.c mark_reg_dependencies xx %p\n",defs);
-         n_debug("mtcsdce.c mark_reg_dependencies yy %p\n",defs->ref);
-         n_debug("mtcsdce.c mark_reg_dependencies zz %p\n",defs->ref->base);
-         n_debug("mtcsdce.c mark_reg_dependencies ww %p\n",defs->ref->base.cl);
-         n_debug("mtcsdce.c mark_reg_dependencies 66 %p insn:%p\n",defs->ref->base.insn_info);
-         if(defs->ref->base.insn_info)
-            n_debug("mtcsdce.c mark_reg_dependencies 77 %p insn:%p\n",defs->ref->base.insn_info->insn,insn);
-         n_debug("mtcsdce.c mark_reg_dependencies %d\n",DF_REF_IS_ARTIFICIAL (defs->ref));
+//         n_debug("mtcsdce.c mark_reg_dependencies xx %p\n",defs);
+//         n_debug("mtcsdce.c mark_reg_dependencies yy %p\n",defs->ref);
+//         n_debug("mtcsdce.c mark_reg_dependencies zz %p\n",defs->ref->base);
+//         n_debug("mtcsdce.c mark_reg_dependencies ww %p\n",defs->ref->base.cl);
+//         n_debug("mtcsdce.c mark_reg_dependencies 66 %p insn:%p\n",defs->ref->base.insn_info);
+//         if(defs->ref->base.insn_info)
+//            n_debug("mtcsdce.c mark_reg_dependencies 77 %p insn:%p\n",defs->ref->base.insn_info->insn,insn);
+//         n_debug("mtcsdce.c mark_reg_dependencies %d\n",DF_REF_IS_ARTIFICIAL (defs->ref));
 
          if (! DF_REF_IS_ARTIFICIAL (defs->ref)){
             mark_insn(self,DF_REF_INSN (defs->ref), false);
@@ -897,7 +895,7 @@ static void init_dce (MtcsDce *self,bool fast)
       self->can_alter_cfg = false;
    }else
       self->can_alter_cfg = true;
-   n_debug("mtcsdce.c init_dce 11 fast:%d df_in_progress:%d\n",fast,self->df_in_progress);
+   //n_debug("mtcsdce.c init_dce 11 fast:%d df_in_progress:%d\n",fast,self->df_in_progress);
 
    self->marked = sbitmap_alloc (mtcs_rtl_data_get_max_uid/*!get_max_uid*/(mtcsRtlData) + 1);
    bitmap_clear (self->marked);
@@ -1113,7 +1111,7 @@ static bool dce_process_block (MtcsDce *self,basic_block bb, bool redo_out, bitm
    MtcsCfgBuild *mtcsCfgBuild=mtcs_target_get_cfg_build(mtcsTarget);
 
    bitmap local_live = BITMAP_ALLOC (&self->dce_tmp_bitmap_obstack);
-   n_debug("mtcsdce.c dce_process_block 00 local_live:%p redo_out:%d au:%d\n",local_live,redo_out,au);
+  // n_debug("mtcsdce.c dce_process_block 00 local_live:%p redo_out:%d au:%d\n",local_live,redo_out,au);
    rtx_insn *insn;
    bool block_changed;
    df_ref def;
@@ -1136,54 +1134,51 @@ static bool dce_process_block (MtcsDce *self,basic_block bb, bool redo_out, bitm
       mtcs_dfcore_df_print_regset/*!df_print_regset*/(mtcsDfcore,dump_file, DF_LR_OUT (bb));
    }
    bitmap_copy (local_live, DF_LR_OUT (bb));
-   n_debug("mtcsdce.c dce_process_block 11 local_live:%p redo_out:%d au:%d\n",local_live,redo_out,au);
+  // n_debug("mtcsdce.c dce_process_block 11 local_live:%p redo_out:%d au:%d\n",local_live,redo_out,au);
    mtcs_dfproblems_df_simulate_initialize_backwards/*!df_simulate_initialize_backwards*/(mtcsDfproblems,bb, local_live);
    dead_debug_local_init (&debug, NULL, global_debug);
 
    FOR_BB_INSNS_REVERSE (bb, insn)
       if (DEBUG_INSN_P (insn)){
          df_ref use;
-         n_debug("mtcsdce.c dce_process_block 22 needed %d\n");
-         mtcs_print_rtl_single(stderr,insn);
+         //n_debug("mtcsdce.c dce_process_block 22 needed %d\n");
+         //mtcs_print_rtl_single(stderr,insn);
 
          FOR_EACH_INSN_USE (use, insn)
             if (!bitmap_bit_p (local_live, DF_REF_REGNO (use)) && !bitmap_bit_p (au, DF_REF_REGNO (use)))
                dead_debug_add (&debug, use, DF_REF_REGNO (use));
       }else if (INSN_P (insn)){
          bool needed = marked_insn_p(self,insn);
-         n_debug("mtcsdce.c dce_process_block 33 bb:%p insn:%p needed %d\n",bb,insn,needed);
-         mtcs_print_rtl_single(stderr,insn);
+         //n_debug("mtcsdce.c dce_process_block 33 bb:%p insn:%p needed %d\n",bb,insn,needed);
+         //mtcs_print_rtl_single(stderr,insn);
 
          /* The insn is needed if there is someone who uses the output.  */
          if (!needed)
             FOR_EACH_INSN_DEF (def, insn){
-               n_debug("mtcsdce.c dce_process_block 44 bb:%p insn:%p needed %d %d %d\n",bb,insn,
-                  needed,bitmap_bit_p (local_live, DF_REF_REGNO (def)),bitmap_bit_p (au, DF_REF_REGNO (def)));
+               //n_debug("mtcsdce.c dce_process_block 44 bb:%p insn:%p needed %d %d %d\n",bb,insn,
+                  //needed,bitmap_bit_p (local_live, DF_REF_REGNO (def)),bitmap_bit_p (au, DF_REF_REGNO (def)));
                if (bitmap_bit_p (local_live, DF_REF_REGNO (def)) || bitmap_bit_p (au, DF_REF_REGNO (def))){
                   needed = true;
                   mark_insn(self,insn, true);
-
-                  mtcs_print_rtl_single(stderr,insn);
-
                   break;
                }
             }
-         n_debug("mtcsdce.c dce_process_block 44 aa打印  local_live need:%d insn:%p\n",needed,insn);
-         if(n_log_is_debug_file(NULL,NULL))
-            dump_bitmap (stderr, local_live);
+//         n_debug("mtcsdce.c dce_process_block 44 aa打印  local_live need:%d insn:%p\n",needed,insn);
+//         if(n_log_is_debug_file(NULL,NULL))
+//            dump_bitmap (stderr, local_live);
          /* No matter if the instruction is needed or not, we remove
          any regno in the defs from the live set.  */
          mtcs_dfproblems_df_simulate_defs/*!df_simulate_defs*/(mtcsDfproblems,insn, local_live);
-         n_debug("mtcsdce.c  dce_process_block 44 bb打印 local_live insn:%p\n",insn);
-         if(n_log_is_debug_file(NULL,NULL))
-            dump_bitmap (stderr, local_live);
+//         n_debug("mtcsdce.c  dce_process_block 44 bb打印 local_live insn:%p\n",insn);
+//         if(n_log_is_debug_file(NULL,NULL))
+//            dump_bitmap (stderr, local_live);
          /* On the other hand, we do not allow the dead uses to set
          anything in local_live.  */
          if (needed)
             mtcs_dfproblems_df_simulate_uses/*!df_simulate_uses*/(mtcsDfproblems,insn, local_live);
-         n_debug("mtcsdce.c   dce_process_block 44 cc打印  local_live insn:%p\n",insn);
-         if(n_log_is_debug_file(NULL,NULL))
-            dump_bitmap (stderr, local_live);
+//         n_debug("mtcsdce.c   dce_process_block 44 cc打印  local_live insn:%p\n",insn);
+//         if(n_log_is_debug_file(NULL,NULL))
+//            dump_bitmap (stderr, local_live);
          /* Insert debug temps for dead REGs used in subsequent debug
          insns.  We may have to emit a debug temp even if the insn
          was marked, in case the debug use was after the point of
@@ -1199,9 +1194,9 @@ static bool dce_process_block (MtcsDce *self,basic_block bb, bool redo_out, bitm
 
    dead_debug_local_finish (&debug, NULL);
    mtcs_dfproblems_df_simulate_finalize_backwards/*!df_simulate_finalize_backwards*/(mtcsDfproblems,bb, local_live);
-   n_debug("mtcsdce.c  dce_process_block 44 dd打印  local_live \n");
-   if(n_log_is_debug_file(NULL,NULL))
-      dump_bitmap (stderr, local_live);
+//   n_debug("mtcsdce.c  dce_process_block 44 dd打印  local_live \n");
+//   if(n_log_is_debug_file(NULL,NULL))
+//      dump_bitmap (stderr, local_live);
 
    block_changed = !bitmap_equal_p (local_live, DF_LR_IN (bb));
    if (block_changed)
@@ -1280,17 +1275,15 @@ static void fast_dce (MtcsDce *self,bool word_level)
             dfScanVerify(cfun);
 
          }else{
-            n_debug("mtcsdce.c fast_dce 44cc n_blocks:%d i:%d processed:%p index:%d\n",n_blocks,i,processed,index);
-
-                      dfScanVerify(cfun);
+            //n_debug("mtcsdce.c fast_dce 44cc n_blocks:%d i:%d processed:%p index:%d\n",n_blocks,i,processed,index);
+            //dfScanVerify(cfun);
             local_changed = dce_process_block(self,bb, bitmap_bit_p (redo_out, index),bb_has_eh_pred (bb) ? au_eh : au, &global_debug);
-            n_debug("mtcsdce.c fast_dce 44dd n_blocks:%d i:%d processed:%p index:%d\n",n_blocks,i,processed,index);
-
-                 dfScanVerify(cfun);
+            //n_debug("mtcsdce.c fast_dce 44dd n_blocks:%d i:%d processed:%p index:%d\n",n_blocks,i,processed,index);
+            //dfScanVerify(cfun);
          }
-         n_debug("mtcsdce.c fast_dce 55 n_blocks:%d i:%d processed:%p index:%d local_changed:%d\n",
-               n_blocks,i,processed,index,local_changed);
-         dfScanVerify(cfun);
+         //n_debug("mtcsdce.c fast_dce 55 n_blocks:%d i:%d processed:%p index:%d local_changed:%d\n",
+               //n_blocks,i,processed,index,local_changed);
+         //dfScanVerify(cfun);
 
          bitmap_set_bit (processed, index);
 
@@ -1299,29 +1292,29 @@ static void fast_dce (MtcsDce *self,bool word_level)
             edge_iterator ei;
             FOR_EACH_EDGE (e, ei, bb->preds)
                if (bitmap_bit_p (processed, e->src->index)){
-                  n_debug("mtcsdce.c fast_dce 66 n_blocks:%d i:%d processed:%p index:%d local_changed:%d\n",
-                               n_blocks,i,processed,index,local_changed);
+                  //n_debug("mtcsdce.c fast_dce 66 n_blocks:%d i:%d processed:%p index:%d local_changed:%d\n",
+                               //n_blocks,i,processed,index,local_changed);
                   /* Be tricky about when we need to iterate the
                   analysis.  We only have redo the analysis if the
                   bitmaps change at the top of a block that is the
                   entry to a loop.  */
                   global_changed = true;
                }else{
-                  n_debug("mtcsdce.c fast_dce 77 n_blocks:%d i:%d processed:%p index:%d redo_out:%p\n",
-                               n_blocks,i,processed,index,redo_out);
+                  //n_debug("mtcsdce.c fast_dce 77 n_blocks:%d i:%d processed:%p index:%d redo_out:%p\n",
+                               //n_blocks,i,processed,index,redo_out);
                   bitmap_set_bit (redo_out, e->src->index);
                }
          }
       }
-      n_debug("mtcsdce.c fast_dce 77aa\n");
-      dfScanVerify(cfun);
+     // n_debug("mtcsdce.c fast_dce 77aa\n");
+      //dfScanVerify(cfun);
 
       if (global_changed){
          /* Turn off the RUN_DCE flag to prevent recursive calls to
          dce.  */
          int old_flag = mtcs_dfcore_df_clear_flags/*!df_clear_flags*/(mtcsDfcore,DF_LR_RUN_DCE);
-         n_debug("mtcsdce.c fast_dce 88 old_flag:%d word_level:%d\n",old_flag,word_level);
-         dfScanVerify(cfun);
+         //n_debug("mtcsdce.c fast_dce 88 old_flag:%d word_level:%d\n",old_flag,word_level);
+         //dfScanVerify(cfun);
 
          /* So something was deleted that requires a redo.  Do it on
          the cheap.  */
@@ -1346,20 +1339,20 @@ static void fast_dce (MtcsDce *self,bool word_level)
          prescan_insns_for_dce(self,true);
       }
    }
-   n_debug("mtcsdce.c fast_dce 99 word_level:%d global_changed:%d %p %p %p\n",
-         word_level,global_changed,processed,redo_out,all_blocks);
-   dfScanVerify(cfun);
+   //n_debug("mtcsdce.c fast_dce 99 word_level:%d global_changed:%d %p %p %p\n",
+         //word_level,global_changed,processed,redo_out,all_blocks);
+   //dfScanVerify(cfun);
 
    //printrtl();
 
    dead_debug_global_finish (&global_debug, NULL);
-   n_debug("mtcsdce.c fast_dce 100 word_level:%d global_changed:%d %p %p %p\n",
-         word_level,global_changed,processed,redo_out,all_blocks);
-   dfScanVerify(cfun);
+   //n_debug("mtcsdce.c fast_dce 100 word_level:%d global_changed:%d %p %p %p\n",
+         //word_level,global_changed,processed,redo_out,all_blocks);
+   //dfScanVerify(cfun);
    delete_unmarked_insns(self);
-   n_debug("mtcsdce.c fast_dce 101 word_level:%d global_changed:%d %p %p %p\n",
-         word_level,global_changed,processed,redo_out,all_blocks);
-   dfScanVerify(cfun);
+   //n_debug("mtcsdce.c fast_dce 101 word_level:%d global_changed:%d %p %p %p\n",
+         //word_level,global_changed,processed,redo_out,all_blocks);
+   //dfScanVerify(cfun);
    BITMAP_FREE (processed);
    BITMAP_FREE (redo_out);
    BITMAP_FREE (all_blocks);

@@ -25,6 +25,10 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 #include "nlib.h"
 #include "aetparser.h"
 
+/**
+ * 提供 Semantic Intrinsic 级的实现
+ * 所有平台共享的语法语义，与target intrinsic区别在一个共同一个专有
+ */
 //建内建变量和函数数据，并提供访问这些数据的方法。
 #define MTCS_BUILTIN_VAR_COUNT 10
 
@@ -33,6 +37,7 @@ typedef struct _MtcsBuiltinTree MtcsBuiltinTree;
 struct _MtcsBuiltinTree
 {
     AetParser *parser;
+    //内部变量，比如grid、block
     struct{
        char *name;
        int   region;

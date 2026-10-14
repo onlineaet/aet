@@ -69,9 +69,9 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 #define AET_SUPER_FUNC_NAME_ARRAY           "_superFuncNameArray" //用来保存类方法实现的混淆函数名
 
 //第三版 super实现
-#define AET_SUPER_FUNC_ADDRESS_ARRAY               "_superFuncAddressArray"       //用来保存类方法实现的地址
-#define AET_SUPER_KERNEL_NAME_ARRAY                "_superKernelNameArray"        //用来保存类核方法实现的函数名
-#define AET_SUPER_DEVICE_ADDRESS_ARRAY             "_superDeviceAddressArray"      //用来保存类设备方法实现的地址
+#define AET_SUPER_FUNC_ADDRESS_ARRAY        "_superFuncAddressArray"       //用来保存类方法实现的地址
+#define AET_SUPER_KERNEL_NAME_ARRAY         "_superKernelNameArray"        //用来保存类核方法实现的函数名
+#define AET_SUPER_DEVICE_ADDRESS_ARRAY      "_superDeviceAddressArray"      //用来保存类设备方法实现的地址
 
 #define AET_INIT_GLOBAL_SUPER_FUNC_NAME            "init_global_super_data_1"    //全局初始化本类的super数据函数名
 #define AET_INIT_INNER_SUPER_FUNC_NAME             "init_inner_super_data_2"      //内部初始化本类的super数据的函数名
@@ -105,14 +105,14 @@ typedef enum{
 #define LIB_GLOBAL_GENERIC_VAR_NAME_PREFIX "_global_aet_generic_A_$_123_" //用来保存泛型对象和块函数。
 
 //11-08
-#define IFACE_FILE_SUFFIX            "_impl_iface" //接口实现源文件或.o文件的后缀
+#define IFACE_FILE_SUFFIX                   "_impl_iface" //接口实现源文件或.o文件的后缀
 
 #define AET_MAGIC_NAME                       "_aet_magic$_123"  //存放魔数的变量名
 #define AET_MAGIC_NAME_VALUE                 1725348960 //类魔数
 #define AET_IFACE_MAGIC_NAME_VALUE           (AET_MAGIC_NAME_VALUE+1)//接口魔数
 #define AET_VAR_OF_FUNC_NAME                 "varof_object_or_interface"  //varof具体实现。定义在AObject.h。
-#define AET_DYNAMIC_CLASS_TO_IFACE_FUNC_NAME     "dynamic_class_to_iface"  //类转接口的动态实现函数，定义在AObject.h。
-#define AET_DYNAMIC_IFACE_TO_CLASS_FUNC_NAME     "dynamic_iface_to_class"  //接口转类的动态实现函数，定义在AObject.h。
+#define AET_DYNAMIC_CLASS_TO_IFACE_FUNC_NAME "dynamic_class_to_iface"  //类转接口的动态实现函数，定义在AObject.h。
+#define AET_DYNAMIC_IFACE_TO_CLASS_FUNC_NAME "dynamic_iface_to_class"  //接口转类的动态实现函数，定义在AObject.h。
 
 typedef enum{
    COMPILE_IFACE=1<<1,//文件引用了接口
@@ -214,6 +214,12 @@ typedef struct _aet_generic_info{
 extern int enter_aet;//是否进入aet 定义在classparser中
 
 #define ELF_MAGIC 0x61746531 //aet1的数字化
+
+//修饰class$的属性，表示这是个intrinsic实现和声明类
+#define MTCS_INTRINSIC_CLASS "mic"
+#define MTCS_INTRINSIC_IMPLEMENTS "mii"
+#define MTCS_INTRINSIC_FUNCTION_DECL "intrinsic_fndecl"
+#define MTCS_INTRINSIC_FUNCTION_IMPLEMENTS "intrinsic_fnimpl"
 
 
 

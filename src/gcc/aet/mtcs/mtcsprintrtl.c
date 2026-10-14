@@ -1179,12 +1179,28 @@ void mtcs_print_rtl (FILE *outf, const_rtx rtx_first)
    fprintf(outf,"\n");
 }
 
+//原型 print_rtl rtl.h print-rtl.cc
+void mtcs_print_rtl_skip_debug (FILE *outf, const_rtx rtx_first)
+{
+   MtcsTarget *mtcsTarget=mtcs_compile_get_current_target(mtcs_compile_get());
+   mtcs_rtx_writer w (outf, 0, false, false, NULL,mtcsTarget);
+   w.print_rtl (rtx_first);
+   fprintf(outf,"\n");
+}
+
 /* Like print_rtx, except specify a file.  */
 //原型 print_rtl_single rtl.h print-rtl.cc
 void mtcs_print_rtl_single (FILE *outf, const_rtx x)
 {
    if(!n_log_is_debug_file(NULL,NULL))
       return;
+   MtcsTarget *mtcsTarget=mtcs_compile_get_current_target(mtcs_compile_get());
+   mtcs_rtx_writer w (outf, 0, false, false, NULL,mtcsTarget);
+   w.print_rtl_single_with_indent (x, 0);
+}
+
+void mtcs_print_rtl_single_skip_debug(FILE *outf, const_rtx x)
+{
    MtcsTarget *mtcsTarget=mtcs_compile_get_current_target(mtcs_compile_get());
    mtcs_rtx_writer w (outf, 0, false, false, NULL,mtcsTarget);
    w.print_rtl_single_with_indent (x, 0);

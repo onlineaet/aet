@@ -753,16 +753,16 @@ static void init_reg_sets_1 (MtcsReg *self)
 
   mtcs_reg_clear_hard_reg_set/*!CLEAR_HARD_REG_SET*/(&self->hardRegs.x_fixed_reg_set);
   mtcs_reg_clear_hard_reg_set/*!CLEAR_HARD_REG_SET*/(&self->hardRegs.x_regs_invalidated_by_call);
-  n_debug("mtcsreg.c init_reg_sets_1 00 %ld\n",self->hardRegs.x_regs_invalidated_by_call.elts[0]);
+  //n_debug("mtcsreg.c init_reg_sets_1 00 %ld\n",self->hardRegs.x_regs_invalidated_by_call.elts[0]);
 
   self->hardRegs.x_operand_reg_set/*!operand_reg_set*/ &= self->hardRegs.x_accessible_reg_set/*!accessible_reg_set*/;
-  n_debug("mtcsreg.c init_reg_sets_1 11 %ld\n",self->hardRegs.x_regs_invalidated_by_call);
+  //n_debug("mtcsreg.c init_reg_sets_1 11 %ld\n",self->hardRegs.x_regs_invalidated_by_call);
 
   int maxMachineMode=mtcs_mode_get_max_number(mtcsMode);//原型   MAX_MACHINE_MODE
   int firstPseudoRegister=mtcs_reg_get_first_pseudo_register(self);//原型 FIRST_PSEUDO_REGISTER
-  n_debug("mtcsreg.c init_reg_sets_1 22 %d\n",firstPseudoRegister);
-  n_debug("mtcsreg.c init_reg_sets_1 33 %ld firstPseudoRegister:%d\n",
-          self->hardRegs.x_regs_invalidated_by_call.elts[0],firstPseudoRegister);
+  //n_debug("mtcsreg.c init_reg_sets_1 22 %d\n",firstPseudoRegister);
+  //n_debug("mtcsreg.c init_reg_sets_1 33 %ld firstPseudoRegister:%d\n",
+          //self->hardRegs.x_regs_invalidated_by_call.elts[0],firstPseudoRegister);
 
   for (i = 0; i < firstPseudoRegister/*!FIRST_PSEUDO_REGISTER*/; i++){
       /* As a special exception, registers whose class is NO_REGS are
@@ -797,8 +797,7 @@ static void init_reg_sets_1 (MtcsReg *self)
           ;
       else if (self->global_regs/*!global_regs*/[i]){
           mtcs_reg_set_hard_reg_bit/*!SET_HARD_REG_BIT*/(self,&self->hardRegs.x_regs_invalidated_by_call/*!regs_invalidated_by_call*/, i);
-          n_debug("mtcsreg.c init_reg_sets_1 44 %d %ld\n",i,self->hardRegs.x_regs_invalidated_by_call.elts[0]);
-
+          //n_debug("mtcsreg.c init_reg_sets_1 44 %d %ld\n",i,self->hardRegs.x_regs_invalidated_by_call.elts[0]);
       }else if (i == self->normalHardRegsNum.frame_pointer_regnum/*!FRAME_POINTER_REGNUM*/)
           ;
       else if (!self->hardFramePointerIsFramePointer/*!HARD_FRAME_POINTER_IS_FRAME_POINTER*/
@@ -814,7 +813,7 @@ static void init_reg_sets_1 (MtcsReg *self)
           ;
       else if (self->hardRegs.x_call_used_regs/*!call_used_regs*/[i]){
           mtcs_reg_set_hard_reg_bit/*!SET_HARD_REG_BIT*/(self,&self->hardRegs.x_regs_invalidated_by_call, i);
-          n_debug("mtcsreg.c init_reg_sets_1 55 %d %ld\n",i,self->hardRegs.x_regs_invalidated_by_call.elts[0]);
+          //n_debug("mtcsreg.c init_reg_sets_1 55 %d %ld\n",i,self->hardRegs.x_regs_invalidated_by_call.elts[0]);
       }
   }
 
@@ -867,7 +866,7 @@ static void init_reg_sets_1 (MtcsReg *self)
         }
    }
   mtcs_predefined_function_abi *defaultFuncAbi=mtcs_func_abi_get_default(mtcsFuncAbi);
-  n_debug("mtcsreg.c init_reg_sets_1 66 defaultFuncAbi:%p\n",defaultFuncAbi);
+  //n_debug("mtcsreg.c init_reg_sets_1 66 defaultFuncAbi:%p\n",defaultFuncAbi);
   defaultFuncAbi/*!default_function_abi*/->initialize (0,self->hardRegs.x_regs_invalidated_by_call);
 }
 

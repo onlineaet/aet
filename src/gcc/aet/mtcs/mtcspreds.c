@@ -84,7 +84,7 @@ void  mtcs_preds_init (MtcsPreds *self)
  */
 bool mtcs_preds_register_operand (MtcsPreds *self,rtx op, mtcs_mode mode)
 {
-  n_debug("mtcspreds.c mtcs_preds_register_operand 00 op:%p mode:%d\n",op,mode);
+  //n_debug("mtcspreds.c mtcs_preds_register_operand 00 op:%p mode:%d\n",op,mode);
   if (GET_CODE (op) == SUBREG){
       rtx sub = SUBREG_REG (op);
 
@@ -98,7 +98,7 @@ bool mtcs_preds_register_operand (MtcsPreds *self,rtx op, mtcs_mode mode)
           return false;
   }else if (!REG_P (op))
     return false;
-  n_debug("mtcspreds.c mtcs_preds_register_operand 11 op:%p mode:%d\n",op,mode);
+  //n_debug("mtcspreds.c mtcs_preds_register_operand 11 op:%p mode:%d\n",op,mode);
 
   return mtcs_preds_general_operand (self,op, mode);
 }

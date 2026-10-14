@@ -1585,3 +1585,111 @@ int main()
    return 0;
 }
 
+//测试36，最简单的测试mic,mii
+public$ final$  __attribute__((mii("cuda","sm_35"))) class$ CudaMemInstrinsic
+{
+   public$ static  __device__  float ldcs(const float *ptr) {
+         float ret = 5;
+         asm volatile ("ld.global.cs.f32 %0, [%1];"  : "=r"(ret) : "R"(ptr));
+         return ret;
+     }
+};
+
+__attribute__((mic())) class$  Target{
+#pragma mtcs intrinsic
+   public$ static __device__ float ldcs(const float *ptr);
+};
+
+class$ TFirst  {
+   __global__ void test(float *avc);
+};
+
+impl$ TFirst{
+    __global__ void test(float *ptr){
+       Target.ldcs(ptr);
+       Target.ldcs(ptr);
+    }
+};
+
+int main()
+{
+   MtcsSystem.init();
+   TFirst a=new$ TFirst();
+   a.test(NULL);
+   return 0;
+}
+
+//测试37,memcpy的余数
+#include "AObject.h"
+#include "mtcs/MtcsSystem.h"
+
+class$ TFirst {
+    __global__ void test(char *src, char *dest, int count);
+};
+
+impl$ TFirst {
+    __global__ void test(char *src, char *dest, int count) {
+        memcpy(dest, src, count);
+    }
+};
+
+int main()
+{
+    MtcsSystem.init();
+
+    TFirst a = new$ TFirst();
+
+    // 分配32字节，测试count=24..31。
+    int max_len = 32;
+    char *src = MtcsSystem.malloc(max_len);
+    char *dest = MtcsSystem.malloc(max_len);
+
+    char sentinel = 0x5a;
+    int i;
+    int count;
+
+    // 初始化源数据，避免字符串结束符影响比较。
+    for (i = 0; i < max_len; i++) {
+        src[i] = (char)(i + 1);
+        dest[i] = sentinel;
+    }
+
+    // 24..31分别对应count % 8 = 0..7。
+    for (count = 24; count <= 31; count++) {
+        // 每轮重新设置目标缓冲区。
+        for (i = 0; i < max_len; i++)
+            dest[i] = sentinel;
+
+        a.test(src, dest, count);
+
+        int ok = 1;
+
+        // 检查应该复制的区域。
+        for (i = 0; i < count; i++) {
+            if (dest[i] != src[i]) {
+                printf("FAIL: count=%d rem=%d mismatch at %d"
+                       " src=%d dest=%d\n",
+                       count, count % 8, i,
+                       (int)src[i], (int)dest[i]);
+                ok = 0;
+                break;
+            }
+        }
+
+        // 检查复制区域以外的数据没有被修改。
+        for (i = count; i < max_len; i++) {
+            if (dest[i] != sentinel) {
+                printf("FAIL: count=%d rem=%d overwrite at %d"
+                       " dest=%d\n",
+                       count, count % 8, i, (int)dest[i]);
+                ok = 0;
+                break;
+            }
+        }
+
+        printf("count=%d rem=%d : %s\n",
+               count, count % 8, ok ? "PASS" : "FAIL");
+    }
+
+    return 0;
+}

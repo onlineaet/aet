@@ -1383,7 +1383,7 @@ static tree convert_EP_E_COMPONENT_REF(tree component,tree trueType,tree rhsType
  */
 static tree convert_EP_EP_COMPONENT_REF(tree compref,tree trueType,tree rhsType)
 {
-   printf("convert_EP_EP_COMPONENT_REF 转化左值到类型 11-- queue[0] lhs:%d\n",
+   n_debug("convert_EP_EP_COMPONENT_REF 转化左值到类型 11-- queue[0] lhs:%d\n",
          (rhsType && POINTER_TYPE_P(rhsType)));
    // 1. 构造 int **
    tree trueTypePointer = build_pointer_type (trueType);
@@ -1500,7 +1500,7 @@ static tree convert_EP_E_INDIRECT_REF(tree indirect,tree trueType,tree rhsType)
       tree result       = build_array_ref (EXPR_LOCATION (orig), new_base, index);
       return result;
    }else if(TREE_CODE(compref)==COMPONENT_REF){
-      printf("第二种情 E =int E *queue queue[0]=...\n");
+      //printf("第二种情 E =int E *queue queue[0]=...\n");
       tree queue_ptr = TREE_OPERAND (indirect, 0);   // 原来的 component_ref，类型是 void*
       // 1. 构造 int *
       tree trueTypePointer = build_pointer_type (trueType);

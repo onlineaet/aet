@@ -958,6 +958,18 @@ void n_log_enter_mtcs()
    }
 }
 
+static int backlevel = 0;
+void n_log_enter_force_front(nboolean enter)
+{
+   if(enter){
+      backlevel = n_log_msg_prefix;
+      n_log_set_level(debug_level);
+   }else{
+      n_log_set_level(backlevel);
+   }
+}
+
+
 char  *n_log_get_info()
 {
    sprintf(infos,"level:%d file_func_line:%d compilefiles:%s compilefuncs:%s callfiles:%s callfuncs:%s",

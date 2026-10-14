@@ -29,6 +29,8 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 #include "c/c-parser.h"
 #include "../libcpp/include/cpplib.h"
 #include "options.h"
+#include "stringpool.h"
+#include "attribs.h"
 
 #include "aetutils.h"
 #include "aetinfo.h"
@@ -65,6 +67,8 @@ ClassInfo *class_info_new()
    self->file=NULL;
    self->declLoc =0;//声明的位置  class A
    self->implLoc =0; //实现的位置 impl$ A
+   self->isMIC = FALSE;//intrinsic class
+   self->isMII = FALSE;//intrinsic implements
    return self;
 }
 
@@ -97,39 +101,41 @@ nboolean   class_info_is_field(ClassInfo *self,tree component)
 
 nboolean   class_info_is_field_by_name(ClassInfo *self,char *fieldName)
 {
-     tree record=self->record;
-     tree  component=aet_utils_create_ident(fieldName);
-     return class_util_have_field(record,component);
+   tree record=self->record;
+   tree  component=aet_utils_create_ident(fieldName);
+   return class_util_have_field(record,component);
 }
 
 tree  class_info_get_field_by_component(ClassInfo *self,tree ident)
 {
-    tree chain;
-	tree record=self->record;
-    tree fieldList=TYPE_FIELDS(record);
-	for (chain = fieldList; chain; chain = DECL_CHAIN (chain)){
-        tree name=DECL_NAME(chain);
-        n_info("class_info_get_field_by_component 查找field val name::%s code:%s %d",IDENTIFIER_POINTER(name),get_tree_code_name(TREE_CODE(name)),name==ident);
-        if(name==ident)
-        	return chain;
-	}
-	return NULL_TREE;
+   tree chain;
+   tree record=self->record;
+   tree fieldList=TYPE_FIELDS(record);
+   for (chain = fieldList; chain; chain = DECL_CHAIN (chain)){
+      tree name=DECL_NAME(chain);
+      n_info("class_info_get_field_by_component 查找field val name::%s code:%s %d",
+            IDENTIFIER_POINTER(name),get_tree_code_name(TREE_CODE(name)),name==ident);
+      if(name==ident)
+      return chain;
+   }
+   return NULL_TREE;
 }
 
 tree  class_info_get_field_by_name(ClassInfo *self,char *idName)
 {
-	tree field;
-	tree record=self->record;
-    tree fieldList=TYPE_FIELDS(record);
-	for (field = fieldList; field; field = DECL_CHAIN (field)){
-        tree name=DECL_NAME(field);
-        tree type=TREE_TYPE(field);
-        if(!strcmp(idName,IDENTIFIER_POINTER(name))){
-            n_info("class_info_get_field_by_name 找到了field class:%s val name::%s",self->className.sysName,IDENTIFIER_POINTER(name));
-        	return field;
-        }
-	}
-	return NULL_TREE;
+   tree field;
+   tree record=self->record;
+   tree fieldList=TYPE_FIELDS(record);
+   for (field = fieldList; field; field = DECL_CHAIN (field)){
+      tree name=DECL_NAME(field);
+      tree type=TREE_TYPE(field);
+      if(!strcmp(idName,IDENTIFIER_POINTER(name))){
+         n_info("class_info_get_field_by_name 找到了field class:%s val name::%s",
+               self->className.sysName,IDENTIFIER_POINTER(name));
+         return field;
+      }
+   }
+   return NULL_TREE;
 }
 
 
@@ -152,28 +158,28 @@ void   class_info_set_parent(ClassInfo *self,ClassName *parent)
 
 void       class_info_set_ifaces(ClassInfo *self,ClassName **ifaces,int count)
 {
-	  if(self->ifaceCount>0){
-		  n_warning("接口已设 %d %d",self->ifaceCount,count);
-		  return;
-	  }
-	  int i;
-	  for(i=0;i<count;i++){
-		  copyClassName(&(self->ifaces[i]),ifaces[i]);
-	  }
-	  self->ifaceCount=count;
+   if(self->ifaceCount>0){
+      n_warning("接口已设 %d %d",self->ifaceCount,count);
+      return;
+   }
+   int i;
+   for(i=0;i<count;i++){
+      copyClassName(&(self->ifaces[i]),ifaces[i]);
+   }
+   self->ifaceCount=count;
 }
 
 void       class_name_free(ClassName *className)
 {
-	if(className!=NULL){
-		if(className->sysName)
-			n_free(className->sysName);
-		if(className->userName)
-		    n_free(className->userName);
-		if(className->package)
-		    n_free(className->package);
-		n_slice_free(ClassName,className);
-	}
+   if(className!=NULL){
+      if(className->sysName)
+         n_free(className->sysName);
+      if(className->userName)
+         n_free(className->userName);
+      if(className->package)
+         n_free(className->package);
+      n_slice_free(ClassName,className);
+   }
 }
 
 ClassName *class_info_clone_class_name(ClassInfo *self)
@@ -209,17 +215,17 @@ nboolean   class_info_is_belong(ClassInfo *self,char *className)
  */
 nboolean class_info_is_generic_decl(ClassInfo *self,tree id)
 {
-    if(!self->genericModel)
-    	return FALSE;
-    n_debug("class_info_is_generic_decl --- %s\n",IDENTIFIER_POINTER(id));
-    return generic_model_exits_ident(self->genericModel,IDENTIFIER_POINTER(id));
+   if(!self->genericModel)
+      return FALSE;
+   n_debug("class_info_is_generic_decl --- %s\n",IDENTIFIER_POINTER(id));
+   return generic_model_exits_ident(self->genericModel,IDENTIFIER_POINTER(id));
 }
 
 int class_info_get_undefine_generic_count(ClassInfo *self)
 {
-	if(!self->genericModel)
-		return -1;
-	return generic_model_get_undefine_count(self->genericModel);
+   if(!self->genericModel)
+      return -1;
+   return generic_model_get_undefine_count(self->genericModel);
 }
 
 int class_info_get_generic_count(ClassInfo *self)
@@ -505,5 +511,75 @@ nboolean   class_info_have_iface(ClassInfo *self,ClassName *ifaceName)
    return FALSE;
 }
 
+/**
+ * 设置是不是一个内在目标的类
+ */
+void class_info_set_intrinsic_class(ClassInfo *self)
+{
+   tree recordTypeDecl=lookup_name(aet_utils_create_ident(self->className.sysName));
+   if(!aet_utils_valid_tree(recordTypeDecl)){
+      n_error("没有类%s声明。",self->className.sysName);
+      return ;
+   }
+   tree intrinsicClass=lookup_attribute (MTCS_INTRINSIC_IMPLEMENTS, DECL_ATTRIBUTES (recordTypeDecl));
+   if(intrinsicClass){
+      if(!class_info_is_class(self)){
+         error_at(self->declLoc,"%s只能是普通类的属性。",MTCS_INTRINSIC_IMPLEMENTS);
+      }else{
+         int count=0;
+         for (tree a = TREE_VALUE (intrinsicClass); a; a = TREE_CHAIN (a)){
+               count++;
+         }
+         if(count==0){
+            error_at(self->declLoc,"类 %s 的属性 %s 第一个参数是目标名。如:\"ptx\",\"gcn\"等。",
+                  self->className.userName,MTCS_INTRINSIC_IMPLEMENTS);
+            return ;
+         }
+         self->isMII = TRUE;
+      }
+   }
+
+   intrinsicClass=lookup_attribute (MTCS_INTRINSIC_CLASS, DECL_ATTRIBUTES (recordTypeDecl));
+   if(intrinsicClass){
+      if(!class_info_is_class(self)){
+         error_at(self->declLoc,"%s只能是普通类的属性。",MTCS_INTRINSIC_CLASS);
+      }else{
+         self->isMIC = TRUE;
+      }
+   }
+}
+
+tree   class_info_get_mic_attribute(ClassInfo *self)
+{
+   if(!self)
+      return NULL_TREE;
+   tree recordTypeDecl=lookup_name(aet_utils_create_ident(self->className.sysName));
+   if(!aet_utils_valid_tree(recordTypeDecl))
+      return NULL_TREE;
+
+   tree intrinsicClass=lookup_attribute (MTCS_INTRINSIC_CLASS, DECL_ATTRIBUTES (recordTypeDecl));
+   return intrinsicClass;
+}
 
 
+tree    class_info_get_mii_attribute(ClassInfo *self)
+{
+   if(!self)
+      return NULL_TREE;
+   tree recordTypeDecl=lookup_name(aet_utils_create_ident(self->className.sysName));
+   if(!aet_utils_valid_tree(recordTypeDecl))
+      return NULL_TREE;
+
+   tree intrinsicClass=lookup_attribute (MTCS_INTRINSIC_IMPLEMENTS, DECL_ATTRIBUTES (recordTypeDecl));
+   return intrinsicClass;
+}
+
+
+nboolean class_info_is_mic(ClassInfo *self)
+{
+   return self->isMIC;
+}
+nboolean class_info_is_mii(ClassInfo *self)
+{
+   return self->isMII;
+}

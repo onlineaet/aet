@@ -66,7 +66,8 @@ int           func_mgr_get_orig_func_and_class_name(FuncMgr *self,char *mangleNa
 
 nboolean      func_mgr_set_static_func_premission(FuncMgr *self,ClassName *className,
                               tree funDecl,ClassPermissionType permission,nboolean isFinal);
-nboolean      func_mgr_change_static_func_decl(FuncMgr *self,struct c_declarator *declarator,ClassName *className,tree structTree);
+nboolean      func_mgr_change_static_func_decl(FuncMgr *self,struct c_declarator *declarator,
+                              ClassName *className,tree structTree);
 nboolean      func_mgr_set_static_func_decl(FuncMgr *self,tree decl,ClassName *className,nboolean define);
 char         *func_mgr_create_static_var_name(FuncMgr *self,ClassName *className,tree varName,tree type);
 nboolean      func_mgr_static_func_exits(FuncMgr *self,ClassName *className,char *origName);
@@ -114,5 +115,7 @@ nboolean      func_mgr_parent_have_final(FuncMgr *self,location_t loc,ClassFunc 
  * 引用的对象方法可以在外部使用吗
  */
 nboolean func_mgr_can_use_outside(FuncMgr *self,tree decl);
+//根据mic fndecl 找出 mii fndecl
+ClassFunc *func_mgr_get_mii_func(FuncMgr *self,ClassFunc *micFunc);
 
 #endif

@@ -2234,7 +2234,7 @@ rtx mtcs_rtl_change_address (MtcsRTL *self,rtx memref, machine_mode mode, rtx ad
       MEM_COPY_ATTRIBUTES (new_rtx, memref);
   }
 
-  set_mem_attrs (self,new_rtx, &attrs);
+  set_mem_attrs(self,new_rtx, &attrs);
   return new_rtx;
 }
 

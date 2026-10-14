@@ -46,12 +46,14 @@ struct _AetMediatorUser{
     * 由于mtcsparser不能调用lookup_name,所以通过中介获得。
     */
    tree     (*getParentDeviceArrayDecl) (AetMediatorUser *self,char *sysName);
-   int      (*getPromoteDeclId)(AetMediatorUser *self,tree decl);
+   int      (*getPromoteDeclId)(AetMediatorUser *self,nuint64 hostDeclAddress);
    void     (*addLinkFunc)(AetMediatorUser *self,const char *linkFuncNames,int version,int isa,const char *platName);
    char    *(*getComputeVersion)(AetMediatorUser *self,char *platName,int version,int isa);
    char    *(*getAsmVarName)(AetMediatorUser *self,char *platName,int version,int isa,char *fileName);
    char    *(*getObjectFile)(AetMediatorUser *self);
    void     (*writeNote)(AetMediatorUser *self);
+   //向ast请求，查找mic中的函数，可以被替换为新的mii函数
+   tree     (*getMIIFunction)(AetMediatorUser *self,tree micFndecl);
 
 };
 
@@ -68,7 +70,7 @@ char        *aet_mediator_get_asm_var_name(AetMediator *self,char *platName,int 
 //tree         aet_mediator_get_unit3_constructor(AetMediator *self,AetMediatorUser *send);
 //根据 decl 获取 decl 对应的 id 局部变量提升到全局后，在mtcsparser中生成一个id号，以便汇编是降级为局部变量
 //decl 是主机的decl 存在 MtcsVarNode中。MtcsVarNode 存在 MtcsVar 的 varArray 中。
-int          aet_mediator_get_promote_decl_id(AetMediator *self,tree decl,AetMediatorUser *send);
+int          aet_mediator_get_promote_decl_id(AetMediator *self,nuint64 hostDeclAddress,AetMediatorUser *send);
 tree         aet_mediator_get_parent_device_array_decl(AetMediator *self,char *sysName,AetMediatorUser *send);
 void         aet_mediator_add_link_func(AetMediator *self,const char *linkFuncNames,
                      int version,int isa,const char *platName,AetMediatorUser *send);
@@ -76,5 +78,6 @@ void         aet_mediator_add_link_func(AetMediator *self,const char *linkFuncNa
 char        *aet_mediator_get_object_file(AetMediator *self,AetMediatorUser *send);
 nboolean     aet_mediator_create_compile();//由mtcscompile实现
 void         aet_mediator_write_note(AetMediator *self,AetMediatorUser *send);
+tree         aet_mediator_get_mii_function(AetMediator *self,tree micFndecl,AetMediatorUser *send);
 
 #endif /* ! __GCC_AET_MICRO_H__ */

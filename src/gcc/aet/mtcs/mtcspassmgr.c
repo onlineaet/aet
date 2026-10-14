@@ -746,10 +746,6 @@ bool mtcs_pass_mgr_execute_one_pass (MtcsPassMgr *self,MtcsPass *pass)
    pass->type,pass->name,df?df->def_regs[0]->reg_chain:NULL);
    testprint(pass,cfun);
 
-   /* Do it!  */
-  // if(pass->type==RTL_PASS)
-    //  mtcs_tool_print_cfun_loop();
-   //testprint(pass,cfun);
    todo_after = mtcs_pass_excute(pass,cfun);
    n_debug("mtcspassmgr.c execute_one_pass 44 完成execute type:%d name:%s func:%s reg_chain:%p \n",
          pass->type,pass->name,current_function_name(),df?df->def_regs[0]->reg_chain:NULL);
@@ -787,23 +783,14 @@ bool mtcs_pass_mgr_execute_one_pass (MtcsPassMgr *self,MtcsPass *pass)
       return true;
    }
    n_debug("mtcspassmgr.c execute_one_pass 88 type:%d name:%s func:%s\n",pass->type,pass->name,current_function_name());
-   //testprint(pass,cfun);
 
    do_per_function(self,clear_last_verified, NULL);
    do_per_function(self,update_properties_after_pass, pass);
    n_debug("mtcspassmgr.c execute_one_pass 99 type:%d name:%s func:%s\n",pass->type,pass->name,current_function_name());
-   //testprint(pass,cfun);
-
-   //      fprintf(stderr,"passes.cc execute_one_pass 77  type:%d name:%s func:%s\n",pass->type,pass->name,current_function_name());
-   //      struct cgraph_node *nodex;
-   //      FOR_EACH_FUNCTION(nodex){
-   //          printf("passes.cc execute_one_pass 66 func :%s\n",nodex->name());
-   //      }
 
    /* Run post-pass cleanup and verification.  */
    execute_todo(self,todo_after | pass->todo_flags_finish | TODO_verify_il);
    n_debug("mtcspassmgr.c execute_one_pass 100 type:%d name:%s func:%s\n",pass->type,pass->name,current_function_name());
-   //testprint(pass,cfun);
 
    if (mtcsOptionsItem->x_profile_report){
       /* IPA passes are accounted at transform time.  */
@@ -817,7 +804,6 @@ bool mtcs_pass_mgr_execute_one_pass (MtcsPassMgr *self,MtcsPass *pass)
       }
    }
    n_debug("mtcspassmgr.c execute_one_pass 101 type:%d name:%s func:%s\n",pass->type,pass->name,current_function_name());
-  // testprint(pass,cfun);
 
    verify_interpass_invariants ();
    if (pass->type == IPA_PASS  && pass->function_transform){
@@ -834,7 +820,6 @@ bool mtcs_pass_mgr_execute_one_pass (MtcsPassMgr *self,MtcsPass *pass)
       do_per_function(self,execute_function_dump, pass);
 
    n_debug("mtcspassmgr.c execute_one_pass 103 type:%d name:%s func:%s\n",pass->type,pass->name,current_function_name());
-   //testprint(pass,cfun);
 
    if (!current_function_decl)
       symtab->process_new_functions ();
@@ -854,8 +839,6 @@ bool mtcs_pass_mgr_execute_one_pass (MtcsPassMgr *self,MtcsPass *pass)
       //ggc_collect ();
    }
    n_debug("mtcspassmgr.c execute_one_pass 104 完成 type:%d name:%s func:%s\n",pass->type,pass->name,current_function_name());
-   testprint(pass,cfun);
-
    return true;
 }
 

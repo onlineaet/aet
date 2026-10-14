@@ -723,7 +723,8 @@ rtx mtcs_simplify_rtx_unary_operation_1 (MtcsSimplifyRtx *self,rtx_code code, ma
      if we are not changing the meaning of the address. */
       if (GET_CODE (op) == MEM  && !mtcs_mode_is_vector_p(mtcsMode,mode)
               && !MEM_VOLATILE_P (op)
-              && !mtcs_recog_mode_dependent_address_p/*!mode_dependent_address_p*/(mtcsRecog,XEXP (op, 0), MEM_ADDR_SPACE (op))){
+              && !mtcs_recog_mode_dependent_address_p/*!mode_dependent_address_p*/(mtcsRecog,XEXP (op, 0),
+                    mtcs_rtl_get_mem_addr_space/*!MEM_ADDR_SPACE*/ (mtcsRTL,op))){
           temp = rtl_hooks.gen_lowpart_no_emit (mode, op);
           if (temp)
             return temp;
@@ -2224,28 +2225,28 @@ rtx mtcs_simplify_rtx_binary_operation (MtcsSimplifyRtx *self,rtx_code code, mac
    if (GET_RTX_CLASS (code) == RTX_COMM_ARITH
    && mtcs_rtlanal_swap_commutative_operands_p/*!swap_commutative_operands_p*/(mtcsRtlanal, op0, op1))
       std::swap (op0, op1);
-   n_debug("mtcssimplifyrtx.c mtcs_simplify_rtx_binary_operation 00 code:%d mode:%d\n",code,mode);
-   mtcs_print_rtl(stderr,op0);
-   n_debug("mtcssimplifyrtx.c mtcs_simplify_rtx_binary_operation 11\n");
-   mtcs_print_rtl(stderr,op1);
+//   n_debug("mtcssimplifyrtx.c mtcs_simplify_rtx_binary_operation 00 code:%d mode:%d\n",code,mode);
+//   mtcs_print_rtl(stderr,op0);
+//   n_debug("mtcssimplifyrtx.c mtcs_simplify_rtx_binary_operation 11\n");
+//   mtcs_print_rtl(stderr,op1);
 
    trueop0 = mtcs_simplify_rtx_avoid_constant_pool_reference/*!avoid_constant_pool_reference*/(self,op0);
    trueop1 = mtcs_simplify_rtx_avoid_constant_pool_reference/*!avoid_constant_pool_reference*/(self,op1);
-   n_debug("mtcssimplifyrtx.c mtcs_simplify_rtx_binary_operation 22\n");
-   mtcs_print_rtl(stderr,trueop0);
-   n_debug("mtcssimplifyrtx.c mtcs_simplify_rtx_binary_operation 33\n");
-   mtcs_print_rtl(stderr,trueop1);
+//   n_debug("mtcssimplifyrtx.c mtcs_simplify_rtx_binary_operation 22\n");
+//   mtcs_print_rtl(stderr,trueop0);
+//   n_debug("mtcssimplifyrtx.c mtcs_simplify_rtx_binary_operation 33\n");
+//   mtcs_print_rtl(stderr,trueop1);
    tem = mtcs_simplify_rtx_const_binary_operation/*!simplify_const_binary_operation*/(self,code, mode, trueop0, trueop1);
    if (tem){
-      n_debug("mtcssimplifyrtx.c mtcs_simplify_rtx_binary_operation 44\n");
-      mtcs_print_rtl(stderr,tem);
+      //n_debug("mtcssimplifyrtx.c mtcs_simplify_rtx_binary_operation 44\n");
+      //mtcs_print_rtl(stderr,tem);
       return tem;
    }
    tem = mtcs_simplify_rtx_binary_operation_1 (self,code, mode, op0, op1, trueop0, trueop1);
 
    if (tem){
-      n_debug("mtcssimplifyrtx.c mtcs_simplify_rtx_binary_operation 55\n");
-       mtcs_print_rtl(stderr,tem);
+      //n_debug("mtcssimplifyrtx.c mtcs_simplify_rtx_binary_operation 55\n");
+       //mtcs_print_rtl(stderr,tem);
       return tem;
    }
 
@@ -2254,8 +2255,8 @@ rtx mtcs_simplify_rtx_binary_operation (MtcsSimplifyRtx *self,rtx_code code, mac
    if (trueop0 != op0 || trueop1 != op1){
       tem= mtcs_simplify_rtx_gen_binary (self,code, mode, trueop0, trueop1);
 
-      n_debug("mtcssimplifyrtx.c mtcs_simplify_rtx_binary_operation 55 tem:%p\n",tem);
-       mtcs_print_rtl(stderr,tem);
+      //n_debug("mtcssimplifyrtx.c mtcs_simplify_rtx_binary_operation 55 tem:%p\n",tem);
+       //mtcs_print_rtl(stderr,tem);
       return tem;
    }
 
@@ -5159,12 +5160,13 @@ rtx mtcs_simplify_rtx_const_relational_operation (MtcsSimplifyRtx *self,enum rtx
   rtx trueop1;
 
   gcc_assert (mode != VOIDmode || (GET_MODE (op0) == VOIDmode && GET_MODE (op1) == VOIDmode));
-  n_debug("mtcssimplifyrtx.c mtcs_simplify_rtx_const_relational_operation 00code:%d mode:%d %p %p GET_CODE (op0):%d COMPARE = %d\n",
-        code,mode,op1,const0_rtx,GET_CODE (op0),COMPARE);
+  //n_debug("mtcssimplifyrtx.c mtcs_simplify_rtx_const_relational_operation \
+  //      00code:%d mode:%d %p %p GET_CODE (op0):%d COMPARE = %d\n",
+ //       code,mode,op1,const0_rtx,GET_CODE (op0),COMPARE);
   /* We only handle MODE_CC comparisons that are COMPARE against zero.  */
   if (mtcs_mode_get_class (mtcsMode,mode) == MODE_CC  && (op1 != const0_rtx || GET_CODE (op0) != COMPARE))
     return NULL_RTX;
-  n_debug("mtcssimplifyrtx.c mtcs_simplify_rtx_const_relational_operation 11 code:%d mode:%d\n",code,mode);
+ // n_debug("mtcssimplifyrtx.c mtcs_simplify_rtx_const_relational_operation 11 code:%d mode:%d\n",code,mode);
 
   /* If op0 is a compare, extract the comparison arguments from it.  */
   if (GET_CODE (op0) == COMPARE && op1 == const0_rtx){
@@ -5175,34 +5177,33 @@ rtx mtcs_simplify_rtx_const_relational_operation (MtcsSimplifyRtx *self,enum rtx
       else if (GET_MODE (op1) != VOIDmode)
           mode = GET_MODE (op1);
       else{
-         n_debug("mtcssimplifyrtx.c mtcs_simplify_rtx_const_relational_operation 22 code:%d mode:%d\n",code,mode);
-
-          return 0;
+         //n_debug("mtcssimplifyrtx.c mtcs_simplify_rtx_const_relational_operation 22 code:%d mode:%d\n",code,mode);
+         return 0;
       }
   }
-  n_debug("mtcssimplifyrtx.c mtcs_simplify_rtx_const_relational_operation 33 code:%d mode:%d\n",code,mode);
+  //n_debug("mtcssimplifyrtx.c mtcs_simplify_rtx_const_relational_operation 33 code:%d mode:%d\n",code,mode);
 
   /* We can't simplify MODE_CC values since we don't know what the
      actual comparison is.  */
   if (mtcs_mode_get_class (mtcsMode,GET_MODE (op0)) == MODE_CC)
     return 0;
-  n_debug("mtcssimplifyrtx.c mtcs_simplify_rtx_const_relational_operation 44 code:%d mode:%d\n",code,mode);
+  //n_debug("mtcssimplifyrtx.c mtcs_simplify_rtx_const_relational_operation 44 code:%d mode:%d\n",code,mode);
 
   /* Make sure the constant is second.  */
   if (mtcs_rtlanal_swap_commutative_operands_p/*!swap_commutative_operands_p*/(mtcsRtlanal, op0, op1)){
       std::swap (op0, op1);
       code = swap_condition (code);
   }
-  n_debug("mtcssimplifyrtx.c mtcs_simplify_rtx_const_relational_operation 55 code:%d mode:%d\n",code,mode);
-  mtcs_print_rtl(stderr,op0);
-  mtcs_print_rtl(stderr,op1);
+//  n_debug("mtcssimplifyrtx.c mtcs_simplify_rtx_const_relational_operation 55 code:%d mode:%d\n",code,mode);
+//  mtcs_print_rtl(stderr,op0);
+//  mtcs_print_rtl(stderr,op1);
 
   trueop0 = mtcs_simplify_rtx_avoid_constant_pool_reference (self,op0);
-  n_debug("mtcssimplifyrtx.c mtcs_simplify_rtx_const_relational_operation 55aa code:%d mode:%d\n",code,mode);
-  mtcs_print_rtl(stderr,trueop0);
+ // n_debug("mtcssimplifyrtx.c mtcs_simplify_rtx_const_relational_operation 55aa code:%d mode:%d\n",code,mode);
+ // mtcs_print_rtl(stderr,trueop0);
   trueop1 = mtcs_simplify_rtx_avoid_constant_pool_reference (self,op1);
-  n_debug("mtcssimplifyrtx.c mtcs_simplify_rtx_const_relational_operation 55bb code:%d mode:%d\n",code,mode);
-  mtcs_print_rtl(stderr,trueop1);
+//  n_debug("mtcssimplifyrtx.c mtcs_simplify_rtx_const_relational_operation 55bb code:%d mode:%d\n",code,mode);
+ // mtcs_print_rtl(stderr,trueop1);
 
   /* For integer comparisons of A and B maybe we can simplify A - B and can
      then simplify a comparison of that with zero.  If A and B are both either
@@ -5223,14 +5224,14 @@ rtx mtcs_simplify_rtx_const_relational_operation (MtcsSimplifyRtx *self,enum rtx
       && ! mtcs_rtlanal_nonzero_address_p/*!nonzero_address_p*/(mtcsRtlanal,tem))
     return mtcs_simplify_rtx_const_relational_operation (self,signed_condition (code),mode, tem, const0_rtx);
 
-  n_debug("mtcssimplifyrtx.c mtcs_simplify_rtx_const_relational_operation 66 code:%d mode:%d\n",code,mode);
+ // n_debug("mtcssimplifyrtx.c mtcs_simplify_rtx_const_relational_operation 66 code:%d mode:%d\n",code,mode);
 
   if (!mtcs_mode_honor_nans/*!HONOR_NANS*/ (mtcsMode,mode) && code == ORDERED)
     return const_true_rtx;
 
   if (! mtcs_mode_honor_nans (mtcsMode,mode) && code == UNORDERED)
     return const0_rtx;
-  n_debug("mtcssimplifyrtx.c mtcs_simplify_rtx_const_relational_operation 77 code:%d mode:%d\n",code,mode);
+  //n_debug("mtcssimplifyrtx.c mtcs_simplify_rtx_const_relational_operation 77 code:%d mode:%d\n",code,mode);
 
   /* For modes without NaNs, if the two operands are equal, we know the
      result except if they have side-effects.  Even with NaNs we know
@@ -5243,14 +5244,14 @@ rtx mtcs_simplify_rtx_const_relational_operation (MtcsSimplifyRtx *self,enum rtx
       && rtx_equal_p (trueop0, trueop1)
       && ! side_effects_p (trueop0))
     return comparison_result (code, CMP_EQ);
-  n_debug("mtcssimplifyrtx.c mtcs_simplify_rtx_const_relational_operation 88 code:%d mode:%d\n",code,mode);
+  //n_debug("mtcssimplifyrtx.c mtcs_simplify_rtx_const_relational_operation 88 code:%d mode:%d\n",code,mode);
 
   /* If the operands are floating-point constants, see if we can fold
      the result.  */
   if (CONST_DOUBLE_AS_FLOAT_P (trueop0)
       && CONST_DOUBLE_AS_FLOAT_P (trueop1)
       && mtcs_mode_is_scalar_float_p/*!SCALAR_FLOAT_MODE_P*/ (mtcsMode,GET_MODE (trueop0))){
-     n_debug("mtcssimplifyrtx.c mtcs_simplify_rtx_const_relational_operation 88aa code:%d mode:%d\n",code,mode);
+     //n_debug("mtcssimplifyrtx.c mtcs_simplify_rtx_const_relational_operation 88aa code:%d mode:%d\n",code,mode);
 
       const REAL_VALUE_TYPE *d0 = CONST_DOUBLE_REAL_VALUE (trueop0);
       const REAL_VALUE_TYPE *d1 = CONST_DOUBLE_REAL_VALUE (trueop1);
@@ -5280,7 +5281,7 @@ rtx mtcs_simplify_rtx_const_relational_operation (MtcsSimplifyRtx *self,enum rtx
 
       return comparison_result (code,(real_equal (d0, d1) ? CMP_EQ : real_less (d0, d1) ? CMP_LT : CMP_GT));
   }
-  n_debug("mtcssimplifyrtx.c mtcs_simplify_rtx_const_relational_operation 99 code:%d mode:%d\n",code,mode);
+  //n_debug("mtcssimplifyrtx.c mtcs_simplify_rtx_const_relational_operation 99 code:%d mode:%d\n",code,mode);
 
   /* Otherwise, see if the operands are both integers.  */
   if ((mtcs_mode_get_class (mtcsMode,mode) == MODE_INT || mode == VOIDmode)
@@ -5288,7 +5289,7 @@ rtx mtcs_simplify_rtx_const_relational_operation (MtcsSimplifyRtx *self,enum rtx
       /* It would be nice if we really had a mode here.  However, the
      largest int representable on the target is as good as
      infinite.  */
-     n_debug("mtcssimplifyrtx.c mtcs_simplify_rtx_const_relational_operation 99aa code:%d mode:%d\n",code,mode);
+     //n_debug("mtcssimplifyrtx.c mtcs_simplify_rtx_const_relational_operation 99aa code:%d mode:%d\n",code,mode);
 
       machine_mode cmode = (mode == VOIDmode) ? mtcsMode->modesMinMax.max_INT/*!MAX_MODE_INT*/ : mode;
       mtcs_rtx_mode_t ptrueop0 = mtcs_rtx_mode_t/*!rtx_mode_t*/(trueop0, cmode);
@@ -5302,7 +5303,7 @@ rtx mtcs_simplify_rtx_const_relational_operation (MtcsSimplifyRtx *self,enum rtx
           return comparison_result (code, cr);
       }
   }
-  n_debug("mtcssimplifyrtx.c mtcs_simplify_rtx_const_relational_operation 100 code:%d mode:%d\n",code,mode);
+ // n_debug("mtcssimplifyrtx.c mtcs_simplify_rtx_const_relational_operation 100 code:%d mode:%d\n",code,mode);
 
   /* Optimize comparisons with upper and lower bounds.  */
   scalar_int_mode int_mode;
@@ -5310,7 +5311,7 @@ rtx mtcs_simplify_rtx_const_relational_operation (MtcsSimplifyRtx *self,enum rtx
       && mtcs_mode_is_a <scalar_int_mode> (mtcsMode,mode, &int_mode)
       && mtcs_mode_is_hwi_computable_p/*!HWI_COMPUTABLE_MODE_P*/ (mtcsMode,int_mode)
       && !side_effects_p (trueop0)){
-     n_debug("mtcssimplifyrtx.c mtcs_simplify_rtx_const_relational_operation 100aa code:%d mode:%d %d\n",code,mode,int_mode);
+   //  n_debug("mtcssimplifyrtx.c mtcs_simplify_rtx_const_relational_operation 100aa code:%d mode:%d %d\n",code,mode,int_mode);
 
       int sign;
       unsigned HOST_WIDE_INT nonzero = mtcs_rtlanal_nonzero_bits/*!nonzero_bits*/(mtcsRtlanal,trueop0, int_mode);
@@ -5324,9 +5325,9 @@ rtx mtcs_simplify_rtx_const_relational_operation (MtcsSimplifyRtx *self,enum rtx
           sign = 0;
       else
           sign = 1;
-      n_debug("mtcssimplifyrtx.c mtcs_simplify_rtx_const_relational_operation 100bb "
-            "code:%d mode:%d nonzero:"HOST_WIDE_INT_PRINT_UNSIGNED" val:"HOST_WIDE_INT_PRINT_UNSIGNED" sign:%d\n",
-                  code,mode,nonzero,val,sign);
+     // n_debug("mtcssimplifyrtx.c mtcs_simplify_rtx_const_relational_operation 100bb "
+        //    "code:%d mode:%d nonzero:"HOST_WIDE_INT_PRINT_UNSIGNED" val:"HOST_WIDE_INT_PRINT_UNSIGNED" sign:%d\n",
+        //          code,mode,nonzero,val,sign);
       /* Get a reduced range if the sign bit is zero.  */
       if (nonzero <= (mtcs_mode_get_mask(mtcsMode,int_mode) >> 1)){
 
@@ -5341,20 +5342,20 @@ rtx mtcs_simplify_rtx_const_relational_operation (MtcsSimplifyRtx *self,enum rtx
           mtc_rtl_get_mode_bounds/*get_mode_bounds*/ (mtcsRTL,int_mode, sign, int_mode, &mmin_rtx, &mmax_rtx);
           mmin = INTVAL (mmin_rtx);
           mmax = INTVAL (mmax_rtx);
-          n_debug("mtcssimplifyrtx.c  mtcs_simplify_rtx_const_relational_operation 100dd code:%d mode:%d min:"
-                HOST_WIDE_INT_PRINT_DEC "max:"HOST_WIDE_INT_PRINT_DEC" nonzero:"HOST_WIDE_INT_PRINT_UNSIGNED"\n",
-                code,mode,mmin,mmax,nonzero);
+         // n_debug("mtcssimplifyrtx.c  mtcs_simplify_rtx_const_relational_operation 100dd code:%d mode:%d min:"
+              //  HOST_WIDE_INT_PRINT_DEC "max:"HOST_WIDE_INT_PRINT_DEC" nonzero:"HOST_WIDE_INT_PRINT_UNSIGNED"\n",
+               // code,mode,mmin,mmax,nonzero);
           if (sign){
               unsigned int sign_copies = mtcs_rtlanal_num_sign_bit_copies/*!num_sign_bit_copies*/(mtcsRtlanal,trueop0, int_mode);
               mmin >>= (sign_copies - 1);
               mmax >>= (sign_copies - 1);
-              n_debug("mtcssimplifyrtx.c mtcs_simplify_rtx_const_relational_operation 100ee code:%d mode:%d"
-                                 "min:"HOST_WIDE_INT_PRINT_DEC" max:"HOST_WIDE_INT_PRINT_DEC" nonzero:"HOST_WIDE_INT_PRINT_UNSIGNED"\n",
-                                  code,mode,mmin,mmax,nonzero);
+             // n_debug("mtcssimplifyrtx.c mtcs_simplify_rtx_const_relational_operation 100ee code:%d mode:%d"
+               //                  "min:"HOST_WIDE_INT_PRINT_DEC" max:"HOST_WIDE_INT_PRINT_DEC" nonzero:"HOST_WIDE_INT_PRINT_UNSIGNED"\n",
+                 //                 code,mode,mmin,mmax,nonzero);
           }
-          n_debug("mtcssimplifyrtx.c mtcs_simplify_rtx_const_relational_operation 100ff code:%d mode:%d"
-                        "min:"HOST_WIDE_INT_PRINT_DEC" max:"HOST_WIDE_INT_PRINT_DEC" nonzero:"HOST_WIDE_INT_PRINT_UNSIGNED"\n",
-                         code,mode,mmin,mmax,nonzero);
+          //n_debug("mtcssimplifyrtx.c mtcs_simplify_rtx_const_relational_operation 100ff code:%d mode:%d"
+                      //  "min:"HOST_WIDE_INT_PRINT_DEC" max:"HOST_WIDE_INT_PRINT_DEC" nonzero:"HOST_WIDE_INT_PRINT_UNSIGNED"\n",
+                       //  code,mode,mmin,mmax,nonzero);
 
       }
 
@@ -5431,15 +5432,15 @@ rtx mtcs_simplify_rtx_const_relational_operation (MtcsSimplifyRtx *self,enum rtx
           break;
       }
   }
-  n_debug("mtcssimplifyrtx.c mtcs_simplify_rtx_const_relational_operation 101 code:%d mode:%d\n",code,mode);
+  //n_debug("mtcssimplifyrtx.c mtcs_simplify_rtx_const_relational_operation 101 code:%d mode:%d\n",code,mode);
 
   /* Optimize integer comparisons with zero.  */
   if (mtcs_mode_is_a <scalar_int_mode> (mtcsMode,mode, &int_mode) && trueop1 == const0_rtx && !side_effects_p (trueop0)){
       /* Some addresses are known to be nonzero.  We don't know
      their sign, but equality comparisons are known.  */
-     n_debug("mtcssimplifyrtx.c mtcs_simplify_rtx_const_relational_operation 102 code:%d %s mode:%d %d\n",
-           code,GET_RTX_NAME(code),mode,mtcs_rtlanal_nonzero_address_p/*!nonzero_address_p*/(mtcsRtlanal,trueop0));
-     mtcs_print_rtl_single(stderr,trueop0);
+//     n_debug("mtcssimplifyrtx.c mtcs_simplify_rtx_const_relational_operation 102 code:%d %s mode:%d %d\n",
+//           code,GET_RTX_NAME(code),mode,mtcs_rtlanal_nonzero_address_p/*!nonzero_address_p*/(mtcsRtlanal,trueop0));
+//     mtcs_print_rtl_single(stderr,trueop0);
 
       if (mtcs_rtlanal_nonzero_address_p/*!nonzero_address_p*/(mtcsRtlanal,trueop0)){
           if (code == EQ || code == LEU)
@@ -5447,7 +5448,7 @@ rtx mtcs_simplify_rtx_const_relational_operation (MtcsSimplifyRtx *self,enum rtx
           if (code == NE || code == GTU)
             return const_true_rtx;
       }
-      n_debug("mtcssimplifyrtx.c mtcs_simplify_rtx_const_relational_operation 103 code:%d mode:%d\n",code,mode);
+     // n_debug("mtcssimplifyrtx.c mtcs_simplify_rtx_const_relational_operation 103 code:%d mode:%d\n",code,mode);
 
       /* See if the first operand is an IOR with a constant.  If so, we
      may be able to determine the result of this comparison.  */
@@ -5479,12 +5480,12 @@ rtx mtcs_simplify_rtx_const_relational_operation (MtcsSimplifyRtx *self,enum rtx
           }
       }
   }
-  n_debug("mtcssimplifyrtx.c mtcs_simplify_rtx_const_relational_operation 104 code:%d mode:%d\n",code,mode);
+//  n_debug("mtcssimplifyrtx.c mtcs_simplify_rtx_const_relational_operation 104 code:%d mode:%d\n",code,mode);
 
   /* Optimize comparison of ABS with zero.  */
   if (trueop1 == CONST0_RTX (mode) && !side_effects_p (trueop0)
       && (GET_CODE (trueop0) == ABS  || (GET_CODE (trueop0) == FLOAT_EXTEND  && GET_CODE (XEXP (trueop0, 0)) == ABS))){
-     n_debug("mtcssimplifyrtx.c mtcs_simplify_rtx_const_relational_operation 105 code:%d mode:%d\n",code,mode);
+   //  n_debug("mtcssimplifyrtx.c mtcs_simplify_rtx_const_relational_operation 105 code:%d mode:%d\n",code,mode);
 
       switch (code){
         case LT:

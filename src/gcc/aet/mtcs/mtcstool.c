@@ -26,127 +26,144 @@
 #include "target.h"
 #include "rtl.h"
 #include "tree.h"
-#include "predict.h"
+#include "gimple.h"
+#include "alloc-pool.h"
+#include "timevar.h"
 #include "memmodel.h"
 #include "tm_p.h"
-#include "stringpool.h"
-#include "regs.h"
-#include "emit-rtl.h"
+#include "optabs-libfuncs.h"
+#include "insn-config.h"
+#include "ira.h"
+#include "recog.h"
 #include "cgraph.h"
-#include "c-family/c-common.h"
-#include "diagnostic-core.h"
-#include "fold-const.h"
-#include "stor-layout.h"
+#include "coverage.h"
+#include "diagnostic.h"
 #include "varasm.h"
+#include "tree-inline.h"
+#include "realmpfr.h"   /* For GMP/MPFR/MPC versions, in print_version.  */
 #include "version.h"
 #include "flags.h"
-#include "stmt.h"
-#include "expr.h"
-#include "expmed.h"
-#include "optabs.h"
+#include "insn-attr.h"
 #include "output.h"
-#include "langhooks.h"
+#include "toplev.h"
+#include "expr.h"
+#include "intl.h"
+#include "tree-diagnostic.h"
+#include "reload.h"
+#include "lra.h"
+#include "dwarf2asm.h"
 #include "debug.h"
 #include "common/common-target.h"
+#include "langhooks.h"
+#include "cfgloop.h" /* for init_set_costs */
+#include "hosthooks.h"
+#include "opts.h"
+#include "opts-diagnostic.h"
 #include "stringpool.h"
 #include "attribs.h"
 #include "asan.h"
-#include "rtl-iter.h"
-#include "file-prefix-map.h" /* remap_debug_filename()  */
-#include "alloc-pool.h"
+#include "tsan.h"
+#include "plugin.h"
+#include "context.h"
+#include "pass_manager.h"
+#include "auto-profile.h"
+#include "dwarf2out.h"
+#include "ipa-reference.h"
+#include "symbol-summary.h"
+#include "tree-vrp.h"
+#include "sreal.h"
+#include "ipa-cp.h"
+#include "ipa-prop.h"
+#include "ipa-utils.h"
+#include "gcse.h"
+#include "omp-offload.h"
+#include "edit-context.h"
+#include "tree-pass.h"
+#include "dumpfile.h"
+#include "ipa-fnsummary.h"
+#include "dump-context.h"
+#include "print-tree.h"
+#include "optinfo-emit-json.h"
+#include "ipa-modref-tree.h"
+#include "ipa-modref.h"
+#include "ipa-param-manipulation.h"
+#include "dbgcnt.h"
+#include "gcc-urlifier.h"
+
+#include "tree-pass.h"
+#include "stringpool.h"
+#include "gimple-ssa.h"
+#include "cgraph.h"
+#include "coverage.h"
+#include "lto-streamer.h"
+#include "fold-const.h"
+#include "varasm.h"
+#include "stor-layout.h"
+#include "output.h"
+#include "cfgcleanup.h"
+#include "gimple-iterator.h"
+#include "gimple-fold.h"
+#include "gimplify.h"
+#include "gimplify-me.h"
+#include "tree-cfg.h"
+#include "tree-into-ssa.h"
+#include "tree-ssa.h"
+#include "langhooks.h"
 #include "toplev.h"
-#include "opts.h"
-#include "asan.h"
-#include "recog.h"
-#include "c-family/c-pragma.h"
-#include "c/c-parser.h"
-#include "tree-inline.h"
+#include "debug.h"
+#include "symbol-summary.h"
+#include "tree-ssanames.h"
+#include "tree-dfa.h"
+#include "tree-phinodes.h"
+#include "tree-dfa.h"
+#include "tree-ssa-live.h"
+#include "tree-outof-ssa.h"
+#include "tree-ssa-address.h"
+#include "tree-iterator.h"
+#include "ssa-iterators.h"
+#include "gimple.h"
+#include "tree-outof-ssa.h"
+#include "tree-eh.h"
+
+#include "tree-vrp.h"
+#include "sreal.h"
+#include "ipa-cp.h"
+#include "ipa-prop.h"
+#include "gimple-pretty-print.h"
+#include "plugin.h"
+#include "ipa-fnsummary.h"
+#include "ipa-utils.h"
+#include "except.h"
 #include "cfgloop.h"
+#include "context.h"
+#include "pass_manager.h"
+#include "tree-nested.h"
+#include "dbgcnt.h"
+#include "lto-section-names.h"
+#include "stringpool.h"
+#include "attribs.h"
+#include "ipa-inline.h"
+#include "omp-offload.h"
+#include "symtab-thunks.h"
+#include "ipa-reference.h"
+#include "ipa-modref-tree.h"
+#include "ipa-modref.h"
+#include "tree-ssa-operands.h"
+#include "cfghooks.h"
+
+#include "mtcstarget.h"
+#include "mtcscompile.h"
+#include "../aetprinttree.h"
+#include "../aetprintgimple.h"
+#include "../mtcsinfo.h"
+#include "mtcsprintrtl.h"
 
 #include "mtcstool.h"
 #include "mtcsasm.h"
-#include "mtcscompile.h"
-#include "../mtcsinfo.h"
 
-#include "aet/aetutils.h"
 #include "aet/aetprinttree.h"
 #include "ptx/ptxtool.h"
-
-nboolean mtcs_tool_is_mtcs_var(tree decl)
-{
-    tree att=DECL_ATTRIBUTES (decl);
-    if(!aet_utils_valid_tree(att))
-        return FALSE;
-    const char* varName=IDENTIFIER_POINTER(DECL_NAME(decl));
-    if (lookup_attribute (MTCS_DEVICE_STRING, att) || lookup_attribute (MTCS_CONSTANT_STRING, att)
-            || lookup_attribute (MTCS_SHARED_STRING, att) || lookup_attribute ("texture", att)){
-        return TRUE;
-    }
-    //如果是在核函数内，说明是local_mem,如何判断decl中核函数内?
-    return FALSE;
-}
-
-
-static tree copy_decl_maybe_to_var (tree decl, copy_body_data *id)
-{
-    printf("copy_decl_maybe_to_var -----xx %p\n",decl);
-  //if (TREE_CODE (decl) == PARM_DECL || TREE_CODE (decl) == RESULT_DECL)
-  //  return copy_decl_to_var (decl, id);
-  //else
-    return copy_decl_no_change (decl, id);
-}
-
-/**
- * 复制变量 包括rtl
- */
-tree mtcs_tool_copy_var(tree var)
-{
-    copy_body_data id;
-    tree param;
-    hash_map<tree, tree> decl_map;
-
-    memset (&id, 0, sizeof (id));
-    id.src_fn = current_function_decl;
-    id.dst_fn = current_function_decl;
-    // id.src_cfun = DECL_STRUCT_FUNCTION (fn);
-    id.decl_map = &decl_map;
-
-    id.copy_decl = copy_decl_maybe_to_var;//自定义copy var //tree-inline.h声明有两个 copy_decl_to_var;//copy_decl_no_change;
-    id.transform_call_graph_edges = CB_CGE_DUPLICATE;
-    id.transform_new_cfg = false;
-    id.transform_return_to_modify = false;
-    id.transform_parameter = true;
-    // id.transform_lang_insert_block = NULL;
-
-    /* Make sure not to unshare trees behind the front-end's back
-    since front-end specific mechanisms may rely on sharing.  */
-    id.regimplify = false;
-    id.do_not_unshare = true;
-    id.do_not_fold = false;
-    n_debug("mtcs_tool_copy_var -----xx current_function_decl:%p\n",current_function_decl);
-
-    /* We're not inside any EH region.  */
-    id.eh_lp_nr = 0;
-   // tree srcVar=var;
-    //tree newVar =remap_decl(var,&id);//copy_decl_no_change(var,&id);
-    tree newVar = copy_node (var);
-
-    //walk_tree (&srcVar, copy_tree_body_r, &id, NULL);
-   // tree newVar =srcVar;
-    n_debug("mtcs_tool_copy_var 原始: newVar:%p orig:%p\n",newVar,var);
-    n_debug("mtcs_tool_copy_var 新:\n");
-    rtx origDeclRtl=DECL_WRTL_CHECK (var)->decl_with_rtl.rtl;
-    if(origDeclRtl){
-        n_debug("新变量在的rtx :%p\n",DECL_WRTL_CHECK (newVar)->decl_with_rtl.rtl);
-        rtx newRtx=copy_rtx(origDeclRtl);
-        print_rtl(stderr,origDeclRtl);
-        fprintf(stderr,"\n");
-        print_rtl(stderr,newRtx);
-        fprintf(stderr,"\n");
-        DECL_WRTL_CHECK (var)->decl_with_rtl.rtl=newRtx;
-    }
-    return newVar;
-}
+#include "mtcstree.h"
 
 void  mtcs_tool_print_cfun_loop()
 {
@@ -196,61 +213,209 @@ char    *mtcs_tool_create_asm_varname(char *platform,int isa,int version,char *f
       return ret;
    }
 }
+
+
 /**
  * 解析从gcc.cc写入的mtcs参数
- * -mtcs=sm_75,ptx
+ * -mtcs=ptx:sm_52@7.8,sm_75@7.8
  * platfomr 平台 0 ptx 1 gcn 2...
  */
-int mtcs_tool_get_isa_and_version(int **isaAndVersion,int platform)
-{
-   static const char *SEPARATION="#$%"; //与gcc.cc中 setAetArgv函数中定义的相同
-   char *version=getenv ("GCC_AET_MTCS_ARGV");
-   if(version==NULL)
-      return 0;
-   n_debug("从编译参数'-mtcs'传递平台版本号 version:%s\n",version);
-   char** items= n_strsplit(version,SEPARATION,-1);
-   int len=n_strv_length(items);
-   int i,j;
-   int count=0;
-   for(i=0;i<len;i++){
-      char *ret=items[i];
-      if(!ret || strlen(ret)<=6 || strncmp(ret,"-mtcs=",6))
-         continue;
+#define MAX_TARGETS 8
+#define MAX_ARCHS   32
 
-      char *data=ret+6;
-      int size=strlen(data);
-      int pos=-1;
-      for(j=0;j<size;j++)
-         if(data[j]==','){
-            pos=j;
-            break;
-         }
-      char first[size];
-      char *second=NULL;
-      int result[2];
-      nboolean ok=FALSE;
-      if(pos!=-1){
-         strncpy(first,data,pos);
-         first[pos]='\0';
-         second=data+pos+1;
-         ok = ptx_tool_get_isa_and_version(first,second,result);
-      }else{
-         ok =ptx_tool_get_isa_and_version(data,second,result);
-      }
-      if(ok){
-         //检查是否有重复的
-         int z;
-         nboolean repeat=FALSE;
-         for(z=0;z<count;z++){
-            if(isaAndVersion[z][0]==result[0] && isaAndVersion[z][1]==result[1]){
-               repeat=TRUE;
-               break;
+typedef struct {
+   char name[32];
+   struct {
+      char name[32];
+      int major;
+      int minor;
+   } archs[MAX_ARCHS];
+   int arch_count;
+} TargetData;
+
+
+typedef struct
+{
+   TargetData targets[MAX_TARGETS];
+   int target_count;
+} TargetConfig;
+
+static nboolean parse_version(char *str, int *major, int *minor)
+{
+   char *endchar;
+   char *dot = strchr(str,'.');
+   if (!dot){
+      *major = strtol(str,&endchar,10);
+      if (*major == 0 && str[0] != '0')
+         return FALSE;
+      *minor = 0;
+      return TRUE;
+   }
+   *dot = 0;
+   // 不允许多个 '.'
+   if (strchr(dot + 1,'.'))
+      return FALSE;
+   if (*str == 0 || *(dot+1)==0)
+      return FALSE;
+   *major = strtol(str,&endchar,10);
+   *minor = strtol(dot+1,&endchar,10);
+   return TRUE;
+}
+
+
+static nboolean parse_arch(char *text,TargetData *target)
+{
+   if (*text == 0)
+      return FALSE;
+   if (target->arch_count >= MAX_ARCHS)
+      return FALSE;
+   char *at = strchr(text,'@');
+   int major = 0;
+   int minor = 0;
+   if (at){
+      *at = 0;
+      // 防止 sm_50@7.5@1
+      if (strchr(at+1,'@'))
+         return FALSE;
+      if (!parse_version(at+1,&major,&minor))
+         return FALSE;
+   }
+   // arch 名不能为空
+   if (*text == 0)
+      return FALSE;
+   strcpy(target->archs[target->arch_count].name,text);
+   target->archs[target->arch_count].major = major;
+   target->archs[target->arch_count].minor = minor;
+   target->arch_count++;
+   return TRUE;
+}
+
+static nboolean parse_target(char *text, TargetData *target)
+{
+    char *colon = strchr(text,':');
+    if (!colon)
+        return FALSE;
+    *colon = 0;
+    // backend不能为空
+    if (*text == 0)
+        return FALSE;
+    strcpy(target->name,text);
+    char *arch_list = colon + 1;
+    if (*arch_list == 0)
+        return FALSE;
+    char *saveptr;
+    char *arch = strtok_r(arch_list, ",", &saveptr);
+    int count = 0;
+    while (arch){
+        if (!parse_arch(arch,target))
+            return FALSE;
+        count++;
+        arch = strtok_r(NULL, ",", &saveptr);
+    }
+    // 防止 "ptx:,"
+    if (count == 0)
+        return FALSE;
+    return TRUE;
+}
+
+
+static nboolean parse_mtcs_target(char *option,TargetConfig *config)
+{
+   memset(config,0,sizeof(*config));
+   char *eq=strchr(option,'=');
+   if (!eq || *(eq+1)==0)
+      return FALSE;
+   char *value=eq+1;
+   char *saveptr;
+   char *target=strtok_r(value, ";", &saveptr);
+   int count=0;
+   while(target){
+      if (config->target_count >= MAX_TARGETS)
+         return FALSE;
+      if (!parse_target(target, &config->targets[config->target_count]))
+         return FALSE;
+      config->target_count++;
+      count++;
+      target=strtok_r(NULL, ";", &saveptr);
+   }
+
+   if(count==0)
+      return FALSE;
+   return TRUE;
+}
+
+static nboolean check_duplicate_arch(TargetConfig *config)
+{
+   for (int i = 0; i < config->target_count; i++){
+      TargetData *target = &config->targets[i];
+      for (int j = 0; j < target->arch_count; j++){
+         for (int k = j + 1; k < target->arch_count; k++){
+            if (strcmp(target->archs[j].name,target->archs[k].name) == 0){
+               /*
+               * 同一个 ISA
+               */
+               if (target->archs[j].major == target->archs[k].major
+               && target->archs[j].minor == target->archs[k].minor){
+                  error("duplicate mtcs target: %s:%s@%d.%d\n",
+                     target->name,
+                     target->archs[j].name,
+                     target->archs[j].major,
+                     target->archs[j].minor);
+
+               }else{
+                  error("conflicting mtcs target: %s:%s has different ptx version %d.%d and %d.%d\n",
+                     target->name,
+                     target->archs[j].name,
+                     target->archs[j].major,
+                     target->archs[j].minor,
+                     target->archs[k].major,
+                     target->archs[k].minor);
+               }
+               return FALSE;
             }
          }
-         if(!repeat){
-            isaAndVersion[count][0]=result[0];
-            isaAndVersion[count][1]=result[1];
-            count++;
+      }
+   }
+   return TRUE;
+}
+
+static nboolean findVersionInfo(int target,int isa,int version,int **mtcsVersionInfo,int len)
+{
+   for(int i=0;i<len;i++){
+      int *temp=mtcsVersionInfo[i];
+      if(temp[0]==target && temp[1]==isa && temp[2]==version)
+         return TRUE;
+   }
+   return FALSE;
+}
+
+static int  convertIsaAndPtxVersion(TargetConfig *config,int **mtcsVersionInfo)
+{
+   int count = 0;
+   for(int i=0;i<config->target_count;i++){
+      TargetData *t=&config->targets[i];
+      if(!strcmp(t->name,"ptx")){
+         printf("target=%s\n",t->name);
+         for(int j=0;j<t->arch_count;j++){
+            int isa = 0;
+            int version = 0;
+            nboolean ret =  ptx_tool_get_isa_and_version(t->archs[j].name,t->archs[j].major,
+                     t->archs[j].minor,&isa,&version);
+            if(!ret){
+               error("编译参数中的架构与ptx版本不匹配 target:%s isa:%s ptx version %d.%d\n",
+                  t->name,
+                  t->archs[j].name,
+                  t->archs[j].major,
+                  t->archs[j].minor);
+               return 0;
+            }
+            if(!findVersionInfo(TARGET_PTX,isa,version,mtcsVersionInfo,count)){
+               int *temp=  mtcsVersionInfo[count];
+               temp[0] = TARGET_PTX;
+               temp[1] = isa;
+               temp[2] = version;
+               count++;
+            }
          }
       }
    }
@@ -258,4 +423,48 @@ int mtcs_tool_get_isa_and_version(int **isaAndVersion,int platform)
 }
 
 
-
+int mtcs_tool_parser_mtcs_option(int **mtcsVersionInfo)
+{
+   //example: "-mtcs=ptx:sm_50,sm_75@7.3sms;gcn:gcn_32@7.5";
+   static const char *SEPARATION="#$%"; //与gcc.cc中 setAetArgv函数中定义的相同
+   char *options=getenv ("GCC_AET_MTCS_ARGV");
+   if(options==NULL)
+      return 0;
+   char *option = NULL;
+   char** items= n_strsplit(options,SEPARATION,-1);
+   int len=n_strv_length(items);
+   int count=0;
+   for(int i=0;i<len;i++){
+      char *ret=items[i];
+      if(ret && strlen(ret)>=6 && !strncmp(ret,"-mtcs=",6)){
+         option = n_strdup(ret);
+         break;
+      }
+   }
+   n_strfreev(items);
+   if(option==NULL)
+      return 0;
+   n_debug("编译参数'-mtcs':%s\n",option);
+   TargetConfig config;
+   nboolean ret = parse_mtcs_target(option,&config);
+   if(!ret){
+      error("invalid -mtcs option: %s",option);
+      return 0;
+   }
+   for(int i=0;i<config.target_count;i++){
+      TargetData *t=&config.targets[i];
+      printf("target=%s\n",t->name);
+      for(int j=0;j<t->arch_count;j++){
+         printf("  %s %d.%d\n",
+             t->archs[j].name,
+             t->archs[j].major,
+             t->archs[j].minor);
+      }
+   }
+   free(option);
+   if (!check_duplicate_arch(&config)){
+      return 0;
+   }
+   //todo 需要合并一目标，现在暂时不实现。
+   return convertIsaAndPtxVersion(&config,mtcsVersionInfo);
+}

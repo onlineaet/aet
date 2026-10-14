@@ -285,7 +285,6 @@ static void decide_unrolling (MtcsLoopUnroll *self,int flags)
       if (loop->lpt_decision.decision == LPT_NONE)
          decide_unroll_stupid(self,loop, flags);
       n_debug("mtcsloopunroll.c decide_unrolling 66 flags:%d loop->unroll:%d decision:%d\n",flags,loop->unroll,loop->lpt_decision.decision);
-
       report_unroll(self,loop, locus);
    }
 }
@@ -698,13 +697,11 @@ static void decide_unroll_runtime_iterations (MtcsLoopUnroll *self,class loop *l
    if (mtcsTarget/*!targetm.loop_unroll_adjust*/->loop_unroll_adjust){
       nunroll = mtcsTarget/*!targetm.loop_unroll_adjust*/->loop_unroll_adjust(mtcsTarget,nunroll, loop);
       n_debug("mtcsloopunroll.c decide_unroll_runtime_iterations 33 %d \n",nunroll);
-
    }
 
    if (loop->unroll > 0 && loop->unroll < USHRT_MAX){
       nunroll = loop->unroll;
       n_debug("mtcsloopunroll.c decide_unroll_runtime_iterations 44 %d \n",nunroll);
-
    }
 
    /* Skip big loops.  */
@@ -712,7 +709,6 @@ static void decide_unroll_runtime_iterations (MtcsLoopUnroll *self,class loop *l
       if (dump_file)
          fprintf (dump_file, ";; Not considering loop, is too big\n");
       n_debug(";; Not considering loop, is too big\n");
-
       return;
    }
 
@@ -746,15 +742,20 @@ static void decide_unroll_runtime_iterations (MtcsLoopUnroll *self,class loop *l
 
       return;
    }
+   n_debug("before decision: nunroll=%u i=%u\n", nunroll, i);
 
    /* Success; now force nunroll to be power of 2, as code-gen
    requires it, we are unable to cope with overflows in
    computation of number of iterations.  */
    for (i = 1; 2 * i <= nunroll; i *= 2)
       continue;
+   n_debug("after power-of-two loop: nunroll=%u i=%u\n",
+           nunroll, i);
 
    loop->lpt_decision.decision = LPT_UNROLL_RUNTIME;
    loop->lpt_decision.times = i - 1;
+   n_debug("after decision: times=%u\n",
+           loop->lpt_decision.times);
 }
 
 /* Splits edge E and inserts the sequence of instructions INSNS on it, and
@@ -993,8 +994,10 @@ static void unroll_loop_runtime_iterations (MtcsLoopUnroll *self,class loop *loo
          niter, mtcs_rtl_gen_int_mode/*!gen_int_mode*/(mtcsRTL,max_unroll, desc->mode),NULL_RTX, 0, OPTAB_LIB_WIDEN);
    init_code = mtcs_rtl_data_get_insns/*!get_insns*/(mtcsRtlData);
    mtcs_emit_end_sequence/*!end_sequence*/(mtcsEmit);
-   n_debug("mtcsloopunroll.c unroll_loop_runtime_iterations 00yy 打印 last desc->mode:%d\n",desc->mode);
+   n_debug("mtcsloopunroll.c unroll_loop_runtime_iterations 00yy 打印 last desc->mode:%d max_unroll:%d\n",
+         desc->mode,max_unroll);
    printLast(self);
+   mtcs_print_rtl(stderr,niter);
    mtcs_rtl_unshare_all_rtl_in_chain/*!unshare_all_rtl_in_chain*/(mtcsRTL,init_code);
    /* Precondition the loop.  */
    split_edge_and_insert(self,loop_preheader_edge (loop), init_code);
@@ -1029,10 +1032,16 @@ static void unroll_loop_runtime_iterations (MtcsLoopUnroll *self,class loop *loo
    /* Compute count increments for each switch block and initialize
    innermost switch block.  Switch blocks and peeled loop copies are built
    from innermost outward.  */
-   n_debug("mtcsloopunroll.c unroll_loop_runtime_iterations 33 swtch->count:%d max_unroll:%d\n",swtch->count,max_unroll);
    iter_count = new_count = swtch->count / (max_unroll + 1);
    swtch->count = new_count;
    printLast(self);
+   n_debug("mtcsloopunroll.c unroll_loop_runtime_iterations 33 swtch->count:%d max_unroll:%d\n",
+         swtch->count,max_unroll,new_count);
+
+   n_debug("mtcsloopunroll.c runtime unroll: n_peel=%d extra_zero_check=%d "
+           "last_may_exit=%d\n",
+           n_peel, extra_zero_check, last_may_exit);
+   mtcs_print_rtl(stderr,niter);
 
    for (i = 0; i < n_peel; i++){
       /* Peel the copy.  */
@@ -1059,7 +1068,7 @@ static void unroll_loop_runtime_iterations (MtcsLoopUnroll *self,class loop *loo
       /* Add in count of edge from switch block.  */
       preheader->count += iter_count;
       branch_code = compare_and_jump_seq(self,copy_rtx (niter),
-      mtcs_rtl_gen_int_mode/*!gen_int_mode*/(mtcsRTL,j, desc->mode), EQ,
+               mtcs_rtl_gen_int_mode/*!gen_int_mode*/(mtcsRTL,j, desc->mode), EQ,
       block_label (preheader), p, NULL);
 
       /* We rely on the fact that the compare and jump cannot be optimized out,
@@ -1071,8 +1080,8 @@ static void unroll_loop_runtime_iterations (MtcsLoopUnroll *self,class loop *loo
       single_succ_edge (swtch)->probability = p.invert ();
       new_count += iter_count;
       swtch->count = new_count;
-      e = mtcs_cfg_make_edge/*!make_edge*/(mtcsCfg,swtch, preheader,
-      single_succ_edge (swtch)->flags & EDGE_IRREDUCIBLE_LOOP);
+      e = mtcs_cfg_make_edge/*!make_edge*/(mtcsCfg,
+            swtch, preheader,single_succ_edge (swtch)->flags & EDGE_IRREDUCIBLE_LOOP);
       e->probability = p;
    }
 

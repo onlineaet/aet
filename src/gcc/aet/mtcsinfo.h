@@ -91,6 +91,11 @@ nboolean    mtcs_info_is_builtin_fn(tree fndecl);
 
 nboolean     mtcs_info_is_visible(tree decl);
 tree         mtcs_info_create_kernel_name(char *orig);
+nboolean     mtcs_info_is_intrinsic_function_decl(tree fndecl);
+// intrinsic 函数实现
+nboolean     mtcs_info_is_intrinsic_function_impl(tree fndecl);
+char        *mtcs_info_get_intrinsic_target(tree fndecl);
+char        *mtcs_info_get_intrinsic_isa(tree fndecl);
 
 static inline void  mtcs_info_create_kernel_name(char *orig,char *name)
 {

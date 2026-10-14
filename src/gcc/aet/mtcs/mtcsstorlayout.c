@@ -653,7 +653,7 @@ void mtcs_stor_layout_layout_type (MtcsStorLayout *self ,tree type)
          TYPE_UNSIGNED (type) = 1;
          TYPE_PRECISION (type) = mtcs_mode_get_precision/*!GET_MODE_PRECISION*/(mtcsMode,mode);
       }
-      break;
+         break;
 
       case ARRAY_TYPE:
       {
@@ -682,8 +682,10 @@ void mtcs_stor_layout_layout_type (MtcsStorLayout *self ,tree type)
                && TREE_CODE (ub) == INTEGER_CST
                && TYPE_UNSIGNED (TREE_TYPE (lb))
                && tree_int_cst_lt (ub, lb)){
-                  lb = mtcs_tree_wide_int_to_tree/*!wide_int_to_tree*/(mtcsTree,ssizetype,offset_int::from (wi::to_wide (lb),SIGNED));
-                  ub = mtcs_tree_wide_int_to_tree/*!wide_int_to_tree*/(mtcsTree,ssizetype,offset_int::from (wi::to_wide (ub),SIGNED));
+                  lb = mtcs_tree_wide_int_to_tree/*!wide_int_to_tree*/
+                        (mtcsTree,ssizetype,offset_int::from (wi::to_wide (lb),SIGNED));
+                  ub = mtcs_tree_wide_int_to_tree/*!wide_int_to_tree*/
+                        (mtcsTree,ssizetype,offset_int::from (wi::to_wide (ub),SIGNED));
                }
                length = mtcs_const_fold_convert/*!fold_convert*/(mtcsConst,
                      sizetype, mtcs_const_size_binop/*!size_binop*/(mtcsConst,PLUS_EXPR,
@@ -858,7 +860,8 @@ void mtcs_stor_layout_fixup_unsigned_type (MtcsStorLayout *self,tree type)
 {
   int precision = TYPE_PRECISION (type);
   TYPE_UNSIGNED (type) = 1;
-  set_min_and_max_values_for_integral_type (type, precision, UNSIGNED);
+  mtcs_stor_layout_set_min_and_max_values_for_integral_type/*!set_min_and_max_values_for_integral_type*/
+     (self,type, precision, UNSIGNED);
   /* Lay out the type: set its alignment, size, etc.  */
   mtcs_stor_layout_layout_type/*!layout_type*/(self,type);
 }
@@ -870,12 +873,41 @@ void mtcs_stor_layout_fixup_unsigned_type (MtcsStorLayout *self,tree type)
 void mtcs_stor_layout_fixup_signed_type (MtcsStorLayout *self,tree type)
 {
   int precision = TYPE_PRECISION (type);
-  set_min_and_max_values_for_integral_type (type, precision, SIGNED);
+  mtcs_stor_layout_set_min_and_max_values_for_integral_type/*!set_min_and_max_values_for_integral_type*/
+     (self,type, precision, SIGNED);
   /* Lay out the type: set its alignment, size, etc.  */
   mtcs_stor_layout_layout_type/*!layout_type*/(self,type);
 }
 
+/* TYPE is an integral type, i.e., an INTEGRAL_TYPE, ENUMERAL_TYPE
+   or BOOLEAN_TYPE.  Set TYPE_MIN_VALUE and TYPE_MAX_VALUE
+   for TYPE, based on the PRECISION and whether or not the TYPE
+   IS_UNSIGNED.  PRECISION need not correspond to a width supported
+   natively by the hardware; for example, on a machine with 8-bit,
+   16-bit, and 32-bit register modes, PRECISION might be 7, 23, or
+   61.  */
+//原型 set_min_and_max_values_for_integral_type stor-layout.h stor-layout.cc
+void mtcs_stor_layout_set_min_and_max_values_for_integral_type (MtcsStorLayout *self,
+      tree type,int precision,signop sgn)
+{
+   MtcsMode *mtcsMode=MTCS_GET_MODE_OBJECT(self);
+   MtcsTarget *mtcsTarget=(MtcsTarget *)mtcsMode->target;
+   MtcsAlign   *mtcsAlign=mtcs_target_get_align(mtcsTarget);
+   MtcsTree *mtcsTree = mtcs_target_get_tree(mtcsTarget);
 
+   /* For bitfields with zero width we end up creating integer types
+   with zero precision.  Don't assign any minimum/maximum values
+   to those types, they don't have any valid value.  */
+   if (precision < 1)
+      return;
+
+   gcc_assert (precision <= WIDE_INT_MAX_PRECISION);
+
+   TYPE_MIN_VALUE (type) = mtcs_tree_wide_int_to_tree/*!wide_int_to_tree*/(mtcsTree,
+         type, wi::min_value (precision, sgn));
+   TYPE_MAX_VALUE (type) = mtcs_tree_wide_int_to_tree/*!wide_int_to_tree*/(mtcsTree,
+         type, wi::max_value (precision, sgn));
+}
 
 /* Assuming that all the fields have been laid out, this function uses
    RLI to compute the final TYPE_SIZE, TYPE_ALIGN, etc. for the type

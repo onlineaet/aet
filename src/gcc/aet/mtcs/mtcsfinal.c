@@ -754,15 +754,15 @@ static void final_1 (MtcsFinal *self,rtx_insn *first, int seen, int optimize_p)
 //      pretty_printer pp;
 //      pp.buffer->stream = stderr;
 //      print_insn(&pp,insn,false);
-      mtcs_print_rtl_single(stderr,insn);
-      n_debug("\n mtcsfinal.c final_1 66aa printrtl end\n");
+      //mtcs_print_rtl_single(stderr,insn);
+      //n_debug("\n mtcsfinal.c final_1 66aa printrtl end\n");
 
       dump_basic_block_info(self,mtcsAsm->asmFile, insn, start_to_bb, end_to_bb,bb_map_size, &bb_seqn);
       insn = mtcs_final_final_scan_insn (self,insn, optimize_p, 0, &seen);
   }
-  n_debug("mtcsfinal.c final_1 100\n");
+ // n_debug("mtcsfinal.c final_1 100\n");
   maybe_output_next_view (self,&seen);
-  n_debug("mtcsfinal.c final_1 101\n");
+  //n_debug("mtcsfinal.c final_1 101\n");
   if (mtcsOptionsItem->x_flag_debug_asm){
       n_debug("mtcsfinal.c final_1 102\n");
       free (start_to_bb);
@@ -772,7 +772,7 @@ static void final_1 (MtcsFinal *self,rtx_insn *first, int seen, int optimize_p)
   for (insn = first; insn; insn = next){
       next = NEXT_INSN (insn);
       if (NOTE_P (insn) && (NOTE_KIND (insn) == NOTE_INSN_CFI || NOTE_KIND (insn) == NOTE_INSN_CFI_LABEL)){
-          n_debug("mtcsfinal.c final_1 103\n");
+          //n_debug("mtcsfinal.c final_1 103\n");
 
           mtcs_cfg_rtl_delete_insn/*!delete_insn*/(mtcsCfgRtl,insn);
       }
@@ -1262,8 +1262,9 @@ output_source_line:
             DECL_IGNORED_P (current_function_decl),notice_source_line (self,insn, is_stmt_p),*is_stmt_p);
             maybe_output_next_view (self,seen);
          }
-
+         n_debug("mtcsfinal.c final_scan_insn_1 109-20xxx");
          gcc_checking_assert (!DEBUG_INSN_P (insn));
+         n_debug("mtcsfinal.c final_scan_insn_1 109-20xxxeeee");
 
          if (GET_CODE (body) == PARALLEL && GET_CODE (XVECEXP (body, 0, 0)) == ASM_INPUT){
             n_debug("mtcsfinal.c final_scan_insn_1 109-21--  if (GET_CODE (body) == PARALLEL "
@@ -1294,6 +1295,7 @@ output_source_line:
             }
             break;
          }
+         n_debug("mtcsfinal.c final_scan_insn_1 109-20xxxgggg");
 
          /* Detect `asm' construct with operands.  */
          if (asm_noperands (body) >= 0){
@@ -1347,6 +1349,7 @@ output_source_line:
             mtcsOutput->this_is_asm_operands = 0;
             break;
          }
+         n_debug("mtcsfinal.c final_scan_insn_1 109-20xxxggggxdss");
 
          mtcs_final_app_disable(self);
          n_debug("mtcsfinal.c final_scan_insn_1 109-30--\n");
@@ -1765,21 +1768,21 @@ rtx_insn *mtcs_final_final_scan_insn (MtcsFinal *self,rtx_insn *insn, int optimi
   gcc_assert (seen || recursion_counter);
   gcc_assert (!recursion_counter || !seen || seen == enclosing_seen);
 
-  n_debug("mtcsfinal.c mtcs_final_final_scan_insn 00 optimize_p:%d nopeepholes:%d seen:%d recursion_counter:%d\n",
-          optimize_p,nopeepholes,*seen,recursion_counter);
-  mtcs_print_rtl(stderr,insn);
+  //n_debug("mtcsfinal.c mtcs_final_final_scan_insn 00 optimize_p:%d nopeepholes:%d seen:%d recursion_counter:%d\n",
+         // optimize_p,nopeepholes,*seen,recursion_counter);
+  //mtcs_print_rtl(stderr,insn);
 
   if (!recursion_counter++){
     enclosing_seen = seen;
-    n_debug("mtcsfinal.c mtcs_final_final_scan_insn 11 recursion_counter:%d\n",recursion_counter);
+   // n_debug("mtcsfinal.c mtcs_final_final_scan_insn 11 recursion_counter:%d\n",recursion_counter);
   }else if (!seen){
-      n_debug("mtcsfinal.c mtcs_final_final_scan_insn 22 !seen: enclosing_seen:%d\n",*enclosing_seen);
+      //n_debug("mtcsfinal.c mtcs_final_final_scan_insn 22 !seen: enclosing_seen:%d\n",*enclosing_seen);
       seen = enclosing_seen;
   }
-  n_debug("mtcsfinal.c mtcs_final_final_scan_insn 33 开始 scan_insn_1 recursion_counter:%d\n",recursion_counter);
-  mtcs_print_rtl_single(stderr,insn);
+ // n_debug("mtcsfinal.c mtcs_final_final_scan_insn 33 开始 scan_insn_1 recursion_counter:%d\n",recursion_counter);
+  //mtcs_print_rtl_single(stderr,insn);
   rtx_insn *ret = final_scan_insn_1 (self,insn,  optimize_p, nopeepholes, seen);
-  n_debug("mtcsfinal.c mtcs_final_final_scan_insn 44 结束 scan_insn_1 ret:%p\n",ret);
+ //n_debug("mtcsfinal.c mtcs_final_final_scan_insn 44 结束 scan_insn_1 ret:%p\n",ret);
 
   if (!--recursion_counter)
     enclosing_seen = NULL;

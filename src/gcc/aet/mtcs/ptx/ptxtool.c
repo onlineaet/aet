@@ -231,6 +231,32 @@ const char *ptx_tool_sm_version_to_string (PtxIsa sm)
    }
 }
 
+const char *ptx_tool_get_sm_string (PtxIsa sm)
+{
+   switch (sm){
+      case MTCS_PTX_ISA_SM_30:
+         return "sm_30";
+      case MTCS_PTX_ISA_SM_35:
+         return "sm_35";
+      case MTCS_PTX_ISA_SM_37:
+         return "sm_37";
+      case MTCS_PTX_ISA_SM_52:
+         return "sm_52";
+      case MTCS_PTX_ISA_SM_53:
+         return "sm_53";
+      case MTCS_PTX_ISA_SM_70:
+         return "sm_70";
+      case MTCS_PTX_ISA_SM_75:
+         return "sm_75";
+      case MTCS_PTX_ISA_SM_80:
+         return "sm_80";
+      case MTCS_PTX_ISA_SM_89:
+         return "sm_89";
+      default:
+         gcc_unreachable ();
+   }
+}
+
 static int getIsa(char *arg)
 {
    if(arg==NULL || strlen(arg)<4)
@@ -259,6 +285,15 @@ static int getIsa(char *arg)
    else
       return -1;
 }
+
+/**
+ * 字符串返回isa版本号
+ */
+int  ptx_tool_get_isa (const char *sm)
+{
+   return getIsa(sm);
+}
+
 
 /**
  * PTX ISA 版本
@@ -299,42 +334,37 @@ nboolean ptx_tool_valid_isa_version (PtxIsa isa,PtxVersion version)
 
 /**
  * 编译器gcc收集到的运行参数如下：
- * -mtcs=sm_50,3.1
+ * 从编译参数 -mtcs=ptx:sm_52@7.8,sm_75@7.8解析后得到
+ * isaStr="sm_52"
+ * major = 7
+ * minor = 8
+ * 返回系统给出的isa和ptx version
  */
-nboolean ptx_tool_get_isa_and_version(char *first,char *second,int *result)
+nboolean ptx_tool_get_isa_and_version(char *isaStr,int major,int minor,int *pisa,int *pversion)
 {
-   if(first==NULL && second==NULL)
+   if(isaStr==NULL)
       return FALSE;
-   int isa1=getIsa(first);
-   int isa2=getIsa(second);
-   int isa,version;
-   nboolean ok=FALSE;
-   if(isa1>0){
-     version = getVersion(second);
-     if(version==-1){
-        version = ptx_tool_get_default_version(isa1);
-     }
-     isa=isa1;
-     ok=TRUE;
-   }else if(isa2>0){
-      version = getVersion(first);
-      if(version==-1){
-         version = ptx_tool_get_default_version(isa2);
-      }
-      isa=isa2;
-      ok=TRUE;
+   int isa=getIsa(isaStr);
+   if(isa==-1)
+      return FALSE;
+   int version = -1;
+   if(major==0){
+      version = ptx_tool_get_default_version(isa);
+   }else{
+      char ptxVersion[12];
+      sprintf(ptxVersion,"%d.%d",major,minor);
+      version = getVersion(ptxVersion);
    }
-   if(ok){
-       PtxVersion first = ptx_tool_get_first_version_supporting_sm ((PtxIsa)isa);
-       if (!ptx_tool_valid_isa_version((PtxIsa)isa,(PtxVersion)version)){
-         // error ("PTX version (%<-mptx%>) needs to be at least %s to support selected"
-              //     " %<-misa%> (sm_%s)", ptx_tool_version_to_string (first),
-                //   ptx_tool_sm_version_to_string ((PtxIsa)isa));
-          return FALSE;
-       }
-       result[0]=isa;
-       result[1]=version;
-   }
-   return ok;
+   if(version==-1)
+      return FALSE;
 
+   if (!ptx_tool_valid_isa_version((PtxIsa)isa,(PtxVersion)version)){
+      // error ("PTX version (%<-mptx%>) needs to be at least %s to support selected"
+      //     " %<-misa%> (sm_%s)", ptx_tool_version_to_string (first),
+      //   ptx_tool_sm_version_to_string ((PtxIsa)isa));
+      return FALSE;
+   }
+   *pisa =isa;
+   *pversion=version;
+   return TRUE;
 }

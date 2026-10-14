@@ -142,6 +142,17 @@
 #include "tree-ssanames.h"
 #include "cfghooks.h"
 
+
+#include "basic-block.h"
+#include "cfg.h"
+#include "tree-cfg.h"
+#include "tree-ssa.h"
+#include "gimple.h"
+#include "gimple-iterator.h"
+#include "ssa.h"
+#include "tree-phinodes.h"
+#include "cgraph.h"
+
 #include "../aetprinttree.h"
 #include "../aetprintgimple.h"
 #include "../mtcsinfo.h"
@@ -241,7 +252,6 @@ static void mtcsCompileInit(MtcsCompile *self)
     self->targetCount=0;
     self->haveMtcsFuncOrVar=FALSE;
     self->running=FALSE;
-    self->undecidedVarArray=n_ptr_array_new();
     self->mtcsAdjustPass=mtcs_adjust_pass_new();
     initMediator(self);
 }
@@ -414,16 +424,11 @@ static void doCompile(MtcsCompile *self)
         // 原型 init_final (main_input_filename);
         mtcs_final_init_final(mtcsFinal,main_input_filename);
        // coverage_init (aux_base_name);
-        n_debug("mtcscompile.c do_compile 22  mtcs_port_port\n");
         mtcs_port_port(mtcsPort);
-        n_debug("mtcscompile.c do_compile 33 bitsizetype:%p\n",bitsizetype);
         MtcsRTL  *mtcsRTL=mtcs_target_get_rtl(mtcsTarget);
         MtcsTree  *mtcsTree=mtcs_target_get_tree(mtcsTarget);
-
         mtcsMode->mtcsBackupRestore.backup(&mtcsMode->mtcsBackupRestore);//备份主机的mode
         mtcsRTL->mtcsBackupRestore.backup(&mtcsRTL->mtcsBackupRestore);//备份主机的RTL
-
-        mtcs_port_replace_bitsizetype(mtcsPort);//重要方法
         mtcsTree->mtcsBackupRestore.backup(&mtcsTree->mtcsBackupRestore);//备份设备的tree覆盖主机的global_trees
         mtcs_tree_backup_builtin_info(mtcsTree);
         n_debug("mtcscompile.c do_compile 44 重要的 expand_all_functions 开始\n");
@@ -446,7 +451,6 @@ static void doCompile(MtcsCompile *self)
         mtcs_tree_restore_builtin_info(mtcsTree);
         mtcsRTL->mtcsBackupRestore.restore(&mtcsRTL->mtcsBackupRestore);//恢复主机的RTL
         mtcsMode->mtcsBackupRestore.restore(&mtcsMode->mtcsBackupRestore);//恢复主机的mode
-        mtcs_port_restore_bitsizetype(mtcsPort);//重要，否则aet_print_tree 会报错
     }
     //关闭汇编文件
     mtcs_asm_close(mtcsAsm);
@@ -499,7 +503,6 @@ static void mark_functions_to_output (MtcsCompile *self)
                   || node->clones
                   || DECL_ARTIFICIAL (decl)
                   || DECL_EXTERNAL (decl));
-
       }
   }
 
@@ -632,85 +635,12 @@ static void expand_all_functions(MtcsCompile *self)
 static symbol_table *hostSymtab;
 static void symtabBackup()
 {
-       hostSymtab=symtab;
+   hostSymtab=symtab;
 }
 
 static void symtabRestore()
 {
    symtab=hostSymtab;
-}
-
-
-static varpool_node *getUndecideVar(MtcsCompile *self,tree decl)
-{
-   int i;
-   for(i=0;i<self->undecidedVarArray->len;i++){
-      varpool_node *item=n_ptr_array_index(self->undecidedVarArray,i);
-      if(item->decl==decl){
-         return item;
-      }
-   }
-   return NULL;
-}
-
-/**
- * 收集MTCS是否引用不是MTCS变量，而是由内部声明的全局变量。
- */
-static void collectUnDecideVars(MtcsCompile *self,struct cgraph_node *clone,NPtrArray *undecideVars)
-{
-   tree fndecl=  clone->decl;
-   struct function *nodeFun;
-   nodeFun = DECL_STRUCT_FUNCTION (fndecl);
-   basic_block bb;
-   FOR_EACH_BB_FN (bb, nodeFun){
-      gimple_stmt_iterator gsi;
-      for (gsi = gsi_start_bb (bb); !gsi_end_p (gsi); gsi_next (&gsi)){
-         gimple *stmt = gsi_stmt (gsi);
-         enum gimple_code code = gimple_code (stmt);
-         if(code==GIMPLE_ASSIGN){
-            gassign *assignStmt = as_a <gassign *> (stmt);
-            tree rhs=gimple_assign_rhs1 (assignStmt);
-            if(rhs && TREE_CODE(rhs)==ARRAY_REF){
-               n_debug("mtcscompile.c collectUnDecideVars 检查是否引用了内部声明的全局变量CSWTCH\n");
-               tree op=TREE_OPERAND(rhs,0);
-               varpool_node *item=getUndecideVar(self,op);
-               if(item!=NULL && !n_ptr_array_find(undecideVars,item,NULL)){
-                  n_ptr_array_add(undecideVars,item);
-               }
-               aet_print_tree(op);
-            }
-         }
-      }
-   }
-}
-
-/**
- * 追加由于优化产生的全局变量，例如 CSWTCH.1 等
- */
-static void appendUndecideVar(MtcsCompile *self)
-{
-   int i,j;
-   NPtrArray *unDecideVars=n_ptr_array_new();
-   for(i=0;i<self->targetCount;i++){
-      MtcsTarget *mtcsTarget=self->targets[i];
-      MtcsVar *mtcsVar=mtcs_target_get_var(mtcsTarget);
-      MtcsFunc *mtcsFunc=mtcs_target_get_func(mtcsTarget);
-      NPtrArray *funArray=mtcsFunc->funcArray;
-      n_ptr_array_remove_range(unDecideVars,0,unDecideVars->len);
-      for(j=0;j<funArray->len;j++){
-         MtcsFuncNode *funNode=n_ptr_array_index(funArray,j);
-         collectUnDecideVars(self,funNode->node,unDecideVars);
-      }
-      for(j=0;j<unDecideVars->len;j++){
-         struct varpool_node *origNode=n_ptr_array_index(unDecideVars,j);
-         MtcsVarNode *node=createVarNode(self,origNode,mtcsTarget);
-         n_debug("mtcscompile.c appendUndecideVar 收集未定变量 :%d %d %d rtl:%p\n",
-               origNode->no_reorder,DECL_HARD_REGISTER (origNode->decl),
-               DECL_HAS_VALUE_EXPR_P (origNode->decl),origNode->decl->decl_with_rtl.rtl);
-         node->innerCreate = TRUE;//重要，输出汇编时检查有.号，要替换。
-         mtcs_var_add_mtcs_node(mtcsVar,node);
-      }
-   }
 }
 
 /**
@@ -740,12 +670,12 @@ static void writeNote(MtcsCompile *self)
 void mtcs_compile_compile(MtcsCompile *self)
 {
    if(!self->haveMtcsFuncOrVar){
-      //printf("mtcscompile.c mtcs_compile_compile 没有任何函数和变量，返回。target:%d\n",self->targetCount);
+      //n_debug("mtcscompile.c mtcs_compile_compile 没有任何函数和变量，返回。target:%d\n",self->targetCount);
       writeNote(self);//重要方法
       return;
    }
    //追加未确定的变量到MTCS
-   appendUndecideVar(self);
+   n_debug("start compile 00\n");
    n_log_enter_mtcs();
    int i=0;
    self->running=TRUE;
@@ -868,6 +798,7 @@ static void printNodeBB(  struct function *mtcs_cfun)
 //查看空函数有没有bb
 static void checkBB(MtcsCompile *self)
 {
+   return;
    int i;
    cgraph_node *cnode;
    varpool_node *vnode;
@@ -880,7 +811,8 @@ static void checkBB(MtcsCompile *self)
          struct function *mtcs_cfun;
          mtcs_cfun = DECL_STRUCT_FUNCTION (fndecl);
          push_cfun (mtcs_cfun);
-         fprintf(stderr,"mtcscompile.c checkBB 11 full_profile:%d fndecl:%p mtcs_cfun:%p\n",cfun->cfg->full_profile,fndecl,mtcs_cfun);
+         fprintf(stderr,"mtcscompile.c checkBB 11 full_profile:%d fndecl:%p mtcs_cfun:%p\n",
+               cfun->cfg->full_profile,fndecl,mtcs_cfun);
          fprintf(stderr,"mtcscompile.c checkBB 22 ENTRY_BLOCK_PTR_FOR_FN:%p\n", ENTRY_BLOCK_PTR_FOR_FN (cfun));
          basic_block eb =ENTRY_BLOCK_PTR_FOR_FN (cfun);
          fprintf(stderr,"mtcscompile.c checkBB 33 EDGE_COUNT (eb->succs):%d\n", EDGE_COUNT (eb->succs));
@@ -930,102 +862,17 @@ nboolean  mtcs_compile_is_compiling(MtcsCompile *self)
 
 /*****************************以下是收集mtcs 函数和变量----------------------*/
 
-/* Look for all functions inlined to NODE and update their inlined_to pointers
-   to INLINED_TO.  */
-static void update_inlined_to_pointer (struct cgraph_node *node, struct cgraph_node *inlined_to)
-{
-   struct cgraph_edge *e;
-   for (e = node->callees; e; e = e->next_callee)
-      if (e->callee->inlined_to){
-         e->callee->inlined_to = inlined_to;
-         update_inlined_to_pointer (e->callee, inlined_to);
-      }
-}
-
-/* Return true when NODE can be target of an indirect call.  */
-
-static bool is_indirect_call_target_p (struct cgraph_node *node, void *)
-{
-   return node->indirect_call_target;
-}
-
-/* Return true when NODE has ADDR reference.  */
-static bool has_addr_references_p (struct cgraph_node *node, void *)
-{
-   int i;
-   struct ipa_ref *ref = NULL;
-   for (i = 0; node->iterate_referring (i, ref); i++)
-      if (ref->use == IPA_REF_ADDR)
-         return true;
-   return false;
-}
-
-
-//删除 function由passes.cc 中的 execute_one中 进入    if (todo_after & TODO_discard_function)
-//调用       cgraph_node::get (fn)->release_body ();
-//原型 symbol_table::remove_unreachable_nodes (FILE *file) cgraph.h 类 symbol_table ipa.cc
-static void removeNode (struct cgraph_node *node)
-{
-   if (node->clone_of){
-      fprintf (stderr, "removeNode 11  name:%s %s node->aux :%d\n", node->name(),node->dump_name (),node->aux);
-      node->remove_from_clone_tree ();
-   }
-   node->body_removed = true;
-   node->analyzed = false;
-   node->definition = false;
-   node->cpp_implicit_alias = false;
-   node->alias = false;
-   node->transparent_alias = false;
-   node->thunk = false;
-   node->weakref = false;
-   /* After early inlining we drop always_inline attributes on
-   bodies of functions that are still referenced (have their
-   address taken).  */
-   DECL_ATTRIBUTES (node->decl) = remove_attribute ("always_inline", DECL_ATTRIBUTES (node->decl));
-   if (!node->in_other_partition)
-      node->local = false;
-   node->remove_callees ();
-   node->remove_all_references ();
-   if (node->inlined_to  && !node->callers){
-      gcc_assert (node->clones);
-      node->inlined_to = NULL;
-      update_inlined_to_pointer (node, node);
-   }
-   node->aux = NULL;
-
-   if (node->address_taken && !node->used_from_other_partition){
-      if (!node->call_for_symbol_and_aliases (has_addr_references_p, NULL, true)){
-         node->address_taken = false;
-         if (node->local_p ()
-         /* Virtual functions may be kept in cgraph just because
-         of possible later devirtualization.  Do not mark them as
-         local too early so we won't optimize them out before
-         we are done with polymorphic call analysis.  */
-         && (!node->call_for_symbol_and_aliases (is_indirect_call_target_p, NULL, true))){
-            node->local = true;
-         }
-      }
-   }
-
-   function *fn = DECL_STRUCT_FUNCTION (node->decl);
-   fprintf (stderr, "removeNode 22  fn:%p name:%s %s node->aux :%d\n", fn,node->name(),node->dump_name (),node->aux);
-   TREE_ASM_WRITTEN(node->decl) = 1; //关键 否则在 cgraph_node::expand (void) 中调用 gcc_assert (TREE_ASM_WRITTEN (decl));出错
-   symtab_node::checking_verify_symtab_nodes ();
-   FOR_EACH_DEFINED_FUNCTION (node){
-      fprintf (stderr, "removeNode 33 还剩的节点 name:%s %s node->aux :%d\n", node->name(),node->dump_name (),node->aux);
-   }
-}
-
 static MtcsVarNode *createVarNode(MtcsCompile *self,struct varpool_node *origNode,MtcsTarget *mtcsTarget)
 {
     MtcsClones *mtcsClones=mtcs_target_get_clones(mtcsTarget);
     struct varpool_node *clone=mtcs_clones_clone_var(mtcsClones,origNode);
     if(clone==NULL){
         n_error("不能克隆变量\n");
+        return NULL;
     }
     MtcsVarNode *node =n_slice_alloc0 (sizeof(MtcsVarNode));
     node->node=clone;
-    node->hostDecl = origNode->decl;
+    node->hostDeclAddress = (nuint64)origNode->decl;
     node->promoteId=-1;
     return node;
 }
@@ -1052,32 +899,32 @@ static nboolean isCSWTCH(tree decl)
       && DECL_IGNORED_P (decl);
 }
 
+
 static void collectVars(MtcsCompile *self)
 {
    struct symtab_node *n;
    int i;
    varpool_node *vnode;
    FOR_EACH_VARIABLE (vnode){
-      n_debug("mtcscompile.c collectVars 收集变量 00 vnode:%p %s\n",vnode,vnode->name());
       if (!DECL_HARD_REGISTER (vnode->decl) && !DECL_HAS_VALUE_EXPR_P (vnode->decl)){
          MtcsVarType mtcsType = mtcs_info_get_var_type(vnode->decl);
-         n_debug("mtcscompile.c collectVars 收集变量 11 vnode:%p %s %d\n",vnode,vnode->name(),mtcsType);
-         if(mtcsType==MTCS_VAR_NOT){
-            if(isCSWTCH(vnode->decl) && !n_ptr_array_find(self->undecidedVarArray,vnode,NULL)){
-               //如果有MTCS函数引用到该变量，则加入
-               n_debug("mtcscompile.c collectVars 收集变量 22 不是MTCS变量，是优化产生的变量 vnode:%p %s decl:%p\n",
-                     vnode,vnode->name(),vnode->decl);
-               n_ptr_array_add(self->undecidedVarArray,vnode);
+         n_debug("mtcscompile.c collectVars 收集变量 00 vnode:%p %s %d\n",vnode,vnode->name(),mtcsType);
+         if(mtcsType!=MTCS_VAR_NOT || (mtcsType==MTCS_VAR_NOT && isCSWTCH(vnode->decl))){
+            //如果有MTCS函数引用到该变量，则加入
+            n_debug("mtcscompile.c collectVars 收集变量 11 不是MTCS变量，是优化产生的变量 vnode:%p %s decl:%p\n",
+            vnode,vnode->name(),vnode->decl);
+            for(i=0;i<self->targetCount;i++){
+               MtcsTarget *mtcsTarget=self->targets[i];
+               MtcsVar *mtcsVar=mtcs_target_get_var(mtcsTarget);
+               if(!mtcs_var_have_host_decl(mtcsVar,vnode->decl)){
+                  MtcsVarNode *node=createVarNode(self,vnode,mtcsTarget);
+                  n_debug("mtcscompile.c collectVars 收集变量 22 :%d %d %d rtl:%p\n",
+                        vnode->no_reorder,DECL_HARD_REGISTER (vnode->decl),DECL_HAS_VALUE_EXPR_P (vnode->decl),
+                        vnode->decl->decl_with_rtl.rtl);
+                  node->innerCreate = mtcsType==MTCS_VAR_NOT;//重要，输出汇编时检查有.号，要替换。
+                  mtcs_var_add_mtcs_node(mtcsVar,node);
+               }
             }
-            continue;
-         }
-         for(i=0;i<self->targetCount;i++){
-            MtcsTarget *mtcsTarget=self->targets[i];
-            MtcsVar *mtcsVar=mtcs_target_get_var(mtcsTarget);
-            MtcsVarNode *node=createVarNode(self,vnode,mtcsTarget);
-            n_debug("mtcscompile.c collectVars 收集变量 33 :%d %d %d rtl:%p\n",
-                  vnode->no_reorder,DECL_HARD_REGISTER (vnode->decl),DECL_HAS_VALUE_EXPR_P (vnode->decl),vnode->decl->decl_with_rtl.rtl);
-            mtcs_var_add_mtcs_node(mtcsVar,node);
          }
       }
    }
@@ -1118,71 +965,183 @@ static void printNodeBB(struct cgraph_node *cnode)
    n_debug("mtcscompile.c printNodeBB 11 name:%s nodeFun:%p cfun:%p\n",cnode->name(),nodeFun,cfun);
 }
 
-/**
- * 移走主机中的MTCS内部函数  __builtin_mtcs_level_dim __builtin_mtcs_shared_var
- * 核函数中 int a = threadIdx.x 被转成
- * int a =__builtin_mtcs_level_dim(THREAD_IDX,0);
- * 把核函数当主机函数编译时，再转成 int a =0
- * 该方法是从mtcsclones.c转过来的，因为有多个平台，克隆后移走，其它平台就没法调用该语句了。
+/*
+ * 清空指定函数的 GIMPLE 函数体，仅保留一个返回语句。
+ *
+ * 保留原有的 ENTRY 和 EXIT 基本块，删除所有普通基本块，
+ * 然后重新创建一个返回基本块，构成最简单的控制流：
+ *
+ *     ENTRY -> RET -> EXIT
+ *
+ * 根据函数的返回类型生成返回值：
+ *   - void 类型：直接返回；
+ *   - 其他类型：返回零值。
+ *
+ * 同时重建支配信息和循环结构，维护 CFG、SSA 相关状态，
+ * 以便后续 Pass 能够继续处理该函数。
  */
-static void relaceBuiltinFnAtHost(struct cgraph_node *hostNodeFun)
+static void empty_function_body (struct cgraph_node *node)
 {
-   if(!hostNodeFun)
+   tree decl;
+   function *fn;
+   basic_block entry_bb;
+   basic_block exit_bb;
+   basic_block ret_bb;
+   basic_block bb;
+   basic_block next_bb;
+   tree ret_type;
+   tree ret_value = NULL_TREE;
+   greturn *ret_stmt;
+   gimple_stmt_iterator gsi;
+   edge e;
+
+   /* 检查节点及其函数声明是否有效。 */
+   if (!node || !node->decl)
       return;
 
-   struct function *nodeFun = DECL_STRUCT_FUNCTION (hostNodeFun->decl);
-   basic_block bb;
-   FOR_EACH_BB_FN (bb, nodeFun){
-      gimple_stmt_iterator gsi, seq_gsi;
-      for (gsi = gsi_start_bb (bb); !gsi_end_p (gsi); ){
-         gimple *stmt = gsi_stmt (gsi);
-        // n_debug("mtcscompile.c relaceBuiltinFnAtHost 00 替换主机的mtcs内部函数为0 stmt:%p cfun:%p nodeFun:%p hostNodeFun:%p\n",
-               //stmt,cfun,nodeFun,hostNodeFun);
-         //aet_print_gimple(stmt);
-         enum gimple_code code = gimple_code (stmt);
-         if(code != GIMPLE_CALL){
-            gsi_next (&gsi);
-            continue;
-         }
-         gcall *callStmt = as_a <gcall *> (stmt);
-         tree fndecl = gimple_call_fndecl(callStmt);
-         if(mtcs_builtins_is_builtin_fn(fndecl) || mtcs_builtins_is_internal_fn(fndecl)){
-            tree lhs = gimple_call_lhs (callStmt);
-            n_debug("mtcscompile.c relaceBuiltinFnAtHost 11 替换主机的mtcs内部函数为0 stmt:%p lhs:%p\n",stmt,lhs);
-            //现在只有两个内部函数 __builtin_mtcs_level_dim __builtin_mtcs_shared_var
-            //其中 __builtin_mtcs_shared_var 是在 mtcsparser中通过add_stmt加入的，所以gimple没有左值。直接移走
-            if(!lhs){
-               unlink_stmt_vdef (callStmt);//要加 unlink_stmt_vdef release_defs 否则在verify_ssa 报 错误：定义缺失 bug 014
-               gsi_remove (&gsi, true);
-               release_defs (callStmt);
-               continue;
-            }else{
-               int fncode = mtcs_builtins_get_code(fndecl);
-               n_debug("mtcscompile.c relaceBuiltinFnAtHost 11 xx替换主机的mtcs内部函数为0 fncode:%d\n",fncode);
-               aet_print_tree(lhs);
-               aet_print_tree(TREE_TYPE(lhs));
-               tree type = TREE_TYPE(lhs);
-               tree region = NULL;
-               if(TREE_CODE(type)==INTEGER_TYPE)
-                  region = build_int_cst (TREE_TYPE(lhs), 0);
-               else if (TREE_CODE(type)==REAL_TYPE){
-                  region = build_real(TREE_TYPE(lhs), dconst0);
-                  //要加 unlink_stmt_vdef release_defs 否则在verify_ssa 报 错误：定义缺失 bug 014
-                  //如果是整型不用加，为什么？
-                  //unlink_stmt_vdef (callStmt);
-               }else{
-                  aet_print_tree_skip_debug(TREE_TYPE(lhs));
-                  n_error("不支持从替换核函数或设备函数到主机函数。");
-               }
-               unlink_stmt_vdef (callStmt);
-               gassign *grpl = gimple_build_assign (lhs, region);
-               n_debug("mtcscompile.c relaceBuiltinFnAtHost 22 替换主机的mtcs内部函数为 0 stmt:%p grpl:%p\n",stmt,grpl);
-               gsi_replace (&gsi, grpl, false);
-            }
-         }
-         gsi_next (&gsi);
-      }
+   decl = node->decl;
+   fn = DECL_STRUCT_FUNCTION (decl);
+
+   /* 仅处理已经建立 CFG 的函数。 */
+   if (!fn || !fn->cfg)
+      return;
+
+   /* 将当前函数切换为待处理函数。 */
+   push_cfun (fn);
+
+   /* 保存入口和出口基本块，后续保留这两个基本块。 */
+   entry_bb = ENTRY_BLOCK_PTR_FOR_FN (fn);
+   exit_bb = EXIT_BLOCK_PTR_FOR_FN (fn);
+
+   /*
+   * 一、释放旧的支配信息。
+   *
+   * CFG 即将发生较大变化，原有的支配关系不再适用。
+   * 这里只释放支配信息，不销毁函数的 SSA 基础设施。
+   */
+   if (dom_info_available_p (fn, CDI_DOMINATORS))
+      free_dominance_info (fn, CDI_DOMINATORS);
+
+   if (dom_info_available_p (fn, CDI_POST_DOMINATORS))
+      free_dominance_info (fn, CDI_POST_DOMINATORS);
+
+   /*
+   * 二、释放原有的循环优化器信息。
+   *
+   * 原有基本块即将被删除，因此先结束旧的循环优化器状态，
+   * 避免旧循环结构引用已经删除的基本块。
+   */
+   if (current_loops){
+      loop_optimizer_finalize (fn);
+      set_loops_for_fn (fn, NULL);
    }
+
+   /*
+   * 三、删除原有的普通基本块。
+   *
+   * 保留 ENTRY 和 EXIT，仅删除两者之间的普通基本块。
+   * 在删除前保存下一个基本块，避免删除操作影响遍历。
+   */
+   for (bb = entry_bb->next_bb; bb != exit_bb; bb = next_bb){
+      next_bb = bb->next_bb;
+      delete_basic_block (bb);
+   }
+
+   /*
+   * 删除入口块上残留的后继边，以及出口块上残留的
+   * 前驱边，确保后续重建 CFG 时没有旧的连接关系。
+   */
+   while (EDGE_COUNT (entry_bb->succs) != 0){
+      e = EDGE_SUCC (entry_bb, 0);
+      remove_edge (e);
+   }
+
+   while (EDGE_COUNT (exit_bb->preds) != 0){
+      e = EDGE_PRED (exit_bb, 0);
+      remove_edge (e);
+   }
+
+   /*
+   * 四、创建唯一的返回基本块。
+   *
+   * 将其插入 ENTRY 之后，并继承入口块的执行计数。
+   * 检查计数已经初始化，避免后续 CFG 验证失败。
+   */
+   ret_bb = create_empty_bb (entry_bb);
+   ret_bb->count = entry_bb->count;
+
+   gcc_assert (ret_bb->count.initialized_p ());
+
+   /*
+   * 五、构造返回语句。
+   *
+   * 直接使用零值作为返回值，不额外创建 SSA 名称，
+   * 避免引入不必要的 SSA 定义。
+   */
+   ret_type = TREE_TYPE (TREE_TYPE (decl));
+
+   if (!VOID_TYPE_P (ret_type))
+      ret_value = build_zero_cst (ret_type);
+
+   ret_stmt = gimple_build_return (ret_value);
+
+   /* 将返回语句插入新建的返回基本块。 */
+   gsi = gsi_start_bb (ret_bb);
+   gsi_insert_before (&gsi, ret_stmt, GSI_NEW_STMT);
+
+   /*
+   * 六、重建控制流图。
+   *
+   * 创建 ENTRY -> RET -> EXIT 两条边。
+   * 由于该函数只有一条无条件执行路径，两条边的概率
+   * 均设置为 always，避免边概率未初始化。
+   */
+   e = make_edge (entry_bb, ret_bb, EDGE_FALLTHRU);
+   e->probability = profile_probability::always ();
+
+   e = make_edge (ret_bb, exit_bb, 0);
+   e->probability = profile_probability::always ();
+
+   /*
+   * 七、重新初始化循环结构。
+   *
+   * 创建新的循环信息，初始化循环结构，并将返回块
+   * 加入根循环，保证基本块具有有效的 loop_father。
+   */
+   struct loops *loops = ggc_cleared_alloc<struct loops> ();
+
+   set_loops_for_fn (fn, loops);
+   init_loops_structure (fn, loops, 1);
+   loops->state |= (LOOPS_NEED_FIXUP | LOOPS_MAY_HAVE_MULTIPLE_LATCHES);
+   add_bb_to_loop (ret_bb, loops->tree_root);
+
+   /*
+   * 八、更新函数的 SSA 和 CFG 相关状态。
+   *
+   * 标记虚拟操作数需要重新命名，并清除上次验证状态，
+   * 让后续 Pass 重新处理相关信息。
+   */
+   mark_virtual_operands_for_renaming (fn);
+   fn->last_verified = 0;
+
+   /*
+   * 九、重新计算支配信息。
+   *
+   * CFG 已经重建，需要重新计算基本块之间的支配关系。
+   * 后支配信息在此处保持释放状态。
+   */
+   calculate_dominance_info (CDI_DOMINATORS);
+
+   if (dom_info_available_p (fn, CDI_POST_DOMINATORS))
+      free_dominance_info (fn, CDI_POST_DOMINATORS);
+
+   /*
+   * 标记当前函数具备 CFG、SSA 和循环结构。
+   */
+   fn->curr_properties |= (PROP_cfg | PROP_ssa | PROP_loops);
+
+   /* 恢复之前的函数上下文。 */
+   pop_cfun ();
 }
 
 /**
@@ -1197,10 +1156,12 @@ static nboolean collectFunc(MtcsCompile *self,struct function *fun)
    MtcsFuncType mtcsType = mtcs_info_get_func_type(decl);
    if(mtcsType==MTCS_FUNC_NOT)
       return FALSE;
-   n_debug("mtcscompile.c collectFunc 00 收集核函数或设备函数 decl:%p TREE_ASM_WRITTEN (decl):%d\n",decl,TREE_ASM_WRITTEN (decl));
+   n_debug("mtcscompile.c collectFunc 00 收集核函数或设备函数 decl:%p TREE_ASM_WRITTEN (decl):%d\n",
+         decl,TREE_ASM_WRITTEN (decl));
    int i=0;
    cgraph_node *cnode;
    cgraph_node *origNode=NULL;
+   //检查这个函数是不是mii的静态函数，如果是只能克隆指定平台的
    //第一步，收集各平台的函数
    for(i=0;i<self->targetCount;i++){
       MtcsTarget *mtcsTarget=self->targets[i];
@@ -1208,6 +1169,20 @@ static nboolean collectFunc(MtcsCompile *self,struct function *fun)
       //symtab 是全局变量
       FOR_EACH_DEFINED_FUNCTION (cnode){
          if(cnode->decl==fun->decl){
+            if(mtcs_info_is_intrinsic_function_impl(cnode->decl)){
+               char *target = mtcs_info_get_intrinsic_target(cnode->decl);
+               char *isa = mtcs_info_get_intrinsic_isa(cnode->decl);
+               nboolean support = mtcs_target_is_support(mtcsTarget,target,isa);
+               printf("这是一个intrinsic impl实现函数 %s %s support:%d\n",target,isa,support);
+               if(!support){
+                  const char *target = mtcs_target_get_platform_name(mtcsTarget);
+                  const char *version = mtcs_target_get_version_string(mtcsTarget);
+                  const char *isa = mtcs_target_get_isa_string(mtcsTarget);
+                  char *fname =IDENTIFIER_POINTER(DECL_NAME(cnode->decl));
+                  n_warning("目标不支持。%s %s %s %s",target,isa,version,fname);
+                  break;
+               }
+            }
             MtcsFuncNode *node=createFuncNode(self,cnode,mtcsTarget);
             mtcs_func_add_mtcs_node(mtcsFunc,node);
             origNode=cnode;
@@ -1217,18 +1192,14 @@ static nboolean collectFunc(MtcsCompile *self,struct function *fun)
    }
 
    checkBB(self);
-   n_debug("mtcscompile.c collectFunc 11 collectFunc type:%d\n",mtcsType);
-   //在初始对象的方法TFirst_init_1234ergR5678_TFirst里，不应该给对象方法赋值函数地址
-  //否则报错,因为调用removeNode移走了函数。
-  //TFirst_init_1234ergR5678_TFirst':
-  //ai0.c:(.text+0x264): undefined reference to `_Z6TFirst10testkernelEPN6TFirstE'
-   //主机中不需要mtcs的内部函数 __builtin_mtcs_level_dim __builtin_mtcs_shared_var
-   //if(mtcsType==MTCS_FUNC_KERNEL || mtcsType==MTCS_FUNC_DEVICE)
-     /// removeNode(cnode);// 清除主机的cgraph_node
-   if(mtcsType==MTCS_FUNC_KERNEL || mtcsType==MTCS_FUNC_DEVICE || mtcsType==MTCS_FUNC_DEVICE_HOST)
-      relaceBuiltinFnAtHost(origNode);
-   return 0;//(mtcsType==MTCS_FUNC_KERNEL || mtcsType==MTCS_FUNC_DEVICE);
+   if(mtcsType==MTCS_FUNC_KERNEL || mtcsType==MTCS_FUNC_DEVICE){
+      empty_function_body(origNode);
+      return TRUE;
+   }
+   return 0;
 }
+
+
 
 /**
  * 收集MTCS函数和变量的两个pass
@@ -1259,9 +1230,13 @@ namespace
       /* opt_pass methods: */
       unsigned int execute (function *fun) final override
       {
+         //log_strategy = 2不会进入，等于8也不会进入，只有4才会进入
+         //现在绕过这个限制 2时也会进入
+         n_log_enter_force_front(TRUE);
          nboolean ret= collectFunc(mtcs_compile_get(),fun);
-         //返回 TODO_discard_function 由passes.cc中清除function
-         return ret?TODO_discard_function:0;
+         n_log_enter_force_front(FALSE);
+         return ret?TODO_cleanup_cfg | TODO_update_ssa:0;
+
       }
    };
 
@@ -1301,6 +1276,8 @@ namespace
 /**
  * 注册两个收集passes到 all_passes 和 all_late_ipa_passes
  * 注册两个pass 1个禁用fnsplit 另一个恢复。
+ * pass_mtcs_collect_vars在mtcsCollectFuncs之前执行，所以
+ * mtcsCollectFuncs中移走主机中的函数体并不影响
  */
 static void registerCollectPass()
 {
@@ -1426,28 +1403,41 @@ static void initOptions(MtcsTarget *mtcsTarget)
  */
 static void createTarget(MtcsCompile *self)
 {
-   if(self->targetCount>0)
+   if(self->targetCount>0) //已经创建过了，返回
       return;
-   //获取平台参数
-   int *isaAndVersion[10];
+   static int targetNums = 10;
+    int *isaAndVersion[targetNums];
    int i;
-   for(i=0;i<10;i++)
-      isaAndVersion[i]=xmalloc(sizeof(int)*2);
-   //0 ptx,1 gcn...
-   int count=mtcs_tool_get_isa_and_version(isaAndVersion,0);
+   for(i=0;i<targetNums;i++)
+      isaAndVersion[i]=xmalloc(sizeof(int)*3);
+   //0 ptx,1 gcn... 定义在mtcstool.h中
+   //获取平台参数
+   int count=mtcs_tool_parser_mtcs_option(isaAndVersion);
    if(count==0){
      n_debug("mtcscompile.c 创建缺省的 ptx目标---- \n");
      self->targets[0]=(MtcsTarget *)mtcs_ptx_new();
    }else{
-      n_debug("mtcscompile.c 创建第一个带架构版本和PTX版本的目标 总数量:%d smisa:%d ptxversion:%d\n",
-            count,isaAndVersion[0][0],isaAndVersion[0][1]);
-     self->targets[0]=(MtcsTarget *)mtcs_ptx_new_full(isaAndVersion[0][0],isaAndVersion[0][1]);
+      for(int i=0;i<count;i++){
+         int *temp=isaAndVersion[i];
+         int target = temp[0];
+         int isa = temp[1];
+         int version = temp[2];
+         n_debug("mtcscompile.c 创建第一个带架构版本和PTX版本的目标 总数量:%d target:%d isa:%d version:%d\n",
+               count,target,isa,version);
+         if(target==TARGET_PTX)
+            self->targets[i]=(MtcsTarget *)mtcs_ptx_new_full(isa,version);
+         else
+            n_error("还未支持的目标:%d",target);
+      }
    }
    self->currentMtcsTarget=self->targets[0];
    initOptions(self->targets[0]);
    self->currentMtcsTarget=NULL;
-   self->targetCount=1;
-   for(i=0;i<10;i++)
+   if(count==0)
+      self->targetCount=1;
+   else
+      self->targetCount=count;
+   for(i=0;i<targetNums;i++)
        free(isaAndVersion[i]);
 }
 

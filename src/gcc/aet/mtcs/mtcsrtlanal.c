@@ -3170,11 +3170,11 @@ static unsigned HOST_WIDE_INT nonzero_bits1 (MtcsRtlanal *self,const_rtx x, scal
    unsigned int mode_width = mtcs_mode_get_precision/*!GET_MODE_PRECISION*/(mtcsMode,mode);
 
 
-   n_debug("mtcsrtlanal.c  unit info HOST_BITS_PER_WIDE_INT :%d HOST_WIDE_INT_M1U:%d HOST_WIDE_INT_1U:%d\n",
-         HOST_BITS_PER_WIDE_INT,HOST_WIDE_INT_M1U,HOST_WIDE_INT_1U);
-
-   n_debug("mtcsrtlanal.c nonzero_bits1 00 code:%d %s mode:%d mode_width:%d nonzero:"HOST_WIDE_INT_PRINT_UNSIGNED"\n",
-         code,GET_RTX_NAME(code),mode,mode_width,nonzero);
+//   n_debug("mtcsrtlanal.c  unit info HOST_BITS_PER_WIDE_INT :%d HOST_WIDE_INT_M1U:%d HOST_WIDE_INT_1U:%d\n",
+//         HOST_BITS_PER_WIDE_INT,HOST_WIDE_INT_M1U,HOST_WIDE_INT_1U);
+//
+//   n_debug("mtcsrtlanal.c nonzero_bits1 00 code:%d %s mode:%d mode_width:%d nonzero:"HOST_WIDE_INT_PRINT_UNSIGNED"\n",
+//         code,GET_RTX_NAME(code),mode,mode_width,nonzero);
 
    if (CONST_INT_P (x)){
       if (SHORT_IMMEDIATES_SIGN_EXTEND
@@ -3185,19 +3185,19 @@ static unsigned HOST_WIDE_INT nonzero_bits1 (MtcsRtlanal *self,const_rtx x, scal
 
       return UINTVAL (x);
    }
-   n_debug("mtcsrtlanal.c nonzero_bits1 11 code:%d mode:%d\n",code,mode);
+  // n_debug("mtcsrtlanal.c nonzero_bits1 11 code:%d mode:%d\n",code,mode);
 
    if (!mtcs_mode_is_a <scalar_int_mode> (mtcsMode,GET_MODE (x), &xmode))
       return nonzero;
    unsigned int xmode_width = mtcs_mode_get_precision/*!GET_MODE_PRECISION*/(mtcsMode,xmode);
-   n_debug("mtcsrtlanal.c nonzero_bits1 22 code:%d mode:%d xmode:%d xmode_width:%d\n",code,mode,xmode,xmode_width);
+   //n_debug("mtcsrtlanal.c nonzero_bits1 22 code:%d mode:%d xmode:%d xmode_width:%d\n",code,mode,xmode,xmode_width);
 
    /* If X is wider than MODE, use its mode instead.  */
    if (xmode_width > mode_width){
       mode = xmode;
       nonzero = mtcs_mode_get_mask/*!GET_MODE_MASK*/(mtcsMode,mode);
       mode_width = xmode_width;
-      n_debug("mtcsrtlanal.c nonzero_bits1 33 code:%d mode:%d xmode:%d xmode_width:%d\n",code,mode,xmode,xmode_width);
+     // n_debug("mtcsrtlanal.c nonzero_bits1 33 code:%d mode:%d xmode:%d xmode_width:%d\n",code,mode,xmode,xmode_width);
 
    }
 
@@ -3205,7 +3205,7 @@ static unsigned HOST_WIDE_INT nonzero_bits1 (MtcsRtlanal *self,const_rtx x, scal
       /* Our only callers in this case look for single bit values.  So
       just return the mode mask.  Those tests will then be false.  */
       return nonzero;
-   n_debug("mtcsrtlanal.c nonzero_bits1 44 code:%d mode:%d xmode:%d xmode_width:%d\n",code,mode,xmode,xmode_width);
+  // n_debug("mtcsrtlanal.c nonzero_bits1 44 code:%d mode:%d xmode:%d xmode_width:%d\n",code,mode,xmode,xmode_width);
 
    /* If MODE is wider than X, but both are a single word for both the host
    and target machines, we can compute this from which bits of the object
@@ -3223,7 +3223,7 @@ static unsigned HOST_WIDE_INT nonzero_bits1 (MtcsRtlanal *self,const_rtx x, scal
       nonzero |= mtcs_mode_get_mask/*!GET_MODE_MASK*/(mtcsMode,mode) & ~mtcs_mode_get_mask/*!GET_MODE_MASK*/(mtcsMode,xmode);
       return nonzero;
    }
-   n_debug("mtcsrtlanal.c nonzero_bits1 55 code:%d mode:%d xmode:%d xmode_width:%d\n",code,mode,xmode,xmode_width);
+  // n_debug("mtcsrtlanal.c nonzero_bits1 55 code:%d mode:%d xmode:%d xmode_width:%d\n",code,mode,xmode,xmode_width);
 
    /* Please keep nonzero_bits_binary_arith_p above in sync with
    the code in the switch below.  */
@@ -3243,8 +3243,8 @@ static unsigned HOST_WIDE_INT nonzero_bits1 (MtcsRtlanal *self,const_rtx x, scal
             && REG_POINTER (x)
             && !target_rtx_have_ptr_extend/*!targetm.have_ptr_extend*/(mtcsMachine->tmrtx))
             nonzero &= mtcs_mode_get_mask/*!GET_MODE_MASK*/(mtcsMode,ptr_mode);
-            n_debug("mtcsrtlanal.c nonzero_bits1 66 code:%d mode:%d xmode:%d xmode_width:%d %ld ptr_mode:%d\n",
-                  code,mode,xmode,xmode_width,nonzero,ptr_mode);
+           // n_debug("mtcsrtlanal.c nonzero_bits1 66 code:%d mode:%d xmode:%d xmode_width:%d %ld ptr_mode:%d\n",
+                 // code,mode,xmode,xmode_width,nonzero,ptr_mode);
             //#endif
          }
 
@@ -3258,8 +3258,8 @@ static unsigned HOST_WIDE_INT nonzero_bits1 (MtcsRtlanal *self,const_rtx x, scal
          && mtcs_rtl_data_get_regno_pointer_align/*!REGNO_POINTER_ALIGN*/(mtcsRtlData,REGNO (x))){
             unsigned HOST_WIDE_INT alignment = mtcs_rtl_data_get_regno_pointer_align/*!REGNO_POINTER_ALIGN*/(mtcsRtlData,
                   REGNO (x)) / BITS_PER_UNIT;
-            n_debug("mtcsrtlanal.c nonzero_bits1 77 code:%d mode:%d xmode:%d xmode_width:%d alignment:%d\n",
-                  code,mode,xmode,xmode_width,alignment);
+            //n_debug("mtcsrtlanal.c nonzero_bits1 77 code:%d mode:%d xmode:%d xmode_width:%d alignment:%d\n",
+                 // code,mode,xmode,xmode_width,alignment);
             if(mtcs_config_ifdef(mtcsConfig,MTCS_PUSH_ROUNDING)){
                //#ifdef PUSH_ROUNDING
                /* If PUSH_ROUNDING is defined, it is possible for the
@@ -3269,8 +3269,8 @@ static unsigned HOST_WIDE_INT nonzero_bits1 (MtcsRtlanal *self,const_rtx x, scal
                && target_calls_push_argument/*!targetm.calls.push_argument*/(mtcsMachine->calls,0)){
                   poly_uint64 rounded_1 = mtcs_mode_push_rounding/*!PUSH_ROUNDING*/(mtcsMode,poly_int64 (1));
                   alignment = MIN (known_alignment (rounded_1), alignment);
-                  n_debug("mtcsrtlanal.c nonzero_bits1 88 code:%d mode:%d xmode:%d xmode_width:%d alignment:%d\n",
-                            code,mode,xmode,xmode_width,alignment);
+                  //n_debug("mtcsrtlanal.c nonzero_bits1 88 code:%d mode:%d xmode:%d xmode_width:%d alignment:%d\n",
+                           // code,mode,xmode,xmode_width,alignment);
                }
                //#endif
             }
@@ -3282,9 +3282,9 @@ static unsigned HOST_WIDE_INT nonzero_bits1 (MtcsRtlanal *self,const_rtx x, scal
             unsigned HOST_WIDE_INT nonzero_for_hook = nonzero;
             //mtcsrtl  已把 reg_nonzero_bits 指向 regNonzeroBits_cb
             rtx new_rtx = rtl_hooks.reg_nonzero_bits (x, xmode, mode,&nonzero_for_hook);
-            n_debug("mtcsrtlanal.c nonzero_bits1 99 code:%d mode:%d xmode:%d xmode_width:%d"
-                  " nonzero_for_hook:"HOST_WIDE_INT_PRINT_UNSIGNED"new_rtx:%p "HOST_WIDE_INT_PRINT_UNSIGNED"\n",
-                      code,mode,xmode,xmode_width,nonzero_for_hook,new_rtx,nonzero);
+           // n_debug("mtcsrtlanal.c nonzero_bits1 99 code:%d mode:%d xmode:%d xmode_width:%d"
+                 // " nonzero_for_hook:"HOST_WIDE_INT_PRINT_UNSIGNED"new_rtx:%p "HOST_WIDE_INT_PRINT_UNSIGNED"\n",
+                     // code,mode,xmode,xmode_width,nonzero_for_hook,new_rtx,nonzero);
             if (new_rtx)
                nonzero_for_hook &= cached_nonzero_bits(self,new_rtx, mode, known_x, known_mode, known_ret);
             return nonzero_for_hook;
@@ -3312,12 +3312,11 @@ static unsigned HOST_WIDE_INT nonzero_bits1 (MtcsRtlanal *self,const_rtx x, scal
          operation in, and not the actual operation mode.  We can wind
          up with (subreg:DI (gt:V4HI x y)), and we don't have anything
          that describes the results of a vector compare.  */
-         n_debug("mtcsrtlanal.c nonzero_bits1 66 code:%d xmode:%d\n",code,xmode);
+         //n_debug("mtcsrtlanal.c nonzero_bits1 66 code:%d xmode:%d\n",code,xmode);
          if (mtcs_mode_get_class/*!GET_MODE_CLASS*/(mtcsMode,xmode) == MODE_INT
          && mode_width <= HOST_BITS_PER_WIDE_INT){
             nonzero = mtcs_real_get_store_flag_value/*!STORE_FLAG_VALUE*/(mtcsReal);
-            n_debug("mtcsrtlanal.c nonzero_bits1 77 code:%d xmode:%d %ld\n",code,xmode,nonzero);
-
+           // n_debug("mtcsrtlanal.c nonzero_bits1 77 code:%d xmode:%d %ld\n",code,xmode,nonzero);
          }
          break;
 
@@ -3656,28 +3655,28 @@ static unsigned HOST_WIDE_INT cached_nonzero_bits (MtcsRtlanal *self,const_rtx x
    /* Try to find identical subexpressions.  If found call
    nonzero_bits1 on X with the subexpressions as KNOWN_X and the
    precomputed value for the subexpression as KNOWN_RET.  */
-   n_debug("mtcsrtlanal.c cached_nonzero_bits 00 %d\n",mode);
+   //n_debug("mtcsrtlanal.c cached_nonzero_bits 00 %d\n",mode);
    if (nonzero_bits_binary_arith_p (x)){
       rtx x0 = XEXP (x, 0);
       rtx x1 = XEXP (x, 1);
-      n_debug("mtcsrtlanal.c cached_nonzero_bits 11 %d\n",mode);
+     // n_debug("mtcsrtlanal.c cached_nonzero_bits 11 %d\n",mode);
       mtcs_print_rtl_single(stderr,x0);
       mtcs_print_rtl_single(stderr,x1);
 
       /* Check the first level.  */
       if (x0 == x1)
          return nonzero_bits1(self,x, mode, x0, mode, cached_nonzero_bits(self,x0, mode, known_x,known_mode, known_ret));
-      n_debug("mtcsrtlanal.c cached_nonzero_bits 22 %d\n",mode);
+      //n_debug("mtcsrtlanal.c cached_nonzero_bits 22 %d\n",mode);
 
       /* Check the second level.  */
       if (nonzero_bits_binary_arith_p (x0) && (x1 == XEXP (x0, 0) || x1 == XEXP (x0, 1)))
          return nonzero_bits1(self,x, mode, x1, mode, cached_nonzero_bits(self,x1, mode, known_x,known_mode, known_ret));
-      n_debug("mtcsrtlanal.c cached_nonzero_bits 33 %d\n",mode);
+      //n_debug("mtcsrtlanal.c cached_nonzero_bits 33 %d\n",mode);
 
       if (nonzero_bits_binary_arith_p (x1) && (x0 == XEXP (x1, 0) || x0 == XEXP (x1, 1)))
          return nonzero_bits1(self,x, mode, x0, mode,cached_nonzero_bits(self,x0, mode, known_x,known_mode, known_ret));
    }
-   n_debug("mtcsrtlanal.c cached_nonzero_bits 44 %d\n",mode);
+   //n_debug("mtcsrtlanal.c cached_nonzero_bits 44 %d\n",mode);
 
    return nonzero_bits1(self,x, mode, known_x, known_mode, known_ret);
 }
@@ -3693,7 +3692,7 @@ unsigned HOST_WIDE_INT mtcs_rtlanal_nonzero_bits (MtcsRtlanal *self,const_rtx x,
    if (!mtcs_mode_is_a <scalar_int_mode> (mtcsMode,mode, &int_mode))
       return mtcs_mode_get_mask/*!GET_MODE_MASK*/(mtcsMode,mode);
    unsigned HOST_WIDE_INT ret = cached_nonzero_bits(self,x, int_mode, NULL_RTX, VOIDmode, 0);
-   n_debug("mtcsrtlanal.c nonzero_bits mode:%d ret:%lu\n",mode,ret);
+   //n_debug("mtcsrtlanal.c nonzero_bits mode:%d ret:%lu\n",mode,ret);
    return ret;
 }
 

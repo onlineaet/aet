@@ -249,6 +249,7 @@ int mtcs_reload_operands_match_p (MtcsReload *self,rtx x, rtx y)
    MtcsTarget *mtcsTarget=(MtcsTarget *)mtcsMode->target;
    MtcsReg   *mtcsReg=mtcs_target_get_reg(mtcsTarget);
    MtcsRtlanal *mtcsRtlanal=mtcs_target_get_rtlanal(mtcsTarget);
+   MtcsRTL   *mtcsRTL=mtcs_target_get_rtl(mtcsTarget);
 
    int firstPseudoRegister= mtcs_reg_get_first_pseudo_register/*!FIRST_PSEUDO_REGISTER*/(mtcsReg);
 
@@ -328,7 +329,8 @@ slow:
       return 0;
 
    /* MEMs referring to different address space are not equivalent.  */
-   if (code == MEM && MEM_ADDR_SPACE (x) != MEM_ADDR_SPACE (y))
+   if (code == MEM && mtcs_rtl_get_mem_addr_space/*!MEM_ADDR_SPACE*/ (mtcsRTL,x)
+               != mtcs_rtl_get_mem_addr_space/*!MEM_ADDR_SPACE*/ (mtcsRTL,y))
       return 0;
 
    switch (code){

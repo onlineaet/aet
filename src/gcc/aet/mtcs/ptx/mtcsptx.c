@@ -1862,7 +1862,6 @@ static void createComponent(MtcsPtx *self)
     mtcsTarget->mtcsRTL=(MtcsRTL *)mtcs_ptx_rtl_new(mtcsMode);
     mtcsTarget->mtcsAsm=(MtcsAsm *)mtcs_ptx_asm_new(mtcsMode);
     mtcsTarget->mtcsInternalFn=(MtcsInternalFn *)mtcs_ptx_internal_fn_new(mtcsMode);
-
 }
 
 static void mtcsPtxInit(MtcsPtx *self)
@@ -2243,6 +2242,34 @@ static void publishVersion_cb(MtcsTarget *mtcsTarget)
    mtcs_ptx_version_option=mtcsTarget->platformInfo.version;
 }
 
+static nboolean isSupport_cb (MtcsTarget *mtcsTarget,char *target ,char *isa)
+{
+   if(target==NULL)
+      return FALSE;
+   if(strcmp(target,"ptx") && strcmp(target,"cuda") &&
+   strcmp(target,"PTX") && strcmp(target,"CUDA") &&
+   strcmp(target,"Ptx") && strcmp(target,"Cuda"))
+      return FALSE;
+   if(!strcmp(isa,"default"))
+      return TRUE;
+   int sm =  ptx_tool_get_isa (isa);
+   if(sm==-1)
+      return FALSE;
+
+   return mtcsTarget->platformInfo.isa>=sm;
+}
+
+static const char *getVersionString_cb (MtcsTarget *mtcsTarget)
+{
+   return ptx_tool_version_to_string(mtcsTarget->platformInfo.version);
+}
+
+static const char *getIsaString_cb (MtcsTarget *mtcsTarget)
+{
+   return ptx_tool_get_sm_string(mtcsTarget->platformInfo.isa);
+}
+
+
 MtcsPtx *mtcs_ptx_new_full(int isa,int ptxVersion)
 {
    MtcsPtx *self = n_slice_alloc0 (sizeof(MtcsPtx));
@@ -2266,6 +2293,10 @@ MtcsPtx *mtcs_ptx_new_full(int isa,int ptxVersion)
    self->mtcsPtxMath=mtcs_ptx_math_new(mtcsMode);
    ((MtcsTarget*)self)->getLinkFuncName=getLinkFuncName_cb;
    ((MtcsTarget*)self)->publishVersion=publishVersion_cb;
+   ((MtcsTarget*)self)->isSupport=isSupport_cb;
+   ((MtcsTarget*)self)->getVersionString=getVersionString_cb;
+   ((MtcsTarget*)self)->getIsaString=getIsaString_cb;
+
    return self;
 }
 

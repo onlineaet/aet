@@ -259,6 +259,8 @@ static void c_lex_one_token (c_parser *parser, c_token *token, bool raw = false)
          break;
       case CPP_PRAGMA:
          /* We smuggled the cpp_token->u.pragma value in an INTEGER_CST.  */
+         n_debug("c_lex_one_token CPP_PRAGMA_EOL----\n");
+
          token->pragma_kind = (enum pragma_kind) TREE_INT_CST_LOW (token->value);
          token->value = NULL;
          break;
@@ -786,6 +788,7 @@ static bool c_parser_skip_to_closing_brace (c_parser *parser)
 
       switch (token->type){
          case CPP_PRAGMA_EOL:
+            n_debug("c_parser_skip_to_closing_brace CPP_PRAGMA_EOL----\n");
             if (!parser->in_pragma)
                break;
          /* FALLTHRU */
@@ -875,6 +878,8 @@ static void c_parser_skip_to_end_of_block_or_statement (c_parser *parser,
             return;
 
          case CPP_PRAGMA_EOL:
+            n_debug("c_parser_skip_to_end_of_block_or_statement CPP_PRAGMA_EOL----\n");
+
             if (parser->in_pragma)
                return;
             break;
@@ -1714,7 +1719,7 @@ static tree c_parser_declaration_or_fndef (c_parser *parser, bool fndef_ok,
          n_debug("分析声明说明符 --- 在声明说明符之前有一个泛型函数定义或声明---- %p\n",funcGenericModel);
       }
       if(c_parser_next_token_is (parser, CPP_COMPL)){
-         n_info("进这里处理析构函数====finalize class:%s",classImpl->className->sysName);
+         n_info("分析声明说明符 进这里处理析构函数====finalize class:%s",classImpl->className->sysName);
          class_finalize_parser(classImpl->classFinalize,classImpl->className);
       }else{
          if(c_parser_next_token_is (parser, CPP_NAME)){
@@ -1822,18 +1827,16 @@ static tree c_parser_declaration_or_fndef (c_parser *parser, bool fndef_ok,
    aet_parser_c_parser_declspecs/*!c_parser_declspecs*/(aetParser, specs, true, true, start_attr_ok,
          true, true, start_attr_ok, true, cla_nonabstract_decl);
    if (parser->error){
-      n_debug("分析声明说明符 出错了 22： have_attrs:%d ", have_attrs);
+      n_debug("分析声明说明符 parser->error 有错误直接回");
       c_parser_skip_to_end_of_block_or_statement (parser);
       return result;
    }
    if (nested && !specs->declspecs_seen_p){
-      n_debug("分析声明说明符 出错了 22： nested:%d ", nested);
       c_parser_error (parser, "expected declaration specifiers");
       c_parser_skip_to_end_of_block_or_statement (parser);
       return result;
    }
    if(aetParser->isAet && mtcs_parser_is_attribute(mtcs_parser_get(),c_parser_peek_token (parser))){
-      n_debug("分析声明说明符 是一个MTCS 属性");
       //解决两个连续的MTCS修饰问题 __device__ __host__ void testkernel(
 mtcs_label:
       mtcs_parser_add_attribute(mtcs_parser_get());
@@ -2253,8 +2256,6 @@ mtcs_label:
                generic_impl_check_var_and_parm(generic_impl_get(),d,init.value);//zclei 10.4.0
                finish_decl (d, init_loc, init.value, init.original_type, asm_name);
                result = d;
-               n_debug("分析声明说明符 111aa 完成带初始化的定义：调用 mtcs_parser_check d:%p genericDefineModel:%p",
-                     d,genericDefineModel);
                mtcs_parser_check(mtcs_parser_get(),d,TRUE);//zclei 检查是不是mtcs变量
                //如果是aet对象 设变量的对象类名是什么
                if(new_object_ctor(new_object_get(),init_loc,d)){//zclei 10.4.0
@@ -2318,7 +2319,6 @@ mtcs_label:
                /* If it exists and is cdk_function declaration whose
                arguments have not been set yet, use its arguments.  */
                if (last_non_id_attrs && last_non_id_attrs->kind == cdk_function){
-                  n_debug("分析声明说明符 -----117：设参数 count:%d decl:%p", testcount,d);
                   tree parms = last_non_id_attrs->u.arg_info->parms;
                   if (DECL_ARGUMENTS (d) == NULL_TREE  && DECL_INITIAL (d) == NULL_TREE)
                      DECL_ARGUMENTS (d) = parms;
@@ -2351,7 +2351,8 @@ mtcs_label:
             if (oacc_routine_data)
                c_finish_oacc_routine (oacc_routine_data, d, false);
             if (d){
-               if(aetParser->isAet && TREE_CODE (d) == FUNCTION_DECL && c_parser_next_token_is (parser, CPP_SEMICOLON)){//zclei
+               if(aetParser->isAet && TREE_CODE (d) == FUNCTION_DECL
+                     && c_parser_next_token_is (parser, CPP_SEMICOLON)){//zclei
                   // error_at(here,"类实现中不能声明函数。类%qs，函数%qs。",classImpl->className->sysName,IDENTIFIER_POINTER(DECL_NAME(d)));
                   error_at(here,"Functions cannot be declared in class implementations %qs %qs",
                         classImpl->className->sysName,IDENTIFIER_POINTER(DECL_NAME(d)));
@@ -2448,8 +2449,6 @@ mtcs_label:
          changeNameOk=class_impl_start_function(classImpl,
                specs,declarator,funcGenericModel!=NULL,permissionLoc,haveAccessControl,permission);
       }
-      n_debug("分析声明说明符 124XX： 分析函数定义 count:%d declarator:%p", testcount,declarator);
-
       if (!start_function (specs, declarator, all_prefix_attrs)){
          n_warning("分析声明说明符 125：函数定义出错了 count:%d declarator:%p", testcount,declarator);
          /* At this point we've consumed:
@@ -28086,7 +28085,6 @@ static nboolean aet_parser_c_parser_declspecs_keyword (AetParser *self,location_
       case RID_AET_PROTECTED:
       case RID_AET_PRIVATE:
       case RID_AET_FINAL:
-         //printf("进这里的RID_AET_FINAL\n");
          class_parser_decorate(classParser);
          break;
       case RID_AET_ENUM:
@@ -28470,12 +28468,10 @@ void aet_parser_c_parser_declspecs (AetParser *self, struct c_declspecs *specs,
       tree align;
       location_t loc = c_parser_peek_token (parser)->location;
       //n_debug("声明说明符语法 00 count:%d  %d",count,(!typespec_ok || specs->typespec_kind == ctsk_tagdef));
-      //aet_print_token(c_parser_peek_token (parser));
       if(mtcs_parser_is_attribute(mtcs_parser_get(),c_parser_peek_token (parser))){
          if(mtcs_parser_add_attribute(mtcs_parser_get()))
             continue;
       }
-
       /* If we cannot accept a type, exit if the next token must start
       one.  Also, if we already have seen a tagged definition,
       a typename would be an error anyway and likely the user
@@ -28789,7 +28785,7 @@ void aet_parser_c_parser_declspecs (AetParser *self, struct c_declspecs *specs,
 out:
    if (end_std_attr_ok
    && c_parser_nth_token_starts_std_attributes (parser, 1)){
-     // n_debug("声明说明符语法 104 count:%d keyword:%d ",count,c_parser_peek_token (parser)->keyword);
+      //n_debug("声明说明符语法 104 count:%d keyword:%d ",count,c_parser_peek_token (parser)->keyword);
       specs->postfix_attrs = c_parser_std_attribute_specifier_sequence (parser);
    }
    //n_debug("声明说明符语法 105 count:%d keyword:%d ",count,c_parser_peek_token (parser)->keyword);

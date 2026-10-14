@@ -393,7 +393,7 @@ rtx_insn *mtcs_emit_emit_insn (MtcsEmit *self,rtx x)
   MtcsRtlData *mtcsRtlData=mtcs_func_get_rtl_data(mtcsFunc);
   rtx_insn *last = mtcs_rtl_data_get_last_insn (mtcsRtlData);
   rtx_insn *insn;
-  n_debug("mtcsemit.c mtcs_emit_emit_insn 00 x:%p\n",x);
+  //n_debug("mtcsemit.c mtcs_emit_emit_insn 00 x:%p\n",x);
   if (x == NULL_RTX)
     return last;
 
@@ -405,11 +405,11 @@ rtx_insn *mtcs_emit_emit_insn (MtcsEmit *self,rtx x)
     case CODE_LABEL:
     case BARRIER:
     case NOTE:
-      n_debug("mtcsemit.c mtcs_emit_emit_insn 11 x:%p code:%d\n",x,GET_CODE (x));
+      //n_debug("mtcsemit.c mtcs_emit_emit_insn 11 x:%p code:%d\n",x,GET_CODE (x));
       insn = as_a <rtx_insn *> (x);
       while (insn){
           rtx_insn *next = NEXT_INSN (insn);
-          n_debug("mtcsemit.c mtcs_emit_emit_insn 22 x:%p code:%d %p\n",x,GET_CODE (x),next);
+          //n_debug("mtcsemit.c mtcs_emit_emit_insn 22 x:%p code:%d %p\n",x,GET_CODE (x),next);
 
           mtcs_emit_add_insn (self,insn);
           last = insn;
@@ -425,7 +425,7 @@ rtx_insn *mtcs_emit_emit_insn (MtcsEmit *self,rtx x)
 #endif
 
     default:
-       n_debug("mtcsemit.c mtcs_emit_emit_insn 33 x:%p code:%d %s\n",x,GET_CODE (x),GET_RTX_NAME(GET_CODE (x)));
+       //n_debug("mtcsemit.c mtcs_emit_emit_insn 33 x:%p code:%d %s\n",x,GET_CODE (x),GET_RTX_NAME(GET_CODE (x)));
 
       last = mtcs_emit_make_insn_raw/*!make_insn_raw*/(self,x);
       mtcs_emit_add_insn (self,last);
@@ -452,7 +452,7 @@ rtx_insn *mtcs_emit_emit (MtcsEmit *self,rtx x, bool allow_barrier_p)
       {
     rtx_insn *insn = mtcs_emit_emit_jump_insn (self,x);
     if (allow_barrier_p  && (any_uncondjump_p (insn) || GET_CODE (x) == RETURN))
-      return mtcs_emit_emit_barrier (self);
+      return mtcs_emit_emit_barrier/*!emit_barrier*/(self);
     return insn;
       }
     case CALL_INSN:

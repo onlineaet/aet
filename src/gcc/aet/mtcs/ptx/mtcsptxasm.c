@@ -91,6 +91,11 @@ static void appOn_cb(MtcsAsm *mtcsAsm,int power)
    fputs (PTX_ASM_APP_ON, mtcsAsm->asmFile);
 }
 
+static void appOff_cb(MtcsAsm *mtcsAsm,int power)
+{
+   fputs (PTX_ASM_APP_OFF, mtcsAsm->asmFile);
+}
+
 //原型 #define JUMP_TABLES_IN_TEXT_SECTION 0
 static int  jumpTableInTextSection_cb (MtcsAsm *mtcsAsm)
 {
@@ -264,7 +269,7 @@ static char *outputPromoteDecl_cb (MtcsAsm *mtcsAsm,const_tree decl,const char *
    mtcs_mode elt_mode =TYPE_MODE (type) == mtcsMode->modes.M_BLKmode ?mtcs_mode_get_Pmode(mtcsMode) :mtcsMode->modes.M_DImode;
    const char *ptx_type = mtcs_mode_get_type/*!nvptx_ptx_type_from_mode*/ (mtcsMode,TYPE_MODE (type), true);
 
-   elt_size |= mtcs_mode_get_size/*GET_MODE_SIZE*/ (mtcsMode,elt_mode);
+   elt_size |= mtcs_mode_get_size/*GET_MODE_SIZE*/(mtcsMode,elt_mode);
    elt_size &= -elt_size; /* Extract LSB set.  */
    n_debug("mtcsptx.c-----nvptx.cc -----90bb-- name:%s size:%d elt_size:%d elt_mode:%d\n",name,size,elt_size,elt_mode);
 
@@ -321,6 +326,7 @@ static void mtcsPtxAsmInit(MtcsPtxAsm *self)
    mtcsAsm->output_align = outputAlign_cb;
    //原型 #define ASM_APP_ON "\t// #APP \n"
    mtcsAsm->app_on = appOn_cb;
+   mtcsAsm->app_off = appOff_cb;
    //原型 #define JUMP_TABLES_IN_TEXT_SECTION 0
    mtcsAsm->jump_tables_in_text_section = jumpTableInTextSection_cb;
    //原型 #define ASM_GENERATE_INTERNAL_LABEL 无缺省实现

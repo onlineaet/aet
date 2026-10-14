@@ -99,12 +99,12 @@ tree  aet_mediator_get_parent_device_array_decl(AetMediator *self,char *sysName,
 
 //根据 decl 获取 decl 对应的 id 局部变量提升到全局后，在mtcsparser中生成一个id号，以便汇编是降级为局部变量
 //decl 是主机的decl 存在 MtcsVarNode中。MtcsVarNode 存在 MtcsVar 的 varArray 中。
-int   aet_mediator_get_promote_decl_id(AetMediator *self,tree decl,AetMediatorUser *send)
+int   aet_mediator_get_promote_decl_id(AetMediator *self,nuint64 hostDeclAddress,AetMediatorUser *send)
 {
    int i;
    for(i=0;i<self->userCount;i++){
       if(self->users[i]!=send){
-         int id = self->users[i]->getPromoteDeclId(self->users[i],decl);
+         int id = self->users[i]->getPromoteDeclId(self->users[i],hostDeclAddress);
          if(id>=0)
             return id;
       }
@@ -190,6 +190,17 @@ char  *aet_mediator_get_object_file(AetMediator *self,AetMediatorUser *send)
    }
    return NULL;
 }
+
+tree  aet_mediator_get_mii_function(AetMediator *self,tree micFndecl,AetMediatorUser *send)
+{
+   int i;
+   for(i=0;i<self->userCount;i++){
+      if(self->users[i]!=send)
+        return self->users[i]->getMIIFunction(self->users[i],micFndecl);
+   }
+   return NULL;
+}
+
 /**
  * 获取AetMediator
  * 实现声明在aetmediator.h中

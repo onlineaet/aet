@@ -419,7 +419,7 @@ struct _MtcsTarget
    struct {
       int   version;//目标版本
       int   isa;    //指令集架构
-      char *name; //目标名字如cuda、gcn、spirv、opencl等
+      char *name;   //目标名字如cuda、gcn、spirv、opencl等
    }platformInfo;
    //原型  targetm.libfunc_gnu_prefix #define TARGET_LIBFUNC_GNU_PREFIX false
    bool libfunc_gnu_prefix;
@@ -525,8 +525,6 @@ struct _MtcsTarget
    //避免头文件引入 value-query.h
    //MtcsSsaPropagate *mtcsSsaPropagate;
    void *mtcsSsaPropagate;
-   //不再使用 2025-10-05 MtcsSsaStrlen *mtcsSsaStrlen;
-   //不再使用 2025-10-05 MtcsSsaSprintf *mtcsSsaSprintf;
    MtcsOutofSsa *mtcsOutofSsa;
    MtcsCfgLoop *mtcsCfgLoop;
    MtcsLoopIv *mtcsLoopIv;
@@ -544,17 +542,24 @@ struct _MtcsTarget
    void   *mtcsSsaCoalesce;
    //获取需要link的函数名
    char *(*getLinkFuncName)(MtcsTarget *self);
-   //由于同一个平台有多个版本号，往往这些版本号是全局的，所以在编译前用每个target的版本号设为全局变量。
+   //由于同一个平台有多个版本号，往往这些版本号是全局的，所以在编译前把每个target的版本号设为全局变量。
    void (*publishVersion)(MtcsTarget *self);
+   nboolean (*isSupport)(MtcsTarget *self,char *target ,char *isa);
+   char *(*getIsaString)(MtcsTarget *self);
+   char *(*getVersionString)(MtcsTarget *self);
 };
 
 void                mtcs_target_init(MtcsTarget *self);
 void                mtcs_target_set_version(MtcsTarget *self,int version);
 int                 mtcs_target_get_version(MtcsTarget *self);
+const char         *mtcs_target_get_version_string(MtcsTarget *self);
 void                mtcs_target_set_isa(MtcsTarget *self,int isa);
 int                 mtcs_target_get_isa(MtcsTarget *self);
+const char         *mtcs_target_get_isa_string(MtcsTarget *self);
 void                mtcs_target_set_platform_name(MtcsTarget *self,char *name);
 const char         *mtcs_target_get_platform_name(MtcsTarget *self);
+//是否支持平台和架构
+nboolean            mtcs_target_is_support(MtcsTarget *self,char *target,char *isa);
 //原型 TARGET_SUPPORTS_ALIASES defaults.h nvptx.h
 void                mtcs_target_set_supports_aliases(MtcsTarget *self,int supports);
 

@@ -113,9 +113,10 @@ poly_uint16    mtcs_mode_get_bitsize_poly(MtcsMode *self,mtcs_mode mode)
  */
 unsigned int mtcs_mode_get_alignment (MtcsMode *self,mtcs_mode mode)
 {
-    MtcsTarget *mtcsTarget=(MtcsTarget *)self->target;
-    MtcsAlign *mtcsAlign=mtcs_target_get_align(mtcsTarget);
-    return MIN (mtcs_align_get_biggest_alignment/*!BIGGEST_ALIGNMENT*/(mtcsAlign), MAX (1, self->modeBaseAlign[mode]*BITS_PER_UNIT));
+   MtcsTarget *mtcsTarget=(MtcsTarget *)self->target;
+   MtcsAlign *mtcsAlign=mtcs_target_get_align(mtcsTarget);
+   return MIN (mtcs_align_get_biggest_alignment/*!BIGGEST_ALIGNMENT*/(mtcsAlign),
+         MAX (1, self->modeBaseAlign[mode]*BITS_PER_UNIT));
 }
 
 unsigned short    mtcs_mode_get_precision(MtcsMode *self,mtcs_mode mode)
@@ -167,7 +168,7 @@ void     mtcs_mode_set_ibit(MtcsMode *self ,nuchar *modeIBit)
 //原型 GET_MODE_CLASS
 unsigned char  mtcs_mode_get_class(MtcsMode *self,mtcs_mode mode)
 {
-    return self->modeClass[mode];
+   return self->modeClass[mode];
 }
 
 nuint   mtcs_mode_get_number(MtcsMode *self)
@@ -196,12 +197,10 @@ mtcs_mode mtcs_mode_get_Pmode(MtcsMode *self)
 
 const char    *mtcs_mode_get_name(MtcsMode *self,mtcs_mode mode)
 {
-    //printf("mtcs_mode_get_name --- %d %d\n",mode, self->maxNumber);
-    gcc_assert (mode >= 0 && mode < self->maxNumber);
-    return self->modeName[mode];
+   //printf("mtcs_mode_get_name --- %d %d\n",mode, self->maxNumber);
+   gcc_assert (mode >= 0 && mode < self->maxNumber);
+   return self->modeName[mode];
 }
-
-
 
 /**
  * 原型 toplev.cc do_compile()
@@ -230,23 +229,23 @@ void mtcs_mode_init_int(MtcsMode *self)
  */
 nuint  mtcs_mode_get_modes_by_class(MtcsMode *self,enum mode_class cl,nuint *modes,int len)
 {
-      // const unsigned char modeClass[PTX_NUM_MACHINE_MODES] =
-       int i;
-       int count=0;
-       for(i=0;i<self->number;i++){
-          if(self->modeClass[i]==cl){
-              modes[count++]=(mtcs_mode)i;
-          }
-       }
-       if(count>=len){
-           n_error("modes溢出 %d %d",count,len);
-       }
-       return count;
+   // const unsigned char modeClass[PTX_NUM_MACHINE_MODES] =
+   int i;
+   int count=0;
+   for(i=0;i<self->number;i++){
+      if(self->modeClass[i]==cl){
+         modes[count++]=(mtcs_mode)i;
+      }
+   }
+   if(count>=len){
+      n_error("modes溢出 %d %d",count,len);
+   }
+   return count;
 }
 
 const char    *mtcs_mode_get_type(MtcsMode *self,mtcs_mode mode, nboolean promote)
 {
-    return self->get_type(self,mode,promote);
+   return self->get_type(self,mode,promote);
 }
 
 /* Nonzero if MODE is a scalar/vector accum mode.  */
@@ -257,8 +256,8 @@ const char    *mtcs_mode_get_type(MtcsMode *self,mtcs_mode mode, nboolean promot
 //machmode.h
 nboolean mtcs_mode_is_accum_p(MtcsMode *self,mtcs_mode mode)
 {
-    unsigned char modeClass=mtcs_mode_get_class(self,mode);
-    return (modeClass==MODE_ACCUM || modeClass==MODE_VECTOR_ACCUM);
+   unsigned char modeClass=mtcs_mode_get_class(self,mode);
+   return (modeClass==MODE_ACCUM || modeClass==MODE_VECTOR_ACCUM);
 }
 /* Nonzero if MODE is a scalar/vector fract mode.  */
 //原型
@@ -484,14 +483,14 @@ HOST_WIDE_INT mtcs_mode_trunc_int_for_mode (MtcsMode *self,HOST_WIDE_INT c, mtcs
   scalar_mode smode =mtcs_mode_as_a/*!as_a*/<scalar_mode> (self,(machine_mode)mode);
   int width = mtcs_mode_get_precision(self,(mtcs_mode)smode);/*GET_MODE_PRECISION (smode);*/
   /* You want to truncate to a _what_?  */
+  //n_debug("mtcsmode.c mtcs_mode_trunc_int_for_mode 00 c:"HOST_WIDE_INT_PRINT_DEC" mode:%d width:%d HOST_BITS_PER_WIDE_INT:%d\n",
+        //c,mode,width,HOST_BITS_PER_WIDE_INT);
   gcc_assert (mtcs_mode_is_int(self,mode)/*SCALAR_INT_MODE_P (mode)*/);
-  n_debug("mtcsmode.c mtcs_mode_trunc_int_for_mode 00 c:"HOST_WIDE_INT_PRINT_DEC" mode:%d width:%d HOST_BITS_PER_WIDE_INT:%d\n",
-        c,mode,width,HOST_BITS_PER_WIDE_INT);
   /* Canonicalize BImode to 0 and STORE_FLAG_VALUE.  */
   if (smode == self->modes.M_BImode)
     return c & 1 ? STORE_FLAG_VALUE : 0;
-  n_debug("mtcsmode.c mtcs_mode_trunc_int_for_mode 11 c:"HOST_WIDE_INT_PRINT_DEC" mode:%d width:%d HOST_BITS_PER_WIDE_INT:%d\n",
-        c,mode,width,HOST_BITS_PER_WIDE_INT);
+  //n_debug("mtcsmode.c mtcs_mode_trunc_int_for_mode 11 c:"HOST_WIDE_INT_PRINT_DEC" mode:%d width:%d HOST_BITS_PER_WIDE_INT:%d\n",
+        //c,mode,width,HOST_BITS_PER_WIDE_INT);
   /* Sign-extend for the requested mode.  */
 
   if (width < HOST_BITS_PER_WIDE_INT){
@@ -500,8 +499,8 @@ HOST_WIDE_INT mtcs_mode_trunc_int_for_mode (MtcsMode *self,HOST_WIDE_INT c, mtcs
       c &= (sign << 1) - 1;
       c ^= sign;
       c -= sign;
-      n_debug("mtcsmode.c mtcs_mode_trunc_int_for_mode 22 c:"HOST_WIDE_INT_PRINT_DEC" mode:%d width:%d HOST_BITS_PER_WIDE_INT:%d\n",
-            c,mode,width,HOST_BITS_PER_WIDE_INT);
+      //n_debug("mtcsmode.c mtcs_mode_trunc_int_for_mode 22 c:"HOST_WIDE_INT_PRINT_DEC" mode:%d width:%d HOST_BITS_PER_WIDE_INT:%d\n",
+           // c,mode,width,HOST_BITS_PER_WIDE_INT);
   }
 
   return c;
@@ -523,7 +522,6 @@ poly_int64     mtcs_mode_trunc_int_for_mode (MtcsMode *self,poly_int64 x, mtcs_m
       x.coeffs[i] = mtcs_mode_trunc_int_for_mode (self,x.coeffs[i], mode);
    return x;
 }
-
 
 /* Return the mode to use to pass or return a scalar of TYPE and MODE.
    PUNSIGNEDP points to the signedness of the type and may be adjusted
@@ -573,7 +571,8 @@ mtcs_mode  mtcs_mode_promote_function_mode (MtcsMode *self,const_tree type, mtcs
       (void)(TYPE);                 \//void仅仅是去掉编译器对没有使用的局部变量的警告。
     }
 */
-mtcs_mode mtcs_mode_promote_mode (MtcsMode *self,const_tree type ATTRIBUTE_UNUSED, mtcs_mode mode,int *punsignedp ATTRIBUTE_UNUSED)
+mtcs_mode mtcs_mode_promote_mode (MtcsMode *self,const_tree type ATTRIBUTE_UNUSED,
+      mtcs_mode mode,int *punsignedp ATTRIBUTE_UNUSED)
 {
 //#ifdef PROMOTE_MODE
   enum tree_code code;
@@ -670,7 +669,8 @@ mtcs_mode mtcs_mode_promote_ssa_mode (MtcsMode *self,const_tree name, int *punsi
    }
 
    tree type = TREE_TYPE (name);
-   n_debug("mtcsmode.c mtcs_mode_promote_ssa_mode 11 mode:%d type:%s\n",TYPE_MODE (type),get_tree_code_name(TREE_CODE(type)));
+   n_debug("mtcsmode.c mtcs_mode_promote_ssa_mode 11 mode:%d type:%s maxNumber:%d\n",
+         TYPE_MODE (type),get_tree_code_name(TREE_CODE(type)),self->maxNumber);
    //aet_print_tree(type);
    int unsignedp = TYPE_UNSIGNED (type);
    machine_mode typeMode=TYPE_MODE (type);//转成mtcs_mode

@@ -30,11 +30,11 @@ typedef struct _MtcsVarNode MtcsVarNode;
 struct _MtcsVarNode{
     MtcsNode parent;
     varpool_node *node;
-    tree hostDecl;
     int promoteId;
     //由于优化或其它原因由内部创建的变量，一般在pass创建，比如在 tree-switch-conversion.cc 中的 pass "switchconv"
     //创建全局变量CSWTCH.4
     nboolean innerCreate;
+    nuint64 hostDeclAddress;
 };
 
 //typedef enum{
@@ -54,7 +54,6 @@ struct _MtcsVar
 {
    MtcsComponent parent;
    NPtrArray *varArray;
-   NPtrArray *hostArray;
    tree last_assemble_variable_decl;
 };
 
@@ -72,5 +71,6 @@ bool          mtcs_var_output_variables (MtcsVar *self);
 char         *mtcs_var_assemble_local_shared(MtcsVar *self,int prmoteId);
 char         *mtcs_var_replace_dot(MtcsVar *self,char *name);
 
+nboolean     mtcs_var_have_host_decl(MtcsVar *self,tree hostDecl);
 
 #endif

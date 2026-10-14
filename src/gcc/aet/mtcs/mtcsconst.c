@@ -84,6 +84,7 @@
 #include "aet/aetprinttree.h"
 #include "mtcsconst.h"
 #include "mtcstarget.h"
+#include "mtcstool.h"
 
 #ifndef LOGICAL_OP_NON_SHORT_CIRCUIT
 #define LOGICAL_OP_NON_SHORT_CIRCUIT \
@@ -3853,6 +3854,9 @@ static tree fold_addr_of_array_ref_difference (MtcsConst *self,location_t loc, t
 static tree merge_truthop_with_opposite_arm (MtcsConst *self,location_t loc, tree op, tree cmpop,
              bool rhs_only)
 {
+   MtcsMode *mtcsMode=MTCS_GET_MODE_OBJECT(self);
+   MtcsTarget *mtcsTarget=(MtcsTarget *)mtcsMode->target;
+
    enum tree_code code = TREE_CODE (cmpop);
    enum tree_code truthop_code = TREE_CODE (op);
    tree lhs = TREE_OPERAND (op, 0);
@@ -3885,7 +3889,7 @@ static tree merge_truthop_with_opposite_arm (MtcsConst *self,location_t loc, tre
       }
    }
 
-   inv_code = invert_tree_comparison (code, HONOR_NANS (type));
+   inv_code = invert_tree_comparison (code, mtcs_mode_honor_nans/*!HONOR_NANS*/(mtcsMode,type));
    if (inv_code == rhs_code
    && operand_equal_p (TREE_OPERAND (rhs, 0), TREE_OPERAND (cmpop, 0), 0)
    && operand_equal_p (TREE_OPERAND (rhs, 1), TREE_OPERAND (cmpop, 1), 0))
@@ -4693,12 +4697,17 @@ static tree extract_muldiv_1 (MtcsConst *self,tree t, tree c, enum tree_code cod
    enum tree_code tcode = TREE_CODE (t);
    tree ctype = type;
    if (wide_type){
+      n_debug("extract_muldiv_1--\n");
+      aet_print_tree(t);
+      aet_print_tree(type);
+
       if (TREE_CODE (type) == BITINT_TYPE || TREE_CODE (wide_type) == BITINT_TYPE){
          if (TYPE_PRECISION (wide_type) > TYPE_PRECISION (type))
             ctype = wide_type;
       }else if (mtcs_mode_get_size/*!GET_MODE_SIZE*/(mtcsMode,
             mtcs_mode_scalar_int_type_mode/*!SCALAR_INT_TYPE_MODE*/(mtcsMode,wide_type))
-            > mtcs_mode_get_size/*!GET_MODE_SIZE*/(mtcsMode,mtcs_mode_scalar_int_type_mode/*!SCALAR_INT_TYPE_MODE*/(mtcsMode,type)))
+            > mtcs_mode_get_size/*!GET_MODE_SIZE*/(mtcsMode,
+                  mtcs_mode_scalar_int_type_mode/*!SCALAR_INT_TYPE_MODE*/(mtcsMode,type)))
          ctype = wide_type;
    }
    tree t1, t2;
@@ -5547,7 +5556,7 @@ static tree fold_comparison (MtcsConst *self,location_t loc, enum tree_code code
             + integer_onep (low_result)){
                case 0:
                   /* Always false.  */
-                  return omit_one_operand_loc (loc, type, integer_zero_node, arg0);
+                  return mtcs_const_omit_one_operand_loc/*!omit_one_operand_loc*/(self,loc, type, integer_zero_node, arg0);
                case 1:
                   code = LT_EXPR;
                   break;
@@ -5568,7 +5577,7 @@ static tree fold_comparison (MtcsConst *self,location_t loc, enum tree_code code
                   break;
                case 7:
                   /* Always true.  */
-                  return omit_one_operand_loc (loc, type, integer_one_node, arg0);
+                  return mtcs_const_omit_one_operand_loc/*!omit_one_operand_loc*/(self,loc, type, integer_one_node, arg0);
             }
 
             return mtcs_const_fold_build2_loc/*!fold_build2_loc*/(self,loc, code, type, cval1, cval2);
@@ -5591,6 +5600,7 @@ tree mtcs_const_fold_binary_loc (MtcsConst *self,location_t loc, enum tree_code 
    MtcsTarget *mtcsTarget=(MtcsTarget *)mtcsMode->target;
    MtcsDfa   *mtcsDfa=mtcs_target_get_dfa(mtcsTarget);
    MtcsTree  *mtcsTree =mtcs_target_get_tree(mtcsTarget);
+   MtcsPort  *mtcsPort =mtcs_target_get_port(mtcsTarget);
 
    enum tree_code_class kind = TREE_CODE_CLASS (code);
    tree arg0, arg1, tem;
@@ -5648,9 +5658,17 @@ tree mtcs_const_fold_binary_loc (MtcsConst *self,location_t loc, enum tree_code 
    if (kind == tcc_comparison && tree_swap_operands_p (arg0, arg1))
       return mtcs_const_fold_build2_loc(self,loc, swap_tree_comparison (code), type, op1, op0);
 
-   tem = generic_simplify (loc, code, type, op0, op1);
-   if (tem)
+   tree ts[]={type,op0,op1};
+   //把设备的tree转成主机的tree generic_simplify调用的是generic-matchxx这是主机文件
+   mtcs_port_device_to_host(mtcsPort,ts,3);
+   tem = generic_simplify (loc, code, ts[0], ts[1],ts[2]);
+   if (tem){
+      tem = mtcs_port_host_to_device(mtcsPort,tem);
       return tem;
+   }
+   else{
+      mtcs_port_host_to_device(mtcsPort,ts,3);
+   }
 
    /* ARG0 is the first operand of EXPR, and ARG1 is the second operand.
 
@@ -5729,10 +5747,12 @@ tree mtcs_const_fold_binary_loc (MtcsConst *self,location_t loc, enum tree_code 
          if (TREE_CODE (arg0) == ADDR_EXPR && handled_component_p (TREE_OPERAND (arg0, 0))){
             tree base;
             poly_int64 coffset;
-            base = mtcs_dfa_get_addr_base_and_unit_offset/*!get_addr_base_and_unit_offset*/(mtcsDfa,TREE_OPERAND (arg0, 0),&coffset);
+            base = mtcs_dfa_get_addr_base_and_unit_offset/*!get_addr_base_and_unit_offset*/
+                  (mtcsDfa,TREE_OPERAND (arg0, 0),&coffset);
             if (!base)
                return NULL_TREE;
-            return mtcs_const_fold_build2/*!fold_build2*/(self,MEM_REF, type,build1 (ADDR_EXPR, TREE_TYPE (arg0), base),
+            return mtcs_const_fold_build2/*!fold_build2*/(self,
+                  MEM_REF, type,build1 (ADDR_EXPR, TREE_TYPE (arg0), base),
                   mtcs_const_int_const_binop/*!int_const_binop*/(self,PLUS_EXPR, arg1,size_int (coffset)));
          }
 
@@ -5756,7 +5776,8 @@ tree mtcs_const_fold_binary_loc (MtcsConst *self,location_t loc, enum tree_code 
             && operand_equal_p (arg0, TREE_OPERAND (TREE_OPERAND (arg1, 0), 0), 0)){
                tree cst0 = TREE_OPERAND (TREE_OPERAND (arg1, 0), 1);
                tree cst1 = TREE_OPERAND (arg1, 1);
-               tree sum = mtcs_const_fold_binary_loc/*!fold_binary_loc*/(self,loc, PLUS_EXPR, TREE_TYPE (cst1),cst1, cst0);
+               tree sum = mtcs_const_fold_binary_loc/*!fold_binary_loc*/(self,
+                     loc, PLUS_EXPR, TREE_TYPE (cst1),cst1, cst0);
                if (sum && integer_zerop (sum))
                   return mtcs_const_fold_convert_loc/*!fold_convert_loc*/(self,loc, type,
                mtcs_const_fold_build2_loc(self,loc, TRUNC_MOD_EXPR,TREE_TYPE (arg0), arg0,cst0));
@@ -5821,7 +5842,8 @@ tree mtcs_const_fold_binary_loc (MtcsConst *self,location_t loc, enum tree_code 
             /* Fold __complex__ ( x, 0 ) + __complex__ ( 0, y )
             to __complex__ ( x, y ).  This is not the same for SNaNs or
             if signed zeros are involved.  */
-            if (!mtcs_mode_honor_snans/*!HONOR_SNANS*/(mtcsMode,arg0)  && !HONOR_SIGNED_ZEROS (arg0)  && COMPLEX_FLOAT_TYPE_P (TREE_TYPE (arg0))){
+            if (!mtcs_mode_honor_snans/*!HONOR_SNANS*/(mtcsMode,arg0)
+                  && !HONOR_SIGNED_ZEROS (arg0)  && COMPLEX_FLOAT_TYPE_P (TREE_TYPE (arg0))){
                tree rtype = TREE_TYPE (TREE_TYPE (arg0));
                tree arg0r = fold_unary_loc (loc, REALPART_EXPR, rtype, arg0);
                tree arg0i = fold_unary_loc (loc, IMAGPART_EXPR, rtype, arg0);
@@ -6225,7 +6247,7 @@ tree mtcs_const_fold_binary_loc (MtcsConst *self,location_t loc, enum tree_code 
             /* Fold z * +-I to __complex__ (-+__imag z, +-__real z).
             This is not the same for NaNs or if signed zeros are
             involved.  */
-            if (!HONOR_NANS (arg0)
+            if (!mtcs_mode_honor_nans/*!HONOR_NANS*/(mtcsMode,arg0)
             && !HONOR_SIGNED_ZEROS (arg0)
             && COMPLEX_FLOAT_TYPE_P (TREE_TYPE (arg0))
             && TREE_CODE (arg1) == COMPLEX_CST
@@ -6268,7 +6290,7 @@ tree mtcs_const_fold_binary_loc (MtcsConst *self,location_t loc, enum tree_code 
 
             /* If (C1&C2) == C1, then (X&C1)|C2 becomes (X,C2).  */
             if ((c1 & c2) == c1)
-               return omit_one_operand_loc (loc, type, arg1,TREE_OPERAND (arg0, 0));
+               return mtcs_const_omit_one_operand_loc/*!omit_one_operand_loc*/(self,loc, type, arg1,TREE_OPERAND (arg0, 0));
 
             wide_int msk = wi::mask (width, false,TYPE_PRECISION (TREE_TYPE (arg1)));
 
@@ -6515,18 +6537,18 @@ tree mtcs_const_fold_binary_loc (MtcsConst *self,location_t loc, enum tree_code 
          /* If second arg is constant zero, result is zero, but first arg
          must be evaluated.  */
          if (integer_zerop (arg1))
-            return omit_one_operand_loc (loc, type, arg1, arg0);
+            return mtcs_const_omit_one_operand_loc/*!omit_one_operand_loc*/(self,loc, type, arg1, arg0);
          /* Likewise for first arg, but note that only the TRUTH_AND_EXPR
          case will be handled here.  */
          if (integer_zerop (arg0))
-            return omit_one_operand_loc (loc, type, arg0, arg1);
+            return mtcs_const_omit_one_operand_loc/*!omit_one_operand_loc*/(self,loc, type, arg0, arg1);
 
          /* !X && X is always false.  */
          if (TREE_CODE (arg0) == TRUTH_NOT_EXPR  && operand_equal_p (TREE_OPERAND (arg0, 0), arg1, 0))
-            return omit_one_operand_loc (loc, type, integer_zero_node, arg1);
+            return mtcs_const_omit_one_operand_loc/*!omit_one_operand_loc*/(self,loc, type, integer_zero_node, arg1);
          /* X && !X is always false.  */
          if (TREE_CODE (arg1) == TRUTH_NOT_EXPR && operand_equal_p (arg0, TREE_OPERAND (arg1, 0), 0))
-            return omit_one_operand_loc (loc, type, integer_zero_node, arg0);
+            return mtcs_const_omit_one_operand_loc/*!omit_one_operand_loc*/(self,loc, type, integer_zero_node, arg0);
 
          /* A < X && A + 1 > Y ==> A < X && A >= Y.  Normally A + 1 > Y
          means A >= Y && A != MAX, but in this case we know that
@@ -6568,18 +6590,18 @@ tree mtcs_const_fold_binary_loc (MtcsConst *self,location_t loc, enum tree_code 
          /* If second arg is constant true, result is true, but we must
          evaluate first arg.  */
          if (TREE_CODE (arg1) == INTEGER_CST && ! integer_zerop (arg1))
-            return omit_one_operand_loc (loc, type, arg1, arg0);
+            return mtcs_const_omit_one_operand_loc/*!omit_one_operand_loc*/(self,loc, type, arg1, arg0);
          /* Likewise for first arg, but note this only occurs here for
          TRUTH_OR_EXPR.  */
          if (TREE_CODE (arg0) == INTEGER_CST && ! integer_zerop (arg0))
-            return omit_one_operand_loc (loc, type, arg0, arg1);
+            return mtcs_const_omit_one_operand_loc/*!omit_one_operand_loc*/(self,loc, type, arg0, arg1);
 
          /* !X || X is always true.  */
          if (TREE_CODE (arg0) == TRUTH_NOT_EXPR  && operand_equal_p (TREE_OPERAND (arg0, 0), arg1, 0))
-            return omit_one_operand_loc (loc, type, integer_one_node, arg1);
+            return mtcs_const_omit_one_operand_loc/*!omit_one_operand_loc*/(self,loc, type, integer_one_node, arg1);
          /* X || !X is always true.  */
          if (TREE_CODE (arg1) == TRUTH_NOT_EXPR  && operand_equal_p (arg0, TREE_OPERAND (arg1, 0), 0))
-            return omit_one_operand_loc (loc, type, integer_one_node, arg0);
+            return mtcs_const_omit_one_operand_loc/*!omit_one_operand_loc*/(self,loc, type, integer_one_node, arg0);
 
          /* (X && !Y) || (!X && Y) is X ^ Y */
          if (TREE_CODE (arg0) == TRUTH_AND_EXPR && TREE_CODE (arg1) == TRUTH_AND_EXPR){
@@ -6617,16 +6639,16 @@ tree mtcs_const_fold_binary_loc (MtcsConst *self,location_t loc, enum tree_code 
          }
          /* Identical arguments cancel to zero.  */
          if (operand_equal_p (arg0, arg1, 0))
-            return omit_one_operand_loc (loc, type, integer_zero_node, arg0);
+            return mtcs_const_omit_one_operand_loc/*!omit_one_operand_loc*/(self,loc, type, integer_zero_node, arg0);
 
          /* !X ^ X is always true.  */
          if (TREE_CODE (arg0) == TRUTH_NOT_EXPR
          && operand_equal_p (TREE_OPERAND (arg0, 0), arg1, 0))
-            return omit_one_operand_loc (loc, type, integer_one_node, arg1);
+            return mtcs_const_omit_one_operand_loc/*!omit_one_operand_loc*/(self,loc, type, integer_one_node, arg1);
 
          /* X ^ !X is always true.  */
          if (TREE_CODE (arg1) == TRUTH_NOT_EXPR  && operand_equal_p (arg0, TREE_OPERAND (arg1, 0), 0))
-            return omit_one_operand_loc (loc, type, integer_one_node, arg0);
+            return mtcs_const_omit_one_operand_loc/*!omit_one_operand_loc*/(self,loc, type, integer_one_node, arg0);
 
          return NULL_TREE;
 
@@ -6878,14 +6900,14 @@ tree mtcs_const_fold_binary_loc (MtcsConst *self,location_t loc, enum tree_code 
                return constant_boolean_node (0, type);
 
             /* Convert (X - c) <= X to true.  */
-            if (!HONOR_NANS (arg1)
+            if (!mtcs_mode_honor_nans/*!HONOR_NANS*/(mtcsMode,arg1)
             && code == LE_EXPR
             && ((code0 == MINUS_EXPR && is_positive >= 0)
             || (code0 == PLUS_EXPR && is_positive <= 0)))
                return constant_boolean_node (1, type);
 
             /* Convert (X + c) >= X to true.  */
-            if (!HONOR_NANS (arg1)
+            if (!mtcs_mode_honor_nans/*!HONOR_NANS*/(mtcsMode,arg1)
             && code == GE_EXPR
             && ((code0 == PLUS_EXPR && is_positive >= 0)
             || (code0 == MINUS_EXPR && is_positive <= 0)))
@@ -6910,12 +6932,12 @@ tree mtcs_const_fold_binary_loc (MtcsConst *self,location_t loc, enum tree_code 
 
          /* Convert ABS_EXPR<x> >= 0 to true.  */
          strict_overflow_p = false;
-         if (code == GE_EXPR && (integer_zerop (arg1) || (! HONOR_NANS (arg0)
+         if (code == GE_EXPR && (integer_zerop (arg1) || (! mtcs_mode_honor_nans/*!HONOR_NANS*/(mtcsMode,arg0)
          && real_zerop (arg1)))  && tree_expr_nonnegative_warnv_p (arg0, &strict_overflow_p)){
             if (strict_overflow_p)
                fold_overflow_warning (("assuming signed overflow does not occur "
                      "when simplifying comparison of absolute value and zero"),WARN_STRICT_OVERFLOW_CONDITIONAL);
-            return omit_one_operand_loc (loc, type, constant_boolean_node (true, type),arg0);
+            return mtcs_const_omit_one_operand_loc/*!omit_one_operand_loc*/(self,loc, type, constant_boolean_node (true, type),arg0);
          }
 
          /* Convert ABS_EXPR<x> < 0 to false.  */
@@ -6926,7 +6948,7 @@ tree mtcs_const_fold_binary_loc (MtcsConst *self,location_t loc, enum tree_code 
             if (strict_overflow_p)
                fold_overflow_warning (("assuming signed overflow does not occur "
                   "when simplifying comparison of absolute value and zero"),WARN_STRICT_OVERFLOW_CONDITIONAL);
-            return omit_one_operand_loc (loc, type, constant_boolean_node (false, type),arg0);
+            return mtcs_const_omit_one_operand_loc/*!omit_one_operand_loc*/(self,loc, type, constant_boolean_node (false, type),arg0);
          }
 
          /* If X is unsigned, convert X < (1 << Y) into X >> Y == 0
@@ -7101,6 +7123,27 @@ tree mtcs_const_fold_build_call_array_loc (MtcsConst *self,location_t loc, tree 
    return tem;
 }
 
+/* Return a tree for the case when the result of an expression is RESULT
+   converted to TYPE and OMITTED was previously an operand of the expression
+   but is now not needed (e.g., we folded OMITTED * 0).
+
+   If OMITTED has side effects, we must evaluate it.  Otherwise, just do
+   the conversion of RESULT to TYPE.  */
+//原型 omit_one_operand_loc fold-const.h fold-const.cc
+tree mtcs_const_omit_one_operand_loc (MtcsConst *self,location_t loc, tree type, tree result, tree omitted)
+{
+   tree t = mtcs_const_fold_convert_loc/*!fold_convert_loc*/(self,loc, type, result);
+
+   /* If the resulting operand is an empty statement, just return the omitted
+   statement casted to void. */
+   if (IS_EMPTY_STMT (t) && TREE_SIDE_EFFECTS (omitted))
+      return build1_loc (loc, NOP_EXPR, void_type_node,fold_ignored_result (omitted));
+
+   if (TREE_SIDE_EFFECTS (omitted))
+      return build2_loc (loc, COMPOUND_EXPR, type,fold_ignored_result (omitted), t);
+
+   return non_lvalue_loc (loc, t);
+}
 
 MtcsConst *mtcs_const_new(MtcsMode *mtcsMode)
 {

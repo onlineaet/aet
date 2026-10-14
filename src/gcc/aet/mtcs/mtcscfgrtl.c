@@ -282,7 +282,7 @@ basic_block mtcs_cfg_rtl_create_basic_block_structure (MtcsCfgRtl *self,rtx_insn
   basic_block bb;
   if (bb_note  && (bb = NOTE_BASIC_BLOCK (bb_note)) != NULL && bb->aux == NULL){
       /* If we found an existing note, thread it back onto the chain.  */
-     n_debug("mtcscfgrtl.c create_basic_block_structure 00\n");
+    // n_debug("mtcscfgrtl.c create_basic_block_structure 00\n");
 
       rtx_insn *after;
       if (LABEL_P (head))
@@ -296,26 +296,26 @@ basic_block mtcs_cfg_rtl_create_basic_block_structure (MtcsCfgRtl *self,rtx_insn
          mtcs_rtl_reorder_insns_nobb/*!reorder_insns_nobb*/(mtcsRTL,bb_note, bb_note, after);
   }else{
       /* Otherwise we must create a note and a basic block structure.  */
-     n_debug("mtcscfgrtl.c create_basic_block_structure 11 head:%p end:%p\n",head,end);
+     //n_debug("mtcscfgrtl.c create_basic_block_structure 11 head:%p end:%p\n",head,end);
 
       bb = alloc_block ();
       mtcs_cfg_rtl_init_rtl_bb_info/*!init_rtl_bb_info*/(self,bb);
       if (!head && !end){
 
          rtx_insn *rt=mtcs_rtl_data_get_last_insn (mtcsRtlData);
-         n_debug("mtcscfgrtl.c create_basic_block_structure 11aa last rtx:%p\n",rt);
-         mtcs_print_rtl_single(stderr,rt);
+         //n_debug("mtcscfgrtl.c create_basic_block_structure 11aa last rtx:%p\n",rt);
+        // mtcs_print_rtl_single(stderr,rt);
 
           head = end = bb_note   = mtcs_emit_emit_note_after/*!emit_note_after*/(mtcsEmit,NOTE_INSN_BASIC_BLOCK,
                   mtcs_rtl_data_get_last_insn/*!get_last_insn*/ (mtcsRtlData));
       }else if (LABEL_P (head) && end){
-         n_debug("mtcscfgrtl.c create_basic_block_structure 22 head:%p end:%p\n",head,end);
+        // n_debug("mtcscfgrtl.c create_basic_block_structure 22 head:%p end:%p\n",head,end);
 
           bb_note = mtcs_emit_emit_note_after/*!emit_note_after*/(mtcsEmit,NOTE_INSN_BASIC_BLOCK, head);
           if (head == end)
             end = bb_note;
       }else{
-         n_debug("mtcscfgrtl.c create_basic_block_structure 33 head:%p end:%p\n",head,end);
+        // n_debug("mtcscfgrtl.c create_basic_block_structure 33 head:%p end:%p\n",head,end);
 
           bb_note = mtcs_emit_emit_note_before/*!emit_note_before */(mtcsEmit,NOTE_INSN_BASIC_BLOCK, head);
           head = bb_note;
@@ -327,7 +327,7 @@ basic_block mtcs_cfg_rtl_create_basic_block_structure (MtcsCfgRtl *self,rtx_insn
   /* Always include the bb note in the block.  */
   if (NEXT_INSN (end) == bb_note)
     end = bb_note;
-  n_debug("mtcscfgrtl.c create_basic_block_structure 44\n");
+  //n_debug("mtcscfgrtl.c create_basic_block_structure 44\n");
 
   BB_HEAD (bb) = head;
   BB_END (bb) = end;
@@ -340,16 +340,16 @@ basic_block mtcs_cfg_rtl_create_basic_block_structure (MtcsCfgRtl *self,rtx_insn
   BB_SET_PARTITION (bb, BB_UNPARTITIONED);
   /* Tag the block so that we know it has been used when considering
      other basic block notes.  */
-  n_debug("mtcscfgrtl.c create_basic_block_structure 55 bb:%p\n",bb);
-   rtx_insn *insn;
-   int i=0;
-   FOR_BB_INSNS (bb, insn){
-      if (!INSN_P (insn))
-         continue;
-      n_debug("mtcscfgrtl.c create_basic_block_structure  打印块中的指令 i:%d block:%p index:%d flags:%d insn:%p\n",
-            i++,bb,bb->index,bb->flags,insn);
-      mtcs_print_rtl_single(stderr,insn);
-   }
+  //n_debug("mtcscfgrtl.c create_basic_block_structure 55 bb:%p\n",bb);
+//   rtx_insn *insn;
+//   int i=0;
+//   FOR_BB_INSNS (bb, insn){
+//      if (!INSN_P (insn))
+//         continue;
+//      n_debug("mtcscfgrtl.c create_basic_block_structure  打印块中的指令 i:%d block:%p index:%d flags:%d insn:%p\n",
+//            i++,bb,bb->index,bb->flags,insn);
+//      mtcs_print_rtl_single(stderr,insn);
+//   }
 
   bb->aux = bb;
   return bb;
@@ -3440,7 +3440,7 @@ rtx_insn * mtcs_cfg_rtl_duplicate_insn_chain (MtcsCfgRtl *self,rtx_insn *from, r
             break;
 
         case BARRIER:
-            emit_barrier ();
+            mtcs_emit_emit_barrier/*!emit_barrier*/(mtcsEmit);
             break;
 
         case NOTE:

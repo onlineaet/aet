@@ -111,9 +111,64 @@ nboolean    mtcs_info_is_internal_fn(tree fndecl)
 nboolean    mtcs_info_is_builtin_fn(tree fndecl)
 {
    if(!fndecl)
-        return FALSE;
-     tree_function_decl &fn = FUNCTION_DECL_CHECK (fndecl)->function_decl;
-     return (fn.built_in_class ==NOT_BUILT_IN
-            && fn.function_code>=MTCS_BUILTIN_FN_CODE_START
-            && fn.function_code<= MTCS_BUILTIN_FN_CODE_END);
+      return FALSE;
+   tree_function_decl &fn = FUNCTION_DECL_CHECK (fndecl)->function_decl;
+   return (fn.built_in_class ==NOT_BUILT_IN
+         && fn.function_code>=MTCS_BUILTIN_FN_CODE_START
+         && fn.function_code<= MTCS_BUILTIN_FN_CODE_END);
+}
+
+/**
+ * intrinsic 函数声明
+ */
+nboolean mtcs_info_is_intrinsic_function_decl(tree fndecl)
+{
+   if(!fndecl)
+      return FALSE;
+   tree intrinsic=lookup_attribute (MTCS_INTRINSIC_FUNCTION_DECL, DECL_ATTRIBUTES (fndecl));
+   if(!intrinsic)
+      return FALSE;
+   return TRUE;
+}
+
+/**
+ * intrinsic 函数实现
+ */
+nboolean mtcs_info_is_intrinsic_function_impl(tree fndecl)
+{
+   if(!fndecl)
+      return FALSE;
+   tree intrinsic=lookup_attribute (MTCS_INTRINSIC_FUNCTION_IMPLEMENTS, DECL_ATTRIBUTES (fndecl));
+   if(!intrinsic)
+      return FALSE;
+   return TRUE;
+}
+
+static char *getIntrinsicImpl(tree fndecl,int index)
+{
+   if(!fndecl)
+      return NULL;
+   tree intrinsic=lookup_attribute (MTCS_INTRINSIC_FUNCTION_IMPLEMENTS, DECL_ATTRIBUTES (fndecl));
+   if(!intrinsic)
+      return NULL;
+   int idx = 0;
+   for (tree a = TREE_VALUE (intrinsic); a; a = TREE_CHAIN (a)){
+      tree d = TREE_VALUE (a);
+      const char *name =TREE_STRING_POINTER (d);
+      if(idx==index)
+         return name;
+      idx++;
+   }
+   return NULL;
+}
+
+//参见 __attribute__((mii("cuda","sm_35")))  0=cuda 1=sm_35
+char *mtcs_info_get_intrinsic_target(tree fndecl)
+{
+   return getIntrinsicImpl(fndecl,0);
+}
+
+char *mtcs_info_get_intrinsic_isa(tree fndecl)
+{
+   return getIntrinsicImpl(fndecl,1);
 }

@@ -34,11 +34,20 @@ struct _MtcsPtxBuiltins
 
 MtcsPtxBuiltins *mtcs_ptx_builtins_new(MtcsMode *mtcsMode);
 //原型 targetm.expand_builtin (exp, target, subtarget, mode, ignore) #define TARGET_EXPAND_BUILTIN nvptx_expand_builtin
-rtx mtcs_ptx_builtins_expand_builtin (MtcsPtxBuiltins *self,tree exp, rtx target, rtx subtarget,
-        machine_mode mode, int ignore);
+rtx      mtcs_ptx_builtins_expand_builtin (MtcsPtxBuiltins *self,tree exp, rtx target, rtx subtarget,
+              machine_mode mode, int ignore);
 //原型 targetm.init_builtins ();#define TARGET_INIT_BUILTINS nvptx_init_builtins
-void mtcs_ptx_builtins_init_builtins(MtcsPtxBuiltins *self);
-char *mtcs_ptx_builtins_get_asm_dim(MtcsPtxBuiltins *self,int pos);
-void  mtcs_ptx_builtins_expand_local_shared  (MtcsPtxBuiltins *self,int id,int reserver);
+void     mtcs_ptx_builtins_init_builtins(MtcsPtxBuiltins *self);
+char    *mtcs_ptx_builtins_get_asm_dim(MtcsPtxBuiltins *self,int pos);
+void     mtcs_ptx_builtins_expand_local_shared  (MtcsPtxBuiltins *self,int id,int reserver);
+/**
+ * 匹配 mtcs_ptx.md中的define expand指令 cpymem
+ */
+nboolean mtcs_ptx_builtins_expand_set_or_cpymem (MtcsPtxBuiltins *self,
+            rtx dst, rtx src, rtx count_exp, rtx val_exp,
+            rtx align_exp, rtx expected_align_exp,
+            rtx expected_size_exp, rtx min_size_exp,
+            rtx max_size_exp, rtx probable_max_size_exp,
+            bool issetmem);
 
 #endif

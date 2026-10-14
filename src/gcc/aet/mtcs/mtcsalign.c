@@ -249,5 +249,85 @@ int mtcs_align_get_dwarf_cie_data_alignment(MtcsAlign *self)
    if(self->get_dwarf_cie_data_alignment)
       return self->get_dwarf_cie_data_alignment(self);
    return (-((int) UNITS_PER_WORD)); //STACK_GROWS_DOWNWARD 肯定定义的 参见 defualts.h
-
 }
+
+
+/* Return OFFSET if XEXP (MEM, 0) - OFFSET is known to be ALIGN
+   bits aligned for 0 <= OFFSET < ALIGN / BITS_PER_UNIT, or
+   -1 if not known.  */
+//原型 get_mem_align_offset emit-rtl.h emit-rtl.cc
+int mtcs_align_get_mem_align_offset (MtcsAlign *self,rtx mem, unsigned int align)
+{
+   MtcsMode *mtcsMode=MTCS_GET_MODE_OBJECT(self);
+   MtcsTarget *mtcsTarget=(MtcsTarget *)mtcsMode->target;
+   MtcsOpinit *mtcsOpinit=mtcs_target_get_opinit(mtcsTarget);
+   MtcsRTL *mtcsRTL=mtcs_target_get_rtl(mtcsTarget);
+   MtcsTree *mtcsTree=mtcs_target_get_tree(mtcsTarget);
+
+   tree expr;
+   poly_uint64 offset;
+
+   /* This function can't use
+   if (!MEM_EXPR (mem) || !MEM_OFFSET_KNOWN_P (mem)
+   || (MAX (MEM_ALIGN (mem),
+   MAX (align, get_object_alignment (MEM_EXPR (mem))))
+   < align))
+   return -1;
+   else
+   return (- MEM_OFFSET (mem)) & (align / BITS_PER_UNIT - 1);
+   for two reasons:
+   - COMPONENT_REFs in MEM_EXPR can have NULL first operand,
+   for <variable>.  get_inner_reference doesn't handle it and
+   even if it did, the alignment in that case needs to be determined
+   from DECL_FIELD_CONTEXT's TYPE_ALIGN.
+   - it would do suboptimal job for COMPONENT_REFs, even if MEM_EXPR
+   isn't sufficiently aligned, the object it is in might be.  */
+   gcc_assert (MEM_P (mem));
+   expr = mtcs_rtl_get_mem_expr/*!MEM_EXPR*/(mtcsRTL,mem);
+   if (expr == NULL_TREE || !mtcs_rtl_is_mem_offset_known_p/*!MEM_OFFSET_KNOWN_P*/(mtcsRTL,mem))
+      return -1;
+
+   offset = mtcs_rtl_get_mem_offset/*!MEM_OFFSET*/(mtcsRTL,mem);
+   if (DECL_P (expr)){
+      if (DECL_ALIGN (expr) < align)
+         return -1;
+   }else if (INDIRECT_REF_P (expr)){
+      if (TYPE_ALIGN (TREE_TYPE (expr)) < (unsigned int) align)
+         return -1;
+   } else if (TREE_CODE (expr) == COMPONENT_REF){
+      while (1){
+         tree inner = TREE_OPERAND (expr, 0);
+         tree field = TREE_OPERAND (expr, 1);
+         tree byte_offset = mtcs_tree_component_ref_field_offset/*!component_ref_field_offset*/(mtcsTree,expr);
+         tree bit_offset = DECL_FIELD_BIT_OFFSET (field);
+
+         poly_uint64 suboffset;
+         if (!byte_offset
+         || !poly_int_tree_p (byte_offset, &suboffset)
+         || !tree_fits_uhwi_p (bit_offset))
+            return -1;
+
+         offset += suboffset;
+         offset += tree_to_uhwi (bit_offset) / BITS_PER_UNIT;
+
+         if (inner == NULL_TREE){
+            if (TYPE_ALIGN (DECL_FIELD_CONTEXT (field)) < (unsigned int) align)
+               return -1;
+            break;
+         }else if (DECL_P (inner)){
+            if (DECL_ALIGN (inner) < align)
+               return -1;
+            break;
+         }else if (TREE_CODE (inner) != COMPONENT_REF)
+            return -1;
+         expr = inner;
+      }
+   }else
+      return -1;
+
+   HOST_WIDE_INT misalign;
+   if (!known_misalignment (offset, align / BITS_PER_UNIT, &misalign))
+      return -1;
+   return misalign;
+}
+

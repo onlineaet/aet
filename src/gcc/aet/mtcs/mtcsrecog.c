@@ -181,7 +181,7 @@ bool mtcs_insn_propagation::apply_to_rvalue_1 (rtx *loc)
          if (mtcs_mode_paradoxical_subreg_p/*!paradoxical_subreg_p*/(mtcsMode,
                GET_MODE (x), GET_MODE (from))   && !CONSTANT_P (to))
             return false;
-         n_debug("mtcsrecog.c apply_to_rvalue_1 创建新的 newval--- to:%p\n",to);
+         //n_debug("mtcsrecog.c apply_to_rvalue_1 创建新的 newval--- to:%p\n",to);
          newval = mtcs_simplify_rtx_subreg/*!simplify_subreg*/(mtcsSimplifyRtx,
                GET_MODE (x), to, GET_MODE (from),mtcs_mode_subreg_lowpart_offset/*!subreg_lowpart_offset*/(mtcsMode,
                      GET_MODE (x), GET_MODE (from)));
@@ -206,17 +206,17 @@ bool mtcs_insn_propagation::apply_to_rvalue_1 (rtx *loc)
             if (GET_CODE (*iter) == SUBREG)
                return false;
       }
-      n_debug("mtcsrecog.c apply_to_rvalue_1 00 should_unshare:%d x:%p insn:%p\n",should_unshare,x,insn);
-      mtcs_print_rtl_single(stderr,x);
+      //n_debug("mtcsrecog.c apply_to_rvalue_1 00 should_unshare:%d x:%p insn:%p\n",should_unshare,x,insn);
+      //mtcs_print_rtl_single(stderr,x);
       testprint();
       if (should_unshare)
          mtcs_recog_validate_unshare_change/*!validate_unshare_change*/(mtcsRecog,insn, loc, newval, 1);
       else
          mtcs_recog_validate_change/*!validate_change*/(mtcsRecog,insn, loc, newval, 1);
-      n_debug("mtcsrecog.c apply_to_rvalue_1 00xx should_unshare:%d\n",should_unshare);
-       testprint();
+      //n_debug("mtcsrecog.c apply_to_rvalue_1 00xx should_unshare:%d\n",should_unshare);
+      //testprint();
       if (mem_depth && !REG_P (newval) && !CONSTANT_P (newval)){
-         n_debug("mtcsrecog.c mtcs_insn_propagation xxx should_unshare:%d mem_depth:%d\n",should_unshare,mem_depth);
+         //n_debug("mtcsrecog.c mtcs_insn_propagation xxx should_unshare:%d mem_depth:%d\n",should_unshare,mem_depth);
 
          /* We're substituting into an address, but TO will have the
          form expected outside an address.  Canonicalize it if
@@ -228,7 +228,7 @@ bool mtcs_insn_propagation::apply_to_rvalue_1 (rtx *loc)
             gcc_unreachable ();
          if (should_unshare
          && mtcs_recog_num_validated_changes/*!num_validated_changes*/(mtcsRecog) != old_num_changes + 1){
-            n_debug("mtcsrecog.c mtcs_insn_propagation yyy should_unshare:%d mem_depth:%d\n",should_unshare,mem_depth);
+            //n_debug("mtcsrecog.c mtcs_insn_propagation yyy should_unshare:%d mem_depth:%d\n",should_unshare,mem_depth);
 
             /* TO is owned by someone else, so create a copy and
             return TO to its original form.  */
@@ -242,8 +242,8 @@ bool mtcs_insn_propagation::apply_to_rvalue_1 (rtx *loc)
       result_flags |= UNSIMPLIFIED;
       return true;
    }
-   n_debug("mtcsrecog.c apply_to_rvalue_1 11 *loc:%p x:%p from:%p to:%p\n",*loc,x,from,to);
-   mtcs_print_rtl_single(stderr,*loc);
+   //n_debug("mtcsrecog.c apply_to_rvalue_1 11 *loc:%p x:%p from:%p to:%p\n",*loc,x,from,to);
+   //mtcs_print_rtl_single(stderr,*loc);
    /* Recursively apply the substitution and see if we can simplify
    the result.  This specifically shouldn't use simplify_gen_* for
    speculative simplifications, since we want to avoid generating new
@@ -413,15 +413,15 @@ bool mtcs_insn_propagation::apply_to_rvalue_1 (rtx *loc)
          unshare |= changes_t[i].unshare;
          changes_t[i].unshare = false;
       }
-      n_debug("mtcsrecog.c apply_to_rvalue_1 22 x:%p\n",x);
-       testprint();
+     // n_debug("mtcsrecog.c apply_to_rvalue_1 22 x:%p\n",x);
+      // testprint();
       if (unshare)
          mtcs_recog_validate_unshare_change/*!validate_unshare_change*/(mtcsRecog,insn, loc, newx, 1);
       else
          mtcs_recog_validate_change/*!validate_change*/(mtcsRecog,insn, loc, newx, 1);
    }
-   n_debug("mtcsrecog.c apply_to_rvalue_1 33 x:%p\n",x);
-    testprint();
+  // n_debug("mtcsrecog.c apply_to_rvalue_1 33 x:%p\n",x);
+   // testprint();
    return true;
 }
 
@@ -440,8 +440,8 @@ bool mtcs_insn_propagation::apply_to_lvalue_1 (rtx dest)
          return false;
       dest = XEXP (dest, 0);
    }
-   n_debug("mtcsrecog.c apply_to_lvalue_1 00 dest:%p MEM_P (dest):%p\n",dest,MEM_P (dest));
-   testprint();
+   //n_debug("mtcsrecog.c apply_to_lvalue_1 00 dest:%p MEM_P (dest):%p\n",dest,MEM_P (dest));
+   //testprint();
    if (MEM_P (dest))
       return apply_to_mem_1 (dest);
 
@@ -450,18 +450,18 @@ bool mtcs_insn_propagation::apply_to_lvalue_1 (rtx dest)
    || dest == old_dest
    || !REG_P (dest)
    || !mtcs_rtlanal_reg_overlap_mentioned_p/*!reg_overlap_mentioned_p*/(mtcsRtlanal,dest, from)){
-      n_debug("mtcsrecog.c apply_to_lvalue_1 11 dest:%p\n",dest);
-      testprint();
+      //n_debug("mtcsrecog.c apply_to_lvalue_1 11 dest:%p\n",dest);
+      //testprint();
       return true;
    }
-   n_debug("mtcsrecog.c apply_to_lvalue_1 22 dest:%p\n",dest);
-    testprint();
+   //n_debug("mtcsrecog.c apply_to_lvalue_1 22 dest:%p\n",dest);
+    ///testprint();
    if (SUBREG_P (old_dest)
    && SUBREG_REG (old_dest) == dest
    && !mtcs_rtlanal_read_modify_subreg_p/*!read_modify_subreg_p*/(mtcsRtlanal,old_dest))
       return true;
-   n_debug("mtcsrecog.c apply_to_lvalue_1 33 dest:%p\n",dest);
-    testprint();
+   //n_debug("mtcsrecog.c apply_to_lvalue_1 33 dest:%p\n",dest);
+    //testprint();
    failure_reason = "is part of a read-write destination";
    return false;
 }
@@ -472,8 +472,8 @@ bool mtcs_insn_propagation::apply_to_lvalue_1 (rtx dest)
 bool mtcs_insn_propagation::apply_to_pattern_1 (rtx *loc)
 {
    rtx body = *loc;
-   n_debug("mtcsrecog.c insn_propagation::apply_to_pattern_1 *loc:%p code:%d %s\n",*loc,GET_CODE(body),GET_RTX_NAME(GET_CODE(body)));
-   mtcs_print_rtl_single(stderr,body);
+  // n_debug("mtcsrecog.c insn_propagation::apply_to_pattern_1 *loc:%p code:%d %s\n",*loc,GET_CODE(body),GET_RTX_NAME(GET_CODE(body)));
+   //mtcs_print_rtl_single(stderr,body);
    switch (GET_CODE (body)){
       case COND_EXEC:
          return (apply_to_rvalue_1 (&COND_EXEC_TEST (body))  && apply_to_pattern_1 (&COND_EXEC_CODE (body)));
@@ -526,11 +526,11 @@ bool mtcs_insn_propagation::apply_to_pattern_1 (rtx *loc)
 bool mtcs_insn_propagation::apply_to_pattern (rtx *loc)
 {
    unsigned int num_changes = mtcs_recog_num_validated_changes/*!num_validated_changes*/(mtcsRecog);
-   n_debug("mtcsrecog.c nsn_propagation::apply_to_pattern 00 *loc:%p num_changes:%d\n",*loc,num_changes);
-   mtcs_print_rtl_single(stderr,*loc);
+   //n_debug("mtcsrecog.c nsn_propagation::apply_to_pattern 00 *loc:%p num_changes:%d\n",*loc,num_changes);
+   //mtcs_print_rtl_single(stderr,*loc);
    bool res = apply_to_pattern_1 (loc);
-   n_debug("mtcsrecog.c nsn_propagation::apply_to_pattern 11 *loc:%p num_changes:%d res:%d\n",*loc,num_changes,res);
-   mtcs_print_rtl_single(stderr,*loc);
+  // n_debug("mtcsrecog.c nsn_propagation::apply_to_pattern 11 *loc:%p num_changes:%d res:%d\n",*loc,num_changes,res);
+  // mtcs_print_rtl_single(stderr,*loc);
    if (!res)
       mtcs_recog_cancel_changes/*!cancel_changes*/(mtcsRecog,num_changes);
    return res;
@@ -857,139 +857,142 @@ int mtcs_recog_asm_operand_ok (MtcsRecog *self,rtx op, const char *constraint, c
    MtcsTarget *mtcsTarget =(MtcsTarget *)mtcsMode->target;
    MtcsPreds *mtcsPreds=mtcs_target_get_preds(mtcsTarget);
 
-  int result = 0;
-  bool incdec_ok = false;
-  /* Use constrain_operands after reload.  */
-  gcc_assert (!reload_completed);
-  /* Empty constraint string is the same as "X,...,X", i.e. X for as
-     many alternatives as required to match the other operands.  */
-  if (*constraint == '\0')
-    result = 1;
+   int result = 0;
+   bool incdec_ok = false;
+   /* Use constrain_operands after reload.  */
+   gcc_assert (!reload_completed);
+   /* Empty constraint string is the same as "X,...,X", i.e. X for as
+   many alternatives as required to match the other operands.  */
+   if (*constraint == '\0')
+      result = 1;
 
-  while (*constraint){
+   while (*constraint){
       enum constraint_num cn;
       char c = *constraint;
       int len;
       switch (c){
-        case ',':
-          constraint++;
-          continue;
+         case ',':
+            constraint++;
+            continue;
 
-        case '0': case '1': case '2': case '3': case '4':
-        case '5': case '6': case '7': case '8': case '9':
-          /* If caller provided constraints pointer, look up
-             the matching constraint.  Otherwise, our caller should have
-             given us the proper matching constraint, but we can't
-             actually fail the check if they didn't.  Indicate that
-             results are inconclusive.  */
-          if (constraints){
-              char *end;
-              unsigned long match;
-              match = strtoul (constraint, &end, 10);
-              if (!result)
+         case '0': case '1': case '2': case '3': case '4':
+         case '5': case '6': case '7': case '8': case '9':
+            /* If caller provided constraints pointer, look up
+            the matching constraint.  Otherwise, our caller should have
+            given us the proper matching constraint, but we can't
+            actually fail the check if they didn't.  Indicate that
+            results are inconclusive.  */
+            if (constraints){
+               char *end;
+               unsigned long match;
+               match = strtoul (constraint, &end, 10);
+               if (!result)
                   result = mtcs_recog_asm_operand_ok/*!asm_operand_ok*/(self,op, constraints[match], NULL);
-              constraint = (const char *) end;
-          }else{
-              do
-                  constraint++;
-              while (ISDIGIT (*constraint));
-              if (! result)
+               constraint = (const char *) end;
+            }else{
+               do
+               constraint++;
+               while (ISDIGIT (*constraint));
+               if (! result)
                   result = -1;
-          }
-          continue;
+            }
+            continue;
 
-          /* The rest of the compiler assumes that reloading the address
-             of a MEM into a register will make it fit an 'o' constraint.
-             That is, if it sees a MEM operand for an 'o' constraint,
-             it assumes that (mem (base-reg)) will fit.
+         /* The rest of the compiler assumes that reloading the address
+         of a MEM into a register will make it fit an 'o' constraint.
+         That is, if it sees a MEM operand for an 'o' constraint,
+         it assumes that (mem (base-reg)) will fit.
 
-             That assumption fails on targets that don't have offsettable
-             addresses at all.  We therefore need to treat 'o' asm
-             constraints as a special case and only accept operands that
-             are already offsettable, thus proving that at least one
-             offsettable address exists.  */
-        case 'o': /* offsettable */
-          if (mtcs_recog_offsettable_nonstrict_memref_p/*!offsettable_nonstrict_memref_p*/(self,op))
-            result = 1;
-          break;
+         That assumption fails on targets that don't have offsettable
+         addresses at all.  We therefore need to treat 'o' asm
+         constraints as a special case and only accept operands that
+         are already offsettable, thus proving that at least one
+         offsettable address exists.  */
+         case 'o': /* offsettable */
+            if (mtcs_recog_offsettable_nonstrict_memref_p/*!offsettable_nonstrict_memref_p*/(self,op))
+               result = 1;
+            break;
 
-        case 'g':
-          if (mtcs_preds_general_operand/*!general_operand*/(mtcsPreds,op, VOIDmode))
-            result = 1;
-          break;
+         case 'g':
+            if (mtcs_preds_general_operand/*!general_operand*/(mtcsPreds,op, VOIDmode))
+               result = 1;
+            break;
 
-        case '<':
-        case '>':
-          /* ??? Before auto-inc-dec, auto inc/dec insns are not supposed
-             to exist, excepting those that expand_call created.  Further,
-             on some machines which do not have generalized auto inc/dec,
-             an inc/dec is not a memory_operand.
+         case '<':
+         case '>':
+            /* ??? Before auto-inc-dec, auto inc/dec insns are not supposed
+            to exist, excepting those that expand_call created.  Further,
+            on some machines which do not have generalized auto inc/dec,
+            an inc/dec is not a memory_operand.
 
-             Match any memory and hope things are resolved after reload.  */
-          incdec_ok = true;
-          /* FALLTHRU */
-        default:
-          cn =mtcs_preds_lookup_constraint/*!lookup_constraint*/(mtcsPreds,constraint);
-          rtx mem = NULL;
-          switch (get_constraint_type (cn)){
-            case CT_REGISTER:
-              if (!result
-              && mtcs_preds_reg_class_for_constraint/*!reg_class_for_constraint*/(mtcsPreds,cn) != NO_REGS
-              && GET_MODE (op) != mtcsMode->modes.M_BLKmode
-              && mtcs_preds_register_operand/*!register_operand*/(mtcsPreds,op, VOIDmode))
-                  result = 1;
-              break;
+            Match any memory and hope things are resolved after reload.  */
+            incdec_ok = true;
+         /* FALLTHRU */
+         default:
+            cn =mtcs_preds_lookup_constraint/*!lookup_constraint*/(mtcsPreds,constraint);
+            rtx mem = NULL;
+            fprintf(stderr,"mtcsrecog.c mtcs_recog_asm_operand_ok cn:%d cn:%c\n",cn,cn);
+            switch (mtcs_preds_get_constraint_type/*!get_constraint_type*/(mtcsPreds,cn)){
+               case CT_REGISTER:
+                  if (!result
+                  && mtcs_preds_reg_class_for_constraint/*!reg_class_for_constraint*/(mtcsPreds,cn) != NO_REGS
+                  && GET_MODE (op) != mtcsMode->modes.M_BLKmode
+                  && mtcs_preds_register_operand/*!register_operand*/(mtcsPreds,op, VOIDmode))
+                     result = 1;
+                  break;
 
-            case CT_CONST_INT:
-              if (!result  && CONST_INT_P (op)
-              && mtcs_preds_insn_const_int_ok_for_constraint/*!insn_const_int_ok_for_constraint*/(mtcsPreds,INTVAL (op), cn))
-            result = 1;
-              break;
+               case CT_CONST_INT:
+                  if (!result  && CONST_INT_P (op)
+                  && mtcs_preds_insn_const_int_ok_for_constraint/*!insn_const_int_ok_for_constraint*/(mtcsPreds,
+                                                   INTVAL (op), cn))
+                     result = 1;
+                  break;
 
-            case CT_MEMORY:
-            case CT_RELAXED_MEMORY:
-              mem = op;
-              /* Fall through.  */
-            case CT_SPECIAL_MEMORY:
-              /* Every memory operand can be reloaded to fit.  */
-              if (!mem)
-            mem = extract_mem_from_operand (op);
-              result = result || mtcs_preds_memory_operand/*!memory_operand*/(mtcsPreds,mem, VOIDmode);
-              break;
+               case CT_MEMORY:
+               case CT_RELAXED_MEMORY:
+                  mem = op;
+               /* Fall through.  */
+               case CT_SPECIAL_MEMORY:
+                  /* Every memory operand can be reloaded to fit.  */
+                  if (!mem)
+                     mem = extract_mem_from_operand (op);
+                  result = result || mtcs_preds_memory_operand/*!memory_operand*/(mtcsPreds,mem, VOIDmode);
+                  break;
 
-            case CT_ADDRESS:
-              /* Every address operand can be reloaded to fit.  */
-              result = result || mtcs_preds_address_operand/*!address_operand*/(mtcsPreds,op, VOIDmode);
-              break;
+               case CT_ADDRESS:
+                  /* Every address operand can be reloaded to fit.  */
+                  result = result || mtcs_preds_address_operand/*!address_operand*/(mtcsPreds,op, VOIDmode);
+                  break;
 
-            case CT_FIXED_FORM:
-              result = result || mtcs_preds_constraint_satisfied_p/*!constraint_satisfied_p*/(mtcsPreds,op, cn);
-              break;
+               case CT_FIXED_FORM:
+                  result = result || mtcs_preds_constraint_satisfied_p/*!constraint_satisfied_p*/(mtcsPreds,op, cn);
+                  break;
             }
             break;
       }
-      len = CONSTRAINT_LEN (c, constraint);
+
+      len = mtcs_preds_insn_constraint_len/*!CONSTRAINT_LEN*/(mtcsPreds,c, constraint);
       do
-          constraint++;
+         constraint++;
       while (--len && *constraint && *constraint != ',');
       if (len)
-          return 0;
-  }
-  /* For operands without < or > constraints reject side-effects.  */
-  if (AUTO_INC_DEC && !incdec_ok && result && MEM_P (op))
+         return 0;
+   }
+   /* For operands without < or > constraints reject side-effects.  */
+   if (AUTO_INC_DEC && !incdec_ok && result && MEM_P (op))
       switch (GET_CODE (XEXP (op, 0))){
-          case PRE_INC:
-          case POST_INC:
-          case PRE_DEC:
-          case POST_DEC:
-          case PRE_MODIFY:
-          case POST_MODIFY:
-              return 0;
-          default:
-              break;
-     }
+         case PRE_INC:
+         case POST_INC:
+         case PRE_DEC:
+         case POST_DEC:
+         case PRE_MODIFY:
+         case POST_MODIFY:
+            return 0;
+         default:
+            break;
+      }
 
-  return result;
+   return result;
 }
 
 /* Analyze INSN and fill in recog_data.  */
@@ -1025,11 +1028,11 @@ void mtcs_recog_extract_insn (MtcsRecog *self,rtx_insn *insn)
 
       case SET:
          if (GET_CODE (SET_SRC (body)) == ASM_OPERANDS){
-            n_debug("mtcsrecog.c mtcs_recog_extract_insn GET_CODE (SET_SRC (body)) == ASM_OPERANDS isns:%p body:%p\n",insn,body);
+            //n_debug("mtcsrecog.c mtcs_recog_extract_insn GET_CODE (SET_SRC (body)) == ASM_OPERANDS isns:%p body:%p\n",insn,body);
             goto asm_insn;
          }else{
-            n_debug("mtcsrecog.c mtcs_recog_extract_insn goto normal_insn isns:%p body:%p INSN_CODE (insn):%d\n",
-                  insn,body,INSN_CODE (insn));
+            //n_debug("mtcsrecog.c mtcs_recog_extract_insn goto normal_insn isns:%p body:%p INSN_CODE (insn):%d\n",
+                  //insn,body,INSN_CODE (insn));
             goto normal_insn;
          }
       case PARALLEL:
@@ -1066,8 +1069,6 @@ asm_insn:
          }
          n_debug("mtcsrecog.c mtcs_recog_extract_insn 00 \n");
          fatal_insn_not_found (insn);
-         n_debug("mtcsrecog.c mtcs_recog_extract_insn 11 \n");
-
       default:
 normal_insn:
          /* Ordinary insn: recognize it, get the operands via insn_extract
@@ -1075,15 +1076,14 @@ normal_insn:
          rtx temp=PATTERN (insn);
          rtx x2 = XEXP (temp, 1);
 
-         n_debug("mtcsrecog.c mtcs_recog_extract_insn xx -- %p  %d %s %s\n",
-            temp,GET_CODE(temp),GET_RTX_NAME(GET_CODE(temp)),GET_RTX_FORMAT (GET_CODE (temp)));
-         n_debug("mtcsrecog.c mtcs_recog_extract_insn yy -- %p  %d %s %s\n",
-            insn,GET_CODE(insn),GET_RTX_NAME(GET_CODE(insn)),GET_RTX_FORMAT (GET_CODE (insn)));
-      if(GET_CODE(temp)==SET && x2)
-         n_debug("mtcsrecog.c mtcs_recog_extract_insn zz -- %p %d %s\n",x2,GET_CODE(x2),GET_RTX_NAME(GET_CODE(x2)));
+//         n_debug("mtcsrecog.c mtcs_recog_extract_insn xx -- %p  %d %s %s\n",
+//            temp,GET_CODE(temp),GET_RTX_NAME(GET_CODE(temp)),GET_RTX_FORMAT (GET_CODE (temp)));
+//         n_debug("mtcsrecog.c mtcs_recog_extract_insn yy -- %p  %d %s %s\n",
+//            insn,GET_CODE(insn),GET_RTX_NAME(GET_CODE(insn)),GET_RTX_FORMAT (GET_CODE (insn)));
+      //if(GET_CODE(temp)==SET && x2)
+         //n_debug("mtcsrecog.c mtcs_recog_extract_insn zz -- %p %d %s\n",x2,GET_CODE(x2),GET_RTX_NAME(GET_CODE(x2)));
          icode = mtcs_recog_recog_memoized/*!recog_memoized*/(self,insn);
-      n_debug("mtcsrecog.c mtcs_recog_extract_insn 22 icode:%d code:%d\n",icode,INSN_CODE (insn));
-
+         //n_debug("mtcsrecog.c mtcs_recog_extract_insn 22 icode:%d code:%d\n",icode,INSN_CODE (insn));
          if (icode < 0)
             fatal_insn_not_found (insn);
 
@@ -1238,7 +1238,7 @@ bool mtcs_recog_constrain_operands (MtcsRecog *self,int strict, mtcs_alternative
             win = true;
 
          do
-            switch (c = *p, len = CONSTRAINT_LEN (c, p), c){
+            switch (c = *p, len = mtcs_preds_insn_constraint_len/*!CONSTRAINT_LEN*/(mtcsPreds,c, p), c){
                case '\0':
                   len = 0;
                   break;
@@ -1482,20 +1482,28 @@ bool mtcs_recog_check_asm_operands (MtcsRecog *self,rtx x)
    const char **constraints;
    int i;
 
-   if (!asm_labels_ok (x))
+   if (!asm_labels_ok (x)){
+      n_debug("mtcsrecog.c check_asm_operands 00 asm_labels_ok=false\n");
+      mtcs_print_rtl(stderr,x);
       return false;
+   }
 
    /* Post-reload, be more strict with things.  */
    if (reload_completed){
+
       /* ??? Doh!  We've not got the wrapping insn.  Cook one up.  */
       rtx_insn *insn = mtcs_emit_make_insn_raw/*!make_insn_raw*/(mtcsEmit,x);
       mtcs_recog_extract_insn/*!extract_insn*/(self,insn);
       mtcs_recog_constrain_operands/*!constrain_operands*/(self,1,
             mtcs_recog_get_enabled_alternatives/*!get_enabled_alternatives*/(self,insn));
+      n_debug("mtcsrecog.c check_asm_operands 11 which_alternative:%d\n",which_alternative);
+
       return which_alternative >= 0;
    }
 
    noperands = asm_noperands (x);
+   n_debug("mtcsrecog.c check_asm_operands 22 noperands:%d\n",noperands);
+
    if (noperands < 0)
       return false;
    if (noperands == 0)
@@ -1508,6 +1516,7 @@ bool mtcs_recog_check_asm_operands (MtcsRecog *self,rtx x)
 
    for (i = 0; i < noperands; i++){
       const char *c = constraints[i];
+      n_debug("mtcsrecog.c mtcs_recog_check_asm_operands:%s\n",c);
       if (c[0] == '%')
          c++;
       if (! mtcs_recog_asm_operand_ok/*!asm_operand_ok*/(self,operands[i], c, constraints))
@@ -1669,8 +1678,8 @@ static bool validate_change_1 (MtcsRecog *self,rtx object, rtx *loc, rtx new_rtx
 {
    gcc_assert (self->temporarily_undone_changes == 0);
    rtx old = *loc;
-   n_debug("mtcsrecog.c validate_change_1 00 in_group:%d unshare:%d new_len:%d\n",
-         in_group,unshare,new_len);
+   //n_debug("mtcsrecog.c validate_change_1 00 in_group:%d unshare:%d new_len:%d\n",
+        // in_group,unshare,new_len);
    /* Single-element parallels aren't valid and won't match anything.
    Replace them with the single element.  */
    if (new_len == 1 && GET_CODE (new_rtx) == PARALLEL){
@@ -1680,21 +1689,19 @@ static bool validate_change_1 (MtcsRecog *self,rtx object, rtx *loc, rtx new_rtx
 
    if ((old == new_rtx || rtx_equal_p (old, new_rtx)) && (new_len < 0 || XVECLEN (new_rtx, 0) == new_len))
       return true;
-   n_debug("mtcsrecog.c validate_change_1 11 in_group:%d unshare:%d new_len:%d num_changes:%d changes_allocated:%d\n",
-         in_group,unshare,new_len,self->num_changes,self->changes_allocated);
+  // n_debug("mtcsrecog.c validate_change_1 11 in_group:%d unshare:%d new_len:%d num_changes:%d changes_allocated:%d\n",
+         //in_group,unshare,new_len,self->num_changes,self->changes_allocated);
    gcc_assert ((in_group != 0 || self->num_changes == 0)  && (new_len < 0 || new_rtx == *loc));
-   testprint();
-   n_debug("mtcsrecog.c ---------------------xx-----------------object:%p *loc %p new_rtx:%p\n",object,*loc,new_rtx);
-   mtcs_print_rtl_single(stderr,object);
-
-   mtcs_print_rtl_single(stderr,*loc);
-
-   mtcs_print_rtl_single(stderr,new_rtx);
+  // testprint();
+  // n_debug("mtcsrecog.c ---------------------xx-----------------object:%p *loc %p new_rtx:%p\n",object,*loc,new_rtx);
+  // mtcs_print_rtl_single(stderr,object);
+  // mtcs_print_rtl_single(stderr,*loc);
+   //mtcs_print_rtl_single(stderr,new_rtx);
 
    *loc = new_rtx;
-   n_debug("mtcsrecog.c validate_change_1 11tt in_group:%d unshare:%d new_len:%d num_changes:%d changes_allocated:%d\n",
-         in_group,unshare,new_len,self->num_changes,self->changes_allocated);
-   testprint();
+  // n_debug("mtcsrecog.c validate_change_1 11tt in_group:%d unshare:%d new_len:%d num_changes:%d changes_allocated:%d\n",
+        // in_group,unshare,new_len,self->num_changes,self->changes_allocated);
+   //testprint();
    /* Save the information describing this change.  */
    if (self->num_changes >= self->changes_allocated){
       if (self->changes_allocated == 0)
@@ -1711,27 +1718,27 @@ static bool validate_change_1 (MtcsRecog *self,rtx object, rtx *loc, rtx new_rtx
    changes[self->num_changes].old = old;
    changes[self->num_changes].old_len = (new_len >= 0 ? XVECLEN (new_rtx, 0) : -1);
    changes[self->num_changes].unshare = unshare;
-   n_debug("mtcsrecog.c validate_change_1 11xx in_group:%d unshare:%d new_len:%d num_changes:%d changes_allocated:%d\n",
-           in_group,unshare,new_len,self->num_changes,self->changes_allocated);
-     testprint();
+   //n_debug("mtcsrecog.c validate_change_1 11xx in_group:%d unshare:%d new_len:%d num_changes:%d changes_allocated:%d\n",
+      //     in_group,unshare,new_len,self->num_changes,self->changes_allocated);
+    // testprint();
    if (new_len >= 0)
       XVECLEN (new_rtx, 0) = new_len;
-   n_debug("mtcsrecog.c validate_change_1 11xxyy in_group:%d unshare:%d new_len:%d num_changes:%d changes_allocated:%d\n",
-           in_group,unshare,new_len,self->num_changes,self->changes_allocated);
-     testprint();
+   //n_debug("mtcsrecog.c validate_change_1 11xxyy in_group:%d unshare:%d new_len:%d num_changes:%d changes_allocated:%d\n",
+           //in_group,unshare,new_len,self->num_changes,self->changes_allocated);
+    // testprint();
    if (object && !MEM_P (object)){
       /* Set INSN_CODE to force rerecognition of insn.  Save old code in
       case invalid.  */
       changes[self->num_changes].old_code = INSN_CODE (object);
-      n_debug("mtcsrecog.c validate_change_1 11xxwww in_group:%d unshare:%d new_len:%d num_changes:%d changes_allocated:%d\n",
-              in_group,unshare,new_len,self->num_changes,self->changes_allocated);
-        testprint();
+      //n_debug("mtcsrecog.c validate_change_1 11xxwww in_group:%d unshare:%d new_len:%d num_changes:%d changes_allocated:%d\n",
+              //in_group,unshare,new_len,self->num_changes,self->changes_allocated);
+        //testprint();
       INSN_CODE (object) = -1;
    }
    self->num_changes++;
-   n_debug("mtcsrecog.cc validate_change_1 22 in_group:%d unshare:%d new_len:%d num_changes:%d changes_allocated:%d\n",
-         in_group,unshare,new_len,self->num_changes,self->changes_allocated);
-   testprint();
+  // n_debug("mtcsrecog.cc validate_change_1 22 in_group:%d unshare:%d new_len:%d num_changes:%d changes_allocated:%d\n",
+         //in_group,unshare,new_len,self->num_changes,self->changes_allocated);
+   //testprint();
    /* If we are making a group of changes, return 1.  Otherwise, validate the
    change group we made.  */
    if (in_group)

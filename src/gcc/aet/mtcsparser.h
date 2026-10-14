@@ -89,7 +89,7 @@ char      *mtcs_parser_modify_host_device_func_var_array(MtcsParser *self,ClassN
 nboolean   mtcs_parser_have_mtcs(MtcsParser *self);
 
 void       mtcs_parser_link_func(MtcsParser *self,char *objRootPath,NPtrArray **arrays,int length,int pos);
-
+int        mtcs_parser_get_func_type(MtcsParser *self,tree fndecl);
 #endif
 
 

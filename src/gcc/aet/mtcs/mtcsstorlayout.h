@@ -63,5 +63,8 @@ tree mtcs_stor_layout_make_fract_type (MtcsStorLayout *self,int precision, int u
 tree mtcs_stor_layout_make_accum_type (MtcsStorLayout *self,int precision, int unsignedp, int satp);
 //原型 relayout_decl stor-layout.h stor-layout.cc
 void mtcs_stor_layout_relayout_decl (MtcsStorLayout *self,tree decl);
+//原型 set_min_and_max_values_for_integral_type stor-layout.h stor-layout.cc
+void mtcs_stor_layout_set_min_and_max_values_for_integral_type (MtcsStorLayout *self,
+      tree type,int precision,signop sgn);
 
 #endif

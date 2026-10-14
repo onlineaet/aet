@@ -1104,7 +1104,8 @@ static void df_lr_init (bitmap all_blocks)
 
 static void print_df_lr(int bb_index ,int lrbbType)
 {
-   return;
+   if(5>3)
+      return;
    bitmap_obstack obstack;
    bitmap_obstack_initialize (&obstack);
 
@@ -1682,13 +1683,13 @@ static void df_live_bb_local_compute (MtcsDfproblems *self,unsigned int bb_index
    FOR_BB_INSNS (bb, insn){
       unsigned int uid = INSN_UID (insn);
       struct df_insn_info *insn_info = DF_INSN_UID_GET (uid);
-      n_debug("mtcsdfproblems.c df_live_bb_local_compute 11 bb_info:%p\n",bb_info);
+      //n_debug("mtcsdfproblems.c df_live_bb_local_compute 11 bb_info:%p\n",bb_info);
 
       /* Inserting labels does not always trigger the incremental
       rescanning.  */
       if (!insn_info){
          gcc_assert (!INSN_P (insn));
-         n_debug("mtcsdfproblems.c df_live_bb_local_compute 22 bb_info:%p\n",bb_info);
+         //n_debug("mtcsdfproblems.c df_live_bb_local_compute 22 bb_info:%p\n",bb_info);
          insn_info = df_insn_create_insn_record (insn);
       }
 
@@ -1699,9 +1700,9 @@ static void df_live_bb_local_compute (MtcsDfproblems *self,unsigned int bb_index
       luid++;
       FOR_EACH_INSN_INFO_DEF (def, insn_info){
          unsigned int regno = DF_REF_REGNO (def);
-         n_debug("mtcsdfproblems.c df_live_bb_local_compute 33 bb_info:%p regno:%d\n",bb_info,regno);
+         //n_debug("mtcsdfproblems.c df_live_bb_local_compute 33 bb_info:%p regno:%d\n",bb_info,regno);
          if (DF_REF_FLAGS_IS_SET (def,DF_REF_PARTIAL | DF_REF_CONDITIONAL)){
-            n_debug("mtcsdfproblems.c df_live_bb_local_compute 44 bb_info:%p\n",bb_info);
+            //n_debug("mtcsdfproblems.c df_live_bb_local_compute 44 bb_info:%p\n",bb_info);
             /* All partial or conditional def
             seen are included in the gen set. */
             bitmap_set_bit (&bb_info->gen, regno);
@@ -3812,8 +3813,8 @@ void mtcs_dfproblems_df_simulate_defs (MtcsDfproblems *self,rtx_insn *insn, bitm
    df_ref def;
    FOR_EACH_INSN_DEF (def, insn){
       unsigned int dregno = DF_REF_REGNO (def);
-      n_debug("mtcsdfproblems.c df_simulate_defs dregno:%d live:%p insn:%p def_flags:%d %d\n",
-      dregno,live,insn,DF_REF_FLAGS (def),DF_REF_FLAGS (def) & (DF_REF_PARTIAL | DF_REF_CONDITIONAL));
+      //n_debug("mtcsdfproblems.c df_simulate_defs dregno:%d live:%p insn:%p def_flags:%d %d\n",
+      //dregno,live,insn,DF_REF_FLAGS (def),DF_REF_FLAGS (def) & (DF_REF_PARTIAL | DF_REF_CONDITIONAL));
 
       /* If the def is to only part of the reg, model it as a RMW operation
       by marking it live.  It only kills the reg if it is a complete def.  */
@@ -3835,8 +3836,7 @@ void mtcs_dfproblems_df_simulate_uses (MtcsDfproblems *self,rtx_insn *insn, bitm
       return;
 
    FOR_EACH_INSN_USE (use, insn){
-      n_debug("mtcsdfproblems.c df_simulate_uses dregno:%d live:%p insn:%p \n",
-            DF_REF_REGNO (use),live,insn);
+      //n_debug("mtcsdfproblems.c df_simulate_uses dregno:%d live:%p insn:%p \n",DF_REF_REGNO (use),live,insn);
       /* Add use to set of uses in this BB.  */
       bitmap_set_bit (live, DF_REF_REGNO (use));
    }

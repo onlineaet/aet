@@ -49,7 +49,7 @@ AET_MTCS=aet/mtcs/mtcsalign.o aet/mtcs/mtcsargs.o aet/mtcs/mtcsasm.o aet/mtcs/mt
     aet/mtcs/mtcsloopiv.o aet/mtcs/mtcscfgloopmanip.o aet/mtcs/mtcspredict.o aet/mtcs/mtcsinternalfn.o\
     aet/mtcs/mtcsport.o aet/mtcs/mtcsgimpleexpr.o aet/mtcs/mtcsssacoalesce.o  aet/mtcs/mtcsreplace.o\
     aet/mtcs/mtcsdwarf2codeview.o aet/mtcs/mtcsdebug.o aet/mtcs/mtcsdwarf2lineno.o aet/mtcs/mtcsdonothingdebug.o\
-    aet/mtcs/mtcsgimple.o aet/mtcs/mtcsadjustpass.o aet/mtcs/mtcsssaaddress.o\
+    aet/mtcs/mtcsgimple.o aet/mtcs/mtcsadjustpass.o aet/mtcs/mtcsssaaddress.o \
     \
     aet/mtcs/rtl/mtcsrtlpassmgr.o \
     aet/mtcs/rtl/mtcsfwprop.o \
@@ -107,10 +107,10 @@ AET_MTCS_PTX = aet/mtcs/ptx/mtcsptx.o aet/mtcs/ptx/mtcsptxalign.o aet/mtcs/ptx/m
     aet/mtcs/ptx/mtcsptxreal.o aet/mtcs/ptx/mtcsptxrecog.o aet/mtcs/ptx/mtcsptxreg.o aet/mtcs/ptx/ptxtool.o\
     aet/mtcs/ptx/mtcsptxconfig.o  aet/mtcs/ptx/mtcsptxbuiltins.o aet/mtcs/ptx/mtcsptxtree.o aet/mtcs/ptx/mtcsptxattribs.o\
     aet/mtcs/ptx/mtcsptxinsnattr.o  aet/mtcs/ptx/mtcsptxrtl.o aet/mtcs/ptx/mtcsptxasm.o aet/mtcs/ptx/mtcsptxmath.o\
-    aet/mtcs/ptx/mtcsptxinternalfn.o\
+    aet/mtcs/ptx/mtcsptxinternalfn.o \
     aet/mtcs/ptx/targetptxvectorize.o aet/mtcs/ptx/targetptxaddrspace.o aet/mtcs/ptx/targetptxoption.o\
     aet/mtcs/ptx/targetptxcommon.o aet/mtcs/ptx/targetptxasmout.o aet/mtcs/ptx/targetptxcalls.o\
-    aet/mtcs/ptx/targetptxrtx.o\
+    aet/mtcs/ptx/targetptxrtx.o \
        \
     aet/mtcs/ptx/gen/ptx-insn-output.o\
     aet/mtcs/ptx/gen/ptx-insn-emit.o\

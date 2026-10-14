@@ -108,126 +108,122 @@ static hashval_t hash_section (section *sect)
 }
 
 class GTY((chain_next ("%h.next"), for_user)) constant_descriptor_rtx {
-public:
-  class constant_descriptor_rtx *next;
-  rtx mem;
-  rtx sym;
-  rtx constant;
-  HOST_WIDE_INT offset;
-  hashval_t hash;
-  fixed_size_mode mode;
-  unsigned int align;
-  int labelno;
-  int mark;
+   public:
+     class constant_descriptor_rtx *next;
+     rtx mem;
+     rtx sym;
+     rtx constant;
+     HOST_WIDE_INT offset;
+     hashval_t hash;
+     fixed_size_mode mode;
+     unsigned int align;
+     int labelno;
+     int mark;
 };
-
-
 
 /*-----------------hash功能-------------*/
 //原型 hashval_t section_hasher::hash (section *old) varasm.cc
 static nuint sectionHash_cb(nconstpointer v)
 {
-    section *old=(section*)v;
-    return htab_hash_string (old->named.name);
+   section *old=(section*)v;
+   return htab_hash_string (old->named.name);
 }
 
 //原型 bool section_hasher::equal (section *old, const char *new_name) varasm.cc
 static nboolean sectionHashEqual_cb(nconstpointer v1, nconstpointer v2)
 {
-    section         *old=(section *)v1;
-    const char *new_name=(const char *)v2;
-    return strcmp (old->named.name, new_name) == 0;
+   section         *old=(section *)v1;
+   const char *new_name=(const char *)v2;
+   return strcmp (old->named.name, new_name) == 0;
 }
 
 //原型 hashval_t object_block_hasher::hash (object_block *old) varasm.cc
 static nuint objectBlockHash_cb(nconstpointer v)
 {
-    object_block *old=(object_block *)v;
-    return hash_section (old->sect);
+   object_block *old=(object_block *)v;
+   return hash_section (old->sect);
 }
 
 //原型 inline bool object_block_hasher::equal (object_block *old, const section *new_section) varasm.cc
 static nboolean objectBlockHashEqual_cb(nconstpointer v1, nconstpointer v2)
 {
-    object_block            *old=(object_block *)v1;
-    const section *new_section  =(const section *)v2;
-    return old->sect == new_section;
+   object_block            *old=(object_block *)v1;
+   const section *new_section  =(const section *)v2;
+   return old->sect == new_section;
 }
 
 //原型 hashval_t tree_descriptor_hasher::hash (constant_descriptor_tree *ptr) varasm.cc
 static nuint treeDescriptorHash_cb(nconstpointer v)
 {
-    constant_descriptor_tree *ptr=(constant_descriptor_tree *)v;
-    return ptr->hash;
+   constant_descriptor_tree *ptr=(constant_descriptor_tree *)v;
+   return ptr->hash;
 }
 
 
 //原型 bool tree_descriptor_hasher::equal (constant_descriptor_tree *c1, constant_descriptor_tree *c2) varasm.cc
 static nboolean treeDescriptorHashEqual_cb(nconstpointer v1, nconstpointer v2)
 {
-    constant_descriptor_tree *c1=(constant_descriptor_tree *)v1;
-    constant_descriptor_tree *c2=(constant_descriptor_tree *)v2;
-    if (c1->hash != c2->hash)
+   constant_descriptor_tree *c1=(constant_descriptor_tree *)v1;
+   constant_descriptor_tree *c2=(constant_descriptor_tree *)v2;
+   if (c1->hash != c2->hash)
       return false;
-    return compare_constant (c1->value, c2->value);
+   return compare_constant (c1->value, c2->value);
 }
 
 /* Hash and compare functions for const_rtx_htab.  */
 //原型  hashval_t mtcs_const_rtx_desc_hasher::hash (constant_descriptor_rtx *desc)
 static nuint constRtxDescHash_cb(nconstpointer v)
 {
-    constant_descriptor_rtx *desc=(constant_descriptor_rtx *)v;
-    return desc->hash;
+   constant_descriptor_rtx *desc=(constant_descriptor_rtx *)v;
+   return desc->hash;
 }
 
 //原型 bool mtcs_const_rtx_desc_hasher::equal (constant_descriptor_rtx *x, constant_descriptor_rtx *y)
 static nboolean constRtxDescHashEqual_cb(nconstpointer v1, nconstpointer v2)
 {
-  constant_descriptor_rtx *x=(constant_descriptor_rtx *)v1;
-  constant_descriptor_rtx *y=(constant_descriptor_rtx *)v2;
-  if (x->mode != y->mode)
-    return false;
-  return rtx_equal_p (x->constant, y->constant);
+   constant_descriptor_rtx *x=(constant_descriptor_rtx *)v1;
+   constant_descriptor_rtx *y=(constant_descriptor_rtx *)v2;
+   if (x->mode != y->mode)
+      return false;
+   return rtx_equal_p (x->constant, y->constant);
 }
 
 /*---------------------结束hash功能-----------------------------*/
 
 typedef struct _CreateUnamedSectionCallBackData{
-    MtcsAsm *mtcsAsm;
-    int flag;
-    const char *sectionAsmOp;
+   MtcsAsm *mtcsAsm;
+   int flag;
+   char *sectionAsmOp;
 }CreateUnamedSectionCallBackData;
 
 static CreateUnamedSectionCallBackData *createUNnamdSection(MtcsAsm *self,int flag,const char *sectionAsmOp)
 {
-     CreateUnamedSectionCallBackData *data=(CreateUnamedSectionCallBackData *)xmalloc(sizeof(CreateUnamedSectionCallBackData));
-     data->mtcsAsm=self;
-     data->flag=flag;
-     data->sectionAsmOp=sectionAsmOp;
-     return data;
+   CreateUnamedSectionCallBackData *data=n_slice_new0(CreateUnamedSectionCallBackData);
+   data->mtcsAsm=self;
+   data->flag=flag;
+   data->sectionAsmOp=n_strdup(sectionAsmOp);
+   return data;
 }
 
 /* Return a new unnamed section with the given fields.  */
-static section * createUnnamedSection (MtcsAsm *self,unsigned int flags, void (*callback) (const char *),const char *data)
+static section * createUnnamedSection (MtcsAsm *self,unsigned int flags,
+      void (*callback) (const char *),const char *data)
 {
-  section *sect;
-  sect = ggc_alloc<section> ();
-  sect->unnamed.common.flags = flags | SECTION_UNNAMED;
-  sect->unnamed.callback = callback;
-  sect->unnamed.data = data;
-  sect->unnamed.next = self->unnamed_sections;
-  //fprintf(stderr,"createUnnamedSection --- sect:%p old unnamed_sections:%p flags:%d data:%p\n",sect,unnamed_sections,flags,data);
-  self->unnamed_sections = sect;
-  return sect;
+   section *sect;
+   sect = ggc_alloc<section> ();
+   sect->unnamed.common.flags = flags | SECTION_UNNAMED;
+   sect->unnamed.callback = callback;
+   sect->unnamed.data = data;
+   sect->unnamed.next = self->unnamed_sections;
+   self->unnamed_sections = sect;
+   return sect;
 }
 
 static void createUnnamedSectionCallBack_cb (const char *directive)
 {
-    CreateUnamedSectionCallBackData *data=(CreateUnamedSectionCallBackData *)directive;
-    //n_debug("mtcsasm.c createUnnamedSectionCallBack_cb %p\n",directive);
-    MtcsAsm *self=data->mtcsAsm;
-    fprintf (self->asmFile, "%s\n", data->sectionAsmOp);
-    free(data);
+   CreateUnamedSectionCallBackData *data=(CreateUnamedSectionCallBackData *)directive;
+   MtcsAsm *self=data->mtcsAsm;
+   fprintf (self->asmFile, "%s\n", data->sectionAsmOp);
 }
 
 /* Used in the hash tables to avoid outputting the same constant
@@ -236,19 +232,20 @@ static void createUnnamedSectionCallBack_cb (const char *directive)
 /* ??? Only a few targets need per-function constant pools.  Most
    can use one per-file pool.  Should add a targetm bit to tell the
    difference.  */
-struct GTY(()) rtx_constant_pool {
-  /* Pointers to first and last constant in pool, as ordered by offset.  */
-  class constant_descriptor_rtx *first;
-  class constant_descriptor_rtx *last;
-  /* Hash facility for making memory-constants from constant rtl-expressions.
-     It is used on RISC machines where immediate integer arguments and
-     constant addresses are restricted so that such constants must be stored
-     in memory.  */
-  //原型 hash_table<mtcs_const_rtx_desc_hasher> *const_rtx_htab;
-  NHashTable *const_rtx_htab;
-  /* Current offset in constant pool (does not include any
-     machine-specific header).  */
-  HOST_WIDE_INT offset;
+struct GTY(()) rtx_constant_pool
+{
+   /* Pointers to first and last constant in pool, as ordered by offset.  */
+   class constant_descriptor_rtx *first;
+   class constant_descriptor_rtx *last;
+   /* Hash facility for making memory-constants from constant rtl-expressions.
+   It is used on RISC machines where immediate integer arguments and
+   constant addresses are restricted so that such constants must be stored
+   in memory.  */
+   //原型 hash_table<mtcs_const_rtx_desc_hasher> *const_rtx_htab;
+   NHashTable *const_rtx_htab;
+   /* Current offset in constant pool (does not include any
+   machine-specific header).  */
+   HOST_WIDE_INT offset;
 };
 
 
@@ -256,96 +253,94 @@ struct GTY(()) rtx_constant_pool {
 //原型 create_constant_pool varasm.cc
 static struct rtx_constant_pool *create_constant_pool (void)
 {
-  struct rtx_constant_pool *pool;
-  pool = ggc_alloc<rtx_constant_pool> ();
-  //原型 pool->const_rtx_htab = hash_table<mtcs_const_rtx_desc_hasher>::create_ggc (31);
-  pool->const_rtx_htab = n_hash_table_new_full(constRtxDescHash_cb, constRtxDescHashEqual_cb,NULL, NULL);
-  pool->first = NULL;
-  pool->last = NULL;
-  pool->offset = 0;
-  return pool;
+   struct rtx_constant_pool *pool;
+   pool = ggc_alloc<rtx_constant_pool> ();
+   //原型 pool->const_rtx_htab = hash_table<mtcs_const_rtx_desc_hasher>::create_ggc (31);
+   pool->const_rtx_htab = n_hash_table_new_full(constRtxDescHash_cb, constRtxDescHashEqual_cb,NULL, NULL);
+   pool->first = NULL;
+   pool->last = NULL;
+   pool->offset = 0;
+   return pool;
 }
-
 
 void     mtcs_asm_init(MtcsAsm *self)
 {
-      self->asmFileName=n_strdup_printf("%s_mtcs_asm.o",asm_file_name);
-      self->asmFile=fopen(self->asmFileName,"w");
-      self->asmVarDeclFileName= n_strdup_printf("%s_mtcs_var_decl_asm.o",asm_file_name);
-      self->asmVarDeclFile=fopen(self->asmVarDeclFileName,"w");
-      n_debug("mtcsasm.c mtcs_asm_init 00 asmFileName:%s %s asmFile:%p\n",self->asmFileName,asm_file_name,self->asmFile);
+   self->asmFileName=n_strdup_printf("%s_mtcs_asm.o",asm_file_name);
+   self->asmFile=fopen(self->asmFileName,"w");
+   self->asmVarDeclFileName= n_strdup_printf("%s_mtcs_var_decl_asm.o",asm_file_name);
+   self->asmVarDeclFile=fopen(self->asmVarDeclFileName,"w");
+   n_debug("mtcsasm.c mtcs_asm_init 00 asmFileName:%s %s asmFile:%p\n",self->asmFileName,asm_file_name,self->asmFile);
 
-      //原型 ASM_OUTPUT_LABEL ptx没有自已的实现 用的是default.h的缺省实现
-      self->output_label=outputLabel_cb;//来自宏ASM_OUTPUT_LABEL
-      //来自宏ASM_OUTPUT_INTERNAL_LABEL ptx没有自已的实现 用的是default.h的缺省实现
-      self->output_internal_label=outputInternalLabel_cb;
-      //原型 ASM_OUTPUT_EXTERNAL (asm_out_file, decl, XSTR (XEXP (rtl, 0), 0));
-      self->output_external =NULL;
-      //原型 ASM_OUTPUT_REG_PUSH 各平台自定义 nvptx没定义
-      self->output_reg_push = NULL;
-      //原型 #define ASM_OUTPUT_REG_POP(STREAM, REGNO)  各平台自定义 nvptx没定义
-      self->output_reg_pop = NULL;
-      //原型 #define ASM_WEAKEN_LABEL(FILE,NAME)
-      self->weaken_label = NULL;
-      //原型 #define ASM_OUTPUT_TYPE_DIRECTIVE(STREAM, NAME, TYPE)
-      self->output_type_directive = outputTypeDirective_cb;
-      //原型  #define ASM_OUTPUT_ALIGN_WITH_NOP 各平台自定义 nvptx没定义
-      self->output_align_with_nop = NULL;
-      // 原型  #define  ASM_OUTPUT_MAX_SKIP_ALIGN 各平台自定义 nvptx没定义
-      self->output_max_skip_align = NULL;
-      //原型 #define ASM_OUTPUT_ALIGN(FILE, POWER)  各平台自定义 nvptx有定义
-      self->output_align = NULL;
-      //原型 #define ASM_OUTPUT_ADDR_VEC
-      self->output_addr_vec = NULL;
-      //原型 #define ASM_OUTPUT_ADDR_DIFF_VEC
-      self->output_addr_diff_vec = NULL;
-      //原型 #define ASM_OUTPUT_ADDR_VEC_ELT host=1 nvptx=0 gcn=1
-      self->output_addr_vec_elt = NULL;
-      //原型 #define ASM_OUTPUT_ADDR_DIFF_ELT host=1 nvptx=0
-      self->output_addr_vec_diff_elt = NULL;
-      //原型 #define ASM_OUTPUT_CASE_LABEL //host=1 nvptx=gcn=0
-      self->output_case_label = NULL;
-      //原型 #define ASM_DECLARE_FUNCTION_SIZE(STREAM, NAME, DECL)  nvptx_function_end (STREAM)
-      self->declare_function_size = NULL;
-      //原型 #ifdef ASM_DECLARE_COLD_FUNCTION_NAME
-      self->declare_cold_function_name = NULL;
-      //原型 #ifdef ASM_DECLARE_COLD_FUNCTION_SIZE
-      self->declare_cold_function_size = NULL;
+   //原型 ASM_OUTPUT_LABEL ptx没有自已的实现 用的是default.h的缺省实现
+   self->output_label=outputLabel_cb;//来自宏ASM_OUTPUT_LABEL
+   //来自宏ASM_OUTPUT_INTERNAL_LABEL ptx没有自已的实现 用的是default.h的缺省实现
+   self->output_internal_label=outputInternalLabel_cb;
+   //原型 ASM_OUTPUT_EXTERNAL (asm_out_file, decl, XSTR (XEXP (rtl, 0), 0));
+   self->output_external =NULL;
+   //原型 ASM_OUTPUT_REG_PUSH 各平台自定义 nvptx没定义
+   self->output_reg_push = NULL;
+   //原型 #define ASM_OUTPUT_REG_POP(STREAM, REGNO)  各平台自定义 nvptx没定义
+   self->output_reg_pop = NULL;
+   //原型 #define ASM_WEAKEN_LABEL(FILE,NAME)
+   self->weaken_label = NULL;
+   //原型 #define ASM_OUTPUT_TYPE_DIRECTIVE(STREAM, NAME, TYPE)
+   self->output_type_directive = outputTypeDirective_cb;
+   //原型  #define ASM_OUTPUT_ALIGN_WITH_NOP 各平台自定义 nvptx没定义
+   self->output_align_with_nop = NULL;
+   // 原型  #define  ASM_OUTPUT_MAX_SKIP_ALIGN 各平台自定义 nvptx没定义
+   self->output_max_skip_align = NULL;
+   //原型 #define ASM_OUTPUT_ALIGN(FILE, POWER)  各平台自定义 nvptx有定义
+   self->output_align = NULL;
+   //原型 #define ASM_OUTPUT_ADDR_VEC
+   self->output_addr_vec = NULL;
+   //原型 #define ASM_OUTPUT_ADDR_DIFF_VEC
+   self->output_addr_diff_vec = NULL;
+   //原型 #define ASM_OUTPUT_ADDR_VEC_ELT host=1 nvptx=0 gcn=1
+   self->output_addr_vec_elt = NULL;
+   //原型 #define ASM_OUTPUT_ADDR_DIFF_ELT host=1 nvptx=0
+   self->output_addr_vec_diff_elt = NULL;
+   //原型 #define ASM_OUTPUT_CASE_LABEL //host=1 nvptx=gcn=0
+   self->output_case_label = NULL;
+   //原型 #define ASM_DECLARE_FUNCTION_SIZE(STREAM, NAME, DECL)  nvptx_function_end (STREAM)
+   self->declare_function_size = NULL;
+   //原型 #ifdef ASM_DECLARE_COLD_FUNCTION_NAME
+   self->declare_cold_function_name = NULL;
+   //原型 #ifdef ASM_DECLARE_COLD_FUNCTION_SIZE
+   self->declare_cold_function_size = NULL;
 
-      self->sectionAsmOp.text=NULL;
-      self->sectionAsmOp.data=NULL;
-      self->sectionAsmOp.sdata=NULL;
-      self->sectionAsmOp.readonly_data=NULL;
-      self->sectionAsmOp.ctors=NULL;
-      self->sectionAsmOp.dtors=NULL;
-      self->sectionAsmOp.bss=NULL;
-      self->sectionAsmOp.sbss=NULL;
+   self->sectionAsmOp.text=NULL;
+   self->sectionAsmOp.data=NULL;
+   self->sectionAsmOp.sdata=NULL;
+   self->sectionAsmOp.readonly_data=NULL;
+   self->sectionAsmOp.ctors=NULL;
+   self->sectionAsmOp.dtors=NULL;
+   self->sectionAsmOp.bss=NULL;
+   self->sectionAsmOp.sbss=NULL;
 
+   self->shared_constant_pool =NULL;
+   self->text_section = NULL;
+   self->data_section = NULL;
+   self->readonly_data_section = NULL;
+   self->sdata_section = NULL;
+   self->ctors_section = NULL;
+   self->ctors_section = NULL;
+   self->ctors_section = NULL;
+   self->sbss_section = NULL;
+   self->tls_comm_section = NULL;
+   self->lcomm_section = NULL;
+   self->comm_section = NULL;
+   self->bss_noswitch_section=NULL;
+   //原型 ASM_OUTPUT_ALIGNED_BSS
+   self->asmOutputAlignedBss=FALSE;
 
-      self->shared_constant_pool =NULL;
-      self->text_section = NULL;
-      self->data_section = NULL;
-      self->readonly_data_section = NULL;
-      self->sdata_section = NULL;
-      self->ctors_section = NULL;
-      self->ctors_section = NULL;
-      self->ctors_section = NULL;
-      self->sbss_section = NULL;
-      self->tls_comm_section = NULL;
-      self->lcomm_section = NULL;
-      self->comm_section = NULL;
-      self->bss_noswitch_section=NULL;
-      //原型 ASM_OUTPUT_ALIGNED_BSS
-      self->asmOutputAlignedBss=FALSE;
+   self->funcHashTable = n_hash_table_new_full (n_str_hash, n_str_equal,n_free, NULL);
 
-      self->funcHashTable = n_hash_table_new_full (n_str_hash, n_str_equal,n_free, NULL);
-
-      //原型 static GTY(()) hash_table<section_hasher> *section_htab; varasm.cc
-      self->section_htab = n_hash_table_new_full(sectionHash_cb, sectionHashEqual_cb,NULL, NULL);
-      //原型 static GTY(()) hash_table<mtcs_object_block_hasher> *object_block_htab; varasm.cc
-      self->object_block_htab = n_hash_table_new_full(objectBlockHash_cb, objectBlockHashEqual_cb,NULL, NULL);
-      //原型 static GTY(()) hash_table<tree_descriptor_hasher> *const_desc_htab; varasm.cc
-      self->const_desc_htab = n_hash_table_new_full(treeDescriptorHash_cb, treeDescriptorHashEqual_cb,NULL, NULL);
+   //原型 static GTY(()) hash_table<section_hasher> *section_htab; varasm.cc
+   self->section_htab = n_hash_table_new_full(sectionHash_cb, sectionHashEqual_cb,NULL, NULL);
+   //原型 static GTY(()) hash_table<mtcs_object_block_hasher> *object_block_htab; varasm.cc
+   self->object_block_htab = n_hash_table_new_full(objectBlockHash_cb, objectBlockHashEqual_cb,NULL, NULL);
+   //原型 static GTY(()) hash_table<tree_descriptor_hasher> *const_desc_htab; varasm.cc
+   self->const_desc_htab = n_hash_table_new_full(treeDescriptorHash_cb, treeDescriptorHashEqual_cb,NULL, NULL);
 
 }
 
@@ -357,7 +352,7 @@ static bool use_object_blocks_p (MtcsAsm *self)
    MtcsTarget *mtcsTarget=(MtcsTarget *)mtcsMode->target;
    MtcsOptions *mtcsOptions=mtcs_target_get_options(mtcsTarget);
    MtcsOptionsItem *mtcsOptionsItem=mtcsOptions->global_options;
-  return mtcsOptionsItem->x_flag_section_anchors;
+   return mtcsOptionsItem->x_flag_section_anchors;
 }
 
 /* Return the object_block structure for section SECT.  Create a new
@@ -369,29 +364,29 @@ static bool use_object_blocks_p (MtcsAsm *self)
    maintenance burden.  */
 static struct object_block *get_block_for_section (MtcsAsm *self,section *sect)
 {
-  struct object_block *block;
-  if (sect == NULL)
-    return NULL;
-  if (sect->common.flags & SECTION_MERGE)
-    return NULL;
-  //原型 object_block **slot= object_block_htab->find_slot_with_hash (sect, hash_section (sect),INSERT);
-  object_block *slot = n_hash_table_lookup_by_hash(self->object_block_htab,sect,hash_section (sect));
- /*
-  block = *slot;
-  if (block == NULL){
-      block = ggc_cleared_alloc<object_block> ();
-      block->sect = sect;
-      *slot = block;
-  }
-  */
-  block=slot;
-  if (block == NULL){
+   struct object_block *block;
+   if (sect == NULL)
+      return NULL;
+   if (sect->common.flags & SECTION_MERGE)
+      return NULL;
+   //原型 object_block **slot= object_block_htab->find_slot_with_hash (sect, hash_section (sect),INSERT);
+   object_block *slot = n_hash_table_lookup_by_hash(self->object_block_htab,sect,hash_section (sect));
+   /*
+   block = *slot;
+   if (block == NULL){
+   block = ggc_cleared_alloc<object_block> ();
+   block->sect = sect;
+   *slot = block;
+   }
+   */
+   block=slot;
+   if (block == NULL){
       block = ggc_cleared_alloc<object_block> ();
       block->sect = sect;
       n_hash_table_insert(self->object_block_htab,block,block);
       slot = block;
-  }
-  return block;
+   }
+   return block;
 }
 
 /* Create a symbol with label LABEL and place it at byte offset
@@ -2721,22 +2716,19 @@ static void switchToSection (MtcsAsm *self,section *new_section, tree decl)
    MtcsMode *mtcsMode=MTCS_GET_MODE_OBJECT(self);
    MtcsTarget *mtcsTarget=(MtcsTarget *)mtcsMode->target;
    MtcsMachine *mtcsMachine=mtcs_target_get_machine(mtcsTarget);
-
    bool retain_p;
    if ((new_section->common.flags & SECTION_NAMED) && decl != nullptr  && DECL_P (decl)
    && ((retain_p = !!lookup_attribute ("retain",DECL_ATTRIBUTES (decl)))!= !!(new_section->common.flags & SECTION_RETAIN))){
       /* If the SECTION_RETAIN bit doesn't match, switch to a new
       section.  */
       tree used_decl, no_used_decl;
-      n_debug("mtcsasm.cc switch_to_section 00\n");
-
       if (retain_p){
-         n_debug("mtcsasm.c switch_to_section 11\n");
+         n_debug("mtcsasm.c switch_to_section 00 retain_p\n");
          new_section->common.flags |= SECTION_RETAIN;
          used_decl = decl;
          no_used_decl = new_section->named.decl;
       }else{
-         n_debug("mtcsasm.c switch_to_section 22\n");
+         n_debug("mtcsasm.c switch_to_section !retain_p\n");
          new_section->common.flags &= ~(SECTION_RETAIN | SECTION_DECLARED);
          used_decl = new_section->named.decl;
          no_used_decl = decl;
@@ -2747,8 +2739,8 @@ static void switchToSection (MtcsAsm *self,section *new_section, tree decl)
          inform (DECL_SOURCE_LOCATION (used_decl), "%qD was declared here", used_decl);
       }
    }else if (self->in_section == new_section){
-      n_debug("mtcsasm.cc switch_to_section 33 new_section:%p text:%p readonly:%p\n",
-      new_section,self->text_section,self->readonly_data_section);
+      n_debug("mtcsasm.cc switch_to_section 33 不需要切换section new_section:%p text:%p readonly:%p\n",
+            new_section,self->text_section,self->readonly_data_section);
       return;
    }
    n_debug("mtcsasm.cc switch_to_section 44 new_section:%p text:%p readonly:%p\n",
@@ -2761,14 +2753,13 @@ static void switchToSection (MtcsAsm *self,section *new_section, tree decl)
                new_section->named.name,new_section->named.common.flags,new_section->named.decl);
          break;
       case SECTION_UNNAMED:
-         n_debug("mtcsasm.c switch_to_section 66 SECTION_UNNAMED %p %p\n",new_section,new_section->unnamed);
+         n_debug("mtcsasm.c switch_to_section 66 SECTION_UNNAMED %p %p\n",new_section,new_section->unnamed.data);
          new_section->unnamed.callback (new_section->unnamed.data);
          break;
       case SECTION_NOSWITCH:
          gcc_unreachable ();
          break;
    }
-
    new_section->common.flags |= SECTION_DECLARED;
 }
 
@@ -3611,9 +3602,8 @@ void mtcs_asm_align_variable (MtcsAsm *self,tree decl, bool dont_output_data)
   SET_DECL_ALIGN (decl, align);
 }
 
-
 /* Determine what kind of relocations EXP may need.  */
-
+//原型 compute_reloc_for_constant output.h varasm.cc
 int mtcs_asm_compute_reloc_for_constant (MtcsAsm *self,tree exp)
 {
   MtcsMode *mtcsMode=MTCS_GET_MODE_OBJECT(self);
@@ -3674,6 +3664,55 @@ int mtcs_asm_compute_reloc_for_constant (MtcsAsm *self,tree exp)
       break;
     }
   return reloc;
+}
+
+/* Return true if type TYPE contains any pointers.  */
+
+static bool contains_pointers_p (tree type)
+{
+   switch (TREE_CODE (type)){
+      case POINTER_TYPE:
+      case REFERENCE_TYPE:
+      /* I'm not sure whether OFFSET_TYPE needs this treatment,
+      so I'll play safe and return 1.  */
+      case OFFSET_TYPE:
+         return true;
+
+      case RECORD_TYPE:
+      case UNION_TYPE:
+      case QUAL_UNION_TYPE:
+      {
+         tree fields;
+         /* For a type that has fields, see if the fields have pointers.  */
+         for (fields = TYPE_FIELDS (type); fields; fields = DECL_CHAIN (fields))
+            if (TREE_CODE (fields) == FIELD_DECL && contains_pointers_p (TREE_TYPE (fields)))
+               return true;
+         return false;
+      }
+
+      case ARRAY_TYPE:
+         /* An array type contains pointers if its element type does.  */
+         return contains_pointers_p (TREE_TYPE (type));
+
+      default:
+         return false;
+   }
+}
+
+/* Compute reloc for get_variable_section.  The return value
+   is a mask for which bit 1 indicates a global relocation, and bit 0
+   indicates a local relocation.  */
+//原型 compute_reloc_for_var output.h varasm.cc
+int mtcs_asm_compute_reloc_for_var (MtcsAsm *self,tree decl)
+{
+   int reloc;
+   if (DECL_INITIAL (decl) == error_mark_node)
+      reloc = contains_pointers_p (TREE_TYPE (decl)) ? 3 : 0;
+   else if (DECL_INITIAL (decl))
+      reloc = mtcs_asm_compute_reloc_for_constant/*!compute_reloc_for_constant*/(self,DECL_INITIAL (decl));
+   else
+      reloc = 0;
+   return reloc;
 }
 
 /* Return true when references to DECL must bind to current definition in
@@ -3824,7 +3863,8 @@ section *mtcs_asm_get_variable_section (MtcsAsm *self,tree decl, bool prefer_nos
          return self->comm_section;
       }
    }
-   reloc = compute_reloc_for_var (decl);
+   reloc = mtcs_asm_compute_reloc_for_var/*!compute_reloc_for_var*/(self,decl);
+   n_debug("mtcsasm.c get_variable_section reloc:%d decl:%p\n",reloc,decl);
    mtcs_asm_resolve_unique_section/*resolve_unique_section*/ (self,decl, reloc, flag_data_sections);
    if (IN_NAMED_SECTION (decl)){
       n_debug("mtcsasm.c get_variable_section 55\n");
@@ -4489,74 +4529,87 @@ rtx mtcs_asm_get_section_anchor (MtcsAsm *self,struct object_block *block, HOST_
 //原型 init_varasm_once rtl.h varasm.c
 void mtcs_asm_init_varasm_once (MtcsAsm *self)
 {
-    MtcsMode *mtcsMode=MTCS_GET_MODE_OBJECT(self);
-    MtcsTarget *mtcsTarget=(MtcsTarget *)mtcsMode->target;
-    MtcsMachine *mtcsMachine=mtcs_target_get_machine(mtcsTarget);
+   MtcsMode *mtcsMode=MTCS_GET_MODE_OBJECT(self);
+   MtcsTarget *mtcsTarget=(MtcsTarget *)mtcsMode->target;
+   MtcsMachine *mtcsMachine=mtcs_target_get_machine(mtcsTarget);
 
-    self->shared_constant_pool =(npointer)create_constant_pool ();
+   self->shared_constant_pool =(npointer)create_constant_pool ();
 
-    if(self->sectionAsmOp.text){// 原型 #ifdef TEXT_SECTION_ASM_OP
-        n_debug("mtcsasm.c varasm.cc init_varasm_once 11 %s\n",self->sectionAsmOp.text);
-        CreateUnamedSectionCallBackData *data=createUNnamdSection(self,SECTION_CODE,self->sectionAsmOp.text);
-        self->text_section = createUnnamedSection(self,SECTION_CODE, createUnnamedSectionCallBack_cb,(const char *)data);
-    }
+   if(self->sectionAsmOp.text){// 原型 #ifdef TEXT_SECTION_ASM_OP
+      n_debug("mtcsasm.c varasm.cc init_varasm_once 11 %p\n",self->sectionAsmOp.text);
+      CreateUnamedSectionCallBackData *data=createUNnamdSection(self,SECTION_CODE,self->sectionAsmOp.text);
+      n_debug("mtcsasm.c varasm.cc init_varasm_once 11aa %p %s\n",data,data->sectionAsmOp);
+      self->text_section = createUnnamedSection(self,SECTION_CODE,
+            createUnnamedSectionCallBack_cb,(const char *)data);
+   }
 
-    if(self->sectionAsmOp.data){// 原型#ifdef DATA_SECTION_ASM_OP
-       // n_debug("mtcsasm.c varasm.cc init_varasm_once 22 %s\n",DATA_SECTION_ASM_OP);
-        CreateUnamedSectionCallBackData *data=createUNnamdSection(self,SECTION_WRITE,self->sectionAsmOp.data);
-        self->data_section = createUnnamedSection(self,SECTION_WRITE, createUnnamedSectionCallBack_cb,(const char *)data);
-    }
+   if(self->sectionAsmOp.data){// 原型#ifdef DATA_SECTION_ASM_OP
+      // n_debug("mtcsasm.c varasm.cc init_varasm_once 22 %s\n",DATA_SECTION_ASM_OP);
+      CreateUnamedSectionCallBackData *data=createUNnamdSection(self,SECTION_WRITE,self->sectionAsmOp.data);
+      self->data_section = createUnnamedSection(self,SECTION_WRITE,
+        createUnnamedSectionCallBack_cb,(const char *)data);
+   }
 
-    if(self->sectionAsmOp.sdata){ //原型 #ifdef SDATA_SECTION_ASM_OP
-        CreateUnamedSectionCallBackData *data=createUNnamdSection(self,SECTION_WRITE,self->sectionAsmOp.sdata);
-        self->sdata_section = createUnnamedSection(self,SECTION_WRITE, createUnnamedSectionCallBack_cb,(const char *)data);
-    }
+   if(self->sectionAsmOp.sdata){ //原型 #ifdef SDATA_SECTION_ASM_OP
+      CreateUnamedSectionCallBackData *data=createUNnamdSection(self,SECTION_WRITE,
+        self->sectionAsmOp.sdata);
+      self->sdata_section = createUnnamedSection(self,SECTION_WRITE,
+        createUnnamedSectionCallBack_cb,(const char *)data);
+   }
 
-    if(self->sectionAsmOp.readonly_data){ //原型 #ifdef READONLY_DATA_SECTION_ASM_OP
-       n_debug("mtcsasm.c varasm.cc init_varasm_once 33 %s\n",self->sectionAsmOp.readonly_data);
-        CreateUnamedSectionCallBackData *data=createUNnamdSection(self,SECTION_UNNAMED,self->sectionAsmOp.readonly_data);
-        self->readonly_data_section = createUnnamedSection(self,SECTION_UNNAMED, createUnnamedSectionCallBack_cb,(const char *)data);
-    }
+   if(self->sectionAsmOp.readonly_data){ //原型 #ifdef READONLY_DATA_SECTION_ASM_OP
+      n_debug("mtcsasm.c varasm.cc init_varasm_once 33 %s\n",self->sectionAsmOp.readonly_data);
+      CreateUnamedSectionCallBackData *data=createUNnamdSection(self,SECTION_UNNAMED,
+        self->sectionAsmOp.readonly_data);
+      self->readonly_data_section = createUnnamedSection(self,SECTION_UNNAMED,
+        createUnnamedSectionCallBack_cb,(const char *)data);
+   }
 
-    if(self->sectionAsmOp.ctors){ //原型 #ifdef CTORS_SECTION_ASM_OP
-        CreateUnamedSectionCallBackData *data=createUNnamdSection(self,SECTION_UNNAMED,self->sectionAsmOp.ctors);
-        self->ctors_section = createUnnamedSection(self,SECTION_UNNAMED, createUnnamedSectionCallBack_cb,(const char *)data);
-    }
+   if(self->sectionAsmOp.ctors){ //原型 #ifdef CTORS_SECTION_ASM_OP
+      CreateUnamedSectionCallBackData *data=createUNnamdSection(self,SECTION_UNNAMED,self->sectionAsmOp.ctors);
+      self->ctors_section = createUnnamedSection(self,SECTION_UNNAMED,
+            createUnnamedSectionCallBack_cb,(const char *)data);
+   }
 
-    if(self->sectionAsmOp.dtors){ //原型 #ifdef DTORS_SECTION_ASM_OP
-        CreateUnamedSectionCallBackData *data=createUNnamdSection(self,SECTION_UNNAMED,self->sectionAsmOp.dtors);
-        self->dtors_section = createUnnamedSection(self,SECTION_UNNAMED, createUnnamedSectionCallBack_cb,(const char *)data);
-    }
+   if(self->sectionAsmOp.dtors){ //原型 #ifdef DTORS_SECTION_ASM_OP
+      CreateUnamedSectionCallBackData *data=createUNnamdSection(self,SECTION_UNNAMED,self->sectionAsmOp.dtors);
+      self->dtors_section = createUnnamedSection(self,SECTION_UNNAMED,
+            createUnnamedSectionCallBack_cb,(const char *)data);
+   }
 
-    if(self->sectionAsmOp.bss){ //原型 #ifdef BSS_SECTION_ASM_OP
-        CreateUnamedSectionCallBackData *data=createUNnamdSection(self,SECTION_WRITE | SECTION_BSS,self->sectionAsmOp.bss);
-        self->dtors_section = createUnnamedSection(self,SECTION_WRITE | SECTION_BSS, createUnnamedSectionCallBack_cb,(const char *)data);
-    }
+   if(self->sectionAsmOp.bss){ //原型 #ifdef BSS_SECTION_ASM_OP
+      CreateUnamedSectionCallBackData *data=createUNnamdSection(self,
+            SECTION_WRITE | SECTION_BSS,self->sectionAsmOp.bss);
+      self->dtors_section = createUnnamedSection(self,SECTION_WRITE | SECTION_BSS,
+            createUnnamedSectionCallBack_cb,(const char *)data);
+   }
 
-    if(self->sectionAsmOp.sbss){ //原型 #ifdef SBSS_SECTION_ASM_OP
-        CreateUnamedSectionCallBackData *data=createUNnamdSection(self,SECTION_WRITE | SECTION_BSS,self->sectionAsmOp.sbss);
-        self->dtors_section = createUnnamedSection(self,SECTION_WRITE | SECTION_BSS, createUnnamedSectionCallBack_cb,(const char *)data);
-    }
+   if(self->sectionAsmOp.sbss){ //原型 #ifdef SBSS_SECTION_ASM_OP
+      CreateUnamedSectionCallBackData *data=createUNnamdSection(self,
+            SECTION_WRITE | SECTION_BSS,self->sectionAsmOp.sbss);
+      self->dtors_section = createUnnamedSection(self,SECTION_WRITE | SECTION_BSS,
+            createUnnamedSectionCallBack_cb,(const char *)data);
+   }
 
 
-    //n_debug("mtcsasm.c varasm.cc init_varasm_once 44 %s\n",DATA_SECTION_ASM_OP);
-    self->tls_comm_section = createNoSwitchSection (SECTION_WRITE | SECTION_BSS | SECTION_COMMON, emit_tls_common);
-    self->lcomm_section = createNoSwitchSection (SECTION_WRITE | SECTION_BSS | SECTION_COMMON, emit_local);
-    self->comm_section = createNoSwitchSection (SECTION_WRITE | SECTION_BSS| SECTION_COMMON, emit_common);
+   //n_debug("mtcsasm.c varasm.cc init_varasm_once 44 %s\n",DATA_SECTION_ASM_OP);
+   self->tls_comm_section = createNoSwitchSection (SECTION_WRITE | SECTION_BSS | SECTION_COMMON, emit_tls_common);
+   self->lcomm_section = createNoSwitchSection (SECTION_WRITE | SECTION_BSS | SECTION_COMMON, emit_local);
+   self->comm_section = createNoSwitchSection (SECTION_WRITE | SECTION_BSS| SECTION_COMMON, emit_common);
 
-    if(self->asmOutputAlignedBss){// 原型 #if defined ASM_OUTPUT_ALIGNED_BSS
-        self->bss_noswitch_section = createNoSwitchSection (SECTION_WRITE | SECTION_BSS, emit_bss);
-    }
+   if(self->asmOutputAlignedBss){// 原型 #if defined ASM_OUTPUT_ALIGNED_BSS
+      self->bss_noswitch_section = createNoSwitchSection (SECTION_WRITE | SECTION_BSS, emit_bss);
+   }
 
-    target_asm_out_init_sections/*!targetm.asm_out.init_sections*/(mtcsMachine->asmOut);
+   target_asm_out_init_sections/*!targetm.asm_out.init_sections*/(mtcsMachine->asmOut);
    // n_debug("mtcsasm.c varasm.cc init_varasm_once 55 %s\n",DATA_SECTION_ASM_OP);
 
-    if (self->readonly_data_section == NULL)
-        self->readonly_data_section = self->text_section;
-
-    if(self->output_external){// 原型#ifdef ASM_OUTPUT_EXTERNAL
-        self->pending_assemble_externals_set = new hash_set<tree>;
-    }
+   if (self->readonly_data_section == NULL){
+      self->readonly_data_section = self->text_section;
+   }
+   if(self->output_external){// 原型#ifdef ASM_OUTPUT_EXTERNAL
+      self->pending_assemble_externals_set = new hash_set<tree>;
+   }
 }
 
 //原型 ASM_OUTPUT_ALIGNED_BSS
@@ -4568,15 +4621,15 @@ void mtcs_asm_set_asm_output_aligned_bss(MtcsAsm *self,nboolean is)
 //原型 default_asm_output_anchor output.h varasm.cc
 void mtcs_asm_default_asm_output_anchor (MtcsAsm *self,rtx symbol)
 {
-  MtcsMode *mtcsMode=MTCS_GET_MODE_OBJECT(self);
-  MtcsTarget *mtcsTarget=(MtcsTarget *)mtcsMode->target;
-  MtcsMachine  *mtcsMachine =mtcs_target_get_machine(mtcsTarget);
+   MtcsMode *mtcsMode=MTCS_GET_MODE_OBJECT(self);
+   MtcsTarget *mtcsTarget=(MtcsTarget *)mtcsMode->target;
+   MtcsMachine  *mtcsMachine =mtcs_target_get_machine(mtcsTarget);
 
-  gcc_checking_assert (TARGET_SUPPORTS_ALIASES);
-  char buffer[100];
-  sprintf (buffer, "*. + " HOST_WIDE_INT_PRINT_DEC,SYMBOL_REF_BLOCK_OFFSET (symbol));
-  //ASM_OUTPUT_DEF (asm_out_file, XSTR (symbol, 0), buffer);
-  target_asm_out_output_def/*!ASM_OUTPUT_DEF*/(mtcsMachine->asmOut,XSTR (symbol, 0),buffer);
+   gcc_checking_assert (TARGET_SUPPORTS_ALIASES);
+   char buffer[100];
+   sprintf (buffer, "*. + " HOST_WIDE_INT_PRINT_DEC,SYMBOL_REF_BLOCK_OFFSET (symbol));
+   //ASM_OUTPUT_DEF (asm_out_file, XSTR (symbol, 0), buffer);
+   target_asm_out_output_def/*!ASM_OUTPUT_DEF*/(mtcsMachine->asmOut,XSTR (symbol, 0),buffer);
 }
 
 /* Initialize constant pool hashing for a new function.  */
@@ -4618,10 +4671,10 @@ void mtcs_asm_decide_function_section (MtcsAsm *self,tree decl)
 
    if (DECL_SECTION_NAME (decl)){
       struct cgraph_node *node = cgraph_node::get (current_function_decl);
-       /* Calls to function_section rely on first_function_block_is_cold
-       being accurate.  */
+      /* Calls to function_section rely on first_function_block_is_cold
+      being accurate.  */
       self->first_function_block_is_cold = (node && node->frequency == NODE_FREQUENCY_UNLIKELY_EXECUTED);
-    }
+   }
 
    self->in_cold_section_p = self->first_function_block_is_cold;
 }
@@ -4756,7 +4809,7 @@ rtx mtcs_asm_make_decl_rtl_for_debug (MtcsAsm *self,tree decl)
 }
 
 /**
- * 把汇编文件存入变量
+ * 把汇编文件存入变量,这里是主机状态，已完成了mtcs编译
  */
 void mtcs_asm_create_asm_var(MtcsAsm *self)
 {

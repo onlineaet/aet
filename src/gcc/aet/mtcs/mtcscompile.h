@@ -37,8 +37,6 @@ struct _MtcsCompile
    MtcsTarget *currentMtcsTarget;
    nboolean haveMtcsFuncOrVar;
    nboolean running;
-   //有些变量是因为优化内部生成的，如果有MTCS函数引用到这些变量，则这些变量也成为MTCS的变量
-   NPtrArray *undecidedVarArray;
    //禁用一些pass
    MtcsAdjustPass *mtcsAdjustPass;
 };

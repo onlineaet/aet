@@ -365,14 +365,12 @@ struct _MtcsTree
      //原型 nonstandard_boolean_type_cache tree.cc
      GTY(()) tree nonstandard_boolean_type_cache[200/*!MAX_BOOL_CACHED_PREC + 1 200足够大*/];
 
-
      uint64_t tree_code_counts[MAX_TREE_CODES];
      uint64_t tree_node_counts[(int) all_kinds];
      uint64_t tree_node_sizes[(int) all_kinds];
      /* Hash table and temporary node for larger integer const values.  */
      //原型 int_cst_node tree.cc
      GTY (()) tree int_cst_node;
-
 
     //原型 #define POINTER_SIZE BITS_PER_WORD
     int pointerSize;
@@ -392,6 +390,7 @@ struct _MtcsTree
     //原型  struct lang_hooks...tree (*builtin_function) (tree decl);#define LANG_HOOKS_BUILTIN_FUNCTION lhd_builtin_function
     tree (*builtin_function)(MtcsTree *self,tree decl);
     void *backup;//备份主机的rtl
+    nboolean haveBackup;//是否备份了主机tree
 };
 
 //原型 #define size_int(L) size_int_kind (L, stk_sizetype) tree.h
@@ -557,6 +556,23 @@ void mtcs_tree_debug_tree(MtcsTree *self,int passType,char *name);
 void mtcs_tree_backup_builtin_info(MtcsTree *self);
 //恢复主机的 builtin_info
 void mtcs_tree_restore_builtin_info(MtcsTree *self);
+//原型 build_array_type_1 tree.h tree.cc
+tree mtcs_tree_build_array_type_1 (MtcsTree *self,tree elt_type, tree index_type,
+      bool typeless_storage,bool shared, bool set_canonical);
+//原型 build_array_type tree.h tree.cc
+tree mtcs_tree_build_array_type (MtcsTree *self,tree elt_type, tree index_type, bool typeless_storage = false);
+//原型 build_range_type tree.h tree.cc
+tree mtcs_tree_build_range_type (MtcsTree *self,tree type, tree lowval, tree highval);
+//原型 build_index_type tree.h tree.cc
+tree mtcs_tree_build_index_type (MtcsTree *self,tree maxval);
+/**
+ * 从主机类型找到设备类型
+ * mtcs_tree_build_common_tree_nodes已完成tree的创建
+ */
+tree     mtcs_tree_host_to_device(MtcsTree *self,tree hostType);
+nboolean mtcs_tree_is_host_global(MtcsTree *self,tree type);
+tree     mtcs_tree_device_to_host(MtcsTree *self,tree deviceType);
+nboolean mtcs_tree_is_device_global(MtcsTree *self,tree type);
 
 #endif
 

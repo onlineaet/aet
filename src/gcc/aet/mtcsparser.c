@@ -72,19 +72,19 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 typedef struct  _PromoteSharedVar
 {
    int id;
-   tree hostDecl;
+   nuint64 hostDeclAddress; //保存指针的数值，因为在mtcscompile中会移走hostDecl
 }PromoteSharedVar;
 
 static tree handle_mtcs_attribute (tree *node, tree name, tree args,int flags, bool *no_add_attrs);
 
-static int  getPromoteDeclId_cb(AetMediatorUser *user,tree decl)
+static int  getPromoteDeclId_cb(AetMediatorUser *user,nuint64 hostDeclAddress)
 {
    MtcsParser *self = (MtcsParser *)user;
    int len=self->mtcsPromoteLocalVarArray->len;
    int i;
    for(i=0;i<len;i++){
       PromoteSharedVar *item=(PromoteSharedVar *)n_ptr_array_index(self->mtcsPromoteLocalVarArray,i);
-      if(item->hostDecl == decl)
+      if(item->hostDeclAddress == hostDeclAddress)
          return item->id;
    }
    return -1;
@@ -124,6 +124,21 @@ static char *getObjectFile_cb(AetMediatorUser *self)
    return makefile_parm_get_object_file(makefile_parm_get());
 }
 
+static tree  getMIIFunction_cb(AetMediatorUser *self,tree micFndecl)
+{
+    char *mangleFuncName = IDENTIFIER_POINTER(DECL_NAME(micFndecl));
+    ClassFunc *micClassFunc = func_mgr_get_static_entity_by_mangle(func_mgr_get(),mangleFuncName);
+    printf("这是不是一个mic函数名:%s %p\n",mangleFuncName,micClassFunc);
+    ClassFunc *miifn = func_mgr_get_mii_func(func_mgr_get(),micClassFunc);
+    printf("这是不是一个mic函数名ttt:%s %p\n",mangleFuncName,miifn);
+    //aet_print_tree(miifn->fromImplDefine);
+    if(miifn && miifn->fromImplDefine)
+       return miifn->fromImplDefine;
+
+    return NULL_TREE;
+}
+
+
 static void initMediator(MtcsParser *self)
 {
    AetMediator *mediator = aet_mediator_get();
@@ -134,6 +149,7 @@ static void initMediator(MtcsParser *self)
    mediatorUser->addLinkFunc=addLinkFunc_cb;
    mediatorUser->getObjectFile = getObjectFile_cb;
    mediatorUser->writeNote = writeNote_cb;
+   mediatorUser->getMIIFunction = getMIIFunction_cb;
 
    aet_mediator_add_user(mediator,mediatorUser);
 }
@@ -546,6 +562,51 @@ static void setAssembleName(MtcsParser *self,tree decl)
    SET_DECL_ASSEMBLER_NAME (decl, get_identifier(name));
 }
 
+static void addMiiAttribute(ClassFunc *func,tree fndecl)
+{
+   ClassName *cn=func->className;
+   ClassInfo *info = class_mgr_get_class_info_by_class_name(class_mgr_get(),func->className);
+   if(class_info_is_mii(info) &&
+         class_func_is_static(func) &&
+         class_func_get_mtcs_type(func) == MTCS_FUNC_DEVICE &&
+         !lookup_attribute (MTCS_INTRINSIC_FUNCTION_IMPLEMENTS, DECL_ATTRIBUTES (fndecl))){
+      //说明函数已有属性 mii
+//      tree fnImplAtt=lookup_attribute (MTCS_INTRINSIC_FUNCTION_IMPLEMENTS, DECL_ATTRIBUTES (fndecl));
+//      if(fnImplAtt)
+//         return;
+      tree miiAtt=  class_info_get_mii_attribute(info);
+      gcc_assert(miiAtt);
+      tree intrinsic = NULL_TREE;
+      tree list = NULL_TREE;
+      //classinfo中的属性 __attribute__((mii("cuda","sm_35"))) 复制到函数中
+       int ix=0;
+       for (tree a = TREE_VALUE (miiAtt); a; a = TREE_CHAIN (a)){
+          tree d = TREE_VALUE (a);
+          list=tree_cons (NULL_TREE, d, list);
+          ix++;
+       }
+       if(ix==0){
+          list=tree_cons (NULL_TREE, get_identifier("default"), list);
+          list=tree_cons (NULL_TREE, get_identifier("default"), list);
+       }else if(ix==1){
+          list=tree_cons (NULL_TREE, get_identifier("default"), list);
+       }
+       list = nreverse(list);
+       intrinsic = build_tree_list (get_identifier(MTCS_INTRINSIC_FUNCTION_IMPLEMENTS),list);
+       tree attrs = DECL_ATTRIBUTES (fndecl);
+       if(!attrs)
+          DECL_ATTRIBUTES (fndecl) = tree_cons (intrinsic,NULL_TREE,DECL_ATTRIBUTES (fndecl));
+       else{
+          attrs=chainon (attrs, intrinsic);
+       }
+       tree mtcs1=lookup_attribute (MTCS_INTRINSIC_FUNCTION_IMPLEMENTS, DECL_ATTRIBUTES (fndecl));
+       printf("测试是不是实现----\n");
+       aet_print_tree(DECL_ATTRIBUTES (fndecl));
+       aet_print_tree(mtcs1);
+   }
+
+}
+
 //类中声明的函数和类实现中定义的函数
 static void checkFuncDefineAndField(MtcsParser *self,tree decl,nboolean finishDecl)
 {
@@ -578,6 +639,7 @@ static void checkFuncDefineAndField(MtcsParser *self,tree decl,nboolean finishDe
                      mtcsFuncType = class_func_get_mtcs_type(parentFunc);
                      class_func_set_mtcs(func,TRUE);
                      class_func_set_mtcs_type(func,(MtcsFuncType)mtcsFuncType);
+                     addMiiAttribute(func,decl);
                      func->permission = parentFunc->permission;
                   }
                   break;
@@ -601,6 +663,7 @@ static void checkFuncDefineAndField(MtcsParser *self,tree decl,nboolean finishDe
    }
    class_func_set_mtcs(func,TRUE);
    class_func_set_mtcs_type(func,(MtcsFuncType)mtcsFuncType);
+   addMiiAttribute(func,decl);
    self->haveMtcsFunc = TRUE;
    const char *mtcsFuncTypeStr = mtcs_info_get_mtcs_type_string((MtcsFuncType)mtcsFuncType);
    n_debug("mtcsparser.c mtcs_parser_check 设函数类型 %s\n",mtcsFuncTypeStr);
@@ -649,8 +712,6 @@ static void checkFuncDefineAndField(MtcsParser *self,tree decl,nboolean finishDe
          (mtcsFuncType==MTCS_FUNC_KERNEL || mtcsFuncType==MTCS_FUNC_DEVICE ||  mtcsFuncType==MTCS_FUNC_DEVICE_HOST)
          && TREE_CODE(decl)==FUNCTION_DECL)
       add_no_sanitize_value (decl, "all");
-
-
 }
 
 static void checkVarSize(MtcsParser *self,tree decl,nboolean finishDecl)
@@ -808,7 +869,7 @@ void mtcs_parser_check(MtcsParser *self,tree decl,nboolean finishDecl)
          setAssembleName(self,decl);
          PromoteSharedVar *item=n_slice_new(PromoteSharedVar);
          item->id=self->mtcsPromoteLocalVarArray->len;
-         item->hostDecl = decl;
+         item->hostDeclAddress = decl;
          n_ptr_array_add(self->mtcsPromoteLocalVarArray,item);
          tree call = createSharedCall(self,DECL_SOURCE_LOCATION(decl),item->id,0);
          n_debug("mtcsparser.c 声明是一个变量并在mtcs函数内 00 是局部变量，可能要提升。  类型是:%d hostdecl:%p\n",type,decl);
@@ -1068,6 +1129,15 @@ void mtcs_parser_link_func(MtcsParser *self,char *objRootPath,NPtrArray **arrays
 {
    mtcs_link_link(self->mtcsLink,objRootPath,arrays,length,pos);
 }
+
+/**
+ * 返回fndecl的类型 MTCS_FUNC_DEVICE 还是 MTCS_FUNC_KERNEL...
+ */
+int  mtcs_parser_get_func_type(MtcsParser *self,tree fndecl)
+{
+   return getMtcsFuncType(self,fndecl);
+}
+
 
 MtcsParser *mtcs_parser_get()
 {

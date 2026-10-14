@@ -2185,7 +2185,7 @@ static bool maybe_legitimize_operand (MtcsOptabs *self,enum insn_code icode, uns
 
    machine_mode mode, imode, tmode;
    mode = op->mode;
-   n_debug("mtcsoptabs.c maybe_legitimize_operand 00 op->type:%d mode:%d\n",op->type,mode);
+   n_debug("mtcsoptabs.c maybe_legitimize_operand 00 op->type:%d mode:%d icode:%d opno:%d\n",op->type,mode,icode,opno);
 
    switch (op->type){
       case EXPAND_FIXED:
@@ -4060,39 +4060,49 @@ bool mtcs_optabs_maybe_legitimize_operands (MtcsOptabs *self,enum insn_code icod
 //原型 insn_operand_matches optabs.h optabs.cc
 bool mtcs_optabs_insn_operand_matches (MtcsOptabs *self,enum insn_code icode, unsigned int opno, rtx operand)
 {
-  MtcsMode *mtcsMode=MTCS_GET_MODE_OBJECT(self);
-  MtcsTarget *mtcsTarget=(MtcsTarget *)mtcsMode->target;
-  MtcsOutput   *mtcsOutput=mtcs_target_get_output(mtcsTarget);
-  MtcsPreds *mtcsPreds=mtcs_target_get_preds(mtcsTarget);
-  n_debug("mtcsoptabs.c mtcs_optabs_insn_operand_matches 00  icode:%d opno:%d operand:%p REGNO:%d\n",icode,opno,operand,REGNO(operand));
-  n_debug("mtcsoptabs.c mtcs_optabs_insn_operand_matches 11 predicate:%p\n", mtcsOutput->insn_data[(int) icode].operand[opno].predicate);
-  n_debug("mtcsoptabs.c mtcs_optabs_insn_operand_matches 22 mode:%d %s rtx mode:%d\n",mtcsOutput->insn_data[(int) icode].operand[opno].mode,
-        mtcs_mode_get_name(mtcsMode,mtcsOutput->insn_data[(int) icode].operand[opno].mode),GET_MODE (operand));
-  n_debug("mtcsoptabs.c mtcs_optabs_insn_operand_matches 33 name:%s\n",mtcsOutput->insn_data[(int) icode].name);
-  mtcs_print_rtl(stderr,operand);
-
- /*! return (!mtcsOutput->insn_data[(int) icode].operand[opno].predicate
-     || (mtcsOutput->insn_data[(int) icode].operand[opno].predicate(operand, mtcsOutput->insn_data[(int) icode].operand[opno].mode)));
+   MtcsMode *mtcsMode=MTCS_GET_MODE_OBJECT(self);
+   MtcsTarget *mtcsTarget=(MtcsTarget *)mtcsMode->target;
+   MtcsOutput   *mtcsOutput=mtcs_target_get_output(mtcsTarget);
+   MtcsPreds *mtcsPreds=mtcs_target_get_preds(mtcsTarget);
+   /*
+   if(operand!=NULL){
+      n_debug("mtcsoptabs.c mtcs_optabs_insn_operand_matches 00 icode:%d opno:%d operand:%p REGNO:%d\n",
+            icode,opno,operand,REGNO(operand));
+      n_debug("mtcsoptabs.c mtcs_optabs_insn_operand_matches 11 predicate:%p\n",
+            mtcsOutput->insn_data[(int) icode].operand[opno].predicate);
+      n_debug("mtcsoptabs.c mtcs_optabs_insn_operand_matches 22 mode:%d %s rtx mode:%d\n",
+            mtcsOutput->insn_data[(int) icode].operand[opno].mode,
+            mtcs_mode_get_name(mtcsMode,mtcsOutput->insn_data[(int) icode].operand[opno].mode),GET_MODE (operand));
+      n_debug("mtcsoptabs.c mtcs_optabs_insn_operand_matches 33 name:%s\n",mtcsOutput->insn_data[(int) icode].name);
+   }else{
+      n_debug("mtcsoptabs.c mtcs_optabs_insn_operand_matches 00 操作数是空的 name:%s\n",
+            mtcsOutput->insn_data[(int) icode].name);
+   }
+   mtcs_print_rtl(stderr,operand);
    */
-  //insn_data[..predicate原型是insn_operand_predicate_fn(recog.h)是两个参数，实际predicate是函数mtcs_insn_operand_predicate_fn
-  //有三个参数
-  insn_operand_predicate_fn fn=mtcsOutput->insn_data[(int) icode].operand[opno].predicate;
-  if(!fn)
-     return true;
-  bool ret;
-  if(mtcs_preds_is_common(mtcsPreds,(void*)fn)){
-     mtcs_insn_operand_predicate_fn *fx=&fn;
-     ret= (*fx)(mtcsPreds,operand, mtcsOutput->insn_data[(int) icode].operand[opno].mode);
-  }else{
-     mtcs_insn_operand_predicate_fn *fx=&fn;
-     ret =fn(operand, mtcsOutput->insn_data[(int) icode].operand[opno].mode);
-  }
-  //mtcs_insn_operand_predicate_fn *fn=(mtcs_insn_operand_predicate_fn*)&mtcsOutput->insn_data[(int) icode].operand[opno].predicate;
- // bool ret= (!fn || (*fn)(mtcsPreds,operand, mtcsOutput->insn_data[(int) icode].operand[opno].mode));
-  n_debug("mtcsoptabs.c mtcs_optabs_insn_operand_matches 44 fn:%p %s %d\n",fn,mtcsOutput->insn_data[(int) icode].name,ret);
-  mtcs_print_rtl(stderr,operand);
 
-  return ret;
+   /*! return (!mtcsOutput->insn_data[(int) icode].operand[opno].predicate
+   || (mtcsOutput->insn_data[(int) icode].operand[opno].predicate(operand, mtcsOutput->insn_data[(int) icode].operand[opno].mode)));
+   */
+   //insn_data[..predicate原型是insn_operand_predicate_fn(recog.h)是两个参数，实际predicate是函数mtcs_insn_operand_predicate_fn
+   //有三个参数
+   insn_operand_predicate_fn fn=mtcsOutput->insn_data[(int) icode].operand[opno].predicate;
+   if(!fn)
+      return true;
+   bool ret;
+   if(mtcs_preds_is_common(mtcsPreds,(void*)fn)){
+      mtcs_insn_operand_predicate_fn *fx=&fn;
+      ret= (*fx)(mtcsPreds,operand, mtcsOutput->insn_data[(int) icode].operand[opno].mode);
+   }else{
+      mtcs_insn_operand_predicate_fn *fx=&fn;
+      ret =fn(operand, mtcsOutput->insn_data[(int) icode].operand[opno].mode);
+   }
+   //mtcs_insn_operand_predicate_fn *fn=(mtcs_insn_operand_predicate_fn*)&mtcsOutput->insn_data[(int) icode].operand[opno].predicate;
+   // bool ret= (!fn || (*fn)(mtcsPreds,operand, mtcsOutput->insn_data[(int) icode].operand[opno].mode));
+//   n_debug("mtcsoptabs.c mtcs_optabs_insn_operand_matches 44 fn:%p %s %d\n",fn,mtcsOutput->insn_data[(int) icode].name,ret);
+//   mtcs_print_rtl(stderr,operand);
+
+   return ret;
 }
 
 /* Create a new vector value in VMODE with all elements set to OP.  The

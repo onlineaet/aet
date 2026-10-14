@@ -1236,6 +1236,16 @@ int   mtcs_target_get_isa(MtcsTarget *self)
     return self->platformInfo.isa;
 }
 
+const char  *mtcs_target_get_version_string(MtcsTarget *self)
+{
+   return self->getVersionString(self);
+}
+
+const char  *mtcs_target_get_isa_string(MtcsTarget *self)
+{
+   return self->getIsaString(self);
+}
+
 /**
  * 目标名字如cuda、gcn、spirv、opencl等
  */
@@ -1729,7 +1739,6 @@ MtcsMachine  *mtcs_target_get_machine(MtcsTarget *self)
    return self->mtcsMachine;
 }
 
-
 //原型 target_default_pointer_address_modes_p target.h targhooks.cc
 bool mtcs_target_target_default_pointer_address_modes_p (MtcsTarget *self)
 {
@@ -1758,3 +1767,10 @@ void mtcs_target_publish_version(MtcsTarget *self)
    if(self->publishVersion)
       self->publishVersion(self);
 }
+
+//是否支持平台和架构
+nboolean   mtcs_target_is_support(MtcsTarget *self,char *target,char *isa)
+{
+   return self->isSupport(self,target,isa);
+}
+

@@ -4174,7 +4174,7 @@ bool mtcs_func_use_register_for_decl (MtcsFunc *self,const_tree decl)
    MtcsMachine *mtcsMachine=mtcs_target_get_machine(mtcsTarget);
 
    if (TREE_CODE (decl) == SSA_NAME){
-      n_debug("mtcsfunc.c mtcs_func_use_register_for_decl 00\n");
+      //n_debug("mtcsfunc.c mtcs_func_use_register_for_decl 00\n");
       /* We often try to use the SSA_NAME, instead of its underlying
       decl, to get type information and guide decisions, to avoid
       differences of behavior between anonymous and named
@@ -4196,7 +4196,7 @@ bool mtcs_func_use_register_for_decl (MtcsFunc *self,const_tree decl)
 
       decl = SSA_NAME_VAR (decl);
    }
-   n_debug("mtcsfunc.c mtcs_func_use_register_for_decl 11\n");
+   //n_debug("mtcsfunc.c mtcs_func_use_register_for_decl 11\n");
 
    /* Honor volatile.  */
    if (TREE_SIDE_EFFECTS (decl))
@@ -4205,14 +4205,14 @@ bool mtcs_func_use_register_for_decl (MtcsFunc *self,const_tree decl)
    /* Honor addressability.  */
    if (TREE_ADDRESSABLE (decl))
       return false;
-   n_debug("mtcsfunc.c mtcs_func_use_register_for_decl 22\n");
+   //n_debug("mtcsfunc.c mtcs_func_use_register_for_decl 22\n");
 
    /* RESULT_DECLs are a bit special in that they're assigned without
    regard to use_register_for_decl, but we generally only store in
    them.  If we coalesce their SSA NAMEs, we'd better return a
    result that matches the assignment in expand_function_start.  */
    if (TREE_CODE (decl) == RESULT_DECL){
-      n_debug("mtcsfunc.c mtcs_func_use_register_for_decl 33\n");
+      //n_debug("mtcsfunc.c mtcs_func_use_register_for_decl 33\n");
 
       /* If it's not an aggregate, we're going to use a REG or a
       PARALLEL containing a REG.  */
@@ -4250,7 +4250,7 @@ bool mtcs_func_use_register_for_decl (MtcsFunc *self,const_tree decl)
       /* We don't set DECL_REGISTER for the function_result_decl.  */
       return false;
    }
-   n_debug("mtcsfunc.c mtcs_func_use_register_for_decl 44\n");
+   //n_debug("mtcsfunc.c mtcs_func_use_register_for_decl 44\n");
 
    /* Only register-like things go in registers.  */
    if (DECL_MODE (decl) == mtcsMode->modes.M_BLKmode)
@@ -4265,18 +4265,18 @@ bool mtcs_func_use_register_for_decl (MtcsFunc *self,const_tree decl)
 
    if (!target_calls_allocate_stack_slots_for_args/*!targetm.calls.allocate_stack_slots_for_args*/(mtcsMachine->calls))
       return true;
-   n_debug("mtcsfunc.c mtcs_func_use_register_for_decl 55\n");
+  // n_debug("mtcsfunc.c mtcs_func_use_register_for_decl 55\n");
 
    /* If we're not interested in tracking debugging information for
    this decl, then we can certainly put it in a register.  */
    if (DECL_IGNORED_P (decl))
       return true;
-   n_debug("mtcsfunc.c mtcs_func_use_register_for_decl 66 %d %d\n",
-         (TREE_CODE (decl) == PARM_DECL && cfun->tail_call_marked),RECORD_OR_UNION_TYPE_P (TREE_TYPE (decl)));
+   //n_debug("mtcsfunc.c mtcs_func_use_register_for_decl 66 %d %d\n",
+        // (TREE_CODE (decl) == PARM_DECL && cfun->tail_call_marked),RECORD_OR_UNION_TYPE_P (TREE_TYPE (decl)));
 
    if (mtcsOptionsItem->x_optimize)
       return true;
-   n_debug("mtcsfunc.c mtcs_func_use_register_for_decl 77\n");
+  // n_debug("mtcsfunc.c mtcs_func_use_register_for_decl 77\n");
 
    /* Thunks force a tail call even at -O0 so we need to avoid creating a
    dangling reference in case the parameter is passed by reference.  */
@@ -4285,7 +4285,7 @@ bool mtcs_func_use_register_for_decl (MtcsFunc *self,const_tree decl)
 
    if (!DECL_REGISTER (decl))
       return false;
-   n_debug("mtcsfunc.c mtcs_func_use_register_for_decl 66\n");
+   //n_debug("mtcsfunc.c mtcs_func_use_register_for_decl 88\n");
 
    /* When not optimizing, disregard register keyword for types that
    could have methods, otherwise the methods won't be callable from
@@ -5546,8 +5546,8 @@ void mtcs_func_instantiate_virtual_regs (MtcsFunc *self)
    else
       self->cfa_offset = self->get_arg_pointer_cfg_offset/*!ARG_POINTER_CFA_OFFSET*/(self,current_function_decl);
    //#endif
-   n_debug("mtcsfunc.c  mtcs_func_instantiate_virtual_regs 00 %d %d %d %d %d\n",
-         self->in_arg_offset,self->var_offset,self->dynamic_offset,self->out_arg_offset,self->cfa_offset);
+   //n_debug("mtcsfunc.c  mtcs_func_instantiate_virtual_regs 00 %d %d %d %d %d\n",
+         //self->in_arg_offset,self->var_offset,self->dynamic_offset,self->out_arg_offset,self->cfa_offset);
 
    /* Initialize recognition, indicating that volatile is OK.  */
    mtcs_recog_init_recog/*!init_recog*/(mtcsRecog);
@@ -5558,45 +5558,44 @@ void mtcs_func_instantiate_virtual_regs (MtcsFunc *self)
       if (INSN_P (insn)){
          /* These patterns in the instruction stream can never be recognized.
          Fortunately, they shouldn't contain virtual registers either.  */
-         n_debug("mtcsfunc.c  mtcs_func_instantiate_virtual_regs 11 %p  %d %s %s\n",
-               insn,GET_CODE(insn),GET_RTX_NAME(GET_CODE(insn)),GET_RTX_FORMAT (GET_CODE (insn)));
+         //n_debug("mtcsfunc.c  mtcs_func_instantiate_virtual_regs 11 %p  %d %s %s\n",
+               //insn,GET_CODE(insn),GET_RTX_NAME(GET_CODE(insn)),GET_RTX_FORMAT (GET_CODE (insn)));
 
          if (GET_CODE (PATTERN (insn)) == USE
          || GET_CODE (PATTERN (insn)) == CLOBBER
          || GET_CODE (PATTERN (insn)) == ASM_INPUT
          || DEBUG_MARKER_INSN_P (insn)){
-            n_debug("mtcsfunc.c  mtcs_func_instantiate_virtual_regs 22 %p  %d %s %s\n",
-                  insn,GET_CODE(insn),GET_RTX_NAME(GET_CODE(insn)),GET_RTX_FORMAT (GET_CODE (insn)));
+            //n_debug("mtcsfunc.c  mtcs_func_instantiate_virtual_regs 22 %p  %d %s %s\n",
+                  //insn,GET_CODE(insn),GET_RTX_NAME(GET_CODE(insn)),GET_RTX_FORMAT (GET_CODE (insn)));
 
             continue;
          }else if (DEBUG_BIND_INSN_P (insn)){
-            n_debug("mtcsfunc.c  mtcs_func_instantiate_virtual_regs 33 %p  %d %s %s\n",
-                  insn,GET_CODE(insn),GET_RTX_NAME(GET_CODE(insn)),GET_RTX_FORMAT (GET_CODE (insn)));
+            //n_debug("mtcsfunc.c  mtcs_func_instantiate_virtual_regs 33 %p  %d %s %s\n",
+                 // insn,GET_CODE(insn),GET_RTX_NAME(GET_CODE(insn)),GET_RTX_FORMAT (GET_CODE (insn)));
 
             instantiate_virtual_regs_in_rtx(self,INSN_VAR_LOCATION_PTR (insn));
          }else{
-            n_debug("mtcsfunc.c  mtcs_func_instantiate_virtual_regs 44 %p  %d %s %s\n",
-                  insn,GET_CODE(insn),GET_RTX_NAME(GET_CODE(insn)),GET_RTX_FORMAT (GET_CODE (insn)));
+           // n_debug("mtcsfunc.c  mtcs_func_instantiate_virtual_regs 44 %p  %d %s %s\n",
+                  //insn,GET_CODE(insn),GET_RTX_NAME(GET_CODE(insn)),GET_RTX_FORMAT (GET_CODE (insn)));
 
             instantiate_virtual_regs_in_insn(self,insn);
-            n_debug("mtcsfunc.c  mtcs_func_instantiate_virtual_regs 44-- instantiate_virtual_regs_in_insn\n");
-
+            //n_debug("mtcsfunc.c  mtcs_func_instantiate_virtual_regs 44-- instantiate_virtual_regs_in_insn\n");
          }
 
          if (insn->deleted ())
             continue;
 
          instantiate_virtual_regs_in_rtx(self,&REG_NOTES (insn));
-         n_debug("mtcsfunc.c  mtcs_func_instantiate_virtual_regs 55 instantiate_virtual_regs_in_rtx\n");
-         mtcs_print_rtl(stderr,insn);
+         //n_debug("mtcsfunc.c  mtcs_func_instantiate_virtual_regs 55 instantiate_virtual_regs_in_rtx\n");
+         //mtcs_print_rtl(stderr,insn);
          /* Instantiate any virtual registers in CALL_INSN_FUNCTION_USAGE.  */
          if (CALL_P (insn)){
-            n_debug("mtcsfunc.c  mtcs_func_instantiate_virtual_regs 66 instantiate_virtual_regs_in_rtx\n");
+           // n_debug("mtcsfunc.c  mtcs_func_instantiate_virtual_regs 66 instantiate_virtual_regs_in_rtx\n");
             instantiate_virtual_regs_in_rtx(self,&CALL_INSN_FUNCTION_USAGE (insn));
          }
       }
 
-   n_debug("mtcsfunc.c  mtcs_func_instantiate_virtual_regs 77 instantiate_decls\n");
+   //n_debug("mtcsfunc.c  mtcs_func_instantiate_virtual_regs 77 instantiate_decls\n");
    /* Instantiate the virtual registers in the DECLs for debugging purposes.  */
    instantiate_decls(self,current_function_decl);
    mtcsTarget/*!targetm.instantiate_decls*/->instantiate_decls(mtcsTarget);

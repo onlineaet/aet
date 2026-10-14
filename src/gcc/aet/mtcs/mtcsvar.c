@@ -71,37 +71,27 @@
 #include "except.h"
 
 #include "aet/aetprinttree.h"
-
 #include "mtcstarget.h"
 #include "mtcsprintrtl.h"
 #include "mtcscompile.h"
 #include "mtcsvar.h"
 
-
-typedef struct _VarData{
-   varpool_node *node;
-   tree decl;
-}VarData;
-
 static void mtcsVarInit(MtcsVar *self)
 {
    self->varArray=n_ptr_array_new();
-   self->hostArray=n_ptr_array_new();
 }
 
 static struct varpool_node *get(MtcsVar *self,tree decl)
 {
-   int len=self->hostArray->len;
+   int len=self->varArray->len;
    int i;
    for(i=0;i<len;i++){
-      VarData *item=(VarData *)n_ptr_array_index(self->hostArray,i);
-      if(item->decl==decl)
+      MtcsVarNode *item=(MtcsVarNode *)n_ptr_array_index(self->varArray,i);
+      if(item->hostDeclAddress==(nuint64)decl)
          return item->node;
    }
    return NULL;
 }
-
-
 
 /* Return varpool node assigned to DECL.  Create new one when needed.  */
 //原型 varpool_node * varpool_node::get_create (tree decl) varpool.cc
@@ -120,29 +110,18 @@ varpool_node *mtcs_var_clone(MtcsVar *self,struct varpool_node *hostNode)
    node = varpool_node::create_empty ();
    tree newdecl=copy_node(hostDecl);
    node->decl = newdecl;
-
-
    n_debug("mtcsvar.c mtcs_var_clone 00 hostNode:%p definition:%d alias:%d aux:%d no_reorder:%d decl sysmtabnode:%p force_output:%d\n",
          hostNode,hostNode->definition,hostNode->alias,hostNode->aux,hostNode->no_reorder,
          hostNode->decl->decl_with_vis.symtab_node,hostNode->force_output);
    n_debug("mtcsvar.c mtcs_var_clone 00aa hostNode:%p analyzed:%d force_output:%d used_from_other_partition:%d newdecl:%p\n",
          hostNode,hostNode->analyzed,node->force_output,node->used_from_other_partition,newdecl);
-
-
    node->definition = hostNode->definition;
    node->alias = hostNode->alias;
    node->analyzed = hostNode->analyzed;
    node->force_output = hostNode->force_output;
    int align = TYPE_ALIGN(TREE_TYPE(hostDecl));
    int newalign = TYPE_ALIGN(TREE_TYPE(newdecl));
-
-
    n_debug("mtcsvar.c mtcs_var_clone sss align %d %d %d %d\n",align,newalign,DECL_ALIGN(hostDecl),DECL_ALIGN(newdecl));
-
-   VarData *data=n_slice_new(VarData);
-   data->node = node;
-   data->decl = hostDecl;
-   n_ptr_array_add(self->hostArray,data);
    symbol_table *save=symtab;
    symtab=mtcsTarget->symtab;
    node->register_symbol ();
@@ -155,15 +134,28 @@ varpool_node *mtcs_var_clone(MtcsVar *self,struct varpool_node *hostNode)
 
 void  mtcs_var_add_mtcs_node(MtcsVar *self,MtcsVarNode *node)
 {
-    int len=self->varArray->len;
-    int i;
-    for(i=0;i<len;i++){
-       MtcsVarNode *item=(MtcsVarNode *)n_ptr_array_index(self->varArray,i);
-       if(item==node)
-          return ;
-    }
-    n_ptr_array_add(self->varArray,node);
+   int len=self->varArray->len;
+   int i;
+   for(i=0;i<len;i++){
+      MtcsVarNode *item=(MtcsVarNode *)n_ptr_array_index(self->varArray,i);
+      if(item==node)
+         return ;
+   }
+   n_ptr_array_add(self->varArray,node);
 }
+
+nboolean  mtcs_var_have_host_decl(MtcsVar *self,tree hostDecl)
+{
+   int len=self->varArray->len;
+   int i;
+   for(i=0;i<len;i++){
+      MtcsVarNode *item=(MtcsVarNode *)n_ptr_array_index(self->varArray,i);
+      if(item->hostDeclAddress==(nuint64)hostDecl)
+         return TRUE;
+   }
+   return FALSE;
+}
+
 
 /* Add NODE to queue starting at FIRST.
    The queue is linked via AUX pointers and terminated by pointer to 1.  */
@@ -597,7 +589,7 @@ void mtcs_var_assemble_variable (MtcsVar *self,tree decl, int top_level ATTRIBUT
          n_debug("mtcsvar.c assemble_variable 99 \n");
          handle_vtv_comdat_section (self,sect, decl);
       }else{
-         n_debug("mtcsvar.c assemble_variable 100 \n");
+         n_debug("mtcsvar.c assemble_variable 100 decl:%p sect:%p\n",decl,sect);
          mtcs_asm_switch_to_section (mtcsAsm,sect, decl);
       }
       if (align > BITS_PER_UNIT){
@@ -839,7 +831,7 @@ bool mtcs_var_assemble_decl (MtcsVar *self,varpool_node *node)
 
    if (!in_other_partition && !DECL_EXTERNAL (decl)){
       n_debug("mtcsvar.c mtcs_var_asm_assemble_decl 00 !in_other_partition && !DECL_EXTERNAL (decl)\n");
-      tree decl=node->decl;;
+      tree decl=node->decl;
       mtcs_var_get_constructor/*!get_constructor*/(self,node);
       mtcs_var_assemble_variable/*!assemble_variable*/(self,decl, 0, 1, 0);
       gcc_assert (TREE_ASM_WRITTEN (decl));
@@ -869,7 +861,7 @@ void mtcs_var_assemble_undefined_decl (MtcsVar *self,tree decl)
    MtcsMachine *mtcsMachine=mtcs_target_get_machine(mtcsTarget);
 
    const char *name = XSTR (XEXP (mtcs_asm_decl_rtl/*!DECL_RTL*/(mtcsAsm,decl), 0), 0);
-   fprintf(stderr,"mtcs_var_assemble_undefined_decl 00 %p %s\n",decl,name);
+   n_debug("mtcs_var_assemble_undefined_decl 00 %p %s\n",decl,name);
    target_asm_out_assemble_undefined_decl/*!targetm.asm_out.assemble_undefined_decl*/(mtcsMachine->asmOut, name, decl);
 }
 
@@ -896,7 +888,8 @@ bool mtcs_var_output_variables (MtcsVar *self)
    mtcs_var_remove_unreferenced_decls/*!remove_unreferenced_decls*/(self);
    FOR_EACH_DEFINED_VARIABLE (node){
       /* Handled in output_in_order.  */
-      n_debug("mtcsvar.c mtcs_var_output_variables 00 %s no_reorder:%d\n",IDENTIFIER_POINTER(DECL_NAME(node->decl)),node->no_reorder);
+      n_debug("mtcsvar.c mtcs_var_output_variables 00 %s no_reorder:%d\n",
+            IDENTIFIER_POINTER(DECL_NAME(node->decl)),node->no_reorder);
       if (node->no_reorder)
          continue;
       if(isLocalSharedVar(self,node))
@@ -908,15 +901,16 @@ bool mtcs_var_output_variables (MtcsVar *self)
    /* There is a similar loop in output_in_order.  Please keep them in sync.  */
    FOR_EACH_VARIABLE (node){
       /* Handled in output_in_order.  */
-      n_debug("mtcsvar.c mtcs_var_output_variables 22 %s\n",IDENTIFIER_POINTER(DECL_NAME(node->decl)));
+      n_debug("mtcsvar.c mtcs_var_output_variables 22 %s node:%p\n",
+            IDENTIFIER_POINTER(DECL_NAME(node->decl)),node);
       if (node->no_reorder)
          continue;
       if (DECL_HARD_REGISTER (node->decl) || DECL_HAS_VALUE_EXPR_P (node->decl))
          continue;
       if(isLocalSharedVar(self,node))
          continue;
-      n_debug("mtcsvar.c mtcs_var_output_variables 33 %s definition:%d\n",IDENTIFIER_POINTER(DECL_NAME(node->decl)),node->definition);
-
+      n_debug("mtcsvar.c mtcs_var_output_variables 33 %s definition:%d node:%p decl:%p\n",
+            IDENTIFIER_POINTER(DECL_NAME(node->decl)),node->definition , node,node->decl);
       if (node->definition)
          changed |= mtcs_var_assemble_decl/*!node->assemble_decl*/(self,node);
       else
@@ -930,14 +924,13 @@ bool mtcs_var_output_variables (MtcsVar *self)
 /**
  * 向 MtcsParser 查询 decl对应提升的id号
  */
-static int getPromoteDeclId(tree decl)
+static int getPromoteDeclId(nuint64 hostDeclAddress)
 {
    AetMediatorUser *mediatorUser =(AetMediatorUser *)mtcs_compile_get();
    AetMediator *mediator = mediatorUser->mediator;
-   int  id = aet_mediator_get_promote_decl_id(mediator,decl,mediatorUser);
+   int  id = aet_mediator_get_promote_decl_id(mediator,hostDeclAddress,mediatorUser);
    return id;
 }
-
 
 static char *assembleSharedVariable (MtcsVar *self,tree decl,int dont_output_data)
 {
@@ -1082,10 +1075,8 @@ char  *mtcs_var_assemble_local_shared(MtcsVar *self,int promoteId)
    for(i=0;i<len;i++){
       MtcsVarNode *item=(MtcsVarNode *)n_ptr_array_index(self->varArray,i);
       varpool_node *node= item->node;
-      int id =getPromoteDeclId(item->hostDecl);
+      int id =getPromoteDeclId(item->hostDeclAddress);
       n_debug("mtcs_var_assemble_local_shared 11 prmoteId:%d len:%d\n",promoteId,len);
-      aet_print_tree(item->hostDecl);
-
       if(id==promoteId){
          n_debug("mtcs_var_assemble_local_shared 11 找到了 promoteId 对应的全局变量 name:%s decl:%p\n",node->name(),node->decl);
          item->promoteId = id;

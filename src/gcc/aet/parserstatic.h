@@ -26,15 +26,19 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 #include "c-aet.h"
 #include "aetparser.h"
 
+typedef void (* TargetIntrinsicFunc) (tree fndecl,void *userData);
+
 typedef struct _ParserStatic ParserStatic;
 /* --- structures --- */
 struct _ParserStatic
 {
 	 AetParser *parser;
+	 TargetIntrinsicFunc tqrgetIntrinsicFunc;
+	 void *userData;
 };
 
-ParserStatic   *parser_static_get();
-tree            parser_static_create_temp_tree(ParserStatic *self,location_t loc,ClassName *className,char *orginalName);
+ParserStatic *parser_static_get();
+tree     parser_static_create_temp_tree(ParserStatic *self,location_t loc,ClassName *className,char *orginalName);
 
 /**
  * 检查是不是给函数变量赋值，如果右边是类中的静态函数。需要重新生成新的tree
@@ -45,15 +49,17 @@ tree            parser_static_create_temp_tree(ParserStatic *self,location_t loc
  *  3.AHashFunc func=AObject.strHash;
  *  4.AHashFunc func=5>3?AObject.strHash:xxx;
  */
-tree  parser_static_modify_or_init_func_pointer(ParserStatic *self,location_t loc,tree lhs,tree rhs);
+tree     parser_static_modify_or_init_func_pointer(ParserStatic *self,location_t loc,tree lhs,tree rhs);
 //在所有静态符号中找出与id相同的标识符
 nboolean parser_static_find_identifier(ParserStatic *self,tree id);
-void parser_static_compile(ParserStatic *self,char *sysName,ClassPermissionType permission,nboolean isFinal);
+void     parser_static_compile(ParserStatic *self,char *sysName,ClassPermissionType permission,nboolean isFinal);
 /**
  * 编历 struct c_declarator *declarator 在数组的维度
  * 如果是变量，看是否有初始值，如果有并且是常数，替换
  */
-void parser_static_replace_dimension(ParserStatic *self,struct c_declarator *declarator);
+void     parser_static_replace_dimension(ParserStatic *self,struct c_declarator *declarator);
+
+void     parser_static_set_func(ParserStatic *self,TargetIntrinsicFunc func,void *userData);
 
 
 #endif

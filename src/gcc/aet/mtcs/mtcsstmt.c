@@ -510,7 +510,7 @@ bool mtcs_stmt_parse_output_constraint (MtcsStmt *self,const char **constraint_p
           break;
       }
 
-      for (size_t len = CONSTRAINT_LEN (*p, p); len; len--, p++)
+      for (size_t len = mtcs_preds_insn_constraint_len/*!CONSTRAINT_LEN*/(mtcsPreds,*p, p); len; len--, p++)
         if (*p == '\0')
           break;
   }
@@ -542,7 +542,7 @@ bool mtcs_stmt_parse_input_constraint (MtcsStmt *self,const char **constraint_p,
 
   /* Make sure constraint has neither `=', `+', nor '&'.  */
 
-  for (j = 0; j < c_len; j += CONSTRAINT_LEN (constraint[j], constraint+j))
+  for (j = 0; j < c_len; j += mtcs_preds_insn_constraint_len/*!CONSTRAINT_LEN*/(mtcsPreds,constraint[j], constraint+j))
       switch (constraint[j]){
           case '+':  case '=':  case '&':
             if (constraint == orig_constraint){

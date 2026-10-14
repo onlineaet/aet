@@ -126,6 +126,17 @@ static void expand_null_return_1 (MtcsExpand *self);
 //原型 expand_debug_expr cfgexpand.cc
 static rtx expand_debug_expr (MtcsExpand *self,tree exp);
 
+static void printbb(basic_block block)
+{
+   rtx_insn *insn;
+   int i=0;
+   FOR_BB_INSNS (block, insn){
+      if (!INSN_P (insn))
+         continue;
+      n_debug("mtcsexpand.c 打印块中的指令 i:%d block:%p index:%d flags:%d insn:%p\n",i++,block,block->index,block->flags,insn);
+      mtcs_print_rtl(stderr,insn);
+   }
+}
 
 class stack_vars_data
 {
@@ -1722,10 +1733,9 @@ static void set_rtl (MtcsExpand *self,tree t, rtx x)
   MtcsRtlData *mtcsRtlData=mtcs_func_get_rtl_data(mtcsFunc);
   MtcsAsm *mtcsAsm=mtcs_target_get_asm(mtcsTarget);
   MtcsGimpleExpr *mtcsGimpleExpr=mtcs_target_get_gimple_expr(mtcsTarget);
-  n_debug("mtcsexpand.c set_rtl 00 x:%p\n",x);
-  n_debug("mtcsexpand.c set_rtl 11 :%d\n",(TREE_CODE (t) == SSA_NAME || mtcs_gimple_expr_is_gimple_reg/*!is_gimple_reg*/(mtcsGimpleExpr,t)));
-  n_debug("mtcsexpand.c set_rtl 22 x:%p\n",mtcs_func_use_register_for_decl/*!use_register_for_decl*/(mtcsFunc,t));
-
+  //n_debug("mtcsexpand.c set_rtl 00 x:%p\n",x);
+  //n_debug("mtcsexpand.c set_rtl 11 :%d\n",(TREE_CODE (t) == SSA_NAME || mtcs_gimple_expr_is_gimple_reg/*!is_gimple_reg*/(mtcsGimpleExpr,t)));
+ // n_debug("mtcsexpand.c set_rtl 22 x:%p\n",mtcs_func_use_register_for_decl/*!use_register_for_decl*/(mtcsFunc,t));
 
   gcc_checking_assert (!x
                || !(TREE_CODE (t) == SSA_NAME || mtcs_gimple_expr_is_gimple_reg/*!is_gimple_reg*/(mtcsGimpleExpr,t))
@@ -1753,14 +1763,14 @@ static void set_rtl (MtcsExpand *self,tree t, rtx x)
      mismatches too, as long as we have BLKmode or are not coalescing
      across variables, so that we don't reject BLKmode PARALLELs or
      unpromoted REGs.  */
-  n_debug("mtcsexpand.c set_rtl 00 t:%p x:%p pc_rtx:%p %p %d\n",t,x,mtcsRTL->pc_rtx,pc_rtx,TREE_CODE (t) != SSA_NAME);
+  //n_debug("mtcsexpand.c set_rtl 00 t:%p x:%p pc_rtx:%p %p %d\n",t,x,mtcsRTL->pc_rtx,pc_rtx,TREE_CODE (t) != SSA_NAME);
   //aet_print_tree(t);
   //aet_print_tree(SSAVAR (t));
   if(TREE_CODE (t) == SSA_NAME){
      bool rs=  mtcs_func_use_register_for_decl/*!use_register_for_decl*/(mtcsFunc,t);
      machine_mode mx= mtcs_mode_promote_ssa_mode/*!promote_ssa_mode*/(mtcsMode,t, NULL);
-     n_debug("mtcsexpand.c set_rtl 00xx blkmode:%d GET_MODE(x):%d mode:%d registerfordecl:%d\n",
-           mtcsMode->modes.M_BLKmode,GET_MODE (x),mx,rs);
+     //n_debug("mtcsexpand.c set_rtl 00xx blkmode:%d GET_MODE(x):%d mode:%d registerfordecl:%d\n",
+           //mtcsMode->modes.M_BLKmode,GET_MODE (x),mx,rs);
   }
 
   gcc_checking_assert (!x || x == pc_rtx || TREE_CODE (t) != SSA_NAME
@@ -1769,8 +1779,7 @@ static void set_rtl (MtcsExpand *self,tree t, rtx x)
                || !mtcs_func_use_register_for_decl/*!use_register_for_decl*/(mtcsFunc,t)
                || GET_MODE (x) == mtcs_mode_promote_ssa_mode/*!promote_ssa_mode*/(mtcsMode,t, NULL));
 
-  n_debug("mtcsexpand.c set_rtl 11 t:%p x:%p pc_rtx:%p %p %d\n",t,x,mtcsRTL->pc_rtx,pc_rtx,TREE_CODE (t) != SSA_NAME);
-
+  //n_debug("mtcsexpand.c set_rtl 11 t:%p x:%p pc_rtx:%p %p %d\n",t,x,mtcsRTL->pc_rtx,pc_rtx,TREE_CODE (t) != SSA_NAME);
 
   if (x){
       bool skip = false;
@@ -1778,25 +1787,25 @@ static void set_rtl (MtcsExpand *self,tree t, rtx x)
       rtx xm = x;
     retry:
       if (MEM_P (xm)){
-         n_debug("mtcsexpand.c set_rtl 22 MEM_P (xm) t:%p \n",t);
+        // n_debug("mtcsexpand.c set_rtl 22 MEM_P (xm) t:%p \n",t);
 
           cur = mtcs_rtl_get_mem_expr/*!MEM_EXPR*/(mtcsRTL,xm);
       }else if (REG_P (xm)){
-         n_debug("mtcsexpand.c set_rtl 33 REG_P (xm) t:%p \n",t);
+         //n_debug("mtcsexpand.c set_rtl 33 REG_P (xm) t:%p \n",t);
 
           cur = REG_EXPR (xm);
       }else if (SUBREG_P (xm)){
-         n_debug("mtcsexpand.c set_rtl 44 SUBREG_P (xm) t:%p \n",t);
+         //n_debug("mtcsexpand.c set_rtl 44 SUBREG_P (xm) t:%p \n",t);
           gcc_assert (mtcs_rtl_subreg_lowpart_p/*!subreg_lowpart_p*/(mtcsRTL,xm));
           xm = SUBREG_REG (xm);
           goto retry;
       }else if (GET_CODE (xm) == CONCAT){
-         n_debug("mtcsexpand.c set_rtl 55 GET_CODE (xm)==CONCAT t:%p \n",t);
+         //n_debug("mtcsexpand.c set_rtl 55 GET_CODE (xm)==CONCAT t:%p \n",t);
 
           xm = XEXP (xm, 0);
           goto retry;
       }else if (GET_CODE (xm) == PARALLEL){
-         n_debug("mtcsexpand.c set_rtl 66 GET_CODE (xm)==PARALLEL t:%p \n",t);
+         //n_debug("mtcsexpand.c set_rtl 66 GET_CODE (xm)==PARALLEL t:%p \n",t);
 
 
           xm = XVECEXP (xm, 0, 0);
@@ -1804,7 +1813,7 @@ static void set_rtl (MtcsExpand *self,tree t, rtx x)
           xm = XEXP (xm, 0);
           goto retry;
       }else if (xm == pc_rtx){
-         n_debug("mtcsexpand.c set_rtl 77 xm == pc_rtx t:%p \n",t);
+         //n_debug("mtcsexpand.c set_rtl 77 xm == pc_rtx t:%p \n",t);
 
           skip = true;
       }else
@@ -1812,7 +1821,7 @@ static void set_rtl (MtcsExpand *self,tree t, rtx x)
 
       tree next = skip ? cur : leader_merge (cur, SSAVAR (t) ? SSAVAR (t) : t);
       if (cur != next){
-         n_debug("mtcsexpand.c set_rtl 88 t:%p MEM_P (x):%d \n",t,MEM_P (x));
+         //n_debug("mtcsexpand.c set_rtl 88 t:%p MEM_P (x):%d \n",t,MEM_P (x));
 
           if (MEM_P (x))
               mtcs_rtl_set_mem_attributes/*!set_mem_attributes*/(mtcsRTL,x,
@@ -1821,12 +1830,12 @@ static void set_rtl (MtcsExpand *self,tree t, rtx x)
             mtcs_rtl_set_reg_attrs_for_decl_rtl(mtcsRTL,next,x);/*set_reg_attrs_for_decl_rtl (next, x);*/
       }
   }
-   n_debug("mtcsexpand.c set_rtl 99 t:%p x:%p pc_rtx:%p %d\n",t,x,pc_rtx,TREE_CODE (t) != SSA_NAME);
+  // n_debug("mtcsexpand.c set_rtl 99 t:%p x:%p pc_rtx:%p %d\n",t,x,pc_rtx,TREE_CODE (t) != SSA_NAME);
   if (TREE_CODE (t) == SSA_NAME){
       int part = var_to_partition (SA.map, t);
-      n_debug("mtcsexpand.c set_rtl 100 t:%p x:%p pc_rtx:%p %d\n",t,x,pc_rtx,TREE_CODE (t) != SSA_NAME);
+      //n_debug("mtcsexpand.c set_rtl 100 t:%p x:%p pc_rtx:%p %d\n",t,x,pc_rtx,TREE_CODE (t) != SSA_NAME);
       if (part != NO_PARTITION){
-         n_debug("mtcsexpand.c set_rtl 101 t:%p %d %d\n",t,SA.partition_to_pseudo[part],(x != pc_rtx));
+        // n_debug("mtcsexpand.c set_rtl 101 t:%p %d %d\n",t,SA.partition_to_pseudo[part],(x != pc_rtx));
 
           if (SA.partition_to_pseudo[part]){
             gcc_assert (SA.partition_to_pseudo[part] == x);
@@ -1841,8 +1850,8 @@ static void set_rtl (MtcsExpand *self,tree t, rtx x)
       if (x && x != pc_rtx && SSA_NAME_VAR (t)  && (VAR_P (SSA_NAME_VAR (t)) || SSA_NAME_IS_DEFAULT_DEF (t))){
 
           tree var = SSA_NAME_VAR (t);
-          n_debug("mtcsexpand.c set_rtl 102 t:%p DECL_RTL_SET_P:%d\n",t,DECL_RTL_SET_P (var));
-          mtcs_print_rtl_single(stderr,x);
+          //n_debug("mtcsexpand.c set_rtl 102 t:%p DECL_RTL_SET_P:%d\n",t,DECL_RTL_SET_P (var));
+         // mtcs_print_rtl_single(stderr,x);
 
           /* If we don't yet have something recorded, just record it now.  */
           if (!DECL_RTL_SET_P (var))
@@ -1861,9 +1870,9 @@ static void set_rtl (MtcsExpand *self,tree t, rtx x)
              mtcs_rtl_set_decl_rtl/*!SET_DECL_RTL*/(mtcsRTL,var, pc_rtx);
       }
   }else{
-     n_debug("mtcsexpand.c set_rtl 103 t:%p \n",t);
+     //n_debug("mtcsexpand.c set_rtl 103 t:%p \n",t);
      mtcs_rtl_set_decl_rtl/*!SET_DECL_RTL*/(mtcsRTL,t, x);
-     n_debug("mtcsexpand.c set_rtl 104 --- t:%p \n",t);
+     //n_debug("mtcsexpand.c set_rtl 104 --- t:%p \n",t);
 
   }
 }
@@ -5175,7 +5184,6 @@ static void expand_call_stmt (MtcsExpand *self,gcall *stmt)
   mark_transaction_restart_calls(self,stmt);
 }
 
-
 /* A subroutine of expand_gimple_stmt, expanding one gimple statement
    STMT that doesn't require special handling for outgoing edges.  That
    is no tailcalls and no GIMPLE_COND.  */
@@ -5948,7 +5956,6 @@ delink_debug_stmt:
       mtcs_expr_gen_move_insn/*!gen_move_insn*/(mtcsExpr,dummy, dummy), last, NULL);
    }
 
-
    /* A __builtin_unreachable () will insert a barrier that should end
       the basic block.  In gimple, any code after it will have already
       deleted, even without optimization.  If we emit additional code
@@ -5965,7 +5972,6 @@ delink_debug_stmt:
 
       mtcs_dojump_discard_pending_stack_adjust/*!discard_pending_stack_adjust*/(mtcsDojump);
    }
-
 
    /* Find the block tail.  The last insn in the block is the insn
    before a barrier and/or table jump insn.  */
@@ -6674,18 +6680,6 @@ static void testprint(struct function *fn)
    test_rtl_verify_edges();
 }
 
-static void printbb(basic_block block)
-{
-   rtx_insn *insn;
-   int i=0;
-   FOR_BB_INSNS (block, insn){
-      if (!INSN_P (insn))
-         continue;
-      n_debug("mtcsexpand.c 打印块中的指令 i:%d block:%p index:%d flags:%d insn:%p\n",i++,block,block->index,block->flags,insn);
-      mtcs_print_rtl_single(stderr,insn);
-   }
-}
-
 
 //打印块中的gimple
 static void printbbgimple()
@@ -6970,9 +6964,7 @@ nuint mtcs_expand_execute(MtcsExpand *self,function *fun)
       n_debug("mtcsexpand.c  mtcs_expand_execute 107 开始expand块中的gimple bb:%p init_block:%p\n",bb,init_block);
       bb = expand_gimple_basic_block(self,bb, var_ret_seq);
       n_debug("mtcsexpand.c  mtcs_expand_execute 108 结束expand块中的gimple bb:%p init_block:%p\n",bb,init_block);
-      printbb(bb);
    }
-
    n_debug("mtcsexpand.c mtcs_expand_execute 109 测试rtl_verify_bb_insn_chain \n");
    rtl_verify_bb_insn_chain(self);
 
@@ -7114,7 +7106,6 @@ nuint mtcs_expand_execute(MtcsExpand *self,function *fun)
 
    if (patch_area_entry > patch_area_size){
       n_debug("mtcsexpand.c  mtcs_expand_execute 122 patch_area_size:%d\n",patch_area_size);
-
       if (patch_area_size > 0)
          warning (OPT_Wattributes, "patchable function entry %wu exceeds size %wu",
       patch_area_entry, patch_area_size);

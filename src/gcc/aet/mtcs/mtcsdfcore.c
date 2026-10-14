@@ -180,8 +180,8 @@ void mtcs_dfcore_df_add_problem (MtcsDfcore *self,const struct df_problem *probl
 {
    struct dataflow *dflow;
    int i;
-   n_debug("mtcsdfcore.c mtcs_dfcore_df_add_problem 00 dependent_problem:%p problem->id:%d dir:%d\n",
-         problem->dependent_problem,problem->id,problem->dir);
+  // n_debug("mtcsdfcore.c mtcs_dfcore_df_add_problem 00 dependent_problem:%p problem->id:%d dir:%d\n",
+         //problem->dependent_problem,problem->id,problem->dir);
    /* First try to add the dependent problem. */
    if (problem->dependent_problem)
       mtcs_dfcore_df_add_problem/*!df_add_problem*/(self,problem->dependent_problem);
@@ -190,8 +190,8 @@ void mtcs_dfcore_df_add_problem (MtcsDfcore *self,const struct df_problem *probl
    has, just return that instance, if not, add it to the end of the
    vector.  */
    dflow = df->problems_by_index[problem->id];
-   n_debug("mtcsdfcore.c mtcs_dfcore_df_add_problem 11 如果 dflow存在返回 dflow:%p problem->id:%d dir:%d num_problems_defined:%d\n",
-         dflow,problem->id,problem->dir,df->num_problems_defined);
+  // n_debug("mtcsdfcore.c mtcs_dfcore_df_add_problem 11 如果 dflow存在返回 dflow:%p problem->id:%d dir:%d num_problems_defined:%d\n",
+        // dflow,problem->id,problem->dir,df->num_problems_defined);
    if (dflow)
       return;
 
@@ -209,8 +209,8 @@ void mtcs_dfcore_df_add_problem (MtcsDfcore *self,const struct df_problem *probl
    after which ever of those problems is defined, but we do not
    require any of those except for LR to have actually been
    defined.  */
-   n_debug("mtcsdfcore.c mtcs_dfcore_df_add_problem 22 df->num_problems_defined:%d problem->id:%d dir:%d\n",
-         df->num_problems_defined,problem->id,problem->dir);
+   //n_debug("mtcsdfcore.c mtcs_dfcore_df_add_problem 22 df->num_problems_defined:%d problem->id:%d dir:%d\n",
+        // df->num_problems_defined,problem->id,problem->dir);
    df->num_problems_defined++;
    for (i = df->num_problems_defined - 2; i >= 0; i--){
       if (problem->id < df->problems_in_order[i]->problem->id)
@@ -579,19 +579,19 @@ static bool df_worklist_propagate_forward (MtcsDfcore *self,struct dataflow *dat
       FOR_EACH_EDGE (e, ei, bb->preds){
          if ((!age || age <= last_change_age[e->src->index])
                      && bitmap_bit_p (considered, e->src->index)){
-            n_debug("df-core.cc df_worklist_propagate_forward 00 con_fun_n bb:%p id:%d\n",bb,dataflow->problem->id);
+           // n_debug("df-core.cc df_worklist_propagate_forward 00 con_fun_n bb:%p id:%d\n",bb,dataflow->problem->id);
             changed |= dataflow->problem->con_fun_n (e);
          }
       }
    }else if (dataflow->problem->con_fun_0){
-      n_debug("mtcsdfcore.c df_worklist_propagate_forward 11 con_fun_n bb_index:%d bb:%p id:%d\n",
-                      bb_index,bb,dataflow->problem->id);
+      //n_debug("mtcsdfcore.c df_worklist_propagate_forward 11 con_fun_n bb_index:%d bb:%p id:%d\n",
+                      //bb_index,bb,dataflow->problem->id);
       dataflow->problem->con_fun_0 (bb);
       dfScanVerify(cfun);
 
    }
-   n_debug("mtcsdfcore.c df_worklist_propagate_forward 22 con_fun_0 change:%d bb_index:%d bb:%p id:%d\n",
-         changed,bb_index,bb,dataflow->problem->id);
+  // n_debug("mtcsdfcore.c df_worklist_propagate_forward 22 con_fun_0 change:%d bb_index:%d bb:%p id:%d\n",
+        // changed,bb_index,bb,dataflow->problem->id);
    dfScanVerify(cfun);
    if (changed  && dataflow->problem->trans_fun (bb_index)){
       /* The out set of this block has changed.
@@ -601,20 +601,20 @@ static bool df_worklist_propagate_forward (MtcsDfcore *self,struct dataflow *dat
 
          if (bitmap_bit_p (considered, ob_index)){
             if (bbindex_to_postorder[bb_index]  < bbindex_to_postorder[ob_index]){
-               n_debug("mtcsdfcore.c df_worklist_propagate_forward 33 con_fun_0 change:%d bb_index:%d bb:%p id:%d\n",
-                     changed,bb_index,bb,dataflow->problem->id);
+              // n_debug("mtcsdfcore.c df_worklist_propagate_forward 33 con_fun_0 change:%d bb_index:%d bb:%p id:%d\n",
+                    // changed,bb_index,bb,dataflow->problem->id);
                if (worklist)
                   bitmap_set_bit (worklist, bbindex_to_postorder[ob_index]);
                dfScanVerify(cfun);
 
             }else{
-               n_debug("mtcsdfcore.c df_worklist_propagate_forward 44 con_fun_0 change:%d bb_index:%d bb:%p id:%d %d %d\n",
-                     changed,bb_index,bb,dataflow->problem->id,ob_index,bbindex_to_postorder[ob_index]);
+              // n_debug("mtcsdfcore.c df_worklist_propagate_forward 44 con_fun_0 change:%d bb_index:%d bb:%p id:%d %d %d\n",
+                     //changed,bb_index,bb,dataflow->problem->id,ob_index,bbindex_to_postorder[ob_index]);
                dfScanVerify(cfun);
 
                bitmap_set_bit (pending, bbindex_to_postorder[ob_index]);
-               n_debug("mtcsdfcore.c df_worklist_propagate_forward 44aa con_fun_0 change:%d bb_index:%d bb:%p id:%d\n",
-                          changed,bb_index,bb,dataflow->problem->id);
+               //n_debug("mtcsdfcore.c df_worklist_propagate_forward 44aa con_fun_0 change:%d bb_index:%d bb:%p id:%d\n",
+                         // changed,bb_index,bb,dataflow->problem->id);
                dfScanVerify(cfun);
 
             }
@@ -719,25 +719,25 @@ static void df_worklist_dataflow_doublequeue (MtcsDfcore *self,struct dataflow *
    bool changed;
    vec<int> last_visit_age = vNULL;
    vec<int> last_change_age = vNULL;
-   n_debug("mtcsdfcore.c df_worklist_dataflow_doublequeue 00aa dir:%d DF_FORWARD:%d\n",
-             dir,DF_FORWARD);
-   dfScanVerify(cfun);
+  // n_debug("mtcsdfcore.c df_worklist_dataflow_doublequeue 00aa dir:%d DF_FORWARD:%d\n",
+            // dir,DF_FORWARD);
+   //dfScanVerify(cfun);
    bitmap worklist = BITMAP_ALLOC (&self->df_bitmap_obstack);
    bitmap_tree_view (worklist);
-   n_debug("mtcsdfcore.c df_worklist_dataflow_doublequeue 00bb dir:%d DF_FORWARD:%d\n",
-             dir,DF_FORWARD);
-   dfScanVerify(cfun);
+  // n_debug("mtcsdfcore.c df_worklist_dataflow_doublequeue 00bb dir:%d DF_FORWARD:%d\n",
+            // dir,DF_FORWARD);
+   //dfScanVerify(cfun);
    last_visit_age.safe_grow (n_blocks, true);
    last_change_age.safe_grow (last_basic_block_for_fn (cfun) + 1, true);
-   n_debug("mtcsdfcore.c df_worklist_dataflow_doublequeue 00cc dir:%d DF_FORWARD:%d\n",
-             dir,DF_FORWARD);
-   dfScanVerify(cfun);
+   //n_debug("mtcsdfcore.c df_worklist_dataflow_doublequeue 00cc dir:%d DF_FORWARD:%d\n",
+             //dir,DF_FORWARD);
+   //dfScanVerify(cfun);
    /* Make last_change_age defined - we can access uninit values for not
    considered blocks but will make sure they are considered as well.  */
    VALGRIND_DISCARD (VALGRIND_MAKE_MEM_DEFINED(last_change_age.address (), sizeof (int) * last_basic_block_for_fn (cfun)));
-   n_debug("mtcsdfcore.c df_worklist_dataflow_doublequeue 00dd dir:%d DF_FORWARD:%d\n",
-             dir,DF_FORWARD);
-   dfScanVerify(cfun);
+   //n_debug("mtcsdfcore.c df_worklist_dataflow_doublequeue 00dd dir:%d DF_FORWARD:%d\n",
+             //dir,DF_FORWARD);
+   //dfScanVerify(cfun);
 
    /* We start with processing all blocks, populating pending for the
    next iteration.  */
@@ -746,9 +746,9 @@ static void df_worklist_dataflow_doublequeue (MtcsDfcore *self,struct dataflow *
    for (unsigned index = 0; index < n_blocks; ++index){
       unsigned bb_index = blocks_in_postorder[index];
       dcount++;
-      n_debug("mtcsdfcore.c df_worklist_dataflow_doublequeue 00 index:%d bb_index:%d dir:%d DF_FORWARD:%d\n",
-               index,bb_index,dir,DF_FORWARD);
-      dfScanVerify(cfun);
+     // n_debug("mtcsdfcore.c df_worklist_dataflow_doublequeue 00 index:%d bb_index:%d dir:%d DF_FORWARD:%d\n",
+               //index,bb_index,dir,DF_FORWARD);
+      //dfScanVerify(cfun);
       if (dir == DF_FORWARD)
          changed = df_worklist_propagate_forward (self,dataflow, bb_index,
                               bbindex_to_postorder,
@@ -766,12 +766,12 @@ static void df_worklist_dataflow_doublequeue (MtcsDfcore *self,struct dataflow *
          last_change_age[bb_index] = age;
       else
          last_change_age[bb_index] = 0;
-      n_debug("mtcsdfcore.c df_worklist_dataflow_doublequeue 00aa index:%d bb_index:%d dir:%d DF_FORWARD:%d\n",
-               index,bb_index,dir,DF_FORWARD);
-      dfScanVerify(cfun);
+     // n_debug("mtcsdfcore.c df_worklist_dataflow_doublequeue 00aa index:%d bb_index:%d dir:%d DF_FORWARD:%d\n",
+               //index,bb_index,dir,DF_FORWARD);
+      //dfScanVerify(cfun);
    }
-   n_debug("mtcsdfcore.c df_worklist_dataflow_doublequeue 00bb\n");
-   dfScanVerify(cfun);
+   //n_debug("mtcsdfcore.c df_worklist_dataflow_doublequeue 00bb\n");
+   //dfScanVerify(cfun);
    /* Double-queueing.  Worklist is for the current iteration,
    and pending is for the next.  */
    while (!bitmap_empty_p (pending)){
@@ -782,9 +782,9 @@ static void df_worklist_dataflow_doublequeue (MtcsDfcore *self,struct dataflow *
          unsigned bb_index = blocks_in_postorder[index];
          dcount++;
          int prev_age = last_visit_age[index];
-         n_debug("mtcsdfcore.c df_worklist_dataflow_doublequeue 11 index:%d bb_index:%d dir:%d DF_FORWARD:%d\n",
-               index,bb_index,dir,DF_FORWARD);
-         dfScanVerify(cfun);
+         //n_debug("mtcsdfcore.c df_worklist_dataflow_doublequeue 11 index:%d bb_index:%d dir:%d DF_FORWARD:%d\n",
+               //index,bb_index,dir,DF_FORWARD);
+         //dfScanVerify(cfun);
          if (dir == DF_FORWARD)
             changed = df_worklist_propagate_forward (self,dataflow, bb_index,
                                  bbindex_to_postorder,
@@ -799,8 +799,8 @@ static void df_worklist_dataflow_doublequeue (MtcsDfcore *self,struct dataflow *
                                  considered,
                                  last_change_age,
                                  prev_age);
-         n_debug("mtcsdfcore.c df_worklist_dataflow_doublequeue 11aa\n");
-         dfScanVerify(cfun);
+         //n_debug("mtcsdfcore.c df_worklist_dataflow_doublequeue 11aa\n");
+         //dfScanVerify(cfun);
          last_visit_age[index] = ++age;
          if (changed)
             last_change_age[bb_index] = age;
@@ -978,7 +978,7 @@ static void df_analyze_1 (MtcsDfcore *self)
    MtcsMode *mtcsMode=MTCS_GET_MODE_OBJECT(self);
    MtcsTarget *mtcsTarget=(MtcsTarget *)mtcsMode->target;
    MtcsDfscan *mtcsDfscan=mtcs_target_get_dfscan(mtcsTarget);
-   n_debug("mtcsdfcore.c df_analyze_1 00 df->num_problems_defined:%d\n",df->num_problems_defined);
+   //n_debug("mtcsdfcore.c df_analyze_1 00 df->num_problems_defined:%d\n",df->num_problems_defined);
 
    int i;
    /* We need to do this before the df_verify_all because this is
@@ -994,16 +994,16 @@ static void df_analyze_1 (MtcsDfcore *self)
 #endif
       mtcs_dfcore_df_verify/*!df_verify*/(self);
    /* Skip over the DF_SCAN problem. */
-   n_debug("mtcsdfcore.c  df_analyze_1 22 df->num_problems_defined:%d\n",df->num_problems_defined);
-   testprint();
+   //n_debug("mtcsdfcore.c  df_analyze_1 22 df->num_problems_defined:%d\n",df->num_problems_defined);
+   //testprint();
    dfScanVerify(cfun);
    for (i = 1; i < df->num_problems_defined; i++){
       struct dataflow *dflow = df->problems_in_order[i];
-      n_debug("mtcsdfcore.c  df_analyze_1 33 i:%d dflow:%p problem id:%d \n",i,dflow,dflow->problem->id);
-      testprint();
+      //n_debug("mtcsdfcore.c  df_analyze_1 33 i:%d dflow:%p problem id:%d \n",i,dflow,dflow->problem->id);
+      //testprint();
       dfScanVerify(cfun);
       if (dflow->solutions_dirty){
-         n_debug("mtcsdfcore.c df_analyze_1 44 i:%d dflow:%p dir:%d \n",i,dflow,dflow->problem->dir);
+        // n_debug("mtcsdfcore.c df_analyze_1 44 i:%d dflow:%p dir:%d \n",i,dflow,dflow->problem->dir);
          dfScanVerify(cfun);
 
          if (dflow->problem->dir == DF_FORWARD){
@@ -1013,8 +1013,8 @@ static void df_analyze_1 (MtcsDfcore *self)
             mtcs_dfcore_df_analyze_problem/*!df_analyze_problem*/(self,
                   dflow,df->blocks_to_analyze,df->postorder,df->n_blocks);
          }
-         n_debug("mtcsdfcore.c df_analyze_1 55 i:%d dflow:%p dir:%d \n",i,dflow,dflow->problem->dir);
-              dfScanVerify(cfun);
+         //n_debug("mtcsdfcore.c df_analyze_1 55 i:%d dflow:%p dir:%d \n",i,dflow,dflow->problem->dir);
+         dfScanVerify(cfun);
       }
    }
 

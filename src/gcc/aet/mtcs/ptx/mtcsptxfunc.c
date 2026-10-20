@@ -538,7 +538,7 @@ bool mtcs_ptx_func_write_return_type (MtcsPtxFunc *self,NString *strs, bool for_
    MtcsPtx *mtcsPtx=(MtcsPtx *)mtcsTarget;
 
    struct ptx_machine_function *nvptxMachine=(struct ptx_machine_function *)cfun->machine;
-   mtcs_mode mode=mtcs_mode_host2device_by_tree(mtcsMode,type,TYPE_MODE (type));
+   mtcs_mode mode=TYPE_MODE (type);//mtcs_mode_host2device_by_tree(mtcsMode,type,TYPE_MODE (type));
    n_debug("mtcsptxfunc.c -----nvptx.cc -----82-- write_return_type mode:%d for_proto:%d\n",mode,for_proto);
    if (mode == mtcsMode->modes.M_VOIDmode)
       return false;
@@ -744,7 +744,6 @@ int mtcs_ptx_func_write_arg_type (MtcsPtxFunc *self,NString *strs, int for_reg, 
       if (split){
          /* Complex types are sent as two separate args.  */
          type = TREE_TYPE (type);
-        // hostMode = TYPE_MODE (type);
          mode=TYPE_MODE (type);//mtcs_mode_host2device_by_tree(mtcsMode,type,hostMode);
          prototyped = true;
       }

@@ -34,6 +34,7 @@ struct _FuncMgr
 	AetMangle *mangle;
 	NHashTable *hashTable;
 	NHashTable *staticHashTable;
+	tree tempParms;//从struct c_arg_info *args=funcdel->u.arg_info; args->parms;
 };
 
 typedef enum{
@@ -53,7 +54,7 @@ ClassFunc    *func_mgr_get_func(FuncMgr *self,tree fndecl);
 char         *func_mgr_get_class_name_by_mangle(FuncMgr *self,char *mangle);
 ClassFunc    *func_mgr_get_func_by_raw_mangle(FuncMgr *self,char *sysName,char *rawMangle);
 ClassFunc    *func_mgr_get_func_by_raw_mangle(FuncMgr *self,ClassName *className,char *rawMangle);
-
+//重要方法，创建ClassFunc
 ClassFunc    *func_mgr_change_class_func_decl(FuncMgr *self,struct c_declarator *declarator,
                            ClassName *className,tree structTree,int *errInfo);
 ClassFunc    *func_mgr_start_func_define(FuncMgr *self,struct c_declspecs *specs,
@@ -67,7 +68,7 @@ int           func_mgr_get_orig_func_and_class_name(FuncMgr *self,char *mangleNa
 nboolean      func_mgr_set_static_func_premission(FuncMgr *self,ClassName *className,
                               tree funDecl,ClassPermissionType permission,nboolean isFinal);
 nboolean      func_mgr_change_static_func_decl(FuncMgr *self,struct c_declarator *declarator,
-                              ClassName *className,tree structTree);
+                              ClassName *className,tree structTree,tree allPrefixAttrs);
 nboolean      func_mgr_set_static_func_decl(FuncMgr *self,tree decl,ClassName *className,nboolean define);
 char         *func_mgr_create_static_var_name(FuncMgr *self,ClassName *className,tree varName,tree type);
 nboolean      func_mgr_static_func_exits(FuncMgr *self,ClassName *className,char *origName);
@@ -78,8 +79,6 @@ ClassFunc    *func_mgr_get_static_method(FuncMgr *self,char *sysName,char *mangl
 char         *func_mgr_get_static_class_name_by_mangle(FuncMgr *self,char *mangle);
 ClassFunc    *func_mgr_get_static_entity_by_mangle(FuncMgr *self,char *mangle);
 ClassFunc    *func_mgr_get_static_func(FuncMgr *self,tree fndecl);
-
-char         *func_mgr_create_parm_string(FuncMgr *self,tree funcType);
 
 nboolean      func_mgr_have_generic_func(FuncMgr *self,ClassName *className);
 nboolean      func_mgr_is_generic_func(FuncMgr *self,ClassName *className,char *mangleFuncName);
@@ -102,7 +101,7 @@ int           func_mgr_get_func_declaration_index(FuncMgr *self,AetFuncType type
 //mangleFunName在数组 deviceFuncPointers中的位置
 int           func_mgr_get_device_func_index(FuncMgr *self,ClassName *className,char *mangleFunName);
 void          func_mgr_add(FuncMgr *self,ClassFunc *func);
-void          func_mgr_create_mangle_name(FuncMgr *self,tree fieldDecl,ClassName *className,char **result);
+void          func_mgr_create_mangle_name(FuncMgr *self,tree fieldDecl,ClassName *className,char **result,tree parms);
 //分裂host device类型的方法
 tree          func_mgr_divide_host_device_func(FuncMgr *self,location_t loc,ClassInfo *info,tree decls);
 //根据主机函数获取对应的分裂函数
@@ -117,5 +116,6 @@ nboolean      func_mgr_parent_have_final(FuncMgr *self,location_t loc,ClassFunc 
 nboolean func_mgr_can_use_outside(FuncMgr *self,tree decl);
 //根据mic fndecl 找出 mii fndecl
 ClassFunc *func_mgr_get_mii_func(FuncMgr *self,ClassFunc *micFunc);
+nboolean func_mgr_have_mtcs_func(FuncMgr *self);
 
 #endif

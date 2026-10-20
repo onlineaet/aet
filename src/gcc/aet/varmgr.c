@@ -122,6 +122,11 @@ static nboolean addVar(VarMgr *self,ClassName *className,tree decl,
       n_ptr_array_add(array,item);
       n_debug("var_mgr_add 11 类：%s的条目已建立，现在加新的变量进来:%s %s",className->sysName,orgiName,mangleVarName);
    }
+   if(!isStatic){
+      MtcsVarType mtcsType =  mtcs_info_get_and_check_var_type(decl,DECL_SOURCE_LOCATION(decl));
+      if(mtcsType!=MTCS_VAR_NOT)
+         error_at(DECL_SOURCE_LOCATION(decl),"不能在类中声明MTCS变量%qs。",orgiName);
+   }
    return TRUE;
 }
 
@@ -281,7 +286,7 @@ char *var_mgr_define_class_static_var(VarMgr *self,ClassName *implClassName)
 	   n_string_free(codes,TRUE);
 	   return NULL;
 	}
-	printf("var is :%s\n",codes->str);
+	//printf("var is :%s\n",codes->str);
 	return  n_string_free(codes,FALSE);
 
 	//在这里编译代码报错误：重复的‘static’
@@ -393,10 +398,10 @@ nboolean   var_mgr_set_static_decl(VarMgr *self,ClassName *className,tree decl,
         item->init_original_type=TREE_TYPE(initExpr->value);
 	   }else{
 	     item->init=initExpr->value;
-        //item->init_original_type=initExpr->original_type;
 	   }
 		item->original_code=initExpr->original_code;
 	}
+
 	return TRUE;
 }
 

@@ -3,6 +3,7 @@
 #define __A_LIB_H__
 
 #include "aet/abase.h"
+#include "aet/atype.h"
 #include "aet/alog.h"
 #include "aet/amem.h"
 #include "aet/innerlock.h"

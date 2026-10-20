@@ -1791,9 +1791,9 @@ static tree c_parser_declaration_or_fndef (c_parser *parser, bool fndef_ok,
          error_at (&richloc,"unknown type name %qE; use %<enum%> keyword to refer to the type",name);
       }else{
          //zclei 解决函数定义有两个连续的mtcs修饰符问题  __device__ __host__ void testkernel() bug 015
-         if(aetParser->isAet && mtcs_parser_is_attribute(mtcs_parser_get(),c_parser_peek_token (parser))){
-            goto mtcs_label;
-         }
+//         if(aetParser->isAet && mtcs_parser_is_attribute(mtcs_parser_get(),c_parser_peek_token (parser))){
+//            goto mtcs_label;
+//         }
          auto_diagnostic_group d;
          name_hint hint = lookup_name_fuzzy (name, FUZZY_LOOKUP_TYPENAME, here);
          if (const char *suggestion = hint.suggestion ()){
@@ -1819,10 +1819,10 @@ static tree c_parser_declaration_or_fndef (c_parser *parser, bool fndef_ok,
       have_attrs = true;
    n_debug("分析声明说明符 22： have_attrs:%d ", have_attrs);
    //在这里匹配的是public$  __global__  int   setData(void *data);
-   if(mtcs_parser_is_attribute(mtcs_parser_get(),c_parser_peek_token (parser))){
-      n_debug("分析声明说明符 是一个MTCS 属性");
-      mtcs_parser_add_attribute(mtcs_parser_get());
-   }
+//   if(mtcs_parser_is_attribute(mtcs_parser_get(),c_parser_peek_token (parser))){
+//      n_debug("分析声明说明符 是一个MTCS 属性");
+//      mtcs_parser_add_attribute(mtcs_parser_get());
+//   }
    // 分析声明说明符,也就是 struct 或 fun 函数声明语句中的符号“ int ”
    aet_parser_c_parser_declspecs/*!c_parser_declspecs*/(aetParser, specs, true, true, start_attr_ok,
          true, true, start_attr_ok, true, cla_nonabstract_decl);
@@ -1836,13 +1836,13 @@ static tree c_parser_declaration_or_fndef (c_parser *parser, bool fndef_ok,
       c_parser_skip_to_end_of_block_or_statement (parser);
       return result;
    }
-   if(aetParser->isAet && mtcs_parser_is_attribute(mtcs_parser_get(),c_parser_peek_token (parser))){
-      //解决两个连续的MTCS修饰问题 __device__ __host__ void testkernel(
-mtcs_label:
-      mtcs_parser_add_attribute(mtcs_parser_get());
-      aet_parser_c_parser_declspecs/*!c_parser_declspecs*/(aetParser,specs, true, true, start_attr_ok,
-            true, true, start_attr_ok, true, cla_nonabstract_decl);
-   }
+//   if(aetParser->isAet && mtcs_parser_is_attribute(mtcs_parser_get(),c_parser_peek_token (parser))){
+//      //解决两个连续的MTCS修饰问题 __device__ __host__ void testkernel(
+//mtcs_label:
+//      mtcs_parser_add_attribute(mtcs_parser_get());
+//      aet_parser_c_parser_declspecs/*!c_parser_declspecs*/(aetParser,specs, true, true, start_attr_ok,
+//            true, true, start_attr_ok, true, cla_nonabstract_decl);
+//   }
    // 此函数把声明说明符的类型信息设置到 specs 上
    // 这个函数执行完,符号“ int ”对应的树节点就设置完了
    finish_declspecs (specs);
@@ -2256,7 +2256,6 @@ mtcs_label:
                generic_impl_check_var_and_parm(generic_impl_get(),d,init.value);//zclei 10.4.0
                finish_decl (d, init_loc, init.value, init.original_type, asm_name);
                result = d;
-               mtcs_parser_check(mtcs_parser_get(),d,TRUE);//zclei 检查是不是mtcs变量
                //如果是aet对象 设变量的对象类名是什么
                if(new_object_ctor(new_object_get(),init_loc,d)){//zclei 10.4.0
                   ;
@@ -2362,7 +2361,8 @@ mtcs_label:
                   generic_impl_check_and_set_func(generic_impl_get(),d,genericDefineModel,funcGenericModel);
                }//zclei
                finish_decl (d, UNKNOWN_LOCATION, NULL_TREE, NULL_TREE, asm_name);
-               mtcs_parser_check(mtcs_parser_get(),d,TRUE);//zclei 检查是不是mtcs变量
+               mtcs_parser_set_mtcs_var(mtcs_parser_get(),d);//zclei 检查是不是mtcs变量
+
                n_debug("分析声明说明符 119-xx context:%p extern:%d static:%d pub:%d ",
                      DECL_CONTEXT(d),DECL_EXTERNAL(d),TREE_STATIC(d),TREE_PUBLIC(d));
                if(aetParser->isAet && setFundecl){//zclei
@@ -2537,8 +2537,6 @@ mtcs_label:
          //}
          c_aet_set_generics_model(fndecl,genericDefineModel);
       }
-      //zclei 检查是否是MTCS函数，如果是进一步检查并加入集合 FALSE 表示没有调用finish_function
-      mtcs_parser_check(mtcs_parser_get(),fndecl,FALSE);
       /* If the definition was marked with __RTL, use the RTL parser now,
       consuming the function body.  */
       if (specs->declspec_il == cdil_rtl){
@@ -6412,11 +6410,12 @@ again:
          }else{
             goto class_dot_access;
          }
-      }else if(mtcs_parser_is_attribute(mtcs_parser_get(),c_parser_peek_token (parser))){
+      /*}else if(mtcs_parser_is_attribute(mtcs_parser_get(),c_parser_peek_token (parser))){
          //fprintf(stderr,"处理 __shared__ ----\n");
          //跳到 class_do_access 利用 c_parser_declaration_or_fndef 处理在mtcs_parser_add_attribute加入的 _attribute_((global)) 属性
          mtcs_parser_add_attribute (mtcs_parser_get());
          goto class_dot_access;
+         */
       }else if (c_parser_next_tokens_start_declaration (parser)
       || (have_std_attrs
       && !c_parser_handle_statement_omp_attributes (parser, std_attrs, &have_std_attrs)
@@ -28468,10 +28467,10 @@ void aet_parser_c_parser_declspecs (AetParser *self, struct c_declspecs *specs,
       tree align;
       location_t loc = c_parser_peek_token (parser)->location;
       //n_debug("声明说明符语法 00 count:%d  %d",count,(!typespec_ok || specs->typespec_kind == ctsk_tagdef));
-      if(mtcs_parser_is_attribute(mtcs_parser_get(),c_parser_peek_token (parser))){
-         if(mtcs_parser_add_attribute(mtcs_parser_get()))
-            continue;
-      }
+//      if(mtcs_parser_is_attribute(mtcs_parser_get(),c_parser_peek_token (parser))){
+//         if(mtcs_parser_add_attribute(mtcs_parser_get()))
+//            continue;
+//      }
       /* If we cannot accept a type, exit if the next token must start
       one.  Also, if we already have seen a tagged definition,
       a typename would be an error anyway and likely the user

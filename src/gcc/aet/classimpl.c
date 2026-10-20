@@ -134,7 +134,6 @@ static void classImplInit(ClassImpl *self)
    aet_diagnostic_iface_set_callback();
 }
 
-
 static nboolean checkDefaultConstructorDefine(ClassImpl *self)
 {
    ClassName *className=self->className;

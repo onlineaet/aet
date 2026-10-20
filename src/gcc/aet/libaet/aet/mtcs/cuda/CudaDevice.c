@@ -17,6 +17,7 @@
  * If not see <http://www.gnu.org/licenses/>.
  * AET was originally developed  by the zclei@sina.com
  */
+#include <cuda_runtime.h>
 #include "CudaDevice.h"
 #include "CudaMemAlloctor.h"
 #include "CudaLanucher.h"

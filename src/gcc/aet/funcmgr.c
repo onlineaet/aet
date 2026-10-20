@@ -75,11 +75,33 @@ static void freeClass_cb(npointer userData)
   printf("funcmgr free free %p\n",userData);
 }
 
+static tree getAnonymousTypeName_cb(tree type,npointer userData)
+{
+   FuncMgr *self = (FuncMgr *)userData;
+   if(self->tempParms==NULL_TREE)
+      return NULL_TREE;
+   for (tree al = self->tempParms; al; al = DECL_CHAIN (al)){
+      tree parmType = TREE_TYPE(al);
+      while (TREE_CODE(parmType) == POINTER_TYPE)
+         parmType = TREE_TYPE(parmType);
+      if(TREE_CODE(parmType)==RECORD_TYPE){
+         tree unql = TYPE_MAIN_VARIANT(parmType);
+         if(unql == type){
+           tree typeName = TYPE_NAME(parmType);
+           if(TREE_CODE(typeName) ==TYPE_DECL)
+              return typeName;
+         }
+      }
+   }
+   return NULL_TREE;
+}
+
 static void funcMgrInit(FuncMgr *self)
 {
 	self->hashTable = n_hash_table_new_full (n_str_hash, n_str_equal,n_free, freeClass_cb);
 	self->staticHashTable = n_hash_table_new_full (n_str_hash, n_str_equal,n_free, freeClass_cb);
 	self->mangle=aet_mangle_new();
+	aet_mangle_set_callback(self->mangle,getAnonymousTypeName_cb,(npointer)self);
 }
 
 
@@ -214,7 +236,7 @@ static int getSerialNumber(FuncMgr *self,ClassName *className)
     return max2>max1?(max2+1):(max1+1);
 }
 
-static ClassFunc *createEntity(tree decl,tree classTree,char *mangle,char *orgiName,enum func_from_code code,nboolean isCtor,
+static ClassFunc *createEntity(tree classTree,char *mangle,char *orgiName,enum func_from_code code,nboolean isCtor,
 		                         nboolean isFinalized,nboolean isUnref,char *mangleNoSelfName,char *rawMangleName)
 {
 	ClassFunc *item=class_func_new();
@@ -226,37 +248,26 @@ static ClassFunc *createEntity(tree decl,tree classTree,char *mangle,char *orgiN
 	item->mangleFunName=n_strdup(mangle);
 	item->mangleNoSelfName=n_strdup(mangleNoSelfName);
 	item->rawMangleName=n_strdup(rawMangleName);
-    item->isStatic=(mangleNoSelfName==NULL)?TRUE:FALSE;
+   item->isStatic=(mangleNoSelfName==NULL)?TRUE:FALSE;
 	item->fieldDecl=NULL_TREE;
 	item->fromImplDefine=NULL_TREE;
-    item->classTree=classTree;
-	if(code==STRUCT_DECL){
-	  item->fieldDecl=decl;
-	}else if(code==CLASS_IMPL_DEFINE){
-	  item->fromImplDefine=decl;
-	}
+   item->classTree=classTree;
+
 	item->permission=CLASS_PERMISSION_DEFAULT;
 	return item;
 }
 
-static nboolean setEntity(ClassFunc *item,tree decl,ClassName *className,tree classTree,char *mangle,char *orgiName,enum func_from_code code)
+static nboolean setEntity(ClassFunc *item, tree classTree,enum func_from_code code)
 {
    nboolean repeat=FALSE;
+   item->classTree=classTree;
    if(code==STRUCT_DECL){
-      if(!aet_utils_valid_tree(item->fieldDecl)){
-         item->fieldDecl=decl;
-         item->classTree=classTree;
-      }else{
+      item->classTree=classTree;
+      if(aet_utils_valid_tree(item->fieldDecl)){
          repeat=TRUE;
       }
    }else if(code==CLASS_IMPL_DEFINE){
-      if(!aet_utils_valid_tree(item->fromImplDefine)){
-         if(item->isAbstract){
-            error_at(DECL_SOURCE_LOCATION(decl),"类%qs的抽象方法%qs，只能由子类实现。",className->userName,orgiName);
-            return FALSE;
-         }
-         item->fromImplDefine=decl;
-      }else{
+      if(aet_utils_valid_tree(item->fromImplDefine)){
          repeat=TRUE;
       }
    }
@@ -312,33 +323,9 @@ static void fillGenericFuncType(tree args,int *haveQueryParam,int *haveGenericCl
 }
 
 /**
- * 找类ClassName中的接口是否声明过指定的函数
- */
-static nboolean findIntefaceFunc(FuncMgr *self,ClassName *className,char *rawMangleName)
-{
-   ClassInfo *info=class_mgr_get_class_info_by_class_name(class_mgr_get(),className);
-   if(!info)
-      return FALSE;
-   int i;
-   for(i=0;i<info->ifaceCount;i++){
-      ClassName *iface=&(info->ifaces[i]);
-      NPtrArray *funcArray=func_mgr_get_funcs(self,iface);
-      int j;
-      if(funcArray){
-         for(j=0;j<funcArray->len;j++){
-            ClassFunc *f=n_ptr_array_index(funcArray,j);
-            if(!strcmp(f->rawMangleName,rawMangleName))
-               return TRUE;
-         }
-      }
-   }
-   return FALSE;
-}
-
-/**
  *  mangleNoself 生成mangle名时不带self
  */
-static ClassFunc *addSubstitutions(FuncMgr *self,tree decl,tree classTree,ClassName *className,
+static ClassFunc *addSubstitutions(FuncMgr *self,tree classTree,ClassName *className,
 		 char *mangle,char *orgiName,enum func_from_code code,char *mangleNoSelf,char *rawMangleName,
 		 tree parms,int *errInfo)
 {
@@ -351,10 +338,10 @@ static ClassFunc *addSubstitutions(FuncMgr *self,tree decl,tree classTree,ClassN
    nboolean allParmIsQuery=0;
    fillGenericFuncType(parms,&haveQueryParam,&haveGenericClassParam,&allParmIsQuery);
    ClassFunc *item=NULL;
-   n_debug("addSubstitutions通过参数判断函数是什么泛型类型的函数:%s 问号:%d 泛型类:%d 全是问号:%d decl:%p\n",
-         orgiName,haveQueryParam,haveGenericClassParam,allParmIsQuery,decl);
+   n_debug("addSubstitutions通过参数判断函数是什么泛型类型的函数:%s 问号:%d 泛型类:%d 全是问号:%d\n",
+         orgiName,haveQueryParam,haveGenericClassParam,allParmIsQuery);
    if(!n_hash_table_contains(self->hashTable,className->sysName)){
-      item=createEntity(decl,classTree,mangle,orgiName,code,isCtor,
+      item=createEntity(classTree,mangle,orgiName,code,isCtor,
             isFinalized,isUnref,mangleNoSelf,rawMangleName);
       item->isQueryGenFunc=haveQueryParam;
       item->isGenericParmFunc=haveGenericClassParam;
@@ -377,7 +364,7 @@ static ClassFunc *addSubstitutions(FuncMgr *self,tree decl,tree classTree,ClassN
             函数类型：code:%d item:%p array:%p parms:%p\n",
             className->sysName,mangle,orgiName,rawMangleName,code,item,array,parms);
       if(item==NULL){
-         item=createEntity(decl,classTree,mangle,orgiName,code,isCtor,
+         item=createEntity(classTree,mangle,orgiName,code,isCtor,
                isFinalized,isUnref,mangleNoSelf,rawMangleName);
          item->isQueryGenFunc=haveQueryParam;
          item->isGenericParmFunc=haveGenericClassParam;
@@ -386,7 +373,7 @@ static ClassFunc *addSubstitutions(FuncMgr *self,tree decl,tree classTree,ClassN
          item->className = class_name_clone(className);
          n_ptr_array_add(array,item);
       }else{
-         nboolean repeat=setEntity(item,decl,className,classTree,mangle,orgiName,code);
+         nboolean repeat=setEntity(item,classTree,code);
          if(repeat){
             printf("is abstract classfun :%d %s error:%d\n",class_func_is_abstract(item),item->orgiName,ret);
             if(item->fromInterface)
@@ -394,11 +381,8 @@ static ClassFunc *addSubstitutions(FuncMgr *self,tree decl,tree classTree,ClassN
             else
                ret=-1;
          }
-         //检查是否与接口声明的方法相同。新的接口实现，是复制接口方法放到class的声明区，所以可以相同
-         //if(ret!=-1 && findIntefaceFunc(self,className,rawMangleName)){
-         //   ret=-2;
-        // }
       }
+      item->parms = parms;
       //如果item->fieldParms ==ggc_freed 说明被释放了（一般头文件中声明的类方法），现在有函数有了新的定义parms，
       //fieldParms已从classfunc中移走了。
       //替换，这项更改来自bug 见日志 为什么会变成ggc_freed呢？取出泛型genericmodel存入
@@ -419,16 +403,16 @@ static ClassFunc *addFunc(FuncMgr *self,tree structTree,ClassName *className,enu
    if(funid==NULL)
       return NULL;
    tree argTypes = funcdecl->u.arg_info->types;
-   tree funName=funid->u.id.id;
-   char *orgiName=n_strdup(IDENTIFIER_POINTER(funName));
-   char *newName=aet_mangle_create(self->mangle,funName,argTypes,className->userName);
    //获取没有self的函数名，用在static函数
    tree noSelfArgTypes = TREE_CHAIN (argTypes);
-   char *newNameNoSelf=aet_mangle_create(self->mangle,funName,noSelfArgTypes,className->userName);
-   char *staticNewName=aet_mangle_create(self->mangle,funName,noSelfArgTypes,className->sysName);
-   char *rawMangleName=aet_mangle_create(self->mangle,funName,noSelfArgTypes,"");
-
-   //printf("addFunc dddd vvv %s %s %s %s %s fromType:%d\n",orgiName,newName,newNameNoSelf,staticNewName,rawMangleName,fromType);
+   tree funName=funid->u.id.id;
+   self->tempParms = funcdecl->u.arg_info->parms;
+   char *orgiName=n_strdup(IDENTIFIER_POINTER(funName));
+   char *newName       = aet_mangle_create(self->mangle,funName,argTypes,className->userName);
+   char *newNameNoSelf = aet_mangle_create(self->mangle,funName,noSelfArgTypes,className->userName);
+   char *staticNewName = aet_mangle_create(self->mangle,funName,noSelfArgTypes,className->sysName);
+   char *rawMangleName = aet_mangle_create(self->mangle,funName,noSelfArgTypes,"");
+   self->tempParms = NULL_TREE;
    //检查与静态函数是否重名
    ClassFunc *func=NULL;
    func = getStaticFunc(self,staticNewName,className);
@@ -452,18 +436,15 @@ static ClassFunc *addFunc(FuncMgr *self,tree structTree,ClassName *className,enu
       n_free(rawMangleName);
       return NULL;
    }
-   //printf("addFunc 0000 %s %p code:%d exitsAetGenericInfoParm:%d\n",orgiName,funcdecl->u.arg_info->parms,fromType,exitsAetGenericInfoParm);
    int ret=0;
-   func=addSubstitutions(self,NULL_TREE,structTree,className,newName,orgiName,
+   func=addSubstitutions(self,structTree,className,newName,orgiName,
          fromType,newNameNoSelf,rawMangleName,funcdecl->u.arg_info->parms,&ret);
-   //printf("addFunc 1111 %s %p code:%d\n",orgiName,funcdecl->u.arg_info->parms,fromType);
    //printf("addFunc 00 sysName:%s userName:%s newFunName:%s newNameNoSelf:%s fromType:%d repeat:%d %s %s %d\n",
    //className->sysName,className->userName,newName,newNameNoSelf,fromType,repeat,__FILE__,__FUNCTION__, __LINE__);
    nboolean result=FALSE;
    if(ret==-1)
       error_at(id_loc,"类%qs有重复的函数名%qs。",className->userName,orgiName);
    else if(ret==-2){
-      //error_at(id_loc,"类%qs声明了与接口重复的函数名%qs。",className->userName,orgiName);
       if(errInfo)
          *errInfo=-2;
    }else{
@@ -487,7 +468,7 @@ static nboolean  setStaticDecl(FuncMgr *self,tree decl,ClassName *className,enum
 	}else if(code==CLASS_IMPL_DEFINE){
 	   item->fromImplDefine=decl;
 	}
-	return TRUE;
+	return class_func_set_decl(item,decl,code);
 }
 
 //0表示没有错误，但不创建classfunc
@@ -498,7 +479,7 @@ ClassFunc *func_mgr_change_class_func_decl(FuncMgr *self,struct c_declarator *de
 {
    struct c_declarator *funcdel=class_util_get_function_declarator(declarator);
    if(!funcdel)
-        return NULL;
+      return NULL;
    struct c_declarator *funid=class_util_get_function_id(funcdel);
    location_t id_loc=getDeclaratorLocation(funid);
    return addFunc(self,structTree,className,STRUCT_DECL,id_loc,funcdel,NULL,errInfo);
@@ -764,7 +745,8 @@ char *func_mgr_create_static_var_name(FuncMgr *self,ClassName *className,tree va
 	return aet_mangle_create_static_var_name(self->mangle,className,varName,type);
 }
 
-nboolean  func_mgr_change_static_func_decl(FuncMgr *self,struct c_declarator *declarator,ClassName *className,tree structTree)
+nboolean  func_mgr_change_static_func_decl(FuncMgr *self,
+      struct c_declarator *declarator,ClassName *className,tree structTree,tree allPrefixAttrs)
 {
    struct c_declarator *funcdel=class_util_get_function_declarator(declarator);
    if(!funcdel)
@@ -780,9 +762,12 @@ nboolean  func_mgr_change_static_func_decl(FuncMgr *self,struct c_declarator *de
    tree argTypes = args->types;
    tree funName=funid->u.id.id;
    char *orgiName=n_strdup(IDENTIFIER_POINTER(funName));
-   char *newName=aet_mangle_create(self->mangle,funName,argTypes,className->userName);
-   char *newSysName=aet_mangle_create(self->mangle,funName,argTypes,className->sysName);
-   char *rawMangleName=aet_mangle_create(self->mangle,funName,argTypes,"");
+   //AetMangle的回调引用 self->tempParms
+   self->tempParms = args->parms;
+   char *newName       = aet_mangle_create(self->mangle,funName,argTypes,className->userName);
+   char *newSysName    = aet_mangle_create(self->mangle,funName,argTypes,className->sysName);
+   char *rawMangleName = aet_mangle_create(self->mangle,funName,argTypes,"");
+   self->tempParms = NULL_TREE;
    if(existsSameStaticFunc(self,newSysName,className)){
       n_debug("func_mgr_change_static_func_decl 11 existsStaticFunc %s %s class:%s\n",newName,newSysName,className->sysName);
       error_at (id_loc,"%qE 有同名的函数声明，并且参数也是一样的 ！", funName);
@@ -811,12 +796,13 @@ nboolean  func_mgr_change_static_func_decl(FuncMgr *self,struct c_declarator *de
          orgiName,haveQueryParam,haveGenericClassParam,allParmIsQuery);
    nboolean result=TRUE;
    if(!n_hash_table_contains(self->staticHashTable,className->sysName)){
-      ClassFunc *item=createEntity(NULL_TREE,structTree,newSysName,orgiName, STRUCT_DECL,FALSE,FALSE,FALSE,NULL,rawMangleName);
+      ClassFunc *item=createEntity(structTree,newSysName,orgiName, STRUCT_DECL,FALSE,FALSE,FALSE,NULL,rawMangleName);
       item->isQueryGenFunc=haveQueryParam;
       item->isGenericParmFunc=haveGenericClassParam;
       item->allParmIsQuery=allParmIsQuery;
       item->serialNumber=getSerialNumber(self,className);
       item->className = class_name_clone(className);
+      class_func_set_mtcs_type(item,id_loc,allPrefixAttrs);
       NPtrArray *array=n_ptr_array_sized_new(2);
       n_ptr_array_add(array,item);
       n_debug("func_mgr_change_static_func_decl 33 第一次加 class:%s mangle:%s org:%s code:%d item:%p\n",
@@ -829,12 +815,13 @@ nboolean  func_mgr_change_static_func_decl(FuncMgr *self,struct c_declarator *de
             函数类型：code:%d item:%p array:%p\n",
             className->sysName,newSysName,orgiName,STRUCT_DECL,item,array);
       if(item==NULL){
-         item=createEntity(NULL_TREE,structTree,newSysName,orgiName, STRUCT_DECL,FALSE,FALSE,FALSE,NULL,rawMangleName);
+         item=createEntity(structTree,newSysName,orgiName, STRUCT_DECL,FALSE,FALSE,FALSE,NULL,rawMangleName);
          item->isQueryGenFunc=haveQueryParam;
          item->isGenericParmFunc=haveGenericClassParam;
          item->allParmIsQuery=allParmIsQuery;
          item->serialNumber=getSerialNumber(self,className);
          item->className = class_name_clone(className);
+         class_func_set_mtcs_type(item,id_loc,allPrefixAttrs);
          n_ptr_array_add(array,item);
       }else{
          error_at (id_loc,"%qE 有同名的函数声明，并且参数也是一样的 ！", funName);
@@ -954,14 +941,6 @@ nboolean  func_mgr_is_generic_func(FuncMgr *self,ClassName *className,char *mang
       }
    }
    return FALSE;
-}
-
-/**
- * 把function_type中的参数写成字符
- */
-char *func_mgr_create_parm_string(FuncMgr *self,tree funcType)
-{
-   return aet_mangle_create_parm_string(self->mangle,funcType);
 }
 
 /**
@@ -1319,8 +1298,10 @@ int func_mgr_get_func_declaration_index(FuncMgr *self,AetFuncType type,ClassName
 /**
  * 从接口复制方法到它的实现类中，需要创建4个新的名字。
  * 给一个fieldDecl和所属的类，生成4个名字
+ * parms对应的fieldDecl的参数,来自arg_info->parms
  */
-void func_mgr_create_mangle_name(FuncMgr *self,tree fieldDecl,ClassName *className,char **result)
+void func_mgr_create_mangle_name(FuncMgr *self,tree fieldDecl,
+      ClassName *className,char **result,tree parms)
 {
    tree fieldType=TREE_TYPE(fieldDecl);
    tree fieldFunType=TREE_TYPE(fieldType);
@@ -1338,12 +1319,18 @@ void func_mgr_create_mangle_name(FuncMgr *self,tree fieldDecl,ClassName *classNa
    tree funName=DECL_NAME(fieldDecl);
    char *orgiName=n_strdup(IDENTIFIER_POINTER(funName));
    tree argTypes=TYPE_ARG_TYPES (fieldFunType);
-   char *newName=aet_mangle_create_skip(self->mangle,funName,argTypes,className->userName,exitsAetGenericInfoParm?2:-1);
    //获取没有self的函数名，用在static函数
    tree noSelfArgTypes = TREE_CHAIN (argTypes);
-   char *newNameNoSelf=aet_mangle_create_skip(self->mangle,funName,noSelfArgTypes,className->userName,exitsAetGenericInfoParm?1:-1);
-   char *staticNewName=aet_mangle_create_skip(self->mangle,funName,noSelfArgTypes,className->sysName,exitsAetGenericInfoParm?1:-1);
-   char *rawMangleName=aet_mangle_create_skip(self->mangle,funName,noSelfArgTypes,"",exitsAetGenericInfoParm?1:-1);
+   self->tempParms = parms;
+   char *newName       = aet_mangle_create_skip(self->mangle,funName,argTypes,
+         className->userName,exitsAetGenericInfoParm?2:-1);
+   char *newNameNoSelf = aet_mangle_create_skip(self->mangle,funName,noSelfArgTypes,
+         className->userName,exitsAetGenericInfoParm?1:-1);
+   char *staticNewName = aet_mangle_create_skip(self->mangle,funName,noSelfArgTypes,
+         className->sysName,exitsAetGenericInfoParm?1:-1);
+   char *rawMangleName = aet_mangle_create_skip(self->mangle,funName,
+         noSelfArgTypes,"",exitsAetGenericInfoParm?1:-1);
+   self->tempParms = NULL_TREE;
    result[0]=orgiName;
    result[1]=newName;
    result[2]=newNameNoSelf;
@@ -1378,9 +1365,10 @@ tree func_mgr_divide_host_device_func(FuncMgr *self,location_t loc,ClassInfo *in
    char newName[256];
    mtcs_info_create_host_device_peer_name(newName,func->orgiName);
    tree decl = build_decl (loc,FIELD_DECL,get_identifier(newName),TREE_TYPE(decls));
-   printf("func_mgr_divide_host_device_func 00 分裂 host device 方法:%s newName:%s old:%s\n",info->className.sysName,newName,func->orgiName);
+   printf("func_mgr_divide_host_device_func 00 分裂 host device 方法:%s newName:%s old:%s\n",
+         info->className.sysName,newName,func->orgiName);
    char *result[5];
-   func_mgr_create_mangle_name(func_mgr_get(),decl,&info->className,result);
+   func_mgr_create_mangle_name(func_mgr_get(),decl,&info->className,result,func->parms);
    //printf("func_mgr_divide_host_device_func 11 分裂 host device 方法:%s newName:%s old:%s\n",info->className.sysName,newName,func->orgiName);
    DECL_NAME(decl)=get_identifier(result[1]);
    ClassFunc  *cloneFunc=class_func_clone(func,decl,result,info->record,&info->className);
@@ -1543,6 +1531,34 @@ ClassFunc *func_mgr_get_mii_func(FuncMgr *self,ClassFunc *micFunc)
    }
    return NULL;
 }
+
+static nboolean haveMtcsFunc(NHashTable *hash)
+{
+   NHashTableIter iter;
+   npointer key, value;
+   n_hash_table_iter_init(&iter, hash);
+   int i;
+   while (n_hash_table_iter_next(&iter, &key, &value)) {
+      char *sysName = (char *)key;
+      NPtrArray *array=(NPtrArray *)n_hash_table_lookup(hash,sysName);
+      if(array!=NULL){
+         for(i=0;i<array->len;i++){
+            ClassFunc *item=(ClassFunc *)n_ptr_array_index(array,i);
+            if(class_func_is_mtcs(item))
+               return TRUE;
+         }
+      }
+   }
+   return FALSE;
+}
+
+nboolean func_mgr_have_mtcs_func(FuncMgr *self)
+{
+   if(haveMtcsFunc(self->hashTable))
+      return TRUE;
+   return haveMtcsFunc(self->staticHashTable);
+}
+
 
 FuncMgr *func_mgr_get()
 {

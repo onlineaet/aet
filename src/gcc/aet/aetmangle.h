@@ -26,6 +26,15 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 #include "classinfo.h"
 #include "c-aet.h"
 
+/**
+ * 混淆函数名和静态变量的名字
+ * 只能用在FuncMgr中，因为在混淆过程中需要回调到funcmgr的方法
+ * 检查匿名struct映射的type_decl,可以解决匿名struct无名字的问题
+ * 比如:typedef struct{int x,y,z,w;}int4
+ * void xxx(int4 name);
+ */
+typedef tree (*GetAnonymousTypeName)(tree type,npointer userData);
+
 typedef struct _AetMangle AetMangle;
 /* --- structures --- */
 struct _AetMangle
@@ -34,6 +43,8 @@ struct _AetMangle
 	vec<tree, va_gc> *substitutions;
 	NString *strBuf;
 	int parm_depth;
+	GetAnonymousTypeName callback;
+	npointer userData;
 };
 
 AetMangle *aet_mangle_new();
@@ -42,6 +53,6 @@ char      *aet_mangle_create_static_var_name(AetMangle *self,ClassName *classNam
 char      *aet_mangle_create_parm_string(AetMangle *self,tree funcType);
 char      *aet_mangle_create(AetMangle *self,tree funName,tree argTypes,char *className);
 char      *aet_mangle_create_skip(AetMangle *self,tree funName,tree argTypes,char *className,int skip);
-
+void       aet_mangle_set_callback(AetMangle *self,GetAnonymousTypeName func,npointer userData);
 #endif
 

@@ -133,7 +133,7 @@ static bool returnInMemory_cb (TargetCalls *targetCalls,const_tree type,const_tr
    MtcsMode *mtcsMode=MTCS_GET_MODE_OBJECT(targetCalls);
    MtcsTarget *mtcsTarget=(MtcsTarget *)mtcsMode->target;
 
-   machine_mode mode=mtcs_mode_host2device_by_tree(mtcsMode,type,TYPE_MODE (type));
+   machine_mode mode=TYPE_MODE (type);//mtcs_mode_host2device_by_tree(mtcsMode,type,TYPE_MODE (type));
    n_debug("targetptxcalls.c -----nvptx.cc -----17-- TARGET_RETURN_IN_MEMORY \
           bool nvptx_return_in_memory (const_tree type, const_tree):host:%d device:%d\n",
           TYPE_MODE (type),mode);
@@ -149,7 +149,7 @@ static rtx functionValue_cb(TargetCalls *targetCalls,const_tree ret_type ATTRIBU
    MtcsFunc *mtcsFunc=mtcs_target_get_func(mtcsTarget);
    MtcsRTL  *mtcsRTL=mtcs_target_get_rtl(mtcsTarget);
 
-   machine_mode deviceMode=mtcs_mode_host2device_by_tree(mtcsMode,ret_type,TYPE_MODE (ret_type));
+   machine_mode deviceMode=TYPE_MODE (ret_type);//mtcs_mode_host2device_by_tree(mtcsMode,ret_type,TYPE_MODE (ret_type));
 
    n_debug("targetptxcalls.c -----nvptx.cc -----122-- TARGET_FUNCTION_VALUE rtx nvptx_function_value \
        (const_tree type, const_tree ARG_UNUSED (func), bool outgoing) outgoint:%d \n",outgoing);

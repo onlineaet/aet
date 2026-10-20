@@ -2054,3 +2054,4 @@ int mtcs_emit_branch_cost(MtcsEmit *self,bool speed_p ,bool predictable_p)
     return self->brach_cost(self,speed_p,predictable_p);
 }
 
+

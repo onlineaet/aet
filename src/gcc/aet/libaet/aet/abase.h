@@ -226,7 +226,8 @@ typedef apointer	    (*ACopyFunc)            (aconstpointer  src,apointer       
 
 #define A_PASTE_ARGS(identifier1,identifier2) identifier1 ## identifier2
 #define A_PASTE(identifier1,identifier2)      A_PASTE_ARGS (identifier1, identifier2)
-#define A_STATIC_ASSERT(expr) typedef char A_PASTE (_AStaticAssertCompileTimeAssertion_, __COUNTER__)[(expr) ? 1 : -1] A_GNUC_UNUSED
+#define A_STATIC_ASSERT(expr) \
+   typedef char A_PASTE (_AStaticAssertCompileTimeAssertion_, __COUNTER__)[(expr) ? 1 : -1] A_GNUC_UNUSED
 
 #define alib_typeof(t) __typeof__ (t)
 
@@ -268,11 +269,35 @@ typedef void* aet_generic_X;
 typedef void* aet_generic_Y;
 typedef void* aet_generic_Z;
 
-typedef struct dim3{
-    unsigned int x;
-    unsigned int y;
-    unsigned int z;
-}dim3;
+#undef __global__
+#ifndef __global__
+#define __global__ __attribute__((global))
+#endif
+
+#undef __device__
+#ifndef __device__
+#define __device__ __attribute__((device))
+#endif
+
+#undef __host__
+#ifndef __host__
+#define __host__ __attribute__((host))
+#endif
+
+#undef __shared__
+#ifndef __shared__
+#define __shared__ __attribute__((shared))
+#endif
+
+#undef __managed__
+#ifndef __managed__
+#define __managed__ __attribute__((managed))
+#endif
+
+#undef __constant__
+#ifndef __constant__
+#define __constant__ __attribute__((constant))
+#endif
 
 #endif
 

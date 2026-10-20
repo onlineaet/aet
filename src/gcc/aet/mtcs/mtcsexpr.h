@@ -262,5 +262,7 @@ void mtcs_expr_generate_reflecting_code_standard (MtcsExpr *self,rtx *op);
 rtx mtcs_expr_get_personality_function (MtcsExpr *self,tree decl);
 //原型 set_storage_via_libcall expr.h expr.cc
 rtx mtcs_expr_set_storage_via_libcall (MtcsExpr *self,rtx object, rtx size, rtx val, bool tailcall=false);
+//原型 copy_blkmode_to_reg expr.h expr.cc
+rtx mtcs_expr_copy_blkmode_to_reg (MtcsExpr *self,machine_mode mode_in, tree src);
 
 #endif

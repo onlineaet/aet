@@ -40,6 +40,7 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 #include "supercall.h"
 #include "genericmodel.h"
 #include "genericfunc.h"
+#include "intrinsicparser.h"
 
 
 typedef struct _ClassParser ClassParser;
@@ -55,6 +56,7 @@ struct _ClassParser
    ClassPermission *classPermission;
    ClassBuild *classBuild;
    ClassParserState state;
+   IntrinsicParser *intrinsicParser;
    ClassName *currentClassName;
    char *fileName;
    nboolean expandMemory;
@@ -72,11 +74,6 @@ struct _ClassParser
       //aetparser.c 中分析说明符时，会报警告：空声明 加入状态 running ,aetparser可以具此跳过警告。
       nboolean running;
    }addAetHeader;
-   //保存#pragma mtcs operation ld.global.cs 中的“ld.global.cs”
-   struct{
-      char *directives;
-      nboolean enter;//=true进入了 #pragma mtcs operation
-   }mtcsIntrinsic;
 };
 
 

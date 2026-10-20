@@ -1002,11 +1002,11 @@ static void encodeSectionInfo_cb(MtcsOutput *mtcsOutput,tree decl, rtx rtl, int 
       n_debug("mtcsptx.c -----nvptx.cc -----3bb--获取 data_area  PTX_DATA_AREA_GENERIC\n");
 
       if (VAR_P (decl)){
-         if (lookup_attribute (MTCS_SHARED_STRING, DECL_ATTRIBUTES (decl))){
+         if (lookup_attribute (MTCS_SHARED_STR, DECL_ATTRIBUTES (decl))){
             area = PTX_DATA_AREA_SHARED;
             if (DECL_INITIAL (decl))
                error ("static initialization of variable %q+D in %<.shared%> memory is not supported", decl);
-         }else if(lookup_attribute (MTCS_CONSTANT_STRING, DECL_ATTRIBUTES (decl))){
+         }else if(lookup_attribute (MTCS_CONSTANT_STR, DECL_ATTRIBUTES (decl))){
             area = PTX_DATA_AREA_CONST;
          }else{
             n_debug("mtcsptx.c -----nvptx.cc -----3dd-- DATA_AREA_GLOBAL\n");

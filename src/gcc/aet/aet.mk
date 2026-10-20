@@ -20,7 +20,7 @@ AET_TREE=aet/c-aet.o aet/classinfo.o aet/classmgr.o aet/aetutils.o aet/aetprintt
     aet/clearwarning.o aet/selectfield.o aet/funcpointer.o aet/aetdiagnosticimpl.o aet/aetprintgimple.o\
     aet/mtcsparser.o aet/aetmediator.o aet/aetparser.o aet/mtcsbuiltintree.o  aet/mtcstypes.o\
     aet/aetcollect.o aet/mtcsinfo.o aet/mtcslanuch.o  aet/genericgraph.o aet/aetlib.o\
-    aet/ifaceimpl.o aet/genericcode.o aet/mtcslink.o \
+    aet/ifaceimpl.o aet/genericcode.o aet/mtcslink.o aet/intrinsicparser.o\
 
 AET_MTCS=aet/mtcs/mtcsalign.o aet/mtcs/mtcsargs.o aet/mtcs/mtcsasm.o aet/mtcs/mtcscalls.o\
     aet/mtcs/mtcsccmp.o aet/mtcs/mtcscfgloopanal.o aet/mtcs/mtcscodes.o aet/mtcs/mtcscompile.o\

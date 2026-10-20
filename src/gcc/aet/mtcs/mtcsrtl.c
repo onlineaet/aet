@@ -1034,20 +1034,20 @@ static rtx change_address_1 (MtcsRTL *self,rtx memref, machine_mode mode, rtx ad
 
   addr_space_t as;
   rtx new_rtx;
-  n_debug("mtcsrtl.c change_address_1 00 validate:%d inplace:%d\n",validate,inplace);
+  //n_debug("mtcsrtl.c change_address_1 00 validate:%d inplace:%d\n",validate,inplace);
   gcc_assert (MEM_P (memref));
   as = mtcs_rtl_get_mem_addr_space/*!MEM_ADDR_SPACE*/(self,memref);
   if (mode == VOIDmode)
     mode = GET_MODE (memref);
   if (addr == 0)
     addr = XEXP (memref, 0);
-  n_debug("mtcsrtl.c change_address_1 11 as:%d inplace:%d %d %d %d\n",as,inplace,mode,GET_MODE (memref),addr == XEXP (memref, 0));
+ // n_debug("mtcsrtl.c change_address_1 11 as:%d inplace:%d %d %d %d\n",as,inplace,mode,GET_MODE (memref),addr == XEXP (memref, 0));
 
   if (mode == GET_MODE (memref) && addr == XEXP (memref, 0)
       && (!validate || mtcs_recog_memory_address_addr_space_p/*!memory_address_addr_space_p*/(mtcsRecog,mode, addr,as,ERROR_MARK)))
     return memref;
-  n_debug("mtcsrtl.c change_address_1 22 reload_in_progress:%d reload_completed:%d lra_in_progress:%d\n",
-        reload_in_progress,reload_completed,lra_in_progress);
+ // n_debug("mtcsrtl.c change_address_1 22 reload_in_progress:%d reload_completed:%d lra_in_progress:%d\n",
+       // reload_in_progress,reload_completed,lra_in_progress);
 
   /* Don't validate address for LRA.  LRA can make the address valid
      by itself in most efficient way.  */
@@ -1060,13 +1060,13 @@ static rtx change_address_1 (MtcsRTL *self,rtx memref, machine_mode mode, rtx ad
 
   if (rtx_equal_p (addr, XEXP (memref, 0)) && mode == GET_MODE (memref))
     return memref;
-  n_debug("mtcsrtl.c change_address_1 33 as:%d inplace:%d\n",as,inplace);
+  //n_debug("mtcsrtl.c change_address_1 33 as:%d inplace:%d\n",as,inplace);
 
   if (inplace){
       XEXP (memref, 0) = addr;
       return memref;
   }
-  n_debug("mtcsrtl.c change_address_1 44 as:%d inplace:%d\n",as,inplace);
+  //n_debug("mtcsrtl.c change_address_1 44 as:%d inplace:%d\n",as,inplace);
 
   new_rtx = gen_rtx_MEM (mode, addr);
   MEM_COPY_ATTRIBUTES (new_rtx, memref);
@@ -1901,6 +1901,9 @@ rtx mtcs_rtl_gen_int_shift_amount (MtcsRTL *self,machine_mode, poly_int64 value)
 rtx mtcs_rtl_gen_highpart (MtcsRTL *self,machine_mode mode, rtx x)
 {
   MtcsMode *mtcsMode=MTCS_GET_MODE_OBJECT(self);
+  MtcsTarget *mtcsTarget=(MtcsTarget *)mtcsMode->target;
+  MtcsSimplifyRtx *mtcsSimplifyRtx=mtcs_target_get_simplify_rtx(mtcsTarget);
+
   poly_uint64 msize = mtcs_mode_get_size (mtcsMode,mode);
   rtx result;
 
@@ -1917,7 +1920,8 @@ rtx mtcs_rtl_gen_highpart (MtcsRTL *self,machine_mode mode, rtx x)
       return mtcs_rtl_adjust_address (self,x, mode, offset);
   }
 
-  result = simplify_gen_subreg (mode, x, GET_MODE (x),mtcs_mode_subreg_highpart_offset (mtcsMode,mode, GET_MODE (x)));
+  result = mtcs_simplify_rtx_gen_subreg/*!simplify_gen_subreg*/(mtcsSimplifyRtx,
+        mode, x, GET_MODE (x),mtcs_mode_subreg_highpart_offset (mtcsMode,mode, GET_MODE (x)));
   /* Since we handle MEM directly above, we should never get a MEM back
      from simplify_gen_subreg.  */
   gcc_assert (result && !MEM_P (result));
@@ -2117,6 +2121,8 @@ rtx mtcs_rtl_operand_subword (MtcsRTL *self,rtx op, poly_uint64 offset, int vali
   MtcsMode *mtcsMode=MTCS_GET_MODE_OBJECT(self);
   MtcsTarget *mtcsTarget=(MtcsTarget *)mtcsMode->target;
   MtcsRecog *mtcsRecog=mtcs_target_get_recog(mtcsTarget);
+  MtcsSimplifyRtx *mtcsSimplifyRtx=mtcs_target_get_simplify_rtx(mtcsTarget);
+
   if (mode == VOIDmode)
     mode = GET_MODE (op);
   gcc_assert (mode != VOIDmode);
@@ -2141,7 +2147,8 @@ rtx mtcs_rtl_operand_subword (MtcsRTL *self,rtx op, poly_uint64 offset, int vali
   }
 
   /* Rest can be handled by simplify_subreg.  */
-  return simplify_gen_subreg (word_mode, op, mode, (offset * UNITS_PER_WORD));
+  return mtcs_simplify_rtx_gen_subreg/*!simplify_gen_subreg*/(mtcsSimplifyRtx,
+        word_mode, op, mode, (offset * UNITS_PER_WORD));
 }
 
 /* Return a memory reference like MEMREF, but with its address changed to
@@ -2636,7 +2643,8 @@ void mtcs_rtl_set_mem_attributes_minus_bitpos(MtcsRTL *self,rtx ref, tree t, int
 
       base = get_base_address (t);
       if (base){
-         if (DECL_P (base)  && TREE_READONLY (base) && (TREE_STATIC (base) || DECL_EXTERNAL (base)) && !TREE_THIS_VOLATILE (base))
+         if (DECL_P (base)  && TREE_READONLY (base)
+               && (TREE_STATIC (base) || DECL_EXTERNAL (base)) && !TREE_THIS_VOLATILE (base))
             MEM_READONLY_P (ref) = 1;
 
          /* Mark static const strings readonly as well.  */
@@ -2652,7 +2660,8 @@ void mtcs_rtl_set_mem_attributes_minus_bitpos(MtcsRTL *self,rtx ref, tree t, int
 
       /* If this expression uses it's parent's alias set, mark it such
       that we won't change it.  */
-      if (mtcs_alias_component_uses_parent_alias_set_from/*!component_uses_parent_alias_set_from*/(mtcsAlias,t) != NULL_TREE)
+      if (mtcs_alias_component_uses_parent_alias_set_from/*!component_uses_parent_alias_set_from*/
+            (mtcsAlias,t) != NULL_TREE)
          MEM_KEEP_ALIAS_SET_P (ref) = 1;
 
       /* If this is a decl, set the attributes of the MEM from it.  */
@@ -2699,7 +2708,8 @@ void mtcs_rtl_set_mem_attributes_minus_bitpos(MtcsRTL *self,rtx ref, tree t, int
                TREE_OPERAND (*orig_base, 0) = *namep;
             else{
                tree aptrt =  mtcs_alias_reference_alias_ptr_type/*!reference_alias_ptr_type*/(mtcsAlias,*orig_base);
-               *orig_base = build2 (MEM_REF, TREE_TYPE (*orig_base),*namep, mtcs_tree_build_int_cst/*!build_int_cst*/(mtcsTree,aptrt, 0));
+               *orig_base = build2 (MEM_REF, TREE_TYPE (*orig_base),*namep,
+                     mtcs_tree_build_int_cst/*!build_int_cst*/(mtcsTree,aptrt, 0));
             }
          }
       }
@@ -3243,6 +3253,7 @@ void mtcs_rtl_clear_mem_offset (MtcsRTL *self,rtx mem)
 void mtcs_rtl_set_decl_rtl (MtcsRTL *self,tree t, rtx x)
 {
   DECL_WRTL_CHECK (t)->decl_with_rtl.rtl = x;
+  n_debug("mtcsrtl.c mtcs_rtl_set_decl_rtl 00 t:%p x:%p\n",t,x);
   if (x)
      mtcs_rtl_set_reg_attrs_for_decl_rtl/*!set_reg_attrs_for_decl_rtl*/(self,t, x);
 }
@@ -3918,6 +3929,19 @@ wi::storage_ref wi::int_traits <mtcs_rtx_mode_t>::decompose (HOST_WIDE_INT *, un
    }
 }
 
+/* Generate a new pseudo-register with the same attributes as REG, but
+   with OFFSET added to the REG_OFFSET.  */
+//原型 gen_reg_rtx_offset rtl.h emit-rtl.cc
+rtx mtcs_rtl_gen_reg_rtx_offset (MtcsRTL *self,rtx reg, machine_mode mode, int offset)
+{
+   MtcsMode *mtcsMode=MTCS_GET_MODE_OBJECT(self);
+   MtcsTarget *mtcsTarget=(MtcsTarget *)mtcsMode->target;
+   MtcsEmit *mtcsEmit=mtcs_target_get_emit(mtcsTarget);
+
+   rtx new_rtx = mtcs_emit_gen_reg_rtx/*!gen_reg_rtx*/(mtcsEmit,mode);
+   update_reg_offset(self,new_rtx, reg, offset);
+   return new_rtx;
+}
 
 
 

@@ -3,15 +3,16 @@
 
 #include "nlib.h"
 
-#define MTCS_GLOBAL_STRING "mtcs_global"//只能修饰函数
-#define MTCS_DEVICE_STRING "mtcs_device" //修饰函数和变量
-#define MTCS_HOST_STRING   "mtcs_host" //只能修饰函数
-#define MTCS_SHARED_STRING   "mtcs_shared" //只能修饰变量
-#define MTCS_MANAGED_STRING   "mtcs_managed" //只能修饰变量
-#define MTCS_CONSTANT_STRING   "mtcs_constant" //只能修饰变量
-
-#define MTCS_DEVICE_HOST_STRING "mtcs_device_host"
+#define MTCS_DEVICE_HOST_STRING "device_host"
 #define MTCS_FN_VISIBLE "mtcs visible"
+
+#define MTCS_GLOBAL_STR "global"
+#define MTCS_DEVICE_STR "device"
+#define MTCS_HOST_STR   "host"
+#define MTCS_SHARED_STR   "shared"
+#define MTCS_MANAGED_STR  "managed"
+#define MTCS_CONSTANT_STR "constant"
+
 
 #define MTCS_INTERNAL_FN_CODE_START 10000
 #define MTCS_INTERNAL_FN_CODE_END   (MTCS_INTERNAL_FN_CODE_START+100)
@@ -71,9 +72,9 @@ typedef enum{
 inline const char *mtcs_info_get_mtcs_type_string(MtcsFuncType type)
 {
    if(type==MTCS_FUNC_KERNEL)
-      return MTCS_GLOBAL_STRING;
+      return MTCS_GLOBAL_STR;
    else if(type==MTCS_FUNC_DEVICE)
-      return MTCS_DEVICE_STRING;
+      return MTCS_DEVICE_STR;
    else if(type==MTCS_FUNC_DEVICE_HOST)
       return MTCS_DEVICE_HOST_STRING;
    else
@@ -83,6 +84,8 @@ inline const char *mtcs_info_get_mtcs_type_string(MtcsFuncType type)
 
 MtcsFuncType mtcs_info_get_func_type(tree decl);
 MtcsVarType  mtcs_info_get_var_type(tree decl);
+MtcsVarType  mtcs_info_get_and_check_var_type(tree decl,location_t loc);
+MtcsFuncType mtcs_info_get_and_check_func_type(tree decl,location_t loc);
 
 //函数声明是不是内部函数
 nboolean    mtcs_info_is_internal_fn(tree fndecl);
@@ -91,6 +94,7 @@ nboolean    mtcs_info_is_builtin_fn(tree fndecl);
 
 nboolean     mtcs_info_is_visible(tree decl);
 tree         mtcs_info_create_kernel_name(char *orig);
+//下面4个函数是intrinsic需要的
 nboolean     mtcs_info_is_intrinsic_function_decl(tree fndecl);
 // intrinsic 函数实现
 nboolean     mtcs_info_is_intrinsic_function_impl(tree fndecl);
@@ -110,5 +114,7 @@ static inline void mtcs_info_create_host_device_peer_name(char *buffer,char *ori
 {
       sprintf(buffer,"%s_device",origName);
 }
+
+
 
 #endif

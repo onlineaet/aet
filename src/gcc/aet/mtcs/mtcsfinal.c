@@ -2923,7 +2923,6 @@ static unsigned int rest_of_clean_state (MtcsFinal *self)
    reload_completed = 0;
    epilogue_completed = 0;
    if(mtcs_config_ifdef(mtcsConfig,MTCS_STACK_REGS)){
-
    //#ifdef STACK_REGS
       mtcs_rtl_set_regstack_completed/*!regstack_completed = 0*/(mtcsRTL,0);//rtl.h声明
    //#endif
@@ -2932,10 +2931,8 @@ static unsigned int rest_of_clean_state (MtcsFinal *self)
    /* Clear out the insn_length contents now that they are no
    longer valid.  */
    mtcs_final_init_insn_lengths/*!init_insn_lengths*/(self);
-
    /* Show no temporary slots allocated.  */
    mtcs_func_init_temp_slots/*!init_temp_slots*/(mtcsFunc);
-
    mtcs_cfg_rtl_free_bb_for_insn/*!free_bb_for_insn*/(mtcsCfgRtl);
 
    if (cfun->gimple_df)
@@ -3086,24 +3083,24 @@ MtcsPassFinal *mtcs_pass_final_new (MtcsMode *mtcsMode)
 //原型 NEXT_PASS (pass_clean_state, 1);  RTL_PASS  final.cc *clean_state   y 无条件执行 rest_of_clean_state
 static nuint clean_state_execute_cb(MtcsPass *mtcsPass,function *func)
 {
-      MtcsPassFinal *self=(MtcsPassFinal *)mtcsPass;
-      MtcsMode *mtcsMode=MTCS_GET_MODE_OBJECT(self);
-      MtcsTarget *mtcsTarget=(MtcsTarget *)mtcsMode->target;
-      MtcsFinal *mtcsFinal=mtcs_target_get_final(mtcsTarget);
-      return rest_of_clean_state(mtcsFinal);
+   MtcsPassFinal *self=(MtcsPassFinal *)mtcsPass;
+   MtcsMode *mtcsMode=MTCS_GET_MODE_OBJECT(self);
+   MtcsTarget *mtcsTarget=(MtcsTarget *)mtcsMode->target;
+   MtcsFinal *mtcsFinal=mtcs_target_get_final(mtcsTarget);
+   return rest_of_clean_state(mtcsFinal);
 }
 
 static void mtcsPassCleanStateInit(MtcsPassCleanState *self)
 {
-    MtcsPass *mtcsPass=(MtcsPass *)self;
-    mtcsPass->execute =clean_state_execute_cb;
-    mtcs_pass_set_properties((MtcsPass *)self,
-            0,/* properties_required */
-            0, /* properties_provided */
-            PROP_rtl /* properties_destroyed */);
-    mtcs_pass_set_todo_flags((MtcsPass *)self,
-          0, /* todo_flags_start */
-          0 /*todo_flags_finish */);
+   MtcsPass *mtcsPass=(MtcsPass *)self;
+   mtcsPass->execute =clean_state_execute_cb;
+   mtcs_pass_set_properties((MtcsPass *)self,
+         0,/* properties_required */
+         0, /* properties_provided */
+         PROP_rtl /* properties_destroyed */);
+   mtcs_pass_set_todo_flags((MtcsPass *)self,
+         0, /* todo_flags_start */
+         0 /*todo_flags_finish */);
 }
 
 MtcsPassCleanState *mtcs_pass_clean_state_new (MtcsMode *mtcsMode)

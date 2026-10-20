@@ -156,7 +156,7 @@ struct c_expr aet_expr_varof_parser(AetExpr *self,struct c_expr lhs)
    ClassInfo *leftInfo=class_mgr_get_class_info(class_mgr_get(),leftSysName);
    if(leftSysName!=NULL){
       ClassRelationship  ship= class_mgr_relationship(class_mgr_get(), leftSysName,rightSysName);
-      printf("说明变量和比较的类型都是AET类或接口:左:%s 右:%s ship:%d\n",leftSysName,rightSysName,ship);
+      //printf("说明变量和比较的类型都是AET类或接口:左:%s 右:%s ship:%d\n",leftSysName,rightSysName,ship);
       if(!strcmp(leftSysName,rightSysName) || ship==CLASS_RELATIONSHIP_CHILD || ship==CLASS_RELATIONSHIP_IMPL){
          lhs.value=build_int_cst(integer_type_node,1);
       }else{

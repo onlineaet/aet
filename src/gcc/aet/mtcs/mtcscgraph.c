@@ -446,7 +446,7 @@ void mtcs_cgraph_node_expand(MtcsCgraph *self, struct cgraph_node *node)
   /* Initialize the RTL code for the function.  */
   saved_loc = input_location;
   input_location = DECL_SOURCE_LOCATION (decl);
-  n_debug("mtcscgraph.c mtcs_cgraph_node_expand 00 decl:%p\n",decl);
+  n_debug("mtcscgraph.c mtcs_cgraph_node_expand 00 decl:%p %s\n",decl,node->name());
   n_debug("mtcscgraph.c mtcs_cgraph_node_expand 11 DECL_STRUCT_FUNCTION (decl):%p\n",DECL_STRUCT_FUNCTION (decl));
 
   mtcs_cfg_context_change_gimple_state(mtcsCfgContext);
@@ -520,9 +520,9 @@ void mtcs_cgraph_node_expand(MtcsCgraph *self, struct cgraph_node *node)
           mtcs_func_pop_cfun/*!pop_cfun*/(mtcsFunc);
       return;
   }
-  //临时测试加的
-  TREE_ASM_WRITTEN (decl) = 1;
 
+  //临时测试加的
+ // TREE_ASM_WRITTEN (decl) = 1;
   /* Make sure that BE didn't give up on compiling.  */
   gcc_assert (TREE_ASM_WRITTEN (decl));
   if (cfun)
@@ -537,6 +537,8 @@ void mtcs_cgraph_node_expand(MtcsCgraph *self, struct cgraph_node *node)
      comdat groups.  */
   node->assemble_thunks_and_aliases ();
   node->release_body ();
+  n_debug("mtcscgraph.c mtcs_cgraph_node_expand 100 execute_pass_list all_passes 有gimple也有rtl 完成\n");
+
 }
 
 MtcsCgraph *mtcs_cgraph_new(MtcsMode *mtcsMode)

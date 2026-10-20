@@ -1851,8 +1851,6 @@ static void set_rtl (MtcsExpand *self,tree t, rtx x)
 
           tree var = SSA_NAME_VAR (t);
           //n_debug("mtcsexpand.c set_rtl 102 t:%p DECL_RTL_SET_P:%d\n",t,DECL_RTL_SET_P (var));
-         // mtcs_print_rtl_single(stderr,x);
-
           /* If we don't yet have something recorded, just record it now.  */
           if (!DECL_RTL_SET_P (var))
              mtcs_rtl_set_decl_rtl/*!SET_DECL_RTL*/(mtcsRTL,var, x);
@@ -3061,6 +3059,7 @@ static void expand_value_return (MtcsExpand *self,rtx val)
 
 /* Generate RTL to evaluate the expression RETVAL and return it
    from the current function.  */
+//返回値是结构体的値int ，生成的result_rtl在i386中 REG_P=true,在PTX中 REG_P = false;i386用寄存器保存返回値，ptx用内存。
 //原型 expand_return cfgexpand.cc
 static void expand_return (MtcsExpand *self,tree retval)
 {
@@ -3094,43 +3093,41 @@ static void expand_return (MtcsExpand *self,tree retval)
       return;
    }else if ((TREE_CODE (retval) == MODIFY_EXPR
    || TREE_CODE (retval) == INIT_EXPR)
-   && TREE_CODE (TREE_OPERAND (retval, 0)) == RESULT_DECL)
+   && TREE_CODE (TREE_OPERAND (retval, 0)) == RESULT_DECL){
       retval_rhs = TREE_OPERAND (retval, 1);
-   else
+   }else
       retval_rhs = retval;
 
    result_rtl = mtcs_asm_decl_rtl/*!DECL_RTL*/(mtcsAsm,DECL_RESULT (current_function_decl));
+
    /* If we are returning the RESULT_DECL, then the value has already
    been stored into it, so we don't have to do anything special.  */
    if (TREE_CODE (retval_rhs) == RESULT_DECL){
       n_debug("mtcsexpand.c expand_return 22\n");
-
       expand_value_return(self,result_rtl);
       /* If the result is an aggregate that is being returned in one (or more)
       registers, load the registers here.  */
    }else if (retval_rhs != 0  && TYPE_MODE (TREE_TYPE (retval_rhs)) ==mtcsMode->modes.M_BLKmode
    && REG_P (result_rtl)){
-      n_debug("mtcsexpand.c expand_return 33\n");
-      val = copy_blkmode_to_reg (GET_MODE (result_rtl), retval_rhs);
+      val = mtcs_expr_copy_blkmode_to_reg/*!copy_blkmode_to_reg*/(mtcsExpr,GET_MODE (result_rtl), retval_rhs);
+      n_debug("mtcsexpand.c expand_return 33 val:%p\n",val);
       if (val){
-         n_debug("mtcsexpand.c expand_return 44\n");
          /* Use the mode of the result value on the return register.  */
          mtcs_rtl_put_mode/*!PUT_MODE*/(mtcsRTL,result_rtl, GET_MODE (val));
          expand_value_return(self,val);
-      }else{
-         n_debug("mtcsexpand.c expand_return 55\n");
+      }else
          mtcs_expand_expand_null_return/*!expand_null_return*/(self);
-      }
+
    }else if (retval_rhs != 0  && !VOID_TYPE_P (TREE_TYPE (retval_rhs))
    && (REG_P (result_rtl)  || (GET_CODE (result_rtl) == PARALLEL))){
-      n_debug("mtcsexpand.c expand_return 66\n");
+      n_debug("mtcsexpand.c expand_return 44\n");
       /* Compute the return value into a temporary (usually a pseudo reg).  */
       val = mtcs_func_assign_temp/*!assign_temp*/(mtcsFunc,TREE_TYPE (DECL_RESULT (current_function_decl)), 0, 1);
       val = mtcs_expr_expand_expr/*!expand_expr*/(mtcsExpr,retval_rhs, val, GET_MODE (val), EXPAND_NORMAL);
       val = mtcs_explow_force_not_mem/*!force_not_mem*/(mtcsExplow,val);
       expand_value_return(self,val);
    }else{
-      n_debug("mtcsexpand.c expand_return 77\n");
+      n_debug("mtcsexpand.c expand_return 55\n");
       /* No hard reg used; calculate value into hard return reg.  */
       mtcs_expr_expand_expr/*!expand_expr*/(mtcsExpr,retval, const0_rtx, VOIDmode, EXPAND_NORMAL);
       expand_value_return(self,result_rtl);
@@ -3685,7 +3682,7 @@ static rtx expand_debug_expr (MtcsExpand *self,tree exp)
                     if (maybe_gt (bitsize, MAX_BITSIZE_MODE_ANY_INT))
                        return NULL;
                     /* Bitfield.  */
-                    mode1 = smallest_int_mode_for_size (bitsize).require ();
+                    mode1 = mtcs_mode_smallest_int_mode_for_size/*!smallest_int_mode_for_size*/(mtcsMode,bitsize);
                 }
                 poly_int64 bytepos = bits_to_bytes_round_down (bitpos);
                 if (maybe_ne (bytepos, 0)){
@@ -6573,8 +6570,6 @@ static bool rtl_verify_bb_insn_chain (MtcsExpand *self)
       for (x = last_head; x != NULL_RTX; x = PREV_INSN (x)){
          n_debug("mtcsexpand.cc rtl_verify_bb_insn_chain 00 bb:%p x:%d %p x:%p end:%p\n",bb,BARRIER_P (x),BLOCK_FOR_INSN (x),x,end);
          mtcs_print_rtl_single(stderr,x);
-
-
          /* Verify the end of the basic block is in the INSN chain.  */
          if (x == end)
             break;

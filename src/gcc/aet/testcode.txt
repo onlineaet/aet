@@ -1586,6 +1586,9 @@ int main()
 }
 
 //测试36，最简单的测试mic,mii
+#include "aet/aet.h"
+#include "mtcs/MtcsSystem.h"
+
 public$ final$  __attribute__((mii("cuda","sm_35"))) class$ CudaMemInstrinsic
 {
    public$ static  __device__  float ldcs(const float *ptr) {
@@ -1607,7 +1610,6 @@ class$ TFirst  {
 impl$ TFirst{
     __global__ void test(float *ptr){
        Target.ldcs(ptr);
-       Target.ldcs(ptr);
     }
 };
 
@@ -1620,7 +1622,7 @@ int main()
 }
 
 //测试37,memcpy的余数
-#include "AObject.h"
+#include "aet/aet.h"
 #include "mtcs/MtcsSystem.h"
 
 class$ TFirst {
@@ -1692,4 +1694,38 @@ int main()
     }
 
     return 0;
+}
+
+
+//测试38,测试返回结构体
+#include "aet/aet.h"
+#include "mtcs/MtcsSystem.h"
+
+class$ TFirst  {
+   __global__ void test(int4 *out);
+};
+
+impl$ TFirst{
+   __device__ int4 ldcs()  {
+      int4 ret;
+      ret.x = 11;
+      ret.y = 22;
+      ret.z = 33;
+      ret.w = 44;
+      return ret;
+   }
+
+   __global__ void test(int4 *out) {
+      out[0] = ldcs();
+   }
+};
+
+int main()
+{
+   MtcsSystem.init();
+   TFirst a=new$ TFirst();
+   int4 *m=MtcsSystem.malloc(sizeof(int4));
+   a.test(m);
+   printf("m is :%d %d %d %d\n",m->x,m->y,m->z,m->w);
+   return 0;
 }

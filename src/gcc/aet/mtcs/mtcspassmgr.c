@@ -964,37 +964,36 @@ void mtcs_pass_mgr_execute_all_pass (MtcsPassMgr *self,struct function *fn)
       free_dominance_info (CDI_POST_DOMINATORS);
    }
    n_debug("mtcspassmgr.c mtcs_pass_mgr_execute_all_pass 22 fn:%p\n",fn);
-
 }
 
 static MtcsPass *findPass(MtcsPassMgr *self,enum opt_pass_type type,char *name,NPtrArray *passArray)
 {
-    int i;
-    for(i=0;i<passArray->len;i++){
-          MtcsPass *pass=n_ptr_array_index(passArray,i);
-          if(pass->type==type && strcmp(pass->name,name)==0)
-              return pass;
-          if(pass->childs->len>0){
-              pass=findPass(self,type,name,pass->childs);
-              if(pass)
-                  return pass;
-          }
-     }
-     return NULL;
+   int i;
+   for(i=0;i<passArray->len;i++){
+      MtcsPass *pass=n_ptr_array_index(passArray,i);
+      if(pass->type==type && strcmp(pass->name,name)==0)
+         return pass;
+      if(pass->childs->len>0){
+         pass=findPass(self,type,name,pass->childs);
+         if(pass)
+            return pass;
+      }
+   }
+   return NULL;
 }
 
 MtcsPass *mtcs_pass_mgr_get_pass(MtcsPassMgr *self,enum opt_pass_type type,char *name)
 {
-    MtcsPass *ret=findPass(self,type,name,self->regularIpaPassArray);
-    if(ret)
-        return ret;
-    ret=findPass(self,type,name,self->lateIpaPassArray);
-    if(ret)
-        return ret;
-    ret=findPass(self,type,name,self->allPassArray);
-    if(ret)
-        return ret;
-    return NULL;
+   MtcsPass *ret=findPass(self,type,name,self->regularIpaPassArray);
+   if(ret)
+      return ret;
+   ret=findPass(self,type,name,self->lateIpaPassArray);
+   if(ret)
+      return ret;
+   ret=findPass(self,type,name,self->allPassArray);
+   if(ret)
+      return ret;
+   return NULL;
 }
 
 

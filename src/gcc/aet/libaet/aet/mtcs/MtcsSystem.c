@@ -243,7 +243,7 @@ static volatile int initLibrary=0;
 __attribute__((constructor)) void mtcs_library_init(void)
 {
    if(!({int v1=1;int v2=1;__atomic_exchange(&initLibrary,&v1,&v2,__ATOMIC_SEQ_CST);v2;})){
-      printf("库已被加载，这是第一个执行的函数！\n");
+      //printf("库已被加载，这是第一个执行的函数！\n");
       MtcsSystem.init();
    }
 }

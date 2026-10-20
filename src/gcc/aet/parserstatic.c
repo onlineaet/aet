@@ -436,7 +436,6 @@ static void parser_var_or_fun_declaration(ParserStatic *self,struct c_declspecs 
                maybe_warn_string_init (init_loc, TREE_TYPE (d), init);
                n_debug("静态声明分析 100 关键，变量是 extern 但定义要留到impl$实现，所以保存初始化。init:%p isStaticVarDecl:%d\n",
                      init.value,isStaticVarDecl);
-               //finish_decl (d, init_loc, init.value,init.original_type, asm_name);
                finish_decl (d, UNKNOWN_LOCATION, NULL_TREE,NULL_TREE, asm_name);
                if(isStaticVarDecl){
                   var_mgr_set_static_decl(var_mgr_get(),className,d,&init,permi,isFinal);
@@ -445,7 +444,11 @@ static void parser_var_or_fun_declaration(ParserStatic *self,struct c_declspecs 
          }else{//c_parser_next_token_is (parser, CPP_EQ) 声明符右边不是等号
             n_debug("静态声明分析 101 start_decl 构建完整的 fun 函数声明语句的树结构 specs中有int"
                   "声明说明符树 declarator有fun及参数的树 count:%d structTree:%p", testcount,structTree);
-            nboolean  isFuncOk=func_mgr_change_static_func_decl(func_mgr_get(),declarator,className,structTree);
+            aet_print_tree(postfix_attrs);
+            aet_print_tree(all_prefix_attrs);
+
+            nboolean  isFuncOk=func_mgr_change_static_func_decl(func_mgr_get(),
+                  declarator,className,structTree,all_prefix_attrs);
             nboolean isStaticVarDecl=FALSE;
             if(!isFuncOk)
                isStaticVarDecl=var_mgr_change_static_decl(var_mgr_get(),className,specs,declarator);
@@ -493,8 +496,8 @@ static void parser_var_or_fun_declaration(ParserStatic *self,struct c_declspecs 
                }
                if(isStaticVarDecl){
                   var_mgr_set_static_decl(var_mgr_get(),className,d,NULL,permi,isFinal);
+                  mtcs_parser_set_mtcs_var(mtcs_parser_get(),d);
                }
-               mtcs_parser_check(mtcs_parser_get(),d,TRUE);
             }
          }// end c_parser_next_token_is (parser, CPP_EQ)
 
@@ -528,8 +531,10 @@ static void parser_var_or_fun_declaration(ParserStatic *self,struct c_declspecs 
          return;
       }
 
-      nboolean  isFuncOk=func_mgr_change_static_func_decl(func_mgr_get(),declarator,className,structTree);
+      nboolean  isFuncOk=func_mgr_change_static_func_decl(func_mgr_get(),
+            declarator,className,structTree,all_prefix_attrs);
       n_debug("静态声明分析 108： 分析函数定义 count:%d declarator:%p isFuncOk:%d ",testcount,declarator,isFuncOk);
+      aet_print_tree(all_prefix_attrs);
       if (!start_function (specs, declarator, all_prefix_attrs)){
          n_debug("静态声明分析 109：函数定义出错了 count:%d declarator:%p ", testcount,declarator);
          gcc_assert (!c_parser_next_token_is (parser, CPP_SEMICOLON));
@@ -557,12 +562,11 @@ static void parser_var_or_fun_declaration(ParserStatic *self,struct c_declspecs 
       n_debug("静态声明分析 111： count:%d declarator:%p ", testcount,declarator);
       if(isFuncOk){
          tree currentFnDecl = current_function_decl;
-         mtcs_parser_check(mtcs_parser_get(),currentFnDecl,TRUE);
-         if(func_mgr_is_mtcs_func(func_mgr_get(),currentFnDecl))
+         if(func_mgr_is_mtcs_func(func_mgr_get(),currentFnDecl)){
             mtcs_parser_enter_function_body(mtcs_parser_get());
+         }
       }
       tree fnbody = NULL_TREE;
-
       while (c_parser_next_token_is_not (parser, CPP_EOF)  && c_parser_next_token_is_not (parser, CPP_OPEN_BRACE)){
          n_debug("静态声明分析 112 循环了 count:%d declarator:%p ", testcount,declarator);
          parser_var_or_fun_declaration (self,specs, className,structTree,permi,isFinal);

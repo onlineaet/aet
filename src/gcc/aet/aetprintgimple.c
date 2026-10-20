@@ -269,72 +269,73 @@ static void printssa(FILE *dump_orig,struct function *fun)
    tree name;
    FOR_EACH_SSA_NAME (i, name, fun){
       tree v=SSA_NAME_VAR(name);
-      fprintf(dump_orig,"printssa i:%d name:%p SSA_NAME_VERSION:%d var:%p %s\n",i,name,SSA_NAME_VERSION (name),v,function_name(fun));
-      aet_print_tree(v);
+      fprintf(dump_orig,"printssa i:%d name:%p SSA_NAME_VERSION:%d var:%p %s\n",
+            i,name,SSA_NAME_VERSION (name),v,function_name(fun));
+      //aet_print_tree(v);
    }
 }
 
 
 void   aet_print_cgraph_node_from(struct cgraph_node *node,const char *file,const char *func,int line)
 {
-//   if(!n_log_is_debug_file(NULL,NULL))
-//      return;
-//   if(!node ){
-//      printf(" aet_print_cgraph_node_from cgraph_node is null \n");
-//      return;
-//   }
-//   FILE *dump_orig;
-//   dump_flags_t local_dump_flags;
-//   dump_file_info *dfi;
-//   dfi = g->get_dumps ()->get_dump_file_info (TDI_original);
-//   dump_orig = dfi->pstream;
-//   local_dump_flags = dfi->pflags;
-//   dump_orig = dump_begin (TDI_original, &local_dump_flags);
-//   if(!dump_orig)
-//      dump_orig=stderr;
-//   /* Original cfun for the callee, doesn't change.  */
-//   struct function *nodeFun = DECL_STRUCT_FUNCTION (node->decl);
-//   fprintf(dump_orig,"打印  cgraph_node 名字:%s %p decl:%p nodeFun:%p availability:%d \n",
-//            node->name(),node,node->decl,nodeFun,node->get_availability());
-//   gcc_assert(node==node->decl->decl_with_vis.symtab_node)
-//
-//   cgraph_edge *e;
-//   int count=0;
-//   /* Update the call expr on the edges to call the new version.  */
-//   for (e = node->callers; e; e = e->next_caller){
-//      tree fndecl=  e->caller->decl;
-//      function *fn = DECL_STRUCT_FUNCTION (e->caller->decl);
-//      fprintf(dump_orig,"调用者: count:%d %s fn:%p  caller:%p node:%s \n",
-//               count++,IDENTIFIER_POINTER(DECL_NAME(fndecl)),fn,e->caller,node->name());
-//   }
-//   /* Update the call expr on the edges to call the new version.  */
-//   count=0;
-//   for (e = node->callees; e; e = e->next_callee){
-//      tree fndecl=  e->callee->decl;
-//      function *fn = DECL_STRUCT_FUNCTION (e->callee->decl);
-//      fprintf(dump_orig,"被调者: count:%d %s 被调函数 fn:%p callee:%p 所在节点 node:%s DECL_RESULT:%p\n",
-//               count++,IDENTIFIER_POINTER(DECL_NAME(fndecl)),fn,e->callee,node->name(),DECL_RESULT (fndecl));
-//   }
-//   if(!nodeFun){
-//      fprintf(dump_orig,"nodeFun是空的返回 struct cgraph_node node:%p name:%s decl:%p nodeFun:%p\n",node,node->name(),node->decl,nodeFun);
-//      return;
-//   }
-//   fprintf(dump_orig,"函数 entry 进入块:%p\n",ENTRY_BLOCK_PTR_FOR_FN (nodeFun));
-//   printbb(dump_orig,-1,ENTRY_BLOCK_PTR_FOR_FN (nodeFun));
-//
-//   basic_block bb;
-//   int countbb=0;
-//   FOR_EACH_BB_FN (bb, nodeFun){
-//      printbb(dump_orig,countbb++,bb);
-//   }
-//   fprintf(dump_orig,"函数 exit 退出块:%p %p\n",EXIT_BLOCK_PTR_FOR_FN (nodeFun));
-//   printbb(dump_orig,-2,EXIT_BLOCK_PTR_FOR_FN (nodeFun));
-//   fprintf(dump_orig,"打印 ssa\n");
-//   printssa(dump_orig,nodeFun);
-//   countbb = 0;
-//   FOR_EACH_BB_REVERSE_FN (bb, nodeFun){
-//      fprintf(dump_orig,"附加信息 --- nodeFun:%p i:%d bb:%p bb->index:%d\n",nodeFun,countbb++,bb,bb->index);
-//   }
+   if(!n_log_is_debug_file(NULL,NULL))
+      return;
+   if(!node ){
+      printf(" aet_print_cgraph_node_from cgraph_node is null \n");
+      return;
+   }
+   FILE *dump_orig;
+   dump_flags_t local_dump_flags;
+   dump_file_info *dfi;
+   dfi = g->get_dumps ()->get_dump_file_info (TDI_original);
+   dump_orig = dfi->pstream;
+   local_dump_flags = dfi->pflags;
+   dump_orig = dump_begin (TDI_original, &local_dump_flags);
+   if(!dump_orig)
+      dump_orig=stderr;
+   /* Original cfun for the callee, doesn't change.  */
+   struct function *nodeFun = DECL_STRUCT_FUNCTION (node->decl);
+   fprintf(dump_orig,"打印  cgraph_node 名字:%s %p decl:%p nodeFun:%p availability:%d \n",
+            node->name(),node,node->decl,nodeFun,node->get_availability());
+   gcc_assert(node==node->decl->decl_with_vis.symtab_node);
+
+   struct cgraph_edge *e;
+   int count=0;
+   /* Update the call expr on the edges to call the new version.  */
+   for (e = node->callers; e; e = e->next_caller){
+      tree fndecl=  e->caller->decl;
+      function *fn = DECL_STRUCT_FUNCTION (e->caller->decl);
+      fprintf(dump_orig,"调用者: count:%d %s fn:%p  caller:%p \n",
+               count++,IDENTIFIER_POINTER(DECL_NAME(fndecl)),fn,e->caller);
+   }
+   /* Update the call expr on the edges to call the new version.  */
+   count=0;
+   for (e = node->callees; e; e = e->next_callee){
+      tree fndecl=  e->callee->decl;
+      function *fn = DECL_STRUCT_FUNCTION (e->callee->decl);
+      fprintf(dump_orig,"被调者: count:%d %s 被调函数 fn:%p callee:%p \n",
+               count++,IDENTIFIER_POINTER(DECL_NAME(fndecl)),fn,e->callee);
+   }
+   if(!nodeFun){
+      fprintf(dump_orig,"nodeFun是空的返回 struct cgraph_node node:%p name:%s decl:%p nodeFun:%p\n",node,node->name(),node->decl,nodeFun);
+      return;
+   }
+   fprintf(dump_orig,"函数 entry 进入块:%p\n",ENTRY_BLOCK_PTR_FOR_FN (nodeFun));
+   printbb(dump_orig,-1,ENTRY_BLOCK_PTR_FOR_FN (nodeFun));
+
+   basic_block bb;
+   int countbb=0;
+   FOR_EACH_BB_FN (bb, nodeFun){
+      printbb(dump_orig,countbb++,bb);
+   }
+   fprintf(dump_orig,"函数 exit 退出块:%p %p\n",EXIT_BLOCK_PTR_FOR_FN (nodeFun));
+   printbb(dump_orig,-2,EXIT_BLOCK_PTR_FOR_FN (nodeFun));
+   fprintf(dump_orig,"打印 ssa\n");
+   printssa(dump_orig,nodeFun);
+   countbb = 0;
+   FOR_EACH_BB_REVERSE_FN (bb, nodeFun){
+      fprintf(dump_orig,"附加信息 --- nodeFun:%p i:%d bb:%p bb->index:%d\n",nodeFun,countbb++,bb,bb->index);
+   }
 
 }
 

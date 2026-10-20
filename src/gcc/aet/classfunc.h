@@ -70,6 +70,7 @@ struct _ClassFunc
    nboolean isDivide;//是不是从host_device类型的ClassFunc分裂而来的。
    ClassFunc *divideSrc;//分裂的源头
    location_t endLoc;//函数定义的结束位置
+   tree parms;//因为field_decl中不能保留DECL_ARGUMENTS,所参保存参数声明在这里，供匿名类型查找type_decl
 };
 
 typedef struct _ParmGenInfo
@@ -131,6 +132,8 @@ static inline nboolean class_func_is_ctor(ClassFunc *self)
 {
    return self->isCtor;
 }
+nboolean class_func_set_mtcs_info(ClassFunc *self,location_t loc,tree decl);
+void     class_func_set_mtcs_type(ClassFunc *self,location_t loc,tree allPrefixAttrs);
 
 #endif
 

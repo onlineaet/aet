@@ -1389,7 +1389,6 @@ static bool store_bit_field_1 (MtcsExpmed *self,rtx str_rtx, poly_uint64 bitsize
       bitnum += mtcs_rtl_subreg_memory_offset_with_rtx/*!subreg_memory_offset*/(mtcsRTL,op0) * BITS_PER_UNIT;
       op0 = SUBREG_REG (op0);
   }
-
   /* No action is needed if the target is a register and if the field
      lies completely outside that register.  This can occur if the source
      code contains an out-of-bounds access to a small array.  */
@@ -1407,6 +1406,7 @@ static bool store_bit_field_1 (MtcsExpmed *self,rtx str_rtx, poly_uint64 bitsize
       && fieldmode == innermode
       && known_eq (bitsize, mtcs_mode_get_precision/*!GET_MODE_PRECISION*/(mtcsMode,innermode))
       && multiple_p (bitnum, mtcs_mode_get_precision/*!GET_MODE_PRECISION*/(mtcsMode,innermode), &pos)){
+
       class expand_operand ops[3];
       enum insn_code icode = mtcs_opinit_optab_handler/*!optab_handler*/(mtcsOpinit,vec_set_optab, outermode);
 
@@ -1460,7 +1460,6 @@ static bool store_bit_field_1 (MtcsExpmed *self,rtx str_rtx, poly_uint64 bitsize
       mtcs_expr_emit_move_insn/*!emit_move_insn*/(mtcsExpr,op0, value);
       return true;
   }
-
   /* It's possible we'll need to handle other cases here for
      polynomial bitnum and bitsize.  */
 
@@ -1496,8 +1495,7 @@ static bool store_bit_field_1 (MtcsExpmed *self,rtx str_rtx, poly_uint64 bitsize
       }else
           op0 = gen_lowpart (op0_mode.require (), op0);
   }
-
-  return store_integral_bit_field (self,op0, op0_mode, ibitsize, ibitnum,
+  return  store_integral_bit_field (self,op0, op0_mode, ibitsize, ibitnum,
                    bitregion_start, bitregion_end, fieldmode, value, reverse, fallback_p);
 }
 
@@ -4392,11 +4390,9 @@ rtx mtcs_expmed_expand_and (MtcsExpmed *self,machine_mode mode, rtx op0, rtx op1
   rtx tem = 0;
   if (GET_MODE (op0) == VOIDmode && GET_MODE (op1) == VOIDmode)
     tem = mtcs_simplify_rtx_binary_operation/*!simplify_binary_operation*/(mtcsSimplifyRtx,AND, mode, op0, op1);
-  n_debug("mtcsexpmed.c mtcs_expmed_expand_and 00 %d tem:%p target:%p\n",mode,tem,target);
 
   if (tem == 0)
     tem = mtcs_optabs_expand_binop/*!expand_binop*/ (mtcsOptabs,mode, and_optab, op0, op1, target, 0, OPTAB_LIB_WIDEN);
-  n_debug("mtcsexpmed.c mtcs_expmed_expand_and 11 %d tem:%p\n",mode,tem);
   if (target == 0)
     target = tem;
   else if (tem != target)
@@ -4784,19 +4780,14 @@ int mtcs_expmed_mode_index (MtcsExpmed *self,machine_mode mode)
    gcc_unreachable ();
 }
 
-
-
 /* Return a pointer to a boolean contained in EOC indicating whether
    a particular operation performed in MODE is cheap when optimizing
    for SPEED.  */
 //原型 expmed_op_cheap_ptr expmed.h
 bool *mtcs_expmed_op_cheap_ptr (MtcsExpmed *self,struct mtcs_expmed_op_cheap *eoc, bool speed, machine_mode mode)
 {
-  int idx = mtcs_expmed_mode_index/*!expmed_mode_index*/(self,mode);
-  n_debug("mtcsexpmed.c mtcs_expmed_op_cheap_ptr mode:%d idx:%d\n",mode,idx);
-  if(idx>6)
-     exit(0);
-  return &eoc->cheap[speed][idx];
+   int idx = mtcs_expmed_mode_index/*!expmed_mode_index*/(self,mode);
+   return &eoc->cheap[speed][idx];
 }
 
 /* Return a pointer to a cost contained in COSTS when a particular
@@ -4804,25 +4795,22 @@ bool *mtcs_expmed_op_cheap_ptr (MtcsExpmed *self,struct mtcs_expmed_op_cheap *eo
 //原型 expmed_op_cost_ptr expmed.h
 int *mtcs_expmed_op_cost_ptr (MtcsExpmed *self,struct mtcs_expmed_op_costs *costs, bool speed,machine_mode mode)
 {
-  int idx =mtcs_expmed_mode_index/*!expmed_mode_index*/(self,mode);
-  n_debug("mtcsexpmed.c mtcs_expmed_op_cost_ptr mode:%d idx:%d\n",mode,idx);
-  if(idx>6)
-       exit(0);
-  return &costs->cost[speed][idx];
+   int idx =mtcs_expmed_mode_index/*!expmed_mode_index*/(self,mode);
+   return &costs->cost[speed][idx];
 }
 
 /* Subroutine of {set_,}add_cost.  Not to be used otherwise.  */
 //原型 add_cost_ptr expmed.h
 int *mtcs_expmed_add_cost_ptr (MtcsExpmed *self,bool speed, machine_mode mode)
 {
-  return mtcs_expmed_op_cost_ptr (self,&self/*this_target_expmed*/->x_add_cost, speed, mode);
+   return mtcs_expmed_op_cost_ptr (self,&self/*this_target_expmed*/->x_add_cost, speed, mode);
 }
 
 /* Set the COST of computing an add in MODE when optimizing for SPEED.  */
 //原型 set_add_cost expmed.h
 void mtcs_expmed_set_add_cost (MtcsExpmed *self,bool speed, machine_mode mode, int cost)
 {
-  *mtcs_expmed_add_cost_ptr(self,speed, mode) = cost;
+   *mtcs_expmed_add_cost_ptr(self,speed, mode) = cost;
 }
 
 /* Return the cost of computing an add in MODE when optimizing for SPEED.  */
@@ -5591,7 +5579,6 @@ static bool store_integral_bit_field(MtcsExpmed *self,rtx op0, opt_scalar_int_mo
 
   /* Storing an lsb-aligned field in a register
      can be done with a movstrict instruction.  */
-
   if (!MEM_P (op0)
       && !reverse
       && lowpart_bit_field_p(self,bitnum, bitsize, op0_mode.require ())
@@ -5634,7 +5621,6 @@ static bool store_integral_bit_field(MtcsExpmed *self,rtx op0, opt_scalar_int_mo
      This is because the most significant word is the one which may
      be less than full.
      However, only do that if the value is not BLKmode.  */
-
       const bool backwards = WORDS_BIG_ENDIAN && fieldmode != mtcsMode->modes.M_BLKmode;
       const int nwords = (bitsize + (BITS_PER_WORD - 1)) / BITS_PER_WORD;
       rtx_insn *last;
@@ -5649,7 +5635,8 @@ static bool store_integral_bit_field(MtcsExpmed *self,rtx op0, opt_scalar_int_mo
      objects are meant to be handled before calling this function.  */
       fixed_size_mode value_mode = mtcs_mode_as_a <fixed_size_mode> (mtcsMode,GET_MODE (value));
       if (value_mode == VOIDmode)
-          value_mode = mtcs_mode_smallest_int_mode_for_size/*!smallest_int_mode_for_size*/(mtcsMode,nwords * BITS_PER_WORD);
+          value_mode = mtcs_mode_smallest_int_mode_for_size/*!smallest_int_mode_for_size*/
+                (mtcsMode,nwords * BITS_PER_WORD);
 
       last = mtcs_rtl_data_get_last_insn/*!get_last_insn*/(mtcsRtlData);
       for (int i = 0; i < nwords; i++){
@@ -5661,10 +5648,12 @@ static bool store_integral_bit_field(MtcsExpmed *self,rtx op0, opt_scalar_int_mo
               ? MAX ((int) bitsize - (i + 1) * BITS_PER_WORD, 0)
               : i * BITS_PER_WORD;
           /* Starting word number in the value.  */
-          const unsigned int wordnum = backwards ? mtcs_mode_get_size/*!GET_MODE_SIZE*/(mtcsMode,value_mode) / UNITS_PER_WORD - (i + 1) : i;
+          const unsigned int wordnum = backwards ?
+                mtcs_mode_get_size/*!GET_MODE_SIZE*/(mtcsMode,value_mode) / UNITS_PER_WORD - (i + 1) : i;
           /* The chunk of the value in word_mode.  We use bit-field extraction
               in BLKmode to handle unaligned memory references and to shift the
               last chunk right on big-endian machines if need be.  */
+
           rtx value_word = fieldmode ==mtcsMode->modes.M_BLKmode
               ?mtcs_expmed_extract_bit_field/*!extract_bit_field*/(self,value, new_bitsize, wordnum * BITS_PER_WORD,
                        1, NULL_RTX, word_mode, word_mode, false, NULL)
@@ -5706,7 +5695,6 @@ static bool store_integral_bit_field(MtcsExpmed *self,rtx op0, opt_scalar_int_mo
       && mtcs_mode_get_size(mtcsMode,op0_mode.require ()) > UNITS_PER_WORD
       && (!REG_P (op0)  || !mtcs_reg_is_hard_rtx/*!HARD_REGISTER_P*/(mtcsReg,op0)
       || mtcs_reg_hard_regno_nregs/*!hard_regno_nregs*/(mtcsReg,REGNO (op0), op0_mode.require ()) != 1)){
-
       if (bitnum % BITS_PER_WORD + bitsize > BITS_PER_WORD){
           if (!fallback_p)
             return false;
@@ -5737,7 +5725,8 @@ static bool store_integral_bit_field(MtcsExpmed *self,rtx op0, opt_scalar_int_mo
   /* If OP0 is a memory, try copying it to a register and seeing if a
      cheap register alternative is available.  */
   if (MEM_P (op0) && !reverse){
-      if (mtcs_optabs_get_best_mem_extraction_insn/*!get_best_mem_extraction_insn*/(mtcsOptabs,&insv, EP_insv, bitsize, bitnum,fieldmode)
+      if (mtcs_optabs_get_best_mem_extraction_insn/*!get_best_mem_extraction_insn*/
+            (mtcsOptabs,&insv, EP_insv, bitsize, bitnum,fieldmode)
         && store_bit_field_using_insv(self,&insv, op0, op0_mode, bitsize, bitnum, value, value_mode))
           return true;
 
@@ -5764,6 +5753,7 @@ static bool store_integral_bit_field(MtcsExpmed *self,rtx op0, opt_scalar_int_mo
 
   store_fixed_bit_field(self,op0, op0_mode, bitsize, bitnum, bitregion_start,
              bitregion_end, value, value_mode, reverse);
+
   return true;
 }
 
@@ -5949,12 +5939,14 @@ void mtcs_expmed_store_bit_field (MtcsExpmed *self,rtx str_rtx, poly_uint64 bits
                 mtcs_rtl_get_mem_align/*!MEM_ALIGN*/(mtcsRTL,str_rtx), INT_MAX,
                 MEM_VOLATILE_P (str_rtx), &best_mode))
           addr_mode = best_mode;
-      str_rtx = mtcs_rtl_adjust_bitfield_address_size/*!adjust_bitfield_address_size*/(mtcsRTL,str_rtx, addr_mode,offset, size);
+      str_rtx = mtcs_rtl_adjust_bitfield_address_size/*!adjust_bitfield_address_size*/
+            (mtcsRTL,str_rtx, addr_mode,offset, size);
   }
 
   if (!store_bit_field_1(self,str_rtx, bitsize, bitnum,
               bitregion_start, bitregion_end,fieldmode, value, reverse, true, undefined_p))
     gcc_unreachable ();
+
 }
 
 /* Generate code to extract a byte-field from STR_RTX

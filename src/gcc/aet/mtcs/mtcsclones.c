@@ -59,7 +59,6 @@
 static void testedge(struct cgraph_node *node,struct function *this_cfun,tree decl);
 static void removeNewNodeFromHostSymtab(MtcsClones *self,struct cgraph_node *newNode);
 static struct cgraph_node *getMtcsFuncNode(MtcsClones *self,tree hostDecl);
-static void printNodeBB(struct cgraph_node *cnode);
 
 typedef struct _MtcsDeclPair
 {
@@ -75,6 +74,69 @@ static void mtcsClonesInit(MtcsClones *self)
    self->mtcsNodeInfoArray = n_ptr_array_new();
 }
 
+static void printNodeEdge(struct cgraph_node *cnode)
+{
+   int count=0;
+   cgraph_edge *e;
+   /* Update the call expr on the edges to call the new version.  */
+   for (e = cnode->callers; e; e = e->next_caller){
+      tree fndecl=  e->caller->decl;
+      function *fn = DECL_STRUCT_FUNCTION (e->caller->decl);
+      n_debug("mtcsclones.c printNodeEdge 00 调用者: count:%d %s fn:%p caller:%p\n",
+               count++,IDENTIFIER_POINTER(DECL_NAME(fndecl)),fn,e->caller);
+   }
+   /* Update the call expr on the edges to call the new version.  */
+   count=0;
+   for (e = cnode->callees; e; e = e->next_callee){
+      tree fndecl=  e->callee->decl;
+      function *fn = DECL_STRUCT_FUNCTION (e->callee->decl);
+      n_debug("mtcsclones.c printNodeEdge 11 被调者: count:%d %s fn:%p callee:%p node:%s\n",
+               count++,IDENTIFIER_POINTER(DECL_NAME(fndecl)),fn,e->callee,cnode->name());
+   }
+}
+
+
+static void printNodeBB(struct cgraph_node *cnode)
+{
+   tree fndecl=  cnode->decl;
+   struct function *nodeFun;
+   nodeFun = DECL_STRUCT_FUNCTION (fndecl);
+   n_debug("mtcsclones.c printNodeBB 00 开始 cnode:%p name:%s nodeFun:%p cfun:%p\n",cnode,cnode->name(),nodeFun,cfun);
+   if(!nodeFun)
+      return;
+   basic_block bb;
+   FOR_EACH_BB_FN (bb, nodeFun){
+      gimple_stmt_iterator gsi, seq_gsi;
+      int i=0;
+      for (gsi = gsi_start_bb (bb); !gsi_end_p (gsi); gsi_next (&gsi)){
+         gimple *stmt = gsi_stmt (gsi);
+         enum gimple_code code = gimple_code (stmt);
+         n_debug("mtcsclones.c printNodeBB 11 i:%d bb:%p name:%s stmt:%p\n",i++,bb,cnode->name(),stmt);
+         aet_print_gimple(stmt);
+         if(code==GIMPLE_CALL){
+            bool internal=gimple_call_internal_p(stmt);
+            bool builtin=gimple_call_builtin_p(stmt);
+            tree decl=gimple_call_fndecl(stmt);
+            n_debug("mtcsclones.c printNodeBB 22 i:%d 被调函数 %p %s 内部:%d 内建:%d 函数节点:%p definition:%d address_taken:%d\n",
+            i,decl,decl?IDENTIFIER_POINTER(DECL_NAME(decl)):"NULL",
+            internal,builtin,decl?decl->decl_with_vis.symtab_node:NULL,cnode->definition,cnode->address_taken);
+         }
+      }
+   }
+   n_debug("mtcsclones.c printNodeBB 33 结束 gimple bb:%p name:%s\n",bb,cnode->name());
+}
+
+static void printAttrs (tree attrs)
+{
+   return;
+   for (const_tree attr = attrs; attr; attr = TREE_CHAIN (attr)){
+      char *name=IDENTIFIER_POINTER(TREE_PURPOSE (attr));
+      n_debug("mtcsclones.c printAttrs 属性 %s\n",name);
+      aet_print_tree(attr);
+   }
+}
+
+
 /**
  * 打印当前符号表的节点，可能是主机也可能是mtcstarget
  */
@@ -83,10 +145,12 @@ static void printSymbolNode()
    cgraph_node *cnode;
    int i=0;
    FOR_EACH_FUNCTION (cnode){
-      n_debug("mtcsclones.c printSymbolNode 当前符号表中的 i:%d node:%p name:%s decl:%p init:%p 是否定义:%d\n",
-            i++,cnode,cnode->name(),cnode->decl,DECL_INITIAL(cnode->decl),cnode->definition);
-      //if(strstr(cnode->name(),"activate") || strstr(cnode->name(),"forwardMTCS"))
-      printNodeBB(cnode);
+      if(strstr(cnode->name(),"test") || strstr(cnode->name(),"ldcs")){
+         n_debug("mtcsclones.c printSymbolNode 当前符号表中的 i:%d node:%p name:%s decl:%p init:%p 是否定义:%d\n",
+               i++,cnode,cnode->name(),cnode->decl,DECL_INITIAL(cnode->decl),cnode->definition);
+         printNodeBB(cnode);
+         printNodeEdge(cnode);
+      }
    }
 }
 
@@ -237,45 +301,6 @@ static struct cgraph_node *getMtcsFuncNode(MtcsClones *self,tree hostDecl)
    return NULL;
 }
 
-static void printNodeBB(struct cgraph_node *cnode)
-{
-   tree fndecl=  cnode->decl;
-   struct function *nodeFun;
-   nodeFun = DECL_STRUCT_FUNCTION (fndecl);
-   n_debug("mtcsclones.c printNodeBB 00 开始 name:%s nodeFun:%p cfun:%p\n",cnode->name(),nodeFun,cfun);
-   if(!nodeFun)
-      return;
-   basic_block bb;
-   FOR_EACH_BB_FN (bb, nodeFun){
-      gimple_stmt_iterator gsi, seq_gsi;
-      int i=0;
-      for (gsi = gsi_start_bb (bb); !gsi_end_p (gsi); gsi_next (&gsi)){
-         gimple *stmt = gsi_stmt (gsi);
-         enum gimple_code code = gimple_code (stmt);
-         n_debug("mtcsclones.c printNodeBB 11 i:%d bb:%p name:%s stmt:%p\n",i++,bb,cnode->name(),stmt);
-         aet_print_gimple(stmt);
-         if(code==GIMPLE_CALL){
-                bool internal=gimple_call_internal_p(stmt);
-                bool builtin=gimple_call_builtin_p(stmt);
-                tree decl=gimple_call_fndecl(stmt);
-                n_debug("mtcsclones.c printNodeBB 22 i:%d 被调函数 %p %s 内部:%d 内建:%d 函数节点:%p definition:%d address_taken:%d\n",
-                     i,decl,decl?IDENTIFIER_POINTER(DECL_NAME(decl)):"NULL",
-                           internal,builtin,decl?decl->decl_with_vis.symtab_node:NULL,cnode->definition,cnode->address_taken);
-         }
-      }
-   }
-   n_debug("mtcsclones.c printNodeBB 33 结束 gimple bb:%p name:%s\n",bb,cnode->name());
-}
-
-static void printAttrs (tree attrs)
-{
-   for (const_tree attr = attrs; attr; attr = TREE_CHAIN (attr)){
-      char *name=IDENTIFIER_POINTER(TREE_PURPOSE (attr));
-      n_debug("mtcsclones.c printAttrs 属性 %s\n",name);
-      aet_print_tree(attr);
-   }
-}
-
 static tree remove_attributes(tree attrs, char *attrName)
 {
    tree new_attrs = NULL_TREE;
@@ -311,6 +336,7 @@ static tree remove_attributes(tree attrs, char *attrName)
 /**
  * 从主机符号表中移走引用到newNode的caller或callee
  * 创建新的node,在主机的symtab中各个节点会成为newNode的调用者或被调用者，所以需要移走
+ * 当前的符号表是主机的
  */
 static void removeNewNodeFromHostSymtab(MtcsClones *self,struct cgraph_node *newNode)
 {
@@ -323,10 +349,10 @@ static void removeNewNodeFromHostSymtab(MtcsClones *self,struct cgraph_node *new
       for (e = cnode->callers; e; e = e->next_caller){
          tree fndecl=  e->caller->decl;
          function *fn = DECL_STRUCT_FUNCTION (e->caller->decl);
-         n_debug("mtcsclones.c removeNewNodeFromSymtab 11 调用者: count:%d %s fn:%p caller:%p node:%s\n",
-         count++,IDENTIFIER_POINTER(DECL_NAME(fndecl)),fn,e->caller,cnode->name());
+         n_debug("mtcsclones.c removeNewNodeFromSymtab 11 调用者: count:%d %s fn:%p caller:%p\n",
+         count++,IDENTIFIER_POINTER(DECL_NAME(fndecl)),fn,e->caller);
          if(e->caller==newNode){
-            n_debug("mtcsclones.c 节点:%s 的调用者 callers:%s存在,移走!\n",cnode->name(),newNode->name());
+            n_debug("mtcsclones.c 节点:%s 的调用者 callers:%s存在,移走! edge:%p\n",cnode->name(),newNode->name(),e);
             cgraph_edge::remove(e);
             break;
          }
@@ -339,7 +365,7 @@ static void removeNewNodeFromHostSymtab(MtcsClones *self,struct cgraph_node *new
          n_debug("mtcsclones.c removeNewNodeFromSymtab 22 被调者: count:%d %s fn:%p callee:%p node:%s\n",
          count++,IDENTIFIER_POINTER(DECL_NAME(fndecl)),fn,e->callee,cnode->name());
          if(e->callee==newNode){
-            n_debug("mtcsclones.c 节点:%s的被调用者 callee:%s存在,移走!\n",cnode->name(),newNode->name());
+            n_debug("mtcsclones.c 节点:%s的被调用者 callee:%s存在,移走! edge:%p\n",cnode->name(),newNode->name(),e);
             cgraph_edge::remove(e);
             break;
          }
@@ -349,7 +375,6 @@ static void removeNewNodeFromHostSymtab(MtcsClones *self,struct cgraph_node *new
 
 /* Hook called when NODE is duplicated and therefore should be
    excluded from removed_nodes.  DATA is a hash set with removed nodes.  */
-
 static void duplicate_cgraph_node_to_order (cgraph_node *origNode, cgraph_node *newNode,void *data)
 {
 //  hash_set<cgraph_node *> *removed_nodes = (hash_set<cgraph_node *> *)data;
@@ -543,7 +568,6 @@ static void replaceCallFndecl(MtcsClones *self,struct cgraph_node *newNode)
    gimple_stmt_iterator gsi;
    tree  newDecl;
 
-label1:
    FOR_EACH_BB_FN (bb, nodeFun){
       for (gsi = gsi_start_bb (bb); !gsi_end_p (gsi); gsi_next (&gsi)){
          gimple *stmt = gsi_stmt (gsi);
@@ -578,8 +602,8 @@ label1:
             if(callleeType==MTCS_FUNC_NOT
             && !mtcs_info_is_internal_fn(callee)
             && !mtcs_info_is_builtin_fn(callee)){
-               error_at(loc,"核函数或设备函数不能调用主机函数 。");
                aet_print_tree_skip_debug(callee);
+               error_at(loc,"核函数或设备函数不能调用主机函数 。");
                return;
             }
             if(callType==MTCS_FUNC_KERNEL && callleeType==MTCS_FUNC_KERNEL){
@@ -596,11 +620,7 @@ label1:
             if(callleeType==MTCS_FUNC_DEVICE
                   && mtcs_info_is_intrinsic_function_decl(callee)){
                printf("找实现mic中的fndcl %p %p \n",call,current_function_decl);
-               int ret = mtcs_replace_replace_intrinsic(self->mtcsReplace,&gsi,call_stmt);
-               if(ret)
-                  goto label1;
-               else
-                  break;
+               mtcs_replace_replace_intrinsic(self->mtcsReplace,call_stmt);
             }
          }
       }
@@ -746,7 +766,7 @@ static int checkCall(MtcsClones *self,struct cgraph_node *cnode,struct cgraph_no
                struct cgraph_node *mtcsNode=getMtcsFuncNode(self,decl);
                if(mtcsNode!=NULL){
                   n_debug("mtcsclones.c checkCall 11 dest name:%s address_taken:%d mtcsNode:%p\n",
-                  dest->name(), dest->address_taken,mtcsNode);
+                           dest->name(), dest->address_taken,mtcsNode);
                   if(dest->address_taken==0){
                      dest->address_taken=1;
                      calleeHostNode[changeCount++]=dest;
@@ -777,19 +797,16 @@ static struct cgraph_node *mtcsCloneCreate (MtcsClones *self,struct cgraph_node 
          n_info("mtcsclones.c mtcsCloneCreate 00 没有gimple 语句 不会创建新的节点 返回。 origNode->has_gimple_body_p=false\n");
          return NULL;
       }
+      n_debug("mtcsclones.c mtcsCloneCreate 11 克隆前目标符号表中的节点 %s\n",IDENTIFIER_POINTER(DECL_NAME (origNode->decl)));
+      printSymbolNode();
       origNode->get_body ();//会执行ssa吗
       symbol_table *save=symtab;//备份主机symtab
       symtab=dest;
-      n_debug("mtcsclones.c mtcsCloneCreate 11 克隆前目标符号表中的节点 %s\n",IDENTIFIER_POINTER(DECL_NAME (origNode->decl)));
-      printSymbolNode();
-      n_debug("mtcsclones.c mtcsCloneCreate 11aa 克隆前目标符号表中的节点 %s\n",IDENTIFIER_POINTER(DECL_NAME (origNode->decl)));
-
-      cgraph_2node_hook_list *duplication_hook = symtab->add_cgraph_duplication_hook (duplicate_cgraph_node_to_order, (void*)self);
-      n_debug("mtcsclones.c mtcsCloneCreate 11bb 克隆前目标符号表中的节点 %s\n",IDENTIFIER_POINTER(DECL_NAME (origNode->decl)));
+      cgraph_2node_hook_list *duplication_hook =
+            symtab->add_cgraph_duplication_hook (duplicate_cgraph_node_to_order,(void*)self);
       struct cgraph_node *calleeHostNode[200];
       int changeCount=checkCall(self,origNode,calleeHostNode);
       new_node = origNode->create_version_clone_with_body (vNULL, NULL, NULL,NULL, NULL,platName);
-      n_debug("mtcsclones.c mtcsCloneCreate 11cc 克隆前目标符号表中的节点 %s\n",IDENTIFIER_POINTER(DECL_NAME (origNode->decl)));
       int i;
       for(i=0;i<changeCount;i++)
          calleeHostNode[i]->address_taken = 0;
@@ -806,37 +823,36 @@ static struct cgraph_node *mtcsCloneCreate (MtcsClones *self,struct cgraph_node 
       n_debug("mtcsclones.c mtcsCloneCreate 22  node 进入新的符号表 new_node:%p %s\
             目标:cgraph_count:%d 源符号表：%p 目标符号表:%p origNode->aux:%p\n",
             new_node,new_node->name(),dest->cgraph_count,save,dest,origNode->aux);
-      aet_print_cgraph_node(new_node);
-      n_debug("mtcsclones.c mtcsCloneCreate 33 克隆后目标符号表中的节点 %s\n",IDENTIFIER_POINTER(DECL_NAME (origNode->decl)));
       printSymbolNode();
       symtab->remove_cgraph_duplication_hook (duplication_hook);
       symtab_node * hashed_node = symtab_node::get (new_node->decl);
       symtab=save; //恢复主机symtab
       symtab_node * hashed_node_1 = symtab_node::get (new_node->decl);
-      n_debug("mtcsclones.c mtcsCloneCreate 44 原节点信息:clone出新节点后 origDecl:%p newDecl:%p hashed_node:%p hashed_node_1:%p\n",
-            origNode->decl,new_node->decl,hashed_node,hashed_node_1);
-      aet_print_cgraph_node(origNode);
+      n_debug("mtcsclones.c mtcsCloneCreate 33 orig:%p decl:%p  new:%p decl:%p\n",
+            origNode,origNode->decl,new_node,new_node->decl);
+      printSymbolNode();
       gcc_assert(new_node->decl->decl_with_rtl.rtl==NULL);
       addMtcsNodeInfo(self,origNode,new_node);
-      n_debug("mtcsclones.c mtcsCloneCreate 55 从主机移走创建的新节点：%p %s\n",new_node,new_node->name());
-      aet_print_cgraph_node(new_node);
       removeNewNodeFromHostSymtab(self,new_node);
+      n_debug("mtcsclones.c mtcsCloneCreate 44 从主机移走创建的新节点：%p %s 主机的符号表:\n",new_node,new_node->name());
+      printSymbolNode();
       save=symtab;
       symtab=dest;
       //重要 make_ssa_name 需要cfun
       mtcs_func_push_cfun(mtcsFunc,DECL_STRUCT_FUNCTION (new_node->decl));
-      n_debug("mtcsclones.c mtcsCloneCreate 66 新符号表中的节点数\n");
+      n_debug("mtcsclones.c mtcsCloneCreate 55 新符号表中的节点数\n");
       printSymbolNode();
-      aet_print_cgraph_node(new_node);
       replaceCallFndecl(self,new_node);
       mtcs_replace_switch(self->mtcsReplace,new_node);
       mtcs_replace_parent_device_func_array(self->mtcsReplace,new_node);
-      //从新cgraph_node中的decl中找出function，再循环每个bb,bb中循环每条gimple语句，找出gcall，然后重新复制gcall中的fndecl.并为新的fndecl创建creage_node
+      //从新cgraph_node中的decl中找出function，再循环每个bb,bb中循环每条gimple语句，
+      //找出gcall，然后重新复制gcall中的fndecl.并为新的fndecl创建creage_node
       rebuild_edges(self,new_node);
       replaceHostDecl(self,origNode,new_node);
-      n_debug("mtcsclones.c mtcsCloneCreate 77 重建 edges后，新符号表中的节点数\n");
+      n_debug("mtcsclones.c mtcsCloneCreate 66 重建 edges后，新符号表中的节点数\n");
       printSymbolNode();
-      aet_print_cgraph_node(new_node);
+      //内联 intrinsic 实现函数 mii
+      mtcs_replace_inline_intrinsic(self->mtcsReplace,new_node,new_node->decl);
       //addTestGimpleStmt(self,new_node);
       mtcs_func_pop_cfun(mtcsFunc);
       symtab=save;
@@ -941,17 +957,12 @@ static struct cgraph_node *cloneKernel (MtcsClones *self,struct cgraph_node *ori
       origNode->get_body ();
    }
    n_debug("mtcsclones.c cloneKernel 33 printSymbolNode name:%s num_ssa_names:%d \n",name,num_ssa_names);
-   printSymbolNode();
-    //n_debug("mtcsclones.c cloneKernel 44 printNodeBB name:%s num_ssa_names:%d \n",name,num_ssa_names);
-   // printNodeBB(origNode);
-
    /* Only when we are sure we want to create the clone actually
    clone the function (or definitions) or create another
    extern FUNCTION_DECL (for prototypes without definitions).  */
    struct cgraph_node *cloneNode = mtcsCloneCreate(self,origNode, !explicit_p);
    n_debug("mtcsclones.c cloneKernel 55 克隆后的主机节点 name:%s\n",name);
    printSymbolNode();
-   //printNodeBB(origNode);
 
    //symbol_table::remove_unreachable_nodes 会判断 DECL_ABSTRACT_ORIGIN (expr) 进入代码块。
    cloneNode->mark_force_output();
@@ -974,7 +985,6 @@ static struct cgraph_node *cloneKernel (MtcsClones *self,struct cgraph_node *ori
 
    n_debug("mtcsclones.c cloneKernel 77 清除原参数 decl:%p DECL_SAVED_TREE在这里已变为空的了\n",origNode->decl);
    cleanParamOrig(cloneNode->decl);
-
    struct function *origfn=DECL_STRUCT_FUNCTION (origNode->decl);
    struct function *newfn=DECL_STRUCT_FUNCTION (cloneNode->decl);
    n_debug("mtcsclones.c cloneKernel 88-1 function orig:%p new:%p\n",origfn,newfn);
@@ -986,13 +996,11 @@ static struct cgraph_node *cloneKernel (MtcsClones *self,struct cgraph_node *ori
          n_basic_blocks_for_fn(origfn),n_basic_blocks_for_fn(newfn));
    n_debug("mtcsclones.c cloneKernel 88-6 ssa_names host:%d mtcs:%d\n",
          vec_safe_length (origfn->gimple_df->ssa_names),vec_safe_length (newfn->gimple_df->ssa_names));
-
    //切换到设备的符号表
    symbol_table *save=symtab;
    symtab=mtcsTarget->symtab;
    n_debug("mtcsclones.c cloneKernel 99 克隆后的新符号表的节点 name:%s\n",name);
    printSymbolNode();
-   //printNodeBB(cloneNode);
    //切换回主机的符号表
    symtab=save;
    return cloneNode;

@@ -187,6 +187,14 @@ static void remove_unreachble_bb(MtcsPort *self);
  * -->int_binop_types_match_p (enum tree_code code, const_tree type1, const_tree type2)
  * 在int_binop_types_match_p中会判断type1,type2的type mode是否相同。
  * 由于mtcs的bitsizetype与主机的不同，所以执行size_binop_loc 段错误。
+ * 2026-10-17
+ * mtcs_copy_tree_body_r 中处理mem_ref原来的代码 TREE_CODE (*tp) == MEM_REF !id->do_not_fold
+ * id->do_not_fold = true ,所以不能port 类型是 mem_ref的 tree ,屏蔽 !id->do_not_fold后，进入
+ * 处理memf_ref的代码中 ，调用  mtcs_const_fold_build2,引起错误，因为
+ * mtcs_const_fold_build2-->mtcs_const_fold_binary_loc-->mtcs_port_device_to_host
+ * 这时hostToDevice=true mtcs_port_device_to_host需要的是设备到主机的状态 ，所以mtcs_const_fold_build2
+ * 改为 build2调用,另外原来的 op1没有做port,补上。
+ * 在remap_type_1把record_type的主机mode(19)改为设备mode(8)
  */
 static void mtcsPortInit(MtcsPort *self)
 {
@@ -289,11 +297,11 @@ static tree mtcs_copy_decl_for_dup_finish (copy_body_data *id, tree decl, tree c
    /* For vector typed decls make sure to update DECL_MODE according
    to the new function context.  */
    if (VECTOR_TYPE_P (TREE_TYPE (copy))){
-      n_debug("mtcsport.c mtcs_copy_decl_for_dup_finish 00 声明类型是向量:%d\n",TYPE_MODE (TREE_TYPE (copy)),copy);
+      //n_debug("mtcsport.c mtcs_copy_decl_for_dup_finish 00 声明类型是向量:%d\n",TYPE_MODE (TREE_TYPE (copy)),copy);
       SET_DECL_MODE (copy, TYPE_MODE (TREE_TYPE (copy)));
    }
-   n_debug("mtcsport.c mtcs_copy_decl_for_dup_finish 11 原声明的mode:%d decl:%p 新:%d %p deviceMode:%d new mode:%d\n",
-         mode,decl,newMode,copy,deviceMode,DECL_MODE(copy));
+   n_debug("mtcsport.c mtcs_copy_decl_for_dup_finish 11 原声明的mode:%d decl:%p 新 %p deviceMode:%d new mode:%d\n",
+         mode,decl,copy,deviceMode,DECL_MODE(copy));
    /* These args would always appear unused, if not for this.  */
    TREE_USED (copy) = 1;
 
@@ -349,10 +357,10 @@ static tree remap_type_3 (tree *tp, int *walk_subtrees, void *data)
    unsigned long long size=result.to_shwi();
    MtcsPort *self=(MtcsPort *)(size);
    if (TYPE_P (*tp)){
-      n_debug("mtcsport.c remap_type_3 00 *type:%p self:%p\n",*tp,self);
+      //n_debug("mtcsport.c remap_type_3 00 *type:%p self:%p\n",*tp,self);
       *walk_subtrees = 0;
    }else if (DECL_P (*tp) && remapDecl(self,*tp, id) != *tp){
-      n_debug("mtcsport.c remap_type_3 11 *type:%p self:%p\n",*tp,self);
+      //n_debug("mtcsport.c remap_type_3 11 *type:%p self:%p\n",*tp,self);
       return *tp;
    }
    return NULL_TREE;
@@ -384,7 +392,7 @@ static bool remap_type_2 (MtcsPort *self,tree type, copy_body_data *id)
       case REFERENCE_TYPE:
       case FUNCTION_TYPE:
       case METHOD_TYPE:
-         n_debug("mtcsport.c remap_type_2 00 type:%s\n",get_tree_code_name(TREE_CODE(type)));
+         //n_debug("mtcsport.c remap_type_2 00 type:%s\n",get_tree_code_name(TREE_CODE(type)));
          return remap_type_2(self,TREE_TYPE (type), id);
 
       case INTEGER_TYPE:
@@ -392,13 +400,13 @@ static bool remap_type_2 (MtcsPort *self,tree type, copy_body_data *id)
       case FIXED_POINT_TYPE:
       case ENUMERAL_TYPE:
       case BOOLEAN_TYPE:
-         n_debug("mtcsport.c remap_type_2 11 type:%s\n",get_tree_code_name(TREE_CODE(type)));
+        // n_debug("mtcsport.c remap_type_2 11 type:%s\n",get_tree_code_name(TREE_CODE(type)));
          RETURN_TRUE_IF_VAR (TYPE_MIN_VALUE (type));
          RETURN_TRUE_IF_VAR (TYPE_MAX_VALUE (type));
          return false;
 
       case ARRAY_TYPE:
-         n_debug("mtcsport.c remap_type_2 22 type:%s\n",get_tree_code_name(TREE_CODE(type)));
+         //n_debug("mtcsport.c remap_type_2 22 type:%s\n",get_tree_code_name(TREE_CODE(type)));
 
          if (remap_type_2(self,TREE_TYPE (type), id)
          || (TYPE_DOMAIN (type) && remap_type_2(self,TYPE_DOMAIN (type), id)))
@@ -408,7 +416,7 @@ static bool remap_type_2 (MtcsPort *self,tree type, copy_body_data *id)
       case RECORD_TYPE:
       case UNION_TYPE:
       case QUAL_UNION_TYPE:
-         n_debug("mtcsport.c remap_type_2 33 type:%s\n",get_tree_code_name(TREE_CODE(type)));
+         //n_debug("mtcsport.c remap_type_2 33 type:%s\n",get_tree_code_name(TREE_CODE(type)));
          for (t = TYPE_FIELDS (type); t; t = DECL_CHAIN (t))
             if (TREE_CODE (t) == FIELD_DECL){
                RETURN_TRUE_IF_VAR (DECL_FIELD_OFFSET (t));
@@ -526,7 +534,7 @@ static bool mtcs_variably_modified_type_p (MtcsPort *self,tree type, tree fn)
       case BOOLEAN_TYPE:
          /* Scalar types are variably modified if their end points
          aren't constant.  */
-         n_debug("mtcsport.c mtcs_variably_modified_type_p 22 type:%p,name:%s\n",type,get_tree_code_name(TREE_CODE(type)));
+         //n_debug("mtcsport.c mtcs_variably_modified_type_p 22 type:%p,name:%s\n",type,get_tree_code_name(TREE_CODE(type)));
         RETURN_TRUE_IF_VAR (TYPE_MIN_VALUE (type));
         RETURN_TRUE_IF_VAR (TYPE_MAX_VALUE(type));
          break;
@@ -598,8 +606,8 @@ static tree remap_type_1 (MtcsPort *self,tree type, copy_body_data *id,nboolean 
 
    tree new_tree, t;
    char *typeCodeName=get_tree_code_name(TREE_CODE (type));
-   n_debug("mtsport.c remap_type_1 00 type:%s type:%p integer_type_node：%p,void_type_node：%p  haveTree:%d\ typeMode:%d\n",
-         typeCodeName,type,integer_type_node,void_type_node,haveTree,TYPE_MODE(type));
+   //n_debug("mtsport.c remap_type_1 00 type:%s type:%p integer_type_node：%p,void_type_node：%p  haveTree:%d\ typeMode:%d\n",
+        // typeCodeName,type,integer_type_node,void_type_node,haveTree,TYPE_MODE(type));
    if(TREE_CODE (type) == VOID_TYPE){
       if(haveTree){
          if(self->hostToDevice)
@@ -665,14 +673,13 @@ static tree remap_type_1 (MtcsPort *self,tree type, copy_body_data *id,nboolean 
       tree size= TYPE_SIZE (newFnType);
       walk_tree (&size, mtcs_copy_tree_body_r, id, NULL);
       TYPE_SIZE (newFnType) = size;
-      n_debug("mtcsport.c remap_type_1 44 类型是函数类型 FUNCTION_TYPE old:%p new:%p size:%p\n",type,newFnType,size);
       insert_decl_map (id, type, newFnType);//缓存function_type
       return newFnType;
    }else{
       if(!haveTree){
          new_tree = copy_node (type);
-         n_debug("mtcsport.c remap_type_1 44aa 复制 type：%p new_tree:%p %s\n",
-               type,new_tree,get_tree_code_name(TREE_CODE (new_tree)));
+//         n_debug("mtcsport.c remap_type_1 44aa 复制 type：%p new_tree:%p %s 新mode:%d old mode:%d\n",
+//               type,new_tree,get_tree_code_name(TREE_CODE (new_tree)),TYPE_MODE(new_tree),TYPE_MODE(type));
          //解决 bug 026
          switch(TREE_CODE(new_tree)){
             case ENUMERAL_TYPE:
@@ -700,8 +707,16 @@ static tree remap_type_1 (MtcsPort *self,tree type, copy_body_data *id,nboolean 
                insert_decl_map (id, oldType, realType);//缓存function_type
             }
                break;
-            default:
+            case RECORD_TYPE:
+            {
+               machine_mode deviceMode= self->hostToDevice?
+                     mtcs_mode_host2device(mtcsMode,TYPE_MODE(new_tree)):
+                     mtcs_mode_device2host(mtcsMode,TYPE_MODE(new_tree));
+               SET_TYPE_MODE(new_tree,deviceMode);
+            }
                break;
+            default:
+                break;
          }
       }else{
          new_tree= self->hostToDevice?
@@ -729,8 +744,8 @@ static tree remap_type_1 (MtcsPort *self,tree type, copy_body_data *id,nboolean 
    }
 
    if (TYPE_STUB_DECL (type)){
-      n_debug("mtsport.c remap_type_1 44bb  new_type:%p type:%p TYPE_STUB_DECL (type):%p\n",
-            new_tree,type,TYPE_STUB_DECL (type));
+//      n_debug("mtsport.c remap_type_1 44bb  new_type:%p type:%p TYPE_STUB_DECL (type):%p\n",
+//            new_tree,type,TYPE_STUB_DECL (type));
       TYPE_STUB_DECL (new_tree) = remapDecl(self,TYPE_STUB_DECL (type), id);
    }
    /* Lazily create pointer and reference types.  */
@@ -746,8 +761,8 @@ static tree remap_type_1 (MtcsPort *self,tree type, copy_body_data *id,nboolean 
       case ENUMERAL_TYPE:
       case BOOLEAN_TYPE:
          if (TYPE_MAIN_VARIANT (new_tree) != new_tree){
-            n_debug("mtsport.c remap_type_1 55   new_tree:%s new_tree:%p type:%s %p \n",
-                  newName,new_tree,typeCodeName,type);
+//            n_debug("mtsport.c remap_type_1 55   new_tree:%s new_tree:%p type:%s %p \n",
+//                  newName,new_tree,typeCodeName,type);
             gcc_checking_assert (TYPE_MIN_VALUE (type) == TYPE_MIN_VALUE (TYPE_MAIN_VARIANT (type)));
             gcc_checking_assert (TYPE_MAX_VALUE (type) == TYPE_MAX_VALUE (TYPE_MAIN_VARIANT (type)));
             walk_tree (&TYPE_MIN_VALUE (TYPE_MAIN_VARIANT (new_tree)), mtcs_copy_tree_body_r, id, NULL);
@@ -756,8 +771,8 @@ static tree remap_type_1 (MtcsPort *self,tree type, copy_body_data *id,nboolean 
             TYPE_MAX_VALUE (new_tree) = TYPE_MAX_VALUE (TYPE_MAIN_VARIANT (new_tree));
 
          }else{
-            n_debug("mtsport.c remap_type_1 66  新 new_tree:%s %p mode:%d 老 type:%s %p mode:%d\n",
-                        newName,new_tree,TYPE_MODE(new_tree),typeCodeName,type,TYPE_MODE(type));
+//            n_debug("mtsport.c remap_type_1 66  新 new_tree:%s %p mode:%d 老 type:%s %p mode:%d\n",
+//                        newName,new_tree,TYPE_MODE(new_tree),typeCodeName,type,TYPE_MODE(type));
             t = TYPE_MIN_VALUE (new_tree);
             if (t && TREE_CODE (t) != INTEGER_CST){
                walk_tree (&TYPE_MIN_VALUE (new_tree), mtcs_copy_tree_body_r, id, NULL);
@@ -769,16 +784,16 @@ static tree remap_type_1 (MtcsPort *self,tree type, copy_body_data *id,nboolean 
          }
          break;
       case ARRAY_TYPE:
-         n_debug("mtsport.c remap_type_1 77   ARRAY_TYPE new_tree:%s new_tree:%p type:%s %p \n",
-                          newName,new_tree,typeCodeName,type);
+//         n_debug("mtsport.c remap_type_1 77   ARRAY_TYPE new_tree:%s new_tree:%p type:%s %p \n",
+//                          newName,new_tree,typeCodeName,type);
          if (TYPE_MAIN_VARIANT (new_tree) != new_tree
          && TREE_TYPE (type) == TREE_TYPE (TYPE_MAIN_VARIANT (type))){
             TREE_TYPE (new_tree) = TREE_TYPE (TYPE_MAIN_VARIANT (new_tree));
-            n_debug("mtsport.c remap_type_1 88   ARRAY_TYPE new_tree:%s new_tree:%p type:%s %p \n",
-                                newName,new_tree,typeCodeName,type);
+//            n_debug("mtsport.c remap_type_1 88   ARRAY_TYPE new_tree:%s new_tree:%p type:%s %p \n",
+//                                newName,new_tree,typeCodeName,type);
          }else{
-            n_debug("mtsport.c remap_type_1 99  remapType ARRAY_TYPE new_tree:%s new_tree:%p type:%s %p \n",
-                                newName,new_tree,typeCodeName,type);
+//            n_debug("mtsport.c remap_type_1 99  remapType ARRAY_TYPE new_tree:%s new_tree:%p type:%s %p \n",
+//                                newName,new_tree,typeCodeName,type);
             TREE_TYPE (new_tree) = remapType(self,TREE_TYPE (new_tree), id);
          }
 
@@ -786,8 +801,8 @@ static tree remap_type_1 (MtcsPort *self,tree type, copy_body_data *id,nboolean 
             gcc_checking_assert (TYPE_DOMAIN (type) == TYPE_DOMAIN (TYPE_MAIN_VARIANT (type)));
             TYPE_DOMAIN (new_tree) = TYPE_DOMAIN (TYPE_MAIN_VARIANT (new_tree));
          }else{
-            n_debug("mtsport.c remap_type_1 100 TYPE_DOMAIN  ARRAY_TYPE new_tree:%s new_tree:%p type:%s %p \n",
-                                   newName,new_tree,typeCodeName,type);
+//            n_debug("mtsport.c remap_type_1 100 TYPE_DOMAIN  ARRAY_TYPE new_tree:%s new_tree:%p type:%s %p \n",
+//                                   newName,new_tree,typeCodeName,type);
             TYPE_DOMAIN (new_tree) = remapType(self,TYPE_DOMAIN (new_tree), id);
             /* For array bounds where we have decided not to copy over the bounds
             variable which isn't used in OpenMP/OpenACC region, change them to
@@ -806,22 +821,22 @@ static tree remap_type_1 (MtcsPort *self,tree type, copy_body_data *id,nboolean 
       case RECORD_TYPE:
       case UNION_TYPE:
       case QUAL_UNION_TYPE:
-         n_debug("mtsport.c remap_type_1 101 %s type:%p,new_type:%p %s\n",
-               get_tree_code_name(TREE_CODE(new_tree)),type,new_tree, getRecordName(new_tree));
+//         n_debug("mtsport.c remap_type_1 101 %s type:%p,new_type:%p %s\n",
+//               get_tree_code_name(TREE_CODE(new_tree)),type,new_tree, getRecordName(new_tree));
          if (TYPE_MAIN_VARIANT (type) != type && TYPE_FIELDS (type) == TYPE_FIELDS (TYPE_MAIN_VARIANT (type))){
-            n_debug("mtsport.c remap_type_1 102 %s type:%p,new_tree:%p %p fields:%p\n",
-                  get_tree_code_name(TREE_CODE(new_tree)),type,new_tree,TYPE_MAIN_VARIANT (new_tree),
-            TYPE_FIELDS (TYPE_MAIN_VARIANT (new_tree)));
+//            n_debug("mtsport.c remap_type_1 102 %s type:%p,new_tree:%p %p fields:%p\n",
+//                  get_tree_code_name(TREE_CODE(new_tree)),type,new_tree,TYPE_MAIN_VARIANT (new_tree),
+            //TYPE_FIELDS (TYPE_MAIN_VARIANT (new_tree)));
             TYPE_FIELDS (new_tree) = TYPE_FIELDS (TYPE_MAIN_VARIANT (new_tree));
          }else{
             const char *recordName = getRecordName(new_tree);
             tree f, nf = NULL;
             for (f = TYPE_FIELDS (new_tree); f ; f = DECL_CHAIN (f)){
-               n_debug("mtsport.c remap_type_1 103 f:%p %s new_tree:%p recordName:%s\n",
-                     f,IDENTIFIER_POINTER(DECL_NAME(f)),new_tree,recordName);
+//               n_debug("mtsport.c remap_type_1 103 f:%p %s new_tree:%p recordName:%s\n",
+//                     f,IDENTIFIER_POINTER(DECL_NAME(f)),new_tree,recordName);
                t = remapDecl(self,f, id);
-               n_debug("mtsport.c remap_type_1 104 f:%p %s new_tree:%p t:%p recordName:%s\n",
-                     f,IDENTIFIER_POINTER(DECL_NAME(f)),new_tree,t,recordName);
+//               n_debug("mtsport.c remap_type_1 104 f:%p %s new_tree:%p t:%p recordName:%s\n",
+//                     f,IDENTIFIER_POINTER(DECL_NAME(f)),new_tree,t,recordName);
                DECL_ABSTRACT_ORIGIN (t)=NULL_TREE;
                DECL_CONTEXT (t) = new_tree;
                DECL_CHAIN (t) = nf;
@@ -829,12 +844,12 @@ static tree remap_type_1 (MtcsPort *self,tree type, copy_body_data *id,nboolean 
             }
             TYPE_FIELDS (new_tree) = nreverse (nf);
          }
-         n_debug("mtsport.c remap_type_1 105 new_tree:%p recordName:%s fields:%p\n",
-               new_tree, getRecordName(new_tree),TYPE_FIELDS (new_tree));
+//         n_debug("mtsport.c remap_type_1 105 new_tree:%p recordName:%s fields:%p\n",
+//               new_tree, getRecordName(new_tree),TYPE_FIELDS (new_tree));
          //重要的方法，加入替换type_decl,原tree-inline.cc没有处理type_decl
          if(TREE_CODE (new_tree) == RECORD_TYPE
          && TYPE_NAME(new_tree) && TREE_CODE(TYPE_NAME(new_tree))==TYPE_DECL){
-            n_debug("mtcsport remap_type_1 type_dec old:%p new:%p recordName:%s\n",type,new_tree, getRecordName(new_tree));
+            //n_debug("mtcsport remap_type_1 type_dec old:%p new:%p recordName:%s\n",type,new_tree, getRecordName(new_tree));
             TYPE_NAME(new_tree) = remapDecl(self,TYPE_NAME(new_tree),id);
          }
          break;
@@ -894,15 +909,15 @@ static tree remapType (MtcsPort *self,tree type, copy_body_data *id)
    if(self->hostToDevice){
       if(mtcs_tree_is_host_global(mtcsTree,type)){
          tree new_tree=mtcs_tree_host_to_device(mtcsTree,type);
-         n_debug("mtcsport.c remapType 22 类型是主机中的缺省类型，可以在mtcs找到对应的类型 type:%p name:%s new_tree:%p old mode:%d new mode:%d\n",
-               type,get_tree_code_name(TREE_CODE(type)),new_tree,TYPE_MODE(type),TYPE_MODE(new_tree));
+        // n_debug("mtcsport.c remapType 22 类型是主机中的缺省类型，可以在mtcs找到对应的类型 type:%p name:%s new_tree:%p old mode:%d new mode:%d\n",
+              // type,get_tree_code_name(TREE_CODE(type)),new_tree,TYPE_MODE(type),TYPE_MODE(new_tree));
           haveTree = TRUE;
       }
    }else{
       if(mtcs_tree_is_device_global(mtcsTree,type)){
          tree new_tree=mtcs_tree_device_to_host(mtcsTree,type);
-         n_debug("mtcsport.c remapType 22 类型是设备中的，可以在主机中对应的类型 type:%p name:%s new_tree:%p old mode:%d new mode:%d\n",
-         type,get_tree_code_name(TREE_CODE(type)),new_tree,TYPE_MODE(type),TYPE_MODE(new_tree));
+         //n_debug("mtcsport.c remapType 22 类型是设备中的，可以在主机中对应的类型 type:%p name:%s new_tree:%p old mode:%d new mode:%d\n",
+         //type,get_tree_code_name(TREE_CODE(type)),new_tree,TYPE_MODE(type),TYPE_MODE(new_tree));
          haveTree = TRUE;
       }
    }
@@ -914,18 +929,18 @@ static tree remapType (MtcsPort *self,tree type, copy_body_data *id)
        || (id->dont_remap_vla_if_no_change && !remap_type_2 (self,type, id))){
        //insert_decl_map (id, type, type);
        //return type;
-       n_debug("mtcsport.c remapType 33 在主机中是不用map，因为:%s mode:%d\n",
+       n_debug("mtcsport.c remapType 22 在主机中是不用map，因为:%s mode:%d\n",
              get_tree_code_name(TREE_CODE(type)),TYPE_MODE(type));
    }
 
-   n_debug("mtcsport.c remapType 44 执行 remap_type_1 type:%p %s haveTree:%d\n",
-         type,get_tree_code_name(TREE_CODE(type)),haveTree);
+//   n_debug("mtcsport.c remapType 44 执行 remap_type_1 type:%p %s haveTree:%d\n",
+//         type,get_tree_code_name(TREE_CODE(type)),haveTree);
 
    id->remapping_type_depth++;
    tmp = remap_type_1(self,type, id,haveTree);
    id->remapping_type_depth--;
-   n_debug("mtcsport.c remapType 55 执行 remap_type_1 完成 type:%p 新类型:%p id->remapping_type_depth:%d %s\n",
-         type,tmp,id->remapping_type_depth,get_tree_code_name(TREE_CODE(tmp)));
+//   n_debug("mtcsport.c remapType 55 执行 remap_type_1 完成 type:%p 新类型:%p id->remapping_type_depth:%d %s\n",
+//         type,tmp,id->remapping_type_depth,get_tree_code_name(TREE_CODE(tmp)));
 
    return tmp;
 }
@@ -1199,9 +1214,8 @@ static tree remap_ssa_name(MtcsPort *self,tree name, copy_body_data *id)
            SET_SSA_NAME_VAR_OR_IDENTIFIER (new_tree, NULL_TREE);
       }
      // SET_SSA_NAME_VAR_OR_IDENTIFIER(new_tree,newtype);
-      n_debug("mtcsport.c remap_ssa_name 22 var:%p name:%p new_tree:%p\n",var,name,new_tree);
       if (!var && SSA_NAME_IDENTIFIER (name)){
-         n_debug("mtcsport.c remap_ssa_name 33 var:%p name:%p new_tree:%p %p\n",var,name,new_tree,SSA_NAME_IDENTIFIER (name));
+         n_debug("mtcsport.c remap_ssa_name 22 var:%p name:%p new_tree:%p %p\n",var,name,new_tree,SSA_NAME_IDENTIFIER (name));
          SET_SSA_NAME_VAR_OR_IDENTIFIER (new_tree, SSA_NAME_IDENTIFIER (name));
       }
       insert_decl_map (id, name, new_tree);
@@ -1217,7 +1231,7 @@ static tree remap_ssa_name(MtcsPort *self,tree name, copy_body_data *id)
       }
       /* So can range-info.  */
       if (!POINTER_TYPE_P (TREE_TYPE (name)) && SSA_NAME_RANGE_INFO (name)){
-         n_debug("mtcsport.c remap_ssa_name 44 类型不是指针并且有range_info name:%p new_tree:%p\n",name,new_tree);
+         n_debug("mtcsport.c remap_ssa_name 33 类型不是指针并且有range_info name:%p new_tree:%p\n",name,new_tree);
          if(new_tree!=name)
             duplicate_ssa_name_range_info (new_tree, name);
       }
@@ -1227,7 +1241,6 @@ static tree remap_ssa_name(MtcsPort *self,tree name, copy_body_data *id)
    /* Do not set DEF_STMT yet as statement is not copied yet. We do that
    in copy_bb.  */
    new_tree = remapDecl(self,var, id);
-   n_debug("mtcsport.c remap_ssa_name 55 name:%p var:%p new_tree:%p\n",name,var,new_tree);
    /* We might've substituted constant or another SSA_NAME for
    the variable.
    Replace the SSA name representing RESULT_DECL by variable during
@@ -1243,7 +1256,7 @@ static tree remap_ssa_name(MtcsPort *self,tree name, copy_body_data *id)
       SET_SSA_NAME_VAR_OR_IDENTIFIER (name, new_tree);
       new_tree=name;
       insert_decl_map (id, name, new_tree);
-      n_debug("mtcsport.c remap_ssa_name 66 创建新的ssa var:%p new_tree:%p\n",var,new_tree);
+      n_debug("mtcsport.c remap_ssa_name 44 创建新的ssa var:%p new_tree:%p\n",var,new_tree);
       SSA_NAME_OCCURS_IN_ABNORMAL_PHI (new_tree) = SSA_NAME_OCCURS_IN_ABNORMAL_PHI (name);
       /* At least IPA points-to info can be directly transferred.  */
       if (id->src_cfun->gimple_df
@@ -1259,7 +1272,7 @@ static tree remap_ssa_name(MtcsPort *self,tree name, copy_body_data *id)
          if(new_tree!=name)
             duplicate_ssa_name_range_info (new_tree, name);
       if (SSA_NAME_IS_DEFAULT_DEF (name)){
-         n_debug("mtcsport.c remap_ssa_name 77 SSA_NAME_IS_DEFAULT_DEF (name) \n");
+         n_debug("mtcsport.c remap_ssa_name 55 SSA_NAME_IS_DEFAULT_DEF (name) \n");
          /* By inlining function having uninitialized variable, we might
          extend the lifetime (variable might get reused).  This cause
          ICE in the case we end up extending lifetime of SSA name across
@@ -1279,10 +1292,10 @@ static tree remap_ssa_name(MtcsPort *self,tree name, copy_body_data *id)
 
             init_stmt = gimple_build_assign (new_tree, zero);
             gsi_insert_after (&gsi, init_stmt, GSI_NEW_STMT);
-            n_debug("mtcsport.c remap_ssa_name 88\n");
+            n_debug("mtcsport.c remap_ssa_name 66\n");
             SSA_NAME_IS_DEFAULT_DEF (new_tree) = 0;
          }else{
-            n_debug("mtcsport.c remap_ssa_name 99 设 SSA_NAME_DEF_STMT\n");
+            n_debug("mtcsport.c remap_ssa_name 77 设 SSA_NAME_DEF_STMT\n");
             SSA_NAME_DEF_STMT (new_tree) = gimple_build_nop ();
             set_ssa_default_def (cfun, SSA_NAME_VAR (new_tree), new_tree);
          }
@@ -1328,19 +1341,14 @@ static void cloneInit(MtcsPort *self, tree constructor ,copy_body_data *id)
    constructor_elt *ce;
    for (cnt = 0;vec_safe_iterate (CONSTRUCTOR_ELTS (constructor), cnt, &ce);cnt++){
       tree val = ce->value;
-      n_debug("mtcsport.c cloneInit 00 cnt:%d\n",cnt);
-      //aet_print_tree(val);
       if(TREE_CODE(val)==ADDR_EXPR){
          tree op=TREE_OPERAND(val,0);
          if(TREE_CODE(op)==FUNCTION_DECL){
             tree *n = id->decl_map->get (op);
-            n_debug("mtcsport.c cloneInit 11 cnt:%d val:%p n:%p\n",cnt,val,n);
             if(!n){
                tree newdecl=findFunction(self,op);
-               n_debug("mtcsport.c cloneInit 22 cnt:%d %p\n",cnt,newdecl);
-
                if(newdecl){
-                  n_debug("mtcsport.c cloneInit 找到函数地址:新:%p 老:%p\n",newdecl,val);
+                  n_debug("mtcsport.c cloneInit 00 找到函数地址:新:%p 老:%p\n",newdecl,val);
                   insert_decl_map (id, op, newdecl);
                   TREE_OPERAND(val,0)=newdecl;
                }
@@ -1546,10 +1554,10 @@ static tree mtcs_copy_tree_body_r (tree *tp, int *walk_subtrees, void *data)
       if (new_type == TREE_TYPE (*tp))
          *walk_subtrees = 0;
       else if (TREE_CODE (*tp) == INTEGER_CST){
-         n_debug("mtcsport.c mtcs_copy_tree_body_r 66 用新类型创建常数 *tp:%p %s\n",*tp,get_tree_code_name(TREE_CODE(*tp)));
+         //n_debug("mtcsport.c mtcs_copy_tree_body_r 66 用新类型创建常数 *tp:%p %s\n",*tp,get_tree_code_name(TREE_CODE(*tp)));
          *tp = mtcs_tree_wide_int_to_tree/*!wide_int_to_tree*/(mtcsTree,new_type, wi::to_wide (*tp));
       }else{
-         n_debug("mtcsport.c mtcs_copy_tree_body_r 77 常数 *tp:%p %s\n",*tp,get_tree_code_name(TREE_CODE(*tp)));
+         //n_debug("mtcsport.c mtcs_copy_tree_body_r 77 常数 *tp:%p %s\n",*tp,get_tree_code_name(TREE_CODE(*tp)));
          *tp = copy_node (*tp);
          TREE_TYPE (*tp) = new_type;
       }
@@ -1622,7 +1630,7 @@ static tree mtcs_copy_tree_body_r (tree *tp, int *walk_subtrees, void *data)
             *walk_subtrees = 0;
             return NULL;
          }
-      }else if (TREE_CODE (*tp) == MEM_REF && !id->do_not_fold){
+      }else if (TREE_CODE (*tp) == MEM_REF /*!&& !id->do_not_fold*/){
          n_debug("mtcsport.c mtcs_copy_tree_body_r 100 剩于类型中的 MEM_REF *tp:%p %s \n",
                *tp,get_tree_code_name(TREE_CODE(*tp)));
 
@@ -1630,10 +1638,15 @@ static tree mtcs_copy_tree_body_r (tree *tp, int *walk_subtrees, void *data)
          that can happen when a pointer argument is an ADDR_EXPR.
          Recurse here manually to allow that.  */
          tree ptr = TREE_OPERAND (*tp, 0);
+         //aet_print_tree(ptr);
+         //test_print_tree(self,TREE_OPERAND (*tp, 1),FALSE);
          tree type = remapType(self,TREE_TYPE (*tp), id);
          tree old = *tp;
          walk_tree (&ptr, mtcs_copy_tree_body_r, data, NULL);
-         *tp = mtcs_const_fold_build2/*!fold_build2*/(mtcsConst,MEM_REF, type, ptr, TREE_OPERAND (*tp, 1));
+         //*tp = mtcs_const_fold_build2/*!fold_build2*/(mtcsConst,MEM_REF, type, ptr, TREE_OPERAND (*tp, 1));
+         tree op1 = TREE_OPERAND (*tp, 1);
+         walk_tree (&op1, mtcs_copy_tree_body_r, data, NULL);
+         *tp = build2 (MEM_REF, type, ptr, op1);
          TREE_THIS_VOLATILE (*tp) = TREE_THIS_VOLATILE (old);
          TREE_SIDE_EFFECTS (*tp) = TREE_SIDE_EFFECTS (old);
          copy_warning (*tp, old);
@@ -1974,39 +1987,12 @@ static tree copy_tree (MtcsPort *self,tree t,copy_body_data *id)
    return t;
 }
 
-/*
- * 有一个tree
- * use_optype_d 定义在 tree-ssa-operands.h中 use_operand_p就是ssa_use_operand_t 定义在tree-core.h中
- * ssa_use_operand_t中有一个 tree *成员
-struct GTY(()) gimple_statement_with_ops_base : public gimple
-{
-  struct use_optype_d GTY((skip (""))) *use_ops;
-};
-
-/**
- * 以下是 extend gimple
- * replaceBaseOps暂时无用
- */
-static void replaceBaseOps(MtcsPort *self,gimple *stmt)
-{
-   use_optype_p old_ops, ptr, last;
-   old_ops = gimple_use_ops (stmt);
-   if (old_ops){
-       for (ptr = old_ops; ptr->next; ptr = ptr->next){
-          tree *var = USE_OP_PTR (ptr)->use;
-          n_debug("mtcsport.c replaceBaseOps --- %p tree:%p *tree:%p\n",stmt,*var,var);
-       }
-   }
-}
-
 static void replaceBind(MtcsPort *self,gimple *stmt,copy_body_data *id)
 {
-    n_debug("mtcsport.c replaceBind 00\n");
     gbind *bindStmt = as_a <gbind *> (stmt);
     tree vars=gimple_bind_vars(bindStmt);
     n_debug("mtcsport.c replaceBind 11 vars:%s\n",get_tree_code_name(TREE_CODE(vars)));
     tree block=gimple_bind_block(bindStmt);
-    n_debug("mtcsport.c replaceBind 22 block:%s\n",get_tree_code_name(TREE_CODE(block)));
 }
 
 static void replaceEH_MUST_NOT_THROW(MtcsPort *self,gimple *gs)
@@ -2074,15 +2060,10 @@ struct GTY((tag("GSS_WITH_OPS")))  gimple_statement_with_ops : public gimple_sta
 */
 static void replaceCOND(MtcsPort *self,struct function *fun,gimple *gs,copy_body_data *id)
 {
-   replaceBaseOps(self,gs);
    tree lhs=gimple_cond_lhs(gs);
    tree rhs=gimple_cond_rhs(gs);
    n_debug("mtcsport.c replaceCOND 00 \n");
-   aet_print_tree(lhs);
-   aet_print_tree(rhs);
-
    const gcond *gc = GIMPLE_CHECK2<const gcond *> (gs);
-
    if(lhs){
       tree newLhs=copy_tree(self,lhs,id);
       n_debug("mtcsport.c replaceCOND 11 检查新的 lhs--- newLhs:%p type:%p\n",newLhs,TREE_TYPE(newLhs));
@@ -2108,14 +2089,10 @@ static void replaceCOND(MtcsPort *self,struct function *fun,gimple *gs,copy_body
       gimple_cond_set_false_label(gc,newFalseLabel);
       update_stmt_fn (fun,gs);
    }
-   n_debug("mtcsport.c replaceCOND 33 trueLabel:%p falseLabel:%p\n",trueLabel,falseLabel);
-   aet_print_tree(trueLabel);
-   aet_print_tree(falseLabel);
 }
 
 static void replaceGOTO(MtcsPort *self,struct function *fun,gimple *gs,copy_body_data *id)
 {
-    replaceBaseOps(self,gs);
     tree dest=gimple_goto_dest(gs);
     n_debug("mtcsport.c replaceGOTO 00 \n");
     aet_print_tree(dest);
@@ -2127,135 +2104,73 @@ static void replaceGOTO(MtcsPort *self,struct function *fun,gimple *gs,copy_body
  */
 static void replaceSWITCH(MtcsPort *self,struct function *fun,gimple *gs,copy_body_data *id)
 {
-    replaceBaseOps(self,gs);
-    gswitch *switchStmt = as_a <gswitch *> (gs);
-    tree switchIndex=gimple_switch_index (switchStmt);
-    if(switchIndex){
-       tree newSwitchIndex=copy_tree(self,switchIndex,id);
-       gimple_switch_set_index(switchStmt,newSwitchIndex);
-       update_stmt_fn (fun,gs);
-    }
-    //0号就是缺省的
-//    tree defaultLabel= gimple_switch_default_label (switchStmt);
-//    if(defaultLabel){
-//          tree newDefaultLabel=copy_tree(self,defaultLabel,id);
-//          gimple_switch_set_default_label(switchStmt,newDefaultLabel);
-//          update_stmt_fn (fun,gs);
-//    }
-    nuint nums=gimple_switch_num_labels (switchStmt);
-    n_debug("mtcsport.c replaceSWITCH 00 nums:%d\n",nums);
-
-    int i;
-    for (i = 0; i < nums; i++){
-        tree caseLabel = gimple_switch_label (switchStmt, i);
-        tree label = CASE_LABEL (caseLabel);
-        int uid = LABEL_DECL_UID (label);
-        n_debug("mtcsport.c replaceSWITCh 11 i:%d uid:%d newlabel:%p cfun->cfg->last_label_uid :%d\n",i,uid,label,cfun->cfg->last_label_uid );
-        aet_print_tree(caseLabel);
-        aet_print_tree(label);
-        tree newCaseLabel=copy_tree(self,caseLabel,id);
-        tree newlabel=copy_tree(self,label,id);
-        LABEL_DECL_UID (newlabel) = uid;
-        CASE_LABEL (newCaseLabel) = newlabel;
-        //tree newlabel = CASE_LABEL (caseLabel);
-        uid = LABEL_DECL_UID (newlabel);
-        n_debug("mtcsport.c replaceSWITCh 22 i:%d uid:%d newlabel:%p cfun->cfg->last_label_uid :%d\n",i,uid,newlabel,cfun->cfg->last_label_uid );
-        aet_print_tree(newCaseLabel);
-        aet_print_tree(newlabel);
-        gimple_switch_set_label(switchStmt,i,newCaseLabel);
-        update_stmt_fn (fun,gs);
-    }
-}
-
-static void replaceDEBUG(MtcsPort *self,gimple *gs)
-{
-    replaceBaseOps(self,gs);
-    printf("replaceDEBUG--- %p\n",gs);
-
-    GIMPLE_CHECK (gs, GIMPLE_DEBUG);
-    printf("replaceDEBUG 11 --- %p\n",gs);
-    printf("replaceDEBUG 22 --- %d %d\n",is_gimple_debug (gs),gs->subcode);
-    printf("replaceDEBUG 22xx --- %d %s\n",is_gimple_debug (gs),gimple_code_name[gs->subcode]);
-
-
-    gcc_gimple_checking_assert (gimple_debug_bind_p (gs));
-    printf("replaceDEBUG 33 --- %p\n",gs);
-
-    tree var= gimple_debug_bind_get_var(gs);
-    tree value= gimple_debug_source_bind_get_value (gs);
-}
-
-static void replaceLABEL(MtcsPort *self,struct function *fun,gimple *gs,copy_body_data *id)
-{
-   replaceBaseOps(self,gs);
-   glabel *labelStmt = as_a <glabel *> (gs);
-   tree llabel= gimple_label_label(labelStmt);
-   if(llabel){
-      int olduid = LABEL_DECL_UID (llabel);
-
-      tree newLabel=copy_tree(self,llabel,id);
-      gimple_label_set_label(labelStmt,newLabel);
-      int newuid = LABEL_DECL_UID (newLabel);
-      n_debug("mtcsport.c replaceLABEL newLabel:%p %d old:%p %d\n",newLabel,newuid,llabel,olduid);
-      aet_print_tree(newLabel);
+   gswitch *switchStmt = as_a <gswitch *> (gs);
+   tree switchIndex=gimple_switch_index (switchStmt);
+   if(switchIndex){
+      tree newSwitchIndex=copy_tree(self,switchIndex,id);
+      gimple_switch_set_index(switchStmt,newSwitchIndex);
+      update_stmt_fn (fun,gs);
+   }
+   nuint nums=gimple_switch_num_labels (switchStmt);
+   int i;
+   for (i = 0; i < nums; i++){
+      tree caseLabel = gimple_switch_label (switchStmt, i);
+      tree label = CASE_LABEL (caseLabel);
+      int uid = LABEL_DECL_UID (label);
+      n_debug("mtcsport.c replaceSWITCh 11 i:%d uid:%d newlabel:%p cfun->cfg->last_label_uid :%d\n",
+            i,uid,label,cfun->cfg->last_label_uid );
+      tree newCaseLabel=copy_tree(self,caseLabel,id);
+      tree newlabel=copy_tree(self,label,id);
+      LABEL_DECL_UID (newlabel) = uid;
+      CASE_LABEL (newCaseLabel) = newlabel;
+      //tree newlabel = CASE_LABEL (caseLabel);
+      uid = LABEL_DECL_UID (newlabel);
+      n_debug("mtcsport.c replaceSWITCh 22 i:%d uid:%d newlabel:%p cfun->cfg->last_label_uid :%d\n",
+            i,uid,newlabel,cfun->cfg->last_label_uid );
+      gimple_switch_set_label(switchStmt,i,newCaseLabel);
       update_stmt_fn (fun,gs);
    }
 }
 
-/**
- * 以下是 extend gimple_statement_with_memory_ops
- *              extend gimple_statement_with_memory_ops_base
- *                      extend gimple_statement_with_ops_base
- *                             extend gimple
- */
-/**
- * GIMPLE_RETURN
- * GIMPLE_ASSIGN:
- * 这两个gimple继承自
- * gimple_statement_with_memory_ops 有一个tree op[1]
- * gimple_statement_with_memory_ops_base有两个 tree vdef vuse
- * gimple_statement_with_memory_ops继承自 gimple_statement_with_memory_ops_base
- * gimple_statement_with_memory_ops_base继承自gimple_statement_with_ops_base
- *
- * struct GTY((tag("GSS_WITH_MEM_OPS")))
-  gimple_statement_with_memory_ops :  public gimple_statement_with_memory_ops_base
+static void replaceDEBUG(MtcsPort *self,gimple *gs)
 {
-  tree GTY((length ("%h.num_ops"))) op[1];
-};
+   GIMPLE_CHECK (gs, GIMPLE_DEBUG);
+   printf("replaceDEBUG 11 --- %p\n",gs);
+   printf("replaceDEBUG 22 --- %d %d\n",is_gimple_debug (gs),gs->subcode);
+   printf("replaceDEBUG 22xx --- %d %s\n",is_gimple_debug (gs),gimple_code_name[gs->subcode]);
+   gcc_gimple_checking_assert (gimple_debug_bind_p (gs));
+   printf("replaceDEBUG 33 --- %p\n",gs);
+   tree var= gimple_debug_bind_get_var(gs);
+   tree value= gimple_debug_source_bind_get_value (gs);
+}
 
-struct GTY((tag("GSS_WITH_MEM_OPS_BASE"))) gimple_statement_with_memory_ops_base : public gimple_statement_with_ops_base
+static void replaceLABEL(MtcsPort *self,struct function *fun,gimple *gs,copy_body_data *id)
 {
-  tree GTY((skip (""))) vdef;
-  tree GTY((skip (""))) vuse;
-};
- */
-static void replaceBaseMemory(MtcsPort *self,gimple *stmt)
-{
-    tree  vdef=gimple_vdef(stmt);
-    tree  vuse=gimple_vuse(stmt);
-    n_debug("mtcsport.c replaceBaseMemory 00 vdef\n");
-    aet_print_tree(vdef);
-    n_debug("mtcsport.c replaceBaseMemory 11 vuse\n");
+   glabel *labelStmt = as_a <glabel *> (gs);
+   tree llabel= gimple_label_label(labelStmt);
+   if(llabel){
+      int olduid = LABEL_DECL_UID (llabel);
+      tree newLabel=copy_tree(self,llabel,id);
+      gimple_label_set_label(labelStmt,newLabel);
+      int newuid = LABEL_DECL_UID (newLabel);
+      n_debug("mtcsport.c replaceLABEL newLabel:%p %d old:%p %d\n",newLabel,newuid,llabel,olduid);
+      update_stmt_fn (fun,gs);
+   }
 }
 
 static void replaceRETURN(MtcsPort *self,struct function *fun,gimple *gs,copy_body_data *id)
 {
-   replaceBaseOps(self,gs);
-   replaceBaseMemory(self,gs);
    greturn *returnStmt = as_a <greturn *> (gs);
    tree retval= gimple_return_retval (returnStmt);
    n_debug("mtcsport.c replaceRETURN retval fun:%s %p\n",function_name(fun),fun);
-   aet_print_tree(retval);
    if(retval!=NULL_TREE){
       tree new_retval=copy_tree(self,retval,id);
-      n_debug("mtcsport.c retval new_retval\n");
-      aet_print_tree(new_retval);
       gimple_return_set_retval(returnStmt,new_retval);
       update_stmt(gs);
    }
 }
 
-static void printfAssign(gimple *gs)
+static void printfAssign(MtcsPort *self,gimple *gs)
 {
    gassign *assignStmt = as_a <gassign *> (gs);
    tree lhs= gimple_assign_lhs (assignStmt);
@@ -2265,9 +2180,9 @@ static void printfAssign(gimple *gs)
    n_debug("mtcsport.c printfAssign 00 基本情况\n");
    aet_print_gimple(gs);
 
-   aet_print_tree(lhs);
-   aet_print_tree(rhs1);
-   aet_print_tree(rhs2);
+//   test_print_tree(self,lhs,FALSE);
+//   test_print_tree(self,rhs1,FALSE);
+//   test_print_tree(self,rhs2,FALSE);
    int n =gimple_num_ops (gs);
    int i;
    for(i=0;i<n;i++){
@@ -2296,10 +2211,10 @@ static void printfAssign(gimple *gs)
       }
    }
    tree var;
-    FOR_EACH_SSA_TREE_OPERAND (var, gs, iter, SSA_OP_ALL_OPERANDS){
-       n_debug("mtcsport.c printAssign 66 要打印语句的所有操作数：var:%p\n",var,get_tree_code_name(TREE_CODE(var)));
-       aet_print_tree(var);
-    }
+   FOR_EACH_SSA_TREE_OPERAND (var, gs, iter, SSA_OP_ALL_OPERANDS){
+      n_debug("mtcsport.c printAssign 66 要打印语句的所有操作数：var:%p\n",var,get_tree_code_name(TREE_CODE(var)));
+      test_print_tree(self,var,FALSE);
+   }
 }
 
 static void checkLhs(tree node)
@@ -2323,8 +2238,8 @@ static void checkLhs(tree node)
    tree mainvariant0 = TYPE_MAIN_VARIANT (TREE_TYPE (node));
    tree mainvariant1 = TYPE_MAIN_VARIANT (TREE_TYPE (TREE_TYPE (TREE_OPERAND (node, 1))));
    n_debug("mtcsport.c checkLhs mainvariant0 mainvariant1 :%p %p %d\n",mainvariant0,mainvariant1,mainvariant0==mainvariant1);
-   aet_print_tree(mainvariant0);
-   aet_print_tree(mainvariant1);
+   //aet_print_tree(mainvariant0);
+   //aet_print_tree(mainvariant1);
 }
 
 /**
@@ -2336,28 +2251,27 @@ static void checkLhs(tree node)
  */
 static void replaceASSIGN(MtcsPort *self,struct function *fun,gimple *gs,copy_body_data *id)
 {
-    replaceBaseOps(self,gs);
-    replaceBaseMemory(self,gs);
     gassign *assignStmt = as_a <gassign *> (gs);
     tree lhs= gimple_assign_lhs (assignStmt);
     tree rhs1=gimple_assign_rhs1 (assignStmt);
     tree rhs2=gimple_assign_rhs2 (assignStmt);
     tree rhs3=gimple_assign_rhs3 (assignStmt);
-    n_debug("mtcsport.c replaceASSIGN 00 替换前的 gs:%p fun:%p cfun:%p\n",assignStmt,fun,cfun);
-    printfAssign(gs);
+    //n_debug("mtcsport.c replaceASSIGN 00 替换前的 gs:%p fun:%p cfun:%p\n",assignStmt,fun,cfun);
+    //printfAssign(self,gs);
     if(lhs){
        checkLhs(lhs);
        tree newLhs=copy_tree(self,lhs,id);
-       n_debug("mtcsport.c replaceASSIGN 11 检查新的lhs--- newLhs:%p type:%p\n",newLhs,TREE_TYPE(newLhs));
+      // n_debug("mtcsport.c replaceASSIGN 11 检查新的lhs--- newLhs:%p type:%p\n",newLhs,TREE_TYPE(newLhs));
        checkLhs(newLhs);
        gimple_assign_set_lhs(assignStmt,newLhs);
        update_stmt_fn (fun,gs);
     }
 
-    n_debug("mtcsport.c replaceASSIGN 22 替换lhs后的情况 gs\n");
-    printfAssign(gs);
+    //n_debug("mtcsport.c replaceASSIGN 22 替换lhs后的情况 gs\n");
+    //printfAssign(self,gs);
 
     if(rhs1){
+       //n_debug("mtcsport.c replaceASSIGN 22aa 替换lhs后的情况 rhs1\n");
        tree newRhs1=copy_tree(self,rhs1,id);
        gimple_assign_set_rhs1(assignStmt,newRhs1);
        update_stmt_fn (fun,gs);
@@ -2367,7 +2281,6 @@ static void replaceASSIGN(MtcsPort *self,struct function *fun,gimple *gs,copy_bo
        tree newRhs2=copy_tree(self,rhs2,id);
        gimple_assign_set_rhs2(assignStmt,newRhs2);
     }
-    n_debug("mtcsport.c replaceASSIGN 33 :%p %p %p %p %p\n",gs,lhs,rhs1,rhs2,rhs3);
     verify_ssa_operands(fun,gs);
     if(rhs3){
        tree newRhs3=copy_tree(self,rhs3,id);
@@ -2389,58 +2302,29 @@ static void replaceASSIGN(MtcsPort *self,struct function *fun,gimple *gs,copy_bo
  */
 static void replaceASM(MtcsPort *self,gimple *gs,copy_body_data *id)
 {
-    replaceBaseOps(self,gs);
-    replaceBaseMemory(self,gs);
-    gasm *asmStmt = as_a <gasm *> (gs);
-    const unsigned noutputs = gimple_asm_noutputs (asmStmt);
-    const unsigned ninputs = gimple_asm_ninputs (asmStmt);
-    const unsigned nclobbers = gimple_asm_nclobbers (asmStmt);
-    const unsigned nlabels = gimple_asm_nlabels (asmStmt);
-    fprintf(stderr,"replaceASM --- out:%d in:%d clob:%d label:%d gs:%p\n",noutputs,ninputs,nclobbers,nlabels,gs);
-    int i;
-    for(i=0;i<noutputs;i++){
-       tree out = gimple_asm_output_op(asmStmt,i);
-       fprintf(stderr,"replaceASM --- 11 out:%d in:%d clob:%d label:%d\n",noutputs,ninputs,nclobbers,nlabels);
-       aet_print_tree(out);
-       tree constraint = TREE_PURPOSE (out);
-       tree value = TREE_VALUE (out);
-       if (TREE_CODE (value) == SSA_NAME){
-           tree var = SSA_NAME_VAR (value);
-           fprintf(stderr,"replaceASM --- 22 out:%d in:%d clob:%d label:%d\n",noutputs,ninputs,nclobbers,nlabels);
-           aet_print_tree(var);
-            /* constraint：=r
-            value：SSA_NAME
-            var：原始变量的 VAR_DECL */
-       }
-       tree newOut=copy_tree(self,out,id);
-       gimple_asm_set_output_op(asmStmt,i,newOut);
-    }
+   gasm *asmStmt = as_a <gasm *> (gs);
+   const unsigned noutputs = gimple_asm_noutputs (asmStmt);
+   const unsigned ninputs = gimple_asm_ninputs (asmStmt);
+   const unsigned nclobbers = gimple_asm_nclobbers (asmStmt);
+   const unsigned nlabels = gimple_asm_nlabels (asmStmt);
+   //fprintf(stderr,"replaceASM --- out:%d in:%d clob:%d label:%d gs:%p\n",noutputs,ninputs,nclobbers,nlabels,gs);
+   int i;
+   for(i=0;i<noutputs;i++){
+      tree out = gimple_asm_output_op(asmStmt,i);
+      tree newOut=copy_tree(self,out,id);
+      gimple_asm_set_output_op(asmStmt,i,newOut);
+   }
 
-    for(i=0;i<ninputs;i++){
-          tree in = gimple_asm_input_op(asmStmt,i);
-          fprintf(stderr,"replaceASM --- 33 int:%d\n",ninputs);
-          aet_print_tree(in);
-          tree constraint = TREE_PURPOSE (in);
-          tree value = TREE_VALUE (in);
-
-          if (TREE_CODE (value) == SSA_NAME){
-              tree var = SSA_NAME_VAR (value);
-              fprintf(stderr,"replaceASM --- 44 int:%d\n",ninputs);
-              aet_print_tree(var);
-               /* constraint：=r
-               value：SSA_NAME
-               var：原始变量的 VAR_DECL */
-          }
-          tree newIn = copy_tree(self,in,id);
-          gimple_asm_set_input_op(asmStmt,i,newIn);
-       }
+   for(i=0;i<ninputs;i++){
+      tree in = gimple_asm_input_op(asmStmt,i);
+      tree newIn = copy_tree(self,in,id);
+      gimple_asm_set_input_op(asmStmt,i,newIn);
+   }
 }
 
 
 static void replaceCALL(MtcsPort *self,gimple *gs,copy_body_data *id)
 {
-   replaceBaseOps(self,gs);
-   replaceBaseMemory(self,gs);
    gcall *callStmt = as_a <gcall *> (gs);
    tree lhs=gimple_call_lhs (callStmt);
    n_debug("mtcsport.c replaceCall 00 lhs :%p \n",lhs);
@@ -2476,13 +2360,10 @@ static void replaceCALL(MtcsPort *self,gimple *gs,copy_body_data *id)
       tree new_arg=copy_tree(self,t,id);
       gimple_call_set_arg(callStmt,i,new_arg);
    }
-
 }
 
 static void replaceTRANSACTION(MtcsPort *self,gimple *gs)
 {
-    replaceBaseOps(self,gs);
-    replaceBaseMemory(self,gs);
     gtransaction *transactionStmt = as_a <gtransaction *> (gs);
     tree norm=gimple_transaction_label_norm (transactionStmt);
     tree uninst=gimple_transaction_label_uninst (transactionStmt);
@@ -2744,14 +2625,11 @@ static void portFuncAndBasickBlock(MtcsPort *self)
       n_debug("mtcsport.c portFuncAndBasickBlock 00 %s fndecl:%p %s cnode:%p use:%d decl_preserve_p:%d\n",
             function_name(id.src_cfun ),fndecl,IDENTIFIER_POINTER(DECL_NAME(fndecl)),cnode,TREE_USED (fndecl),DECL_PRESERVE_P (fndecl));
       mtcs_func_push_cfun(mtcsFunc,id.src_cfun);
-      aet_print_cgraph_node(cnode);
       n_debug("mtcsport.c portFuncAndBasickBlock 11 替换函数声明:cnode:%p fndec:%p %s node:%p function:%p 本地变量数量:%d\n",
             cnode,fndecl,IDENTIFIER_POINTER(DECL_NAME(fndecl)),fndecl->decl_with_vis.symtab_node,id.src_cfun,
             id.src_cfun?vec_safe_length (id.src_cfun->local_decls):0);
-      tree deviceHostAtt = lookup_attribute (MTCS_DEVICE_HOST_STRING, DECL_ATTRIBUTES (fndecl));
-      tree deviceAtt = lookup_attribute (MTCS_DEVICE_STRING, DECL_ATTRIBUTES (fndecl));
-
-      n_debug("mtcsport.c portFuncAndBasickBlock 22 deviceHostAtt:%p deviceAtt:%p\n",deviceHostAtt,deviceAtt);
+      MtcsFuncType mtcsFuncType = mtcs_info_get_func_type(fndecl);
+      n_debug("mtcsport.c portFuncAndBasickBlock 22 mtcsFuncType:%d\n",mtcsFuncType);
       aet_print_tree(fndecl);
 
       mtcs_rtl_set_decl_rtl/*!SET_DECL_RTL*/(mtcsRTL,fndecl, NULL);//清除主机中生成的RTL
@@ -2761,10 +2639,10 @@ static void portFuncAndBasickBlock(MtcsPort *self)
       cnode->decl=newdecl;
       newdecl->decl_with_vis.symtab_node= cnode;
       mtcs_func_pop_cfun(mtcsFunc);
-      deviceHostAtt = lookup_attribute (MTCS_DEVICE_HOST_STRING, DECL_ATTRIBUTES (newdecl));
-      deviceAtt = lookup_attribute (MTCS_DEVICE_STRING, DECL_ATTRIBUTES (newdecl));
-      n_debug("mtcsport.c portFuncAndBasickBlock 44 deviceHostAtt:%p deviceAtt:%p %p 老:fndecl:%p rtl:%p  新的fndecl:%p rtl:%p\n",
-            deviceHostAtt,deviceAtt,DECL_STRUCT_FUNCTION (newdecl),fndecl,
+      mtcsFuncType = mtcs_info_get_func_type(fndecl);
+
+      n_debug("mtcsport.c portFuncAndBasickBlock 44 mtcsFuncType:%d %p 老:fndecl:%p rtl:%p  新的fndecl:%p rtl:%p\n",
+            mtcsFuncType,DECL_STRUCT_FUNCTION (newdecl),fndecl,
             fndecl->decl_with_rtl.rtl,newdecl,newdecl->decl_with_rtl.rtl);
 
       if(id.src_cfun)
@@ -2905,7 +2783,6 @@ static void portFuncAndBasickBlock(MtcsPort *self)
       tree init = DECL_INITIAL(vnode->decl);
       if(init){
          n_debug("mtcsport.c  portFuncAndBasickBlock 104 全局变量 有初始化 decl:%p node:%p\n",vnode->decl,node);
-         aet_print_tree(init);
          tree newInit=copy_tree(self,init,&id);
          DECL_INITIAL(vnode->decl) = newInit;
       }
@@ -2917,15 +2794,7 @@ static void portFuncAndBasickBlock(MtcsPort *self)
             align,newalign,DECL_ALIGN(decl),DECL_ALIGN(newdecl));
    }
    setOptions(self);
-   n_debug("mtcsport.cc 移植后的节点:\n");
-   FOR_EACH_FUNCTION (cnode){
-      aet_print_cgraph_node(cnode);
-   }
    remove_unreachble_bb(self);
-   n_debug("mtcsport.cc 移走第一个bb后的节点:\n");
-   FOR_EACH_FUNCTION (cnode){
-      aet_print_cgraph_node(cnode);
-   }
 }
 
 static void remove_unreachble_bb(MtcsPort *self)
@@ -3029,6 +2898,7 @@ void mtcs_port_port(MtcsPort *self)
    printNode();
    self->hostToDevice = TRUE;//从主机的tree移到设备
    portFuncAndBasickBlock(self);
+   self->hostToDevice = FALSE;
 }
 
 MtcsPort *mtcs_port_new(MtcsMode *mtcsMode)
@@ -3038,47 +2908,6 @@ MtcsPort *mtcs_port_new(MtcsMode *mtcsMode)
    mtcsPortInit(self);
    return self;
 }
-
-//tree mtcs_port_host_to_device(MtcsPort *self,tree hostTree)
-//{
-//   MtcsMode *mtcsMode=MTCS_GET_MODE_OBJECT(self);
-//   MtcsTarget *mtcsTarget=(MtcsTarget *)mtcsMode->target;
-//   MtcsTree  *mtcsTree=mtcs_target_get_tree(mtcsTarget);
-//
-//   if(!hostTree)
-//      return NULL_TREE;
-//   mtcsTree->mtcsBackupRestore.restore(&mtcsTree->mtcsBackupRestore);//恢复主机的global_trees
-//   n_debug("mtcs_port_host_to_device 00 --- haveBackup:%d hostTree:%p\n",mtcsTree->haveBackup,hostTree);
-//   copy_body_data id;
-//   hash_map<tree, tree> decl_map;
-//   memset (&id, 0, sizeof (id));
-//   id.decl_map = &decl_map;
-//   id.copy_decl = mtcs_copy_decl_no_change;
-//   id.transform_call_graph_edges = CB_CGE_DUPLICATE;
-//   id.transform_new_cfg = false;
-//   id.transform_return_to_modify = false;
-//   id.transform_parameter = true;
-//
-//   id.src_fn = current_function_decl;
-//   id.dst_fn = current_function_decl;
-//   id.src_cfun = DECL_STRUCT_FUNCTION (current_function_decl);
-//
-//   /* Make sure not to unshare trees behind the front-end's back
-//   since front-end specific mechanisms may rely on sharing.  */
-//   id.regimplify = false;
-//   id.do_not_unshare = true;
-//   id.do_not_fold = true;
-//   /* We're not inside any EH region.  */
-//   id.eh_lp_nr = 0;
-//   insert_decl_map (&id, get_identifier (MTCS_CLONES),
-//         mtcs_tree_build_int_cst/*!build_int_cst*/(mtcsTree,
-//               mtcs_long_long_unsigned_type_node,(unsigned long long)self));
-//
-//   walk_tree (&hostTree, mtcs_copy_tree_body_r, &id, NULL);
-//   mtcsTree->mtcsBackupRestore.backup(&mtcsTree->mtcsBackupRestore);//备份设备的tree覆盖主机的global_trees
-//   n_debug("mtcs_port_host_to_device 11 --- haveBackup:%d hostTree:%p\n",mtcsTree->haveBackup,hostTree);
-//   return hostTree;
-//}
 
 static void  convertTree(MtcsPort *self,tree *convTree,int count,nboolean h2d)
 {
@@ -3129,7 +2958,6 @@ static void  convertTree(MtcsPort *self,tree *convTree,int count,nboolean h2d)
 void  mtcs_port_host_to_device(MtcsPort *self,tree *convTree,int count)
 {
    convertTree(self,convTree,count,TRUE);
-
 }
 
 tree  mtcs_port_host_to_device(MtcsPort *self,tree convTree)

@@ -1775,15 +1775,13 @@ void mtcs_recog_cancel_changes (MtcsRecog *self,int num)
 //原型 apply_change_group recog.h recog.cc
 bool mtcs_recog_apply_change_group (MtcsRecog *self)
 {
-   n_debug("mtcsrecog.c apply_change_group 00\n");
+   //n_debug("mtcsrecog.c apply_change_group 00\n");
    if (mtcs_recog_verify_changes/*!verify_changes*/(self,0)){
-      n_debug("mtcsrecog.c apply_change_group 11\n");
-
+      //n_debug("mtcsrecog.c apply_change_group 11\n");
       mtcs_recog_confirm_change_group/*!confirm_change_group*/(self);
       return true;
    }else{
-      n_debug("mtcsrecog.c apply_change_group 22\n");
-
+      //n_debug("mtcsrecog.c apply_change_group 22\n");
       mtcs_recog_cancel_changes/*!cancel_changes*/(self,0);
       return false;
    }

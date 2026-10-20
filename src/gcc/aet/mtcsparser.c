@@ -46,7 +46,6 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 #include "c/c-parser.h"
 #include "../libcpp/include/cpplib.h"
 
-
 #include "aet-c-parser-header.h"
 #include "aetutils.h"
 #include "aetprinttree.h"
@@ -90,6 +89,15 @@ static int  getPromoteDeclId_cb(AetMediatorUser *user,nuint64 hostDeclAddress)
    return -1;
 }
 
+static void printAttrs (tree attrs)
+{
+   for (const_tree attr = attrs; attr; attr = TREE_CHAIN (attr)){
+      char *name=IDENTIFIER_POINTER(TREE_PURPOSE (attr));
+      n_debug("mtcsparser.c printAttrs 属性 %s\n",name);
+      aet_print_tree(attr);
+   }
+}
+
 /**
  * 获取声明_TSecond_parent__superDeviceAddressArray
  * 由于mtcsparser不能调用lookup_name,所以通过中介获得。
@@ -107,7 +115,6 @@ static void  addLinkFunc_cb(AetMediatorUser *aetMediatorUser,const char *linkFun
 {
    MtcsParser *self = (MtcsParser *)aetMediatorUser;
    mtcs_link_add(self->mtcsLink,linkFuncNames,version,isa,platName);
-
 }
 
 /**
@@ -150,11 +157,10 @@ static void initMediator(MtcsParser *self)
    mediatorUser->getObjectFile = getObjectFile_cb;
    mediatorUser->writeNote = writeNote_cb;
    mediatorUser->getMIIFunction = getMIIFunction_cb;
-
    aet_mediator_add_user(mediator,mediatorUser);
 }
 
-
+//定义在abase.h中
 //#define __device__ __attribute__((device))
 //#define __global__ __attribute__((global))
 //#define __shared__ __attribute__((shared))
@@ -162,48 +168,48 @@ static void initMediator(MtcsParser *self)
 static void mtcsParserInit(MtcsParser *self)
 {
    /*注册新的属性用于mtcs*/
-   const struct attribute_spec *spx=lookup_attribute_spec (get_identifier(MTCS_DEVICE_STRING));
+   const struct attribute_spec *spx=lookup_attribute_spec (get_identifier(MTCS_GLOBAL_STR));
    if(!spx){
-      struct attribute_spec *device_attr =new attribute_spec {xstrdup(MTCS_DEVICE_STRING),
+      struct attribute_spec *att =new attribute_spec {xstrdup(MTCS_GLOBAL_STR),
          0, -2, false,  false, false, false, handle_mtcs_attribute, NULL };
-      register_attribute (device_attr);
+      register_attribute (att);
    }
-   spx=lookup_attribute_spec (get_identifier(MTCS_GLOBAL_STRING));
+
+   spx=lookup_attribute_spec (get_identifier(MTCS_DEVICE_STR));
    if(!spx){
-      struct attribute_spec *device_attr =new attribute_spec {xstrdup(MTCS_GLOBAL_STRING),
+      struct attribute_spec *att =new attribute_spec {xstrdup(MTCS_DEVICE_STR),
          0, -2, false,  false, false, false, handle_mtcs_attribute, NULL };
-      register_attribute (device_attr);
+      register_attribute (att);
    }
-   spx=lookup_attribute_spec (get_identifier(MTCS_SHARED_STRING));
+
+   spx=lookup_attribute_spec (get_identifier(MTCS_HOST_STR));
    if(!spx){
-      struct attribute_spec *device_attr =new attribute_spec {xstrdup(MTCS_SHARED_STRING),
+      struct attribute_spec *att =new attribute_spec {xstrdup(MTCS_HOST_STR),
          0, -2, false,  false, false, false, handle_mtcs_attribute, NULL };
-      register_attribute (device_attr);
+      register_attribute (att);
    }
-   spx=lookup_attribute_spec (get_identifier(MTCS_CONSTANT_STRING));
+
+   spx=lookup_attribute_spec (get_identifier(MTCS_SHARED_STR));
    if(!spx){
-      struct attribute_spec *device_attr =new attribute_spec {xstrdup(MTCS_CONSTANT_STRING),
+      struct attribute_spec *att =new attribute_spec {xstrdup(MTCS_SHARED_STR),
          0, -2, false,  false, false, false, handle_mtcs_attribute, NULL };
-      register_attribute (device_attr);
+      register_attribute (att);
    }
-   spx=lookup_attribute_spec (get_identifier(MTCS_MANAGED_STRING));
+
+   spx=lookup_attribute_spec (get_identifier(MTCS_MANAGED_STR));
    if(!spx){
-      struct attribute_spec *device_attr =new attribute_spec {xstrdup(MTCS_MANAGED_STRING),
+      struct attribute_spec *att =new attribute_spec {xstrdup(MTCS_MANAGED_STR),
          0, -2, false,  false, false, false, handle_mtcs_attribute, NULL };
-      register_attribute (device_attr);
+      register_attribute (att);
    }
-   spx=lookup_attribute_spec (get_identifier(MTCS_HOST_STRING));
+
+   spx=lookup_attribute_spec (get_identifier(MTCS_CONSTANT_STR));
    if(!spx){
-      struct attribute_spec *device_attr =new attribute_spec {xstrdup(MTCS_HOST_STRING),
+      struct attribute_spec *att =new attribute_spec {xstrdup(MTCS_CONSTANT_STR),
          0, -2, false,  false, false, false, handle_mtcs_attribute, NULL };
-      register_attribute (device_attr);
+      register_attribute (att);
    }
-   spx=lookup_attribute_spec (get_identifier(MTCS_DEVICE_HOST_STRING));
-   if(!spx){
-      struct attribute_spec *device_attr =new attribute_spec {xstrdup(MTCS_DEVICE_HOST_STRING),
-         0, -2, false,  false, false, false, handle_mtcs_attribute, NULL };
-      register_attribute (device_attr);
-   }
+
    self->enterFuncBody=0;
    self->mtcsPromoteLocalVarArray = n_ptr_array_new();
    self->mtcsLanuch = mtcs_lanuch_new();
@@ -217,124 +223,6 @@ static void mtcsParserInit(MtcsParser *self)
 /* Attribute handler callback */
 static tree handle_mtcs_attribute (tree *node, tree name, tree args,int flags, bool *no_add_attrs)
 {
-  return NULL_TREE;
-}
-
-
-#define MTCS_DEVICE  "__device__"
-#define MTCS_GLOBAL  "__global__"
-#define MTCS_HOST    "__host__"
-
-#define MTCS_SHARED   "__shared__"
-#define MTCS_MANAGED  "__managed__"
-#define MTCS_CONSTANT "__constant__"
-
-
-//#define __device__ __attribute__((device))
-//#define __global__ __attribute__((global))
-//#define __shared__ __attribute__((shared))
-static inline nboolean  isAttribute(char *str)
-{
-  return (!strcmp(str,MTCS_DEVICE) || !strcmp(str,MTCS_GLOBAL) || !strcmp(str,MTCS_HOST)
-        || !strcmp(str,MTCS_SHARED) || !strcmp(str,MTCS_MANAGED) || !strcmp(str,MTCS_CONSTANT));
-}
-
-const char *getAttributeName(char *attribute)
-{
-   if(!strcmp(attribute,MTCS_GLOBAL))
-      return MTCS_GLOBAL_STRING;
-   else if(!strcmp(attribute,MTCS_DEVICE))
-      return MTCS_DEVICE_STRING;
-   else if(!strcmp(attribute,MTCS_HOST))
-      return MTCS_HOST_STRING;
-   else if(!strcmp(attribute,MTCS_SHARED))
-      return MTCS_SHARED_STRING;
-   else if(!strcmp(attribute,MTCS_MANAGED))
-      return MTCS_MANAGED_STRING;
-   else if(!strcmp(attribute,MTCS_CONSTANT))
-      return MTCS_CONSTANT_STRING;
-   else
-      gcc_unreachable ();
-   return NULL;
-}
-
-/**
- * 在aet中并且是mtcs预设的属性。
- */
-nboolean mtcs_parser_is_attribute(MtcsParser *self,c_token *token)
-{
-   if(token->type==CPP_NAME){
-      char *str=IDENTIFIER_POINTER (token->value);
-      if(isAttribute(str))
-         return TRUE;
-   }
-   return FALSE;
-}
-
-/**
- * 把__global__、__device__替换为 __attribute__((global))、__attribute__((device))
- */
-static void convertAttributeToken(MtcsParser *self,char *str,location_t loc)
-{
-   c_parser *parser=self->aetParser->parser;
-   int diff=0;
-   if(!strcmp(str,"constant"))
-      diff=1; //多加一个符号 const
-   int tokenCount=parser->tokens_avail;
-   if(tokenCount+6+diff>AET_MAX_TOKEN){
-      error("token太多了");
-      return;
-   }
-   int i;
-   for(i=tokenCount;i>0;i--)
-      aet_utils_copy_token(&parser->tokens[i-1],&parser->tokens[i-1+6+diff]);
-   if(diff)
-      aet_utils_create_const_token(&parser->tokens[0],loc);
-   aet_utils_create_attribute_token(&parser->tokens[diff+0],loc);
-   aet_utils_create_token(&parser->tokens[diff+1],CPP_OPEN_PAREN,"(",1);
-   aet_utils_create_token(&parser->tokens[diff+2],CPP_OPEN_PAREN,"(",1);
-   const char *attName = getAttributeName(str);
-   aet_utils_create_token(&parser->tokens[diff+3],CPP_NAME,attName,strlen(attName));
-   parser->tokens[3].location = loc;
-   aet_utils_create_token(&parser->tokens[diff+4],CPP_CLOSE_PAREN,")",1);
-   aet_utils_create_token(&parser->tokens[diff+5],CPP_CLOSE_PAREN,")",1);
-   parser->tokens_avail=tokenCount+6+diff;
-   aet_print_token_in_parser("mtcs convertAttributeToken ------");
-}
-
-
-/**
- * 分析 public$ __global__    void setData(void *data);
- * 如果分析遇到c_token是 __global__
- * 变成 __attribute__(global)
- */
-nboolean mtcs_parser_add_attribute(MtcsParser *self)
-{
-   if(!mtcs_types_is_init(mtcs_types_get()))
-      mtcs_types_init(mtcs_types_get());
-
-   c_parser *parser=aet_parser_get()->parser;
-   c_token *token=c_parser_peek_token (parser);
-   location_t loc = token->location;
-   if(token->type==CPP_NAME){
-      char *str=IDENTIFIER_POINTER (token->value);
-      if(isAttribute(str)){
-         c_parser_consume_token (parser);//清除 __global__ token
-         convertAttributeToken(self,str,loc);//replaceToken(self,str,loc);
-         return TRUE;
-      }
-   }
-   return FALSE;
-}
-
-static tree getRtn(tree value)
-{
-   tree type=TREE_TYPE(value);
-    if(TREE_CODE(type)==POINTER_TYPE)
-       type=TREE_TYPE(type);
-   if(TREE_CODE(type)==FUNCTION_TYPE){
-      return TREE_TYPE (type);
-   }
    return NULL_TREE;
 }
 
@@ -353,117 +241,7 @@ void  mtcs_parser_exit_function_body(MtcsParser *self)
 
 nboolean    mtcs_parser_is_compiling(MtcsParser *self)
 {
-   return self->enterFuncBody>0;
-}
-
-/**
- * 是否有可变参数
- */
-static nboolean haveVariableParam (tree decl)
-{
-   tree funcType=TREE_TYPE(decl);
-   if(TREE_CODE(funcType)==POINTER_TYPE)
-      funcType=TREE_TYPE(funcType);
-   if(TREE_CODE(funcType)==FUNCTION_TYPE){
-      for (tree al = TYPE_ARG_TYPES (funcType); al; al = TREE_CHAIN (al)){
-         tree type=TREE_VALUE(al);
-         if(type == void_type_node)
-            return FALSE;
-      }
-      return TRUE;
-   }
-   return FALSE;
-}
-
-/**
- * 声明函数完成后，进入这里检查：
- * 如果是mtcs函数 1.检查是否泛型函数。2.检查是不是有泛型参数。
- * 并加入集合
- */
-static nboolean haveDecorate(MtcsParser *self,char *mtcsDecorateString,tree decl)
-{
-   int count=0;
-   const_tree attrs = DECL_ATTRIBUTES (decl);
-   for (const_tree attr = attrs; attr; attr = TREE_CHAIN (attr)){
-       char *name=IDENTIFIER_POINTER(TREE_PURPOSE (attr));
-       if(name && strcmp(name,mtcsDecorateString)==0)
-           return TRUE;
-   }
-   return FALSE;
-}
-
-//如果加入的是 __attribute__((global)) __attribute__((global)) 不会出现重复的 global属性 c-parser过滤了？
-static int getMtcsFuncType(MtcsParser *self,tree decl)
-{
-   nboolean g1= haveDecorate(self,MTCS_GLOBAL_STRING,decl);
-   nboolean g2= haveDecorate(self,MTCS_DEVICE_STRING,decl);
-   nboolean g3= haveDecorate(self,MTCS_HOST_STRING,decl);
-   location_t loc = DECL_SOURCE_LOCATION(decl);
-
-   if(g1){
-      if(g2){
-         error_at(loc,"核函数不能定义为设备函数。");
-      }
-      if(g3){
-         error_at(loc,"核函数不能定义为主机函数。");
-      }
-      return MTCS_FUNC_KERNEL;//这是一个核函数
-   }
-
-   if(g2){
-      if(g3){
-         return MTCS_FUNC_DEVICE_HOST;//即是设备函数也是主机函数
-      }else{
-         return MTCS_FUNC_DEVICE;
-      }
-   }
-   return MTCS_FUNC_NOT;
-}
-
-static int getMtcsVarType(MtcsParser *self,tree decl)
-{
-   nboolean g1= haveDecorate(self,MTCS_SHARED_STRING,decl);
-   nboolean g2= haveDecorate(self,MTCS_MANAGED_STRING,decl);
-   nboolean g3= haveDecorate(self,MTCS_CONSTANT_STRING,decl);
-   nboolean g4= haveDecorate(self,MTCS_GLOBAL_STRING,decl);
-   nboolean g5= haveDecorate(self,MTCS_HOST_STRING,decl);
-   nboolean g6= haveDecorate(self,MTCS_DEVICE_STRING,decl);
-
-   location_t loc = DECL_SOURCE_LOCATION(decl);
-   char *varName = IDENTIFIER_POINTER(DECL_NAME(decl));
-   //fprintf(stderr,"getMtcsVarType 00 %s g1:%d g2:%d g3:%d g4:%d g5:%d\n",varName,g1,g2,g3,g4,g5);
-   if(g4 || g5){
-      error_at(loc,"变量 %s,不能用 __global__ or __host__ 修饰。",varName);
-      return MTCS_VAR_NOT;
-   }
-
-   if(g1){
-      if(g2 || g3 || g6){
-         error_at(loc,"变量 __share__ %s,不能用 __managed__ 、 __constant__、 __device__ 修饰。",varName);
-      }
-      return MTCS_VAR_SHARED;
-   }
-
-   if(g2){
-      if(g1 || g3){
-         error_at(loc,"变量 __managed__ %s,不能用 __shared__ or __constant__ 修饰。",varName);
-      }
-      return MTCS_VAR_MANAGED;
-   }
-
-   if(g3){
-      if(g1 || g2){
-         error_at(loc,"变量 __constant__ %s,不能用 __shared__ or __managed__ 修饰。",varName);
-      }
-      return MTCS_VAR_CONSTANT;
-   }
-   if(g6){
-        if(g1 || g4){
-           error_at(loc,"变量 __device__ %s,不能用 __shared__ or __global__ 修饰。",varName);
-        }
-        return MTCS_VAR_DEVICE;
-     }
-   return MTCS_VAR_NOT;
+   return self->enterFuncBody > 0;
 }
 
 /**
@@ -473,6 +251,7 @@ static int getMtcsVarType(MtcsParser *self,tree decl)
 void mtcs_parser_ast_end(MtcsParser *self)
 {
    //如果有mtcs函数，初始化mtcscmpile
+   self->haveMtcsFunc = func_mgr_have_mtcs_func(func_mgr_get());
    if(self->haveMtcsFunc || self->haveMtcsVar){
       mtcs_builtin_tree_set_builtins_code(self->mtcsBuiltinTree);
       AetMediator *mediator=((AetMediatorUser *)self)->mediator;
@@ -485,6 +264,7 @@ void mtcs_parser_ast_end(MtcsParser *self)
  */
 nboolean mtcs_parser_have_mtcs(MtcsParser *self)
 {
+   self->haveMtcsFunc = func_mgr_have_mtcs_func(func_mgr_get());
    return (self->haveMtcsFunc || self->haveMtcsVar);
 }
 
@@ -560,158 +340,6 @@ static void setAssembleName(MtcsParser *self,tree decl)
    char name[255];
    sprintf(name,"%s_%s_%d",fnname,varname,self->localVarAssembleNumber++);
    SET_DECL_ASSEMBLER_NAME (decl, get_identifier(name));
-}
-
-static void addMiiAttribute(ClassFunc *func,tree fndecl)
-{
-   ClassName *cn=func->className;
-   ClassInfo *info = class_mgr_get_class_info_by_class_name(class_mgr_get(),func->className);
-   if(class_info_is_mii(info) &&
-         class_func_is_static(func) &&
-         class_func_get_mtcs_type(func) == MTCS_FUNC_DEVICE &&
-         !lookup_attribute (MTCS_INTRINSIC_FUNCTION_IMPLEMENTS, DECL_ATTRIBUTES (fndecl))){
-      //说明函数已有属性 mii
-//      tree fnImplAtt=lookup_attribute (MTCS_INTRINSIC_FUNCTION_IMPLEMENTS, DECL_ATTRIBUTES (fndecl));
-//      if(fnImplAtt)
-//         return;
-      tree miiAtt=  class_info_get_mii_attribute(info);
-      gcc_assert(miiAtt);
-      tree intrinsic = NULL_TREE;
-      tree list = NULL_TREE;
-      //classinfo中的属性 __attribute__((mii("cuda","sm_35"))) 复制到函数中
-       int ix=0;
-       for (tree a = TREE_VALUE (miiAtt); a; a = TREE_CHAIN (a)){
-          tree d = TREE_VALUE (a);
-          list=tree_cons (NULL_TREE, d, list);
-          ix++;
-       }
-       if(ix==0){
-          list=tree_cons (NULL_TREE, get_identifier("default"), list);
-          list=tree_cons (NULL_TREE, get_identifier("default"), list);
-       }else if(ix==1){
-          list=tree_cons (NULL_TREE, get_identifier("default"), list);
-       }
-       list = nreverse(list);
-       intrinsic = build_tree_list (get_identifier(MTCS_INTRINSIC_FUNCTION_IMPLEMENTS),list);
-       tree attrs = DECL_ATTRIBUTES (fndecl);
-       if(!attrs)
-          DECL_ATTRIBUTES (fndecl) = tree_cons (intrinsic,NULL_TREE,DECL_ATTRIBUTES (fndecl));
-       else{
-          attrs=chainon (attrs, intrinsic);
-       }
-       tree mtcs1=lookup_attribute (MTCS_INTRINSIC_FUNCTION_IMPLEMENTS, DECL_ATTRIBUTES (fndecl));
-       printf("测试是不是实现----\n");
-       aet_print_tree(DECL_ATTRIBUTES (fndecl));
-       aet_print_tree(mtcs1);
-   }
-
-}
-
-//类中声明的函数和类实现中定义的函数
-static void checkFuncDefineAndField(MtcsParser *self,tree decl,nboolean finishDecl)
-{
-   ClassFunc *func = func_mgr_get_func_by_mangle(func_mgr_get(),IDENTIFIER_POINTER(DECL_NAME(decl)));
-   if(!func){
-      func = func_mgr_get_static_entity_by_mangle(func_mgr_get(),IDENTIFIER_POINTER(DECL_NAME(decl)));
-      if(!func)
-         return ;
-   }
-
-   int mtcsFuncType =getMtcsFuncType(self,decl);
-   //不是mtcs函数
-   if(mtcsFuncType==MTCS_FUNC_NOT){
-      if(TREE_CODE(decl)==FUNCTION_DECL){  //如果有函数声明，要判断实现与声明是否匹配
-         //已经设过类型
-         if(class_func_is_mtcs(func)){
-            MtcsFuncType old = class_func_get_mtcs_type(func);
-            mtcsFuncType= old;
-         }else{
-            //找父类有没有相同的函数声明。如果有用父类的mtcs类型，给当前函数赋值
-            ClassName *className=func->className;
-            ClassInfo *info=class_mgr_get_class_info_by_class_name(class_mgr_get(),className);
-            while(info->parentName.sysName!=NULL){
-               ClassFunc *parentFunc=func_mgr_get_func_by_raw_mangle(func_mgr_get(),info->parentName.sysName,func->rawMangleName);
-               n_debug("没有声明的函数定义 11 %s parentFunc:%p\n",className->sysName,parentFunc);
-
-               if(parentFunc && parentFunc->fieldDecl && class_func_is_mtcs(parentFunc)){
-                  if(!class_func_is_private(parentFunc)){
-                     n_debug("没有声明的函数定义 22 %s\n",func->mangleFunName);
-                     mtcsFuncType = class_func_get_mtcs_type(parentFunc);
-                     class_func_set_mtcs(func,TRUE);
-                     class_func_set_mtcs_type(func,(MtcsFuncType)mtcsFuncType);
-                     addMiiAttribute(func,decl);
-                     func->permission = parentFunc->permission;
-                  }
-                  break;
-               }
-               info=class_mgr_get_class_info(class_mgr_get(),info->parentName.sysName);
-            }
-            if(mtcsFuncType==MTCS_FUNC_NOT)
-               return;
-         }
-      }else
-         return;
-   }
-   //已经设过类型
-   if(class_func_is_mtcs(func)){
-      MtcsFuncType old = class_func_get_mtcs_type(func);
-      if(old!=mtcsFuncType){
-         location_t loc = DECL_SOURCE_LOCATION(decl);
-         error_at(loc,"函数声明是:%s,实现是:%s 声明与实现不匹配。",
-               mtcs_info_get_mtcs_type_string(old),mtcs_info_get_mtcs_type_string(mtcsFuncType));
-      }
-   }
-   class_func_set_mtcs(func,TRUE);
-   class_func_set_mtcs_type(func,(MtcsFuncType)mtcsFuncType);
-   addMiiAttribute(func,decl);
-   self->haveMtcsFunc = TRUE;
-   const char *mtcsFuncTypeStr = mtcs_info_get_mtcs_type_string((MtcsFuncType)mtcsFuncType);
-   n_debug("mtcsparser.c mtcs_parser_check 设函数类型 %s\n",mtcsFuncTypeStr);
-   DECL_ATTRIBUTES (decl) = tree_cons (get_identifier (mtcsFuncTypeStr),NULL_TREE, DECL_ATTRIBUTES (decl));
-   if(func->permission!=CLASS_PERMISSION_PRIVATE){ //
-      DECL_ATTRIBUTES (decl) = tree_cons (get_identifier (MTCS_FN_VISIBLE),NULL_TREE, DECL_ATTRIBUTES (decl));
-   }
-   nboolean isFuncGeneric = class_func_is_func_generic(func);
-   if(isFuncGeneric){
-      error_at(DECL_SOURCE_LOCATION(decl),"核函数或设备函数不能声明为泛型函数%qD",decl);
-   }
-   int genParamCount = class_func_get_generic_param_count(func);
-   char *sysName= class_func_get_class_name(func);
-   ClassName *className = class_mgr_get_class_name_by_sys(class_mgr_get(),sysName);
-   nboolean selfAboutGen = class_mgr_about_generic(class_mgr_get(),className);
-   //printf("是不是泛型func xx:%d genParamCount:%d className:%s selfAboutGen:%d\n",isFuncGeneric,genParamCount,sysName,selfAboutGen);
-   if(selfAboutGen && genParamCount-1>0){
-      error_at(DECL_SOURCE_LOCATION(decl),"核函数或设备函数的不能有泛型参数%qD",decl);
-   }
-   if(mtcsFuncType==MTCS_FUNC_KERNEL){
-      tree rtn = getRtn(decl);
-      if(rtn!=void_type_node){
-         error_at(DECL_SOURCE_LOCATION(decl),"核函数的返回值必须是void类型%qD",decl);
-      }
-   }
-   if(haveVariableParam(decl)){
-      error_at(DECL_SOURCE_LOCATION(decl),"核函数或设备函数不能有可变参数%qD",decl);
-   }
-   TREE_USED(decl) = 1;
-   DECL_PRESERVE_P (decl) = 1; //重要,否则经过gimple后，函数被移走
-   //bug 073
-   if(mtcsFuncType==MTCS_FUNC_KERNEL && TREE_CODE(decl)==FUNCTION_DECL){
-      tree attrs = DECL_ATTRIBUTES (decl);
-      //加 noinline
-      if (!lookup_attribute ("noinline", attrs))
-         attrs = tree_cons (get_identifier ("noinline"), NULL, attrs);
-      //加 noclone
-      if (!lookup_attribute ("noclone", attrs))
-         attrs = tree_cons (get_identifier ("noclone"), NULL, attrs);
-      DECL_ATTRIBUTES (decl) = attrs;
-      // 核心标志位：确保优化器尊重这些属性
-      DECL_UNINLINABLE (decl) = 1;
-   }
-   //如果编译选项有 -fsanitize=address 屏蔽，因为ptx不支持
-   if(flag_sanitize &&
-         (mtcsFuncType==MTCS_FUNC_KERNEL || mtcsFuncType==MTCS_FUNC_DEVICE ||  mtcsFuncType==MTCS_FUNC_DEVICE_HOST)
-         && TREE_CODE(decl)==FUNCTION_DECL)
-      add_no_sanitize_value (decl, "all");
 }
 
 static void checkVarSize(MtcsParser *self,tree decl,nboolean finishDecl)
@@ -810,25 +438,12 @@ static nboolean replaceArrayTypeDomain(tree vardecl)
 *   需要把常数变量 threads改为常数
 *   如果threads不是常数需要报错。
  */
-void mtcs_parser_check(MtcsParser *self,tree decl,nboolean finishDecl)
-{
-   if(TREE_CODE(decl)==FUNCTION_DECL || (TREE_CODE(decl)==FIELD_DECL  && class_util_is_function_field(decl))){
-      checkFuncDefineAndField(self,decl,finishDecl);
-   }else if(TREE_CODE(decl)==FIELD_DECL && !class_util_is_function_field(decl)){
-      MtcsVarType type = getMtcsVarType(self,decl);
-      if(type==MTCS_VAR_NOT)
-         return;
-      error_at(DECL_SOURCE_LOCATION(decl),"不能在类中声明MTCS变量%qD。可以声明为静态变量。",decl);
-//      self->haveMtcsVar = TRUE;
-//      ClassParser       *classParser = class_parser_get();
-//      char *sysName = classParser->currentClassName->sysName;
-//      char *varName = IDENTIFIER_POINTER(DECL_NAME(decl));
-//      VarEntity *entity = var_mgr_get_var(var_mgr_get(),sysName,varName);
-//      printf("mtcsparser.c mtcs_parser_check 11 类变量 %s %s entity:%p\n",sysName,IDENTIFIER_POINTER(DECL_NAME(decl)),entity);
-      //在文件范围内创建同类型的变量 有个问题 变量的存储分配是按对象实例分的，
 
-   }else if(VAR_P(decl)){
-      MtcsVarType type = getMtcsVarType(self,decl);
+void mtcs_parser_set_mtcs_var(MtcsParser *self,tree decl)
+{
+  if(VAR_P(decl)){
+      nboolean finishDecl = TRUE;
+      MtcsVarType type = mtcs_info_get_and_check_var_type(decl,DECL_SOURCE_LOCATION(decl));
       if(type==MTCS_VAR_NOT)
          return;
       self->haveMtcsVar = TRUE;
@@ -896,6 +511,7 @@ void mtcs_parser_check(MtcsParser *self,tree decl,nboolean finishDecl)
  */
 char *mtcs_parser_add_buitlins_tree(MtcsParser *self)
 {
+   self->haveMtcsFunc = func_mgr_have_mtcs_func(func_mgr_get());
    if(self->haveMtcsFunc || self->haveMtcsVar)
       return mtcs_builtin_tree_create_builtins_decl(self->mtcsBuiltinTree);
    return NULL;
@@ -946,7 +562,7 @@ void mtcs_parser_modify_check(MtcsParser *self,location_t loc,tree lhs,tree rhs)
 {
    if(lhs && VAR_P(lhs)){
       if(!self->enterFuncBody && current_function_decl){
-         MtcsVarType type = getMtcsVarType(self,lhs);
+         MtcsVarType type = mtcs_info_get_and_check_var_type(lhs,DECL_SOURCE_LOCATION(lhs));
          if(type==MTCS_VAR_SHARED){
            warning_at(loc,0,"__shared__ 共享变量%qD不能直接在主机函数内写入。",lhs);
          }
@@ -954,7 +570,7 @@ void mtcs_parser_modify_check(MtcsParser *self,location_t loc,tree lhs,tree rhs)
    }
    if(rhs && VAR_P(rhs)){
       if(!self->enterFuncBody && current_function_decl){
-           MtcsVarType type = getMtcsVarType(self,rhs);
+           MtcsVarType type =  mtcs_info_get_and_check_var_type(rhs,DECL_SOURCE_LOCATION(rhs));
            if(type==MTCS_VAR_SHARED){
               //先进入 mtcs_parser_postfix_expression 才会到 modify
             // warning_at(loc,0,"变量%qD不能直接在主机函数内读入。",rhs);
@@ -980,7 +596,7 @@ void mtcs_parser_postfix_expression (MtcsParser *self,location_t loc,tree value)
       //不在mtcs函数内，并且是变量
       c_parser *parser=self->aetParser->parser;
       if(!c_parser_next_token_is (parser, CPP_EQ)){
-         MtcsVarType type = getMtcsVarType(self,value);
+         MtcsVarType type = mtcs_info_get_and_check_var_type(value,DECL_SOURCE_LOCATION(value));
          if(type==MTCS_VAR_SHARED){
             warning_at(loc,0,"__shared__ 共享变量%qD不能直接在主机函数内读入或写入。",value);
          }else if(type==MTCS_VAR_CONSTANT){
@@ -1129,15 +745,6 @@ void mtcs_parser_link_func(MtcsParser *self,char *objRootPath,NPtrArray **arrays
 {
    mtcs_link_link(self->mtcsLink,objRootPath,arrays,length,pos);
 }
-
-/**
- * 返回fndecl的类型 MTCS_FUNC_DEVICE 还是 MTCS_FUNC_KERNEL...
- */
-int  mtcs_parser_get_func_type(MtcsParser *self,tree fndecl)
-{
-   return getMtcsFuncType(self,fndecl);
-}
-
 
 MtcsParser *mtcs_parser_get()
 {

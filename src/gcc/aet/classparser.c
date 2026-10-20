@@ -73,8 +73,6 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 int enter_aet=0;
 
 static void restoreToken(ClassParser *self);
-/* Implement "#pragma mtcs oepration".  */
-static void mtcs_intrinsic_pragma_cb (cpp_reader *);
 
 /**
  * 主要实现功能：
@@ -131,6 +129,7 @@ static void classParserInit(ClassParser *self)
    self->classPermission=class_permission_new();
    self->classBuild=class_build_new();//AClass中的变量赋值代码生成器
    self->superCall=super_call_new();
+   self->intrinsicParser = intrinsic_parser_new();
    self->state=CLASS_STATE_STOP;
    self->currentClassName=NULL;
    n_log_set_param_from_env();
@@ -141,128 +140,6 @@ static void classParserInit(ClassParser *self)
    self->addAetHeader.added=FALSE;
    self->addAetHeader.backTokenCount=0;
    self->addAetHeader.running=FALSE;
-
-   /*注册新的属性用于修饰class是一个target_intrinsic类*/
-   //mii是mtcs_intrinsic_implements的缩写，表示mtcs内在实现
-   //public$ final$ __attribute__((mii("ptx"))) class$ CudaMemInstrinsic
-   //mtcs_intrinsic_class参数 1.目标(ptx,gcn...) 2.版本(sm_32,sm_75) 3.保留
-   const struct attribute_spec *spx=lookup_attribute_spec (get_identifier(MTCS_INTRINSIC_CLASS));
-   if(!spx){
-      struct attribute_spec *atts =new attribute_spec {xstrdup(MTCS_INTRINSIC_CLASS),
-      0, -2, false,  false, false, false, NULL, NULL };
-      register_attribute (atts);
-   }
-
-   spx=lookup_attribute_spec (get_identifier(MTCS_INTRINSIC_IMPLEMENTS));
-   if(!spx){
-      struct attribute_spec *atts =new attribute_spec {xstrdup(MTCS_INTRINSIC_IMPLEMENTS),
-      0, -2, false,  false, false, false, NULL, NULL };
-      register_attribute (atts);
-   }
-
-   c_register_pragma ("mtcs", "intrinsic", mtcs_intrinsic_pragma_cb);
-   self->mtcsIntrinsic.directives = NULL;
-   self->mtcsIntrinsic.enter = FALSE;
-}
-
-/**
- * mic的attribute 有2个参数，如果没有就加入default
- */
-static void targetIntrinsicFunc_cb(tree fndecl,void *userData)
-{
-   ClassParser *self = (ClassParser *)userData;
-   if(!self->mtcsIntrinsic.enter)
-      return ;
-   //获取target,version ,diretcive
-   ClassInfo *info = class_mgr_get_class_info_by_class_name(class_mgr_get(),self->currentClassName);
-   gcc_assert(info && class_info_is_mic(info));
-   tree intrinsicAtt=  class_info_get_mic_attribute(info);
-   printf("mic 的 func attribute111\n");
-
-   aet_print_tree(intrinsicAtt);
-   gcc_assert(intrinsicAtt);
-   int device = mtcs_parser_get_func_type(mtcs_parser_get(),fndecl);
-   if(device!=MTCS_FUNC_DEVICE)
-      return;
-   //把__attribute__((mic())) 与 #pragma mtcs intrinsic
-   //合并到 mtcs_intrinsic_class,然后加入到fndecl的属性中
-   tree intrinsic = NULL_TREE;
-   tree list = NULL_TREE;
-
-   int ix=0;
-   for (tree a = TREE_VALUE (intrinsicAtt); a; a = TREE_CHAIN (a)){
-      tree d = TREE_VALUE (a);
-      list=tree_cons (NULL_TREE, d, list);
-      ix++;
-   }
-   if(ix==0){
-      list=tree_cons (NULL_TREE, get_identifier("param1"), list);
-      list=tree_cons (NULL_TREE, get_identifier("param2"), list);
-   }else if(ix==1){
-      list=tree_cons (NULL_TREE, get_identifier("param2"), list);
-   }
-   char *pragamName=self->mtcsIntrinsic.directives;
-   if(!pragamName)
-      pragamName = "default";
-   list=tree_cons (NULL_TREE, get_identifier(pragamName), list);
-   list = nreverse(list);
-   intrinsic = build_tree_list (get_identifier(MTCS_INTRINSIC_FUNCTION_DECL),list);
-
-   tree attrs = DECL_ATTRIBUTES (fndecl);
-   if(!attrs)
-      DECL_ATTRIBUTES (fndecl) = tree_cons (intrinsic,NULL_TREE,DECL_ATTRIBUTES (fndecl));
-   else{
-      attrs=chainon (attrs, intrinsic);
-   }
-   DECL_ATTRIBUTES (fndecl) = attrs;
-   printf("mic 的 func attribute 00 fndecl:%p TREE_STATIC:%d\n",fndecl,TREE_STATIC(fndecl));
-   aet_print_tree(DECL_ATTRIBUTES (fndecl));
-   tree mtcs=lookup_attribute (MTCS_DEVICE_STRING, DECL_ATTRIBUTES (fndecl));
-   tree mtcs1=lookup_attribute (MTCS_INTRINSIC_FUNCTION_DECL, DECL_ATTRIBUTES (fndecl));
-   printf("mic 的 func attributevvv 11 \n");
-
-   aet_print_tree(mtcs);
-   printf("mic 的 func attributexxx 22\n");
-   aet_print_tree(mtcs1);
-}
-
-
-/**
- * 实现 #pragma mtcs operation
- */
-static void mtcs_intrinsic_pragma_cb (cpp_reader *)
-{
-   tree x;
-   location_t loc;
-   pragma_lex (&x,&loc);
-   printf("mtcs_intrinsic_pragma_cb ----\n");
-   aet_print_tree(x);
-
-   //  if (pragma_lex (&x) != CPP_STRING){
-   //      error ("%<#pragma mtcs operation%> requires a string parameter");
-   //      return;
-   //    }
-
-   const char *name =x?TREE_STRING_POINTER (x):NULL;
-
-
-   //  if (strcmp (name, "arm_sve.h") == 0)
-   //    aarch64_sve::handle_arm_sve_h (false);
-   //  else
-   //  error ("unknown %<#pragma mtcs operation%> option %qs", name);
-   ClassParser *self  = class_parser_get();
-   printf("mtcs_intrinsic_pragma_cb state:%d name:%s\n",self->state,name);
-   if(self->state!=CLASS_STATE_FIELD){
-      error_at(loc,"#pragma mtcs intrinsic 只能用在类声明中。");
-   }
-   //检查所在类是不是一个普通的类
-   ClassInfo *info= class_mgr_get_class_info_by_class_name(class_mgr_get(),self->currentClassName);
-   if(!class_info_is_mic(info)){
-      error_at(loc,"#pragma mtcs intrinsic 所在的类没有属性 'mic'。");
-   }
-   self->mtcsIntrinsic.directives = name;
-   self->mtcsIntrinsic.enter = TRUE;
-   parser_static_set_func(parser_static_get(),targetIntrinsicFunc_cb,(void *)self);
 }
 
 /**
@@ -457,15 +334,15 @@ static tree  c_parser_class_declaration (ClassParser *self,ClassInfo *classInfo,
       aet_print_token(c_parser_peek_token (parser));
       char *str=IDENTIFIER_POINTER(c_parser_peek_token (parser)->value);
       location_t loc=c_parser_peek_token (parser)->location;
-      nboolean isMtcsAttr=mtcs_parser_is_attribute(mtcs_parser_get(),c_parser_peek_token (parser));
-      if(isMtcsAttr){
-         n_debug("class内的声明 44 class_permission_set_decorate 11 mtcs_types_init");
-         mtcs_parser_add_attribute(mtcs_parser_get());
-      }
+//      nboolean isMtcsAttr=mtcs_parser_is_attribute(mtcs_parser_get(),c_parser_peek_token (parser));
+//      if(isMtcsAttr){
+//         n_debug("class内的声明 44 class_permission_set_decorate 11 mtcs_types_init");
+//         mtcs_parser_add_attribute(mtcs_parser_get());
+//      }
       needCheckConstructors=!(class_ctor_parser_constructor(self->classCtor,className));
-      if(!needCheckConstructors && isMtcsAttr){
-          error_at(loc,"构造函数不能声明为核函数或设备函数");
-      }
+//      if(!needCheckConstructors && isMtcsAttr){
+//          error_at(loc,"构造函数不能声明为核函数或设备函数");
+//      }
       c_token *token=c_parser_peek_token (parser);
       n_debug("class内的声明 55 是一个泛型吗  needCheckConstructors:%d %s\n",
             needCheckConstructors,IDENTIFIER_POINTER(token->value));
@@ -483,14 +360,14 @@ static tree  c_parser_class_declaration (ClassParser *self,ClassInfo *classInfo,
       if(c_parser_next_token_is (parser, CPP_NAME)){
          char *str=IDENTIFIER_POINTER(c_parser_peek_token (parser)->value);
          location_t loc=c_parser_peek_token (parser)->location;
-         nboolean isMtcsAttr=mtcs_parser_is_attribute(mtcs_parser_get(),c_parser_peek_token (parser));
-         if(isMtcsAttr){
-              mtcs_parser_add_attribute(mtcs_parser_get());
-         }
+//         nboolean isMtcsAttr=mtcs_parser_is_attribute(mtcs_parser_get(),c_parser_peek_token (parser));
+//         if(isMtcsAttr){
+//              mtcs_parser_add_attribute(mtcs_parser_get());
+//         }
          needCheckConstructors=!(class_ctor_parser_constructor(self->classCtor,className));
-         if(!needCheckConstructors && isMtcsAttr){
-            error_at(loc,"构造函数不能声明为核函数或设备函数");
-         }
+//         if(!needCheckConstructors && isMtcsAttr){
+//            error_at(loc,"构造函数不能声明为核函数或设备函数");
+//         }
          c_token *token=c_parser_peek_token (parser);
          n_debug("class内的声明 77 是一个泛型吗? %s\n",IDENTIFIER_POINTER(token->value));
          if(generic_util_valid_id(token->value))
@@ -511,10 +388,10 @@ static tree  c_parser_class_declaration (ClassParser *self,ClassInfo *classInfo,
    }
 
    //在这里匹配的是public$  __global__  int   setData(void *data);
-   if(mtcs_parser_is_attribute(mtcs_parser_get(),c_parser_peek_token (parser))){
-      n_debug("class内的声明 99 token 是一个MTCS 属性 sysClassName:%s", className->sysName);
-      mtcs_parser_add_attribute(mtcs_parser_get());
-   }
+//   if(mtcs_parser_is_attribute(mtcs_parser_get(),c_parser_peek_token (parser))){
+//      n_debug("class内的声明 99 token 是一个MTCS 属性 sysClassName:%s", className->sysName);
+//      mtcs_parser_add_attribute(mtcs_parser_get());
+//   }
    aet_parser_c_parser_declspecs/*!c_parser_declspecs*/(self->parser,
          specs, false, true, true,true, false, true, true, cla_nonabstract_decl);
    if (parser->error)
@@ -524,12 +401,12 @@ static tree  c_parser_class_declaration (ClassParser *self,ClassInfo *classInfo,
       return NULL_TREE;
    }
    //在这里匹配的是public$  int  __global__  setData(void *data);
-   if(mtcs_parser_is_attribute(mtcs_parser_get(),c_parser_peek_token (parser))){
-        n_debug("class内的声明 100 token 是一个MTCS 属性 sysClassName:%s", className->sysName);
-        mtcs_parser_add_attribute(mtcs_parser_get());
-        aet_parser_c_parser_declspecs/*!c_parser_declspecs*/(self->parser,
-              specs, false, true, true,true, false, true, true, cla_nonabstract_decl);
-   }
+//   if(mtcs_parser_is_attribute(mtcs_parser_get(),c_parser_peek_token (parser))){
+//        n_debug("class内的声明 100 token 是一个MTCS 属性 sysClassName:%s", className->sysName);
+//        mtcs_parser_add_attribute(mtcs_parser_get());
+//        aet_parser_c_parser_declspecs/*!c_parser_declspecs*/(self->parser,
+//              specs, false, true, true,true, false, true, true, cla_nonabstract_decl);
+//   }
    finish_declspecs (specs);
    n_debug("class内的声明 101 到这里specs已有声明说明符了比如 int 完成finish_declspecs %p",specs);
    class_parser_complete_enum(self,specs,TRUE,dr.permission,className);
@@ -667,7 +544,9 @@ static tree  c_parser_class_declaration (ClassParser *self,ClassInfo *classInfo,
          n_debug("class内的声明 109 并在这里改名 grokfield className:%s isQueryFunction:%d structTree:%p\n",
                className->sysName,isQueryGenFunc,structTree);
          int errInfo=0;
-         ClassFunc *newFunc=func_mgr_change_class_func_decl(func_mgr_get(),declarator,className,structTree,&errInfo);
+         ClassFunc *newFunc=func_mgr_change_class_func_decl(func_mgr_get(),
+               declarator,className,structTree,&errInfo);
+         aet_print_tree(all_prefix_attrs);
          if(newFunc && errInfo==-2){
             n_debug("class内的声明 110 在类中声明与接口重复的函数了----%s\n",className->sysName);
             if(self->state==CLASS_STATE_ABSTRACT){
@@ -688,7 +567,9 @@ static tree  c_parser_class_declaration (ClassParser *self,ClassInfo *classInfo,
          checkAndSetGeneric(self,d, fieldGenericModel,funcGenericModel,(newFunc && errInfo==0),declarator);
          DECL_CHAIN (d) = decls;
          decls = d;
-         //n_debug("新----struct内的声明 88 并在这里改名 newFunc:%p",newFunc);
+         n_debug("新----struct内的声明 88 并在这里改名 newFunc:%p",newFunc);
+         aet_print_tree(all_prefix_attrs);
+
          if(newFunc && errInfo==0)
             class_func_set_decl(newFunc,decls,STRUCT_DECL);
          else{//说明是变量
@@ -1020,8 +901,7 @@ static void classCompleted (ClassParser *self)
 {
    self->state=CLASS_STATE_STOP;
    self->currentClassName=NULL;
-   self->mtcsIntrinsic.directives = NULL;
-   self->mtcsIntrinsic.enter = FALSE;
+   intrinsic_parser_class_end(self->intrinsicParser);
 }
 /**
  *解析类或接口声明，即 class$ Abc{ 或 interface$ Abc{
@@ -1031,8 +911,8 @@ struct c_typespec class_parser_parser_class_specifier (ClassParser *self)
    c_parser *parser=self->parser->parser;
    enter_aet=1;//进入了aet
    if(!self->expandMemory){
-      param_ggc_min_expand = param_ggc_min_expand*4;
-      param_ggc_min_heapsize = param_ggc_min_heapsize*4;
+      param_ggc_min_expand = param_ggc_min_expand*8;
+      param_ggc_min_heapsize = param_ggc_min_heapsize*8;
       self->expandMemory = TRUE;
    }
 
@@ -1196,7 +1076,6 @@ struct c_typespec class_parser_parser_class_specifier (ClassParser *self)
                continue;
             }
          }
-         mtcs_parser_check(mtcs_parser_get(),decls,TRUE);
          if(isStatic==0){
             contents = chainon (decls, contents);
             nboolean result=setFuncAbstractQual(self,decls,&classInfo->className,classType,loc);

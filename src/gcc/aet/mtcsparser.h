@@ -53,10 +53,6 @@ struct _MtcsParser
 };
 
 MtcsParser *mtcs_parser_get();
-//供funccall回调
-nboolean   mtcs_parser_is_attribute(MtcsParser *self,c_token *token);
-nboolean   mtcs_parser_add_attribute(MtcsParser *self);
-void       mtcs_parser_check(MtcsParser *self,tree decl,nboolean finishDecl);
 
 void       mtcs_parser_enter_function_body(MtcsParser *self);
 void       mtcs_parser_exit_function_body(MtcsParser *self);
@@ -82,14 +78,13 @@ tree mtcs_parser_create_platform_type_var(MtcsParser *self,location_t loc);
  *static __device__ void *_TFirst_deviceFuncPointers[]={_Z6TFirst10testkernelEPN6TFirstE};
  */
 char      *mtcs_parser_create_device_func_pointers_var(MtcsParser *self,ClassName *className);
-/**
- * 创建的代码嵌入到类初始化方法中。
- */
-char      *mtcs_parser_modify_host_device_func_var_array(MtcsParser *self,ClassName *className);
+
 nboolean   mtcs_parser_have_mtcs(MtcsParser *self);
 
 void       mtcs_parser_link_func(MtcsParser *self,char *objRootPath,NPtrArray **arrays,int length,int pos);
-int        mtcs_parser_get_func_type(MtcsParser *self,tree fndecl);
+//在解析变量时调用该方法设置mtcs变量
+void       mtcs_parser_set_mtcs_var(MtcsParser *self,tree decl);
+
 #endif
 
 

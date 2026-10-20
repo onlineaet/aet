@@ -43,9 +43,11 @@ MtcsReplace  *mtcs_replace_new(MtcsMode *mtcsMode);
 //2.gimple_assign <mem_ref, _2, MEM[(long unsigned int *)_TSecond_parent__superFuncAddressArray.2_1 + 32B], NULL, NULL>
 //为
 //gimple_assign <array_ref, _1, _TSecond_parent__superDeviceAddressArray[4], NULL, NULL>
-void          mtcs_replace_parent_device_func_array(MtcsReplace *self,struct cgraph_node *newNode);
-void          mtcs_replace_switch(MtcsReplace *self,struct cgraph_node *newNode);
-//void          mtcs_replace_replace_intrinsic(MtcsReplace *self,gcall *call);
-nuint mtcs_replace_replace_intrinsic(MtcsReplace *self,gimple_stmt_iterator *gsi,gcall *call);
+void  mtcs_replace_parent_device_func_array(MtcsReplace *self,struct cgraph_node *newNode);
+void  mtcs_replace_switch(MtcsReplace *self,struct cgraph_node *newNode);
+//内联mii函数
+nuint mtcs_replace_inline_intrinsic(MtcsReplace *self,struct cgraph_node *newNode,tree fndecl);
+//替换mic函数调用为mii函数调用
+nuint mtcs_replace_replace_intrinsic(MtcsReplace *self,gcall *call);
 
 #endif

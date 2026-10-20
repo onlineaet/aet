@@ -21,7 +21,6 @@
 #ifndef __AET_CUDA_STREAM_H__
 #define __AET_CUDA_STREAM_H__
 
-#include <cuda_runtime.h>
 #include "../../../aet.h"
 #include "../MtcsStream.h"
 

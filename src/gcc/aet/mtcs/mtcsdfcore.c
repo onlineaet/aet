@@ -380,7 +380,7 @@ void mtcs_dfcore_df_finish_pass (MtcsDfcore *self,bool verify ATTRIBUTE_UNUSED)
    MtcsOptions *mtcsOptions=mtcs_target_get_options(mtcsTarget);
    MtcsOptionsItem *mtcsOptionsItem=mtcsOptions->global_options;
 
-   n_debug("mtcsdfcore.c mtcs_dfcore_df_finish_pass 00 verify:%d\n",verify);
+   //n_debug("mtcsdfcore.c mtcs_dfcore_df_finish_pass 00 verify:%d\n",verify);
    int i;
 
 #ifdef ENABLE_DF_CHECKING
@@ -391,10 +391,10 @@ void mtcs_dfcore_df_finish_pass (MtcsDfcore *self,bool verify ATTRIBUTE_UNUSED)
       return;
 
    mtcs_dfscan_df_maybe_reorganize_def_refs/*!df_maybe_reorganize_def_refs*/(mtcsDfscan,DF_REF_ORDER_NO_TABLE);
-   n_debug("mtcsdfcore.c mtcs_dfcore_df_finish_pass 11 verify:%d\n",verify);
+ //  n_debug("mtcsdfcore.c mtcs_dfcore_df_finish_pass 11 verify:%d\n",verify);
 
    mtcs_dfscan_df_maybe_reorganize_use_refs/*!df_maybe_reorganize_use_refs*/(mtcsDfscan,DF_REF_ORDER_NO_TABLE);
-   n_debug("mtcsdfcore.c mtcs_dfcore_df_finish_pass 22 verify:%d\n",verify);
+   //n_debug("mtcsdfcore.c mtcs_dfcore_df_finish_pass 22 verify:%d\n",verify);
 
 #ifdef ENABLE_DF_CHECKING
    saved_flags = df->changeable_flags;
@@ -404,7 +404,7 @@ void mtcs_dfcore_df_finish_pass (MtcsDfcore *self,bool verify ATTRIBUTE_UNUSED)
    lead to problems_in_order to be reordered.  */
    for (i = 0; i < DF_LAST_PROBLEM_PLUS1; i++){
       struct dataflow *dflow = df->problems_by_index[i];
-      n_debug("mtcsdfcore.c mtcs_dfcore_df_finish_pass 33 verify:%d %d\n",verify,dflow && dflow->optional_p);
+      //n_debug("mtcsdfcore.c mtcs_dfcore_df_finish_pass 33 verify:%d %d\n",verify,dflow && dflow->optional_p);
 
       if (dflow && dflow->optional_p)
          mtcs_dfcore_df_remove_problem/*!df_remove_problem*/(self,dflow);
@@ -416,7 +416,7 @@ void mtcs_dfcore_df_finish_pass (MtcsDfcore *self,bool verify ATTRIBUTE_UNUSED)
 
    /* Set the focus back to the whole function.  */
    if (df->blocks_to_analyze){
-      n_debug("mtcsdfcore.c mtcs_dfcore_df_finish_pass 44 verify:%d \n",verify);
+      //n_debug("mtcsdfcore.c mtcs_dfcore_df_finish_pass 44 verify:%d \n",verify);
 
       BITMAP_FREE (df->blocks_to_analyze);
       df->blocks_to_analyze = NULL;
@@ -461,7 +461,7 @@ static unsigned int rest_of_handle_df_initialize (MtcsDfcore *self)
    gcc_assert (!df);
    df = XCNEW (class df_d);
    df->changeable_flags = 0;
-   n_debug("mtcsdfcore.c rest_of_handle_df_initialize 00 df->postorder:%p\n ",df->postorder);
+   //n_debug("mtcsdfcore.c rest_of_handle_df_initialize 00 df->postorder:%p\n ",df->postorder);
 
    bitmap_obstack_initialize (&self->df_bitmap_obstack);
 
@@ -469,34 +469,34 @@ static unsigned int rest_of_handle_df_initialize (MtcsDfcore *self)
    correctly later.  */
    mtcsRtlData/*!crtl*/->sp_is_unchanging = 0;
    mtcs_dfscan_df_scan_add_problem/*!df_scan_add_problem*/(mtcsDfscan);
-   n_debug("mtcsdfcore.c rest_of_handle_df_initialize 11\n ");
+   //n_debug("mtcsdfcore.c rest_of_handle_df_initialize 11\n ");
 
    mtcs_dfscan_df_scan_alloc/*!df_scan_alloc*/(mtcsDfscan,NULL);
-   n_debug("mtcsdfcore.c rest_of_handle_df_initialize 22\n ");
+   //n_debug("mtcsdfcore.c rest_of_handle_df_initialize 22\n ");
 
    /* These three problems are permanent.  */
    mtcs_dfproblems_df_lr_add_problem/*!df_lr_add_problem*/(mtcsDfproblems);
-   n_debug("mtcsdfcore.c rest_of_handle_df_initialize 33 optimize:%d\n",mtcsOptionsItem->x_optimize);
+   //n_debug("mtcsdfcore.c rest_of_handle_df_initialize 33 optimize:%d\n",mtcsOptionsItem->x_optimize);
 
    if (mtcsOptionsItem->x_optimize > 1)
       mtcs_dfproblems_df_live_add_problem/*!df_live_add_problem*/(mtcsDfproblems);
 
    int firstPseudoRegister = mtcs_reg_get_first_pseudo_register(mtcsReg);
 
-   n_debug("mtcsdfcore.c rest_of_handle_df_initialize 44 :%d\n ",firstPseudoRegister);
+   //n_debug("mtcsdfcore.c rest_of_handle_df_initialize 44 :%d\n ",firstPseudoRegister);
 
    df->hard_regs_live_count = XCNEWVEC (unsigned int, firstPseudoRegister/*!FIRST_PSEUDO_REGISTER*/);
 
    mtcs_dfscan_df_hard_reg_init/*!df_hard_reg_init*/(mtcsDfscan);
-   n_debug("mtcsdfcore.c rest_of_handle_df_initialize 55\n ");
+   //n_debug("mtcsdfcore.c rest_of_handle_df_initialize 55\n ");
 
    /* After reload, some ports add certain bits to regs_ever_live so
    this cannot be reset.  */
    mtcs_dfscan_df_compute_regs_ever_live/*!df_compute_regs_ever_live*/(mtcsDfscan,true);
-   n_debug("mtcsdfcore.c rest_of_handle_df_initialize 66\n ");
+   //n_debug("mtcsdfcore.c rest_of_handle_df_initialize 66\n ");
 
    mtcs_dfscan_df_scan_blocks/*!df_scan_blocks*/(mtcsDfscan);
-   n_debug("mtcsdfcore.c rest_of_handle_df_initialize 77\n ");
+   //n_debug("mtcsdfcore.c rest_of_handle_df_initialize 77\n ");
 
    mtcs_dfscan_df_compute_regs_ever_live/*!df_compute_regs_ever_live*/(mtcsDfscan,false);
    return 0;
@@ -508,33 +508,30 @@ static unsigned int rest_of_handle_df_finish (MtcsDfcore *self)
 {
    int i;
    gcc_assert (df);
-   n_debug("mtcsdfcore.c rest_of_handle_df_finish 00 df->num_problems_defined:%d\n",df->num_problems_defined);
+   //n_debug("mtcsdfcore.c rest_of_handle_df_finish 00 df->num_problems_defined:%d\n",df->num_problems_defined);
    for (i = 0; i < df->num_problems_defined; i++){
       struct dataflow *dflow = df->problems_in_order[i];
-      n_debug("mtcsdfcore.c rest_of_handle_df_finish i:%d id:%d dir:%d %p\n",
-            i,dflow->problem->id,dflow->problem->dir,dflow->problem->free_fun);
-
-
+     // n_debug("mtcsdfcore.c rest_of_handle_df_finish i:%d id:%d dir:%d %p\n",
+      //i,dflow->problem->id,dflow->problem->dir,dflow->problem->free_fun);
       if (dflow->problem->free_fun)
-    dflow->problem->free_fun ();
-       else
-    free (dflow);
+         dflow->problem->free_fun ();
+      else
+         free (dflow);
    }
 
-
-   n_debug("mtcsdfcore.c rest_of_handle_df_finish 11\n");
+   //n_debug("mtcsdfcore.c rest_of_handle_df_finish 11\n");
 
    free (df->postorder);
    free (df->postorder_inverted);
    free (df->hard_regs_live_count);
-   n_debug("mtcsdfcore.c rest_of_handle_df_finish 22\n");
+   //n_debug("mtcsdfcore.c rest_of_handle_df_finish 22\n");
 
    free (df);
-   n_debug("mtcsdfcore.c rest_of_handle_df_finish 33\n");
+   //n_debug("mtcsdfcore.c rest_of_handle_df_finish 33\n");
 
    df = NULL;
    bitmap_obstack_release (&self->df_bitmap_obstack);
-   n_debug("mtcsdfcore.c rest_of_handle_df_finish 44\n");
+   //n_debug("mtcsdfcore.c rest_of_handle_df_finish 44\n");
 
    return 0;
 }
@@ -2289,22 +2286,22 @@ static nuint df_finish_execute_cb(MtcsPass *mtcsPass,function *func)
 
 static void mtcsPassDfFinishInit(MtcsPassDfFinish *self)
 {
-    MtcsPass *mtcsPass=(MtcsPass *)self;
-    mtcsPass->execute =df_finish_execute_cb;
-    mtcs_pass_set_properties((MtcsPass *)self,
-            0,/* properties_required */
-            0, /* properties_provided */
-            0 /* properties_destroyed */);
-    mtcs_pass_set_todo_flags((MtcsPass *)self,
-          0, /* todo_flags_start */
-          0 /*todo_flags_finish */);
+   MtcsPass *mtcsPass=(MtcsPass *)self;
+   mtcsPass->execute =df_finish_execute_cb;
+   mtcs_pass_set_properties((MtcsPass *)self,
+         0,/* properties_required */
+         0, /* properties_provided */
+         0 /* properties_destroyed */);
+   mtcs_pass_set_todo_flags((MtcsPass *)self,
+         0, /* todo_flags_start */
+         0 /*todo_flags_finish */);
 }
 
 MtcsPassDfFinish *mtcs_pass_df_finish_new(MtcsMode *mtcsMode)
 {
-    MtcsPassDfFinish *self = n_slice_alloc0 (sizeof(MtcsPassDfFinish));
-     mtcs_component_set_mode((MtcsComponent*)self,mtcsMode);
-     mtcs_pass_init((MtcsPass *)self,RTL_PASS,"dfinish");
-     mtcsPassDfFinishInit(self);
-     return self;
+   MtcsPassDfFinish *self = n_slice_alloc0 (sizeof(MtcsPassDfFinish));
+   mtcs_component_set_mode((MtcsComponent*)self,mtcsMode);
+   mtcs_pass_init((MtcsPass *)self,RTL_PASS,"dfinish");
+   mtcsPassDfFinishInit(self);
+   return self;
 }

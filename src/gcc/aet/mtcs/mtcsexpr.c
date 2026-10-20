@@ -283,14 +283,14 @@ rtx mtcs_pieces_addr::adjust (fixed_size_mode mode, HOST_WIDE_INT offset,by_piec
 
 void mtcs_pieces_addr::increment_address (HOST_WIDE_INT size)
 {
-  MtcsMode *mtcsMode=MTCS_GET_MODE_OBJECT(self);
-  MtcsTarget *mtcsTarget=(MtcsTarget *)mtcsMode->target;
-  MtcsRTL *mtcsRTL=mtcs_target_get_rtl(mtcsTarget);
-  MtcsOptabs *mtcsOptabs=mtcs_target_get_optabs(mtcsTarget);
-  MtcsEmit *mtcsEmit=mtcs_target_get_emit(mtcsTarget);
+   MtcsMode *mtcsMode=MTCS_GET_MODE_OBJECT(self);
+   MtcsTarget *mtcsTarget=(MtcsTarget *)mtcsMode->target;
+   MtcsRTL *mtcsRTL=mtcs_target_get_rtl(mtcsTarget);
+   MtcsOptabs *mtcsOptabs=mtcs_target_get_optabs(mtcsTarget);
+   MtcsEmit *mtcsEmit=mtcs_target_get_emit(mtcsTarget);
 
-  rtx amount = mtcs_rtl_gen_int_mode/*!gen_int_mode*/(mtcsRTL,size, GET_MODE (m_addr));
-  mtcs_emit_emit_insn/*!emit_insn*/(mtcsEmit,mtcs_optabs_gen_add2_insn/*!gen_add2_insn*/(mtcsOptabs,m_addr, amount));
+   rtx amount = mtcs_rtl_gen_int_mode/*!gen_int_mode*/(mtcsRTL,size, GET_MODE (m_addr));
+   mtcs_emit_emit_insn/*!emit_insn*/(mtcsEmit,mtcs_optabs_gen_add2_insn/*!gen_add2_insn*/(mtcsOptabs,m_addr, amount));
 }
 
 /* If we are supposed to decrement the address after each access, emit code
@@ -3040,65 +3040,59 @@ static rtx emit_move_change_mode (MtcsExpr *self,machine_mode new_mode, machine_
   }
   return ret;
 }
+
 /* Low level part of emit_move_insn.
    Called just like emit_move_insn, but assumes X and Y
    are basically valid.  */
 //原型 emit_move_insn_1 expr.h expr.cc
 rtx_insn *mtcs_expr_emit_move_insn_1 (MtcsExpr *self,rtx x, rtx y)
 {
-  MtcsMode *mtcsMode=MTCS_GET_MODE_OBJECT(self);
-  MtcsTarget *mtcsTarget=(MtcsTarget *)mtcsMode->target;
-  MtcsOpinit *mtcsOpinit=mtcs_target_get_opinit(mtcsTarget);
-  MtcsEmit *mtcsEmit=mtcs_target_get_emit(mtcsTarget);
-  MtcsRecog *mtcsRecog=mtcs_target_get_recog(mtcsTarget);
+   MtcsMode *mtcsMode=MTCS_GET_MODE_OBJECT(self);
+   MtcsTarget *mtcsTarget=(MtcsTarget *)mtcsMode->target;
+   MtcsOpinit *mtcsOpinit=mtcs_target_get_opinit(mtcsTarget);
+   MtcsEmit *mtcsEmit=mtcs_target_get_emit(mtcsTarget);
+   MtcsRecog *mtcsRecog=mtcs_target_get_recog(mtcsTarget);
 
-  machine_mode mode = GET_MODE (x);
-  enum insn_code code;
-  n_debug("mtcsexpr.c mtcs_expr_emit_move_insn_1 00 mod:%d MAX_MACHINE_MODE:%d mov_optab:%d LAST_CONV_OPTAB:%d\n",
-          mode,mtcs_mode_get_max_number(mtcsMode),mov_optab,LAST_CONV_OPTAB);
-  gcc_assert ((unsigned int) mode < (unsigned int) mtcs_mode_get_max_number(mtcsMode)/*MAX_MACHINE_MODE*/);
-  code = mtcs_opinit_optab_handler/*!optab_handler*/ (mtcsOpinit,mov_optab, mode);
-  n_debug("mtcsexpr.c mtcs_expr_emit_move_insn_1 11 mode:%d code:%d %d\n",mode,code,CODE_FOR_nothing);
+   machine_mode mode = GET_MODE (x);
+   enum insn_code code;
 
-  if (code != CODE_FOR_nothing){
-      n_debug("mtcsexpr.c mtcs_expr_emit_move_insn_1 11---有效的 code mode:%d code:%d %d genfn:%s\n",
-            mode,code,CODE_FOR_nothing,mtcsTarget->mtcsOutput->insn_data[code].name);
-     mtcs_print_rtl(stderr,x);
-     mtcs_print_rtl(stderr,y);
-    return mtcs_emit_emit_insn(mtcsEmit,MTCS_GEN_FCN/*!GEN_FCN*/(code) (x, y));
-  }
-  /* Expand complex moves by moving real part and imag part.  */
-  if (mtcs_mode_is_complex_p/*!COMPLEX_MODE_P*/(mtcsMode,mode))
-    return emit_move_complex (self,mode, x, y);
+   gcc_assert ((unsigned int) mode < (unsigned int) mtcs_mode_get_max_number(mtcsMode)/*MAX_MACHINE_MODE*/);
+   code = mtcs_opinit_optab_handler/*!optab_handler*/ (mtcsOpinit,mov_optab, mode);
 
-  if (mtcs_mode_get_class/*!GET_MODE_CLASS*/(mtcsMode,mode) == MODE_DECIMAL_FLOAT
-          ||mtcs_mode_is_all_fixed_point_p/*! ALL_FIXED_POINT_MODE_P*/(mtcsMode,mode)){
+   if (code != CODE_FOR_nothing){
+   //      n_debug("mtcsexpr.c mtcs_expr_emit_move_insn_1 11---有效的 code mode:%d code:%d %d genfn:%s\n",
+   //            mode,code,CODE_FOR_nothing,mtcsTarget->mtcsOutput->insn_data[code].name);
+      return mtcs_emit_emit_insn(mtcsEmit,MTCS_GEN_FCN/*!GEN_FCN*/(code) (x, y));
+   }
+   /* Expand complex moves by moving real part and imag part.  */
+   if (mtcs_mode_is_complex_p/*!COMPLEX_MODE_P*/(mtcsMode,mode))
+      return emit_move_complex (self,mode, x, y);
+
+   if (mtcs_mode_get_class/*!GET_MODE_CLASS*/(mtcsMode,mode) == MODE_DECIMAL_FLOAT
+   ||mtcs_mode_is_all_fixed_point_p/*! ALL_FIXED_POINT_MODE_P*/(mtcsMode,mode)){
       rtx_insn *result = emit_move_via_integer(self,mode, x, y, true);
       n_debug("mtcsexpr.c mtcs_expr_emit_move_insn_1 22 mode:%d code:%d result:%p\n",mode,code,result);
       /* If we can't find an integer mode, use multi words.  */
       if (result)
-          return result;
+         return result;
       else
-          return emit_move_multi_word (self,mode, x, y);
-  }
+         return emit_move_multi_word (self,mode, x, y);
+   }
 
-  if (mtcs_mode_get_class (mtcsMode,mode) == MODE_CC)
-    return emit_move_ccmode (self,mode, x, y);
-  n_debug("mtcsexpr.c mtcs_expr_emit_move_insn_1 33 mode:%d code:%d\n",mode,code);
-
-  /* Try using a move pattern for the corresponding integer mode.  This is
-     only safe when simplify_subreg can convert MODE constants into integer
-     constants.  At present, it can only do this reliably if the value
-     fits within a HOST_WIDE_INT.  */
-  if (!CONSTANT_P (y)|| known_le (mtcs_mode_get_bitsize(mtcsMode,mode), HOST_BITS_PER_WIDE_INT)){
+   if (mtcs_mode_get_class (mtcsMode,mode) == MODE_CC)
+      return emit_move_ccmode (self,mode, x, y);
+   /* Try using a move pattern for the corresponding integer mode.  This is
+   only safe when simplify_subreg can convert MODE constants into integer
+   constants.  At present, it can only do this reliably if the value
+   fits within a HOST_WIDE_INT.  */
+   if (!CONSTANT_P (y)|| known_le (mtcs_mode_get_bitsize(mtcsMode,mode), HOST_BITS_PER_WIDE_INT)){
       rtx_insn *ret = emit_move_via_integer(self,mode, x, y, lra_in_progress);
       if (ret){
-          if (! lra_in_progress || mtcs_recog_recog/*!recog*/(mtcsRecog,PATTERN (ret), ret, 0) >= 0)
-            return ret;
+         if (! lra_in_progress || mtcs_recog_recog/*!recog*/(mtcsRecog,PATTERN (ret), ret, 0) >= 0)
+         return ret;
       }
-  }
-  n_debug("mtcsexpr.c mtcs_expr_emit_move_insn_1 44 mode:%d code:%d\n",mode,code);
-  return emit_move_multi_word (self,mode, x, y);
+   }
+   return emit_move_multi_word (self,mode, x, y);
 }
 
 
@@ -3164,7 +3158,7 @@ rtx_insn *mtcs_expr_emit_move_insn (MtcsExpr *self,rtx x, rtx y)
     y_inner = SUBREG_REG (y);
 
   if (x_inner != NULL_RTX && y_inner != NULL_RTX && GET_MODE (x_inner) == GET_MODE (y_inner)
-      && !mtcsTarget->can_change_mode_class(mtcsTarget,GET_MODE (x_inner), mode, ALL_REGS)){
+      && !mtcsTarget->can_change_mode_class(mtcsTarget,GET_MODE (x_inner), mode, allRegs/*!ALL_REGS*/)){
       x = x_inner;
       y = y_inner;
       mode = GET_MODE (x_inner);
@@ -3185,7 +3179,8 @@ rtx_insn *mtcs_expr_emit_move_insn (MtcsExpr *self,rtx x, rtx y)
   }
 
   if (CONSTANT_P (y)){
-      if (optimize  && mtcs_mode_is_scalar_float_p(mtcsMode,GET_MODE (x)) && (last_insn = compress_float_constant (self,x, y)))
+      if (optimize  && mtcs_mode_is_scalar_float_p(mtcsMode,GET_MODE (x))
+               && (last_insn = compress_float_constant (self,x, y)))
           return last_insn;
       y_cst = y;
       n_debug("mtcsexpr.c mtcs_expr_emit_move_insn 22 allRegs:%d\n",allRegs);
@@ -3214,7 +3209,6 @@ rtx_insn *mtcs_expr_emit_move_insn (MtcsExpr *self,rtx x, rtx y)
   n_debug("mtcsexpr.c mtcs_expr_emit_move_insn 44 allRegs:%d mode:%d BLK:%d\n",allRegs,mode,mtcsMode->modes.M_BLKmode);
 
   gcc_assert (mode != mtcsMode->modes.M_BLKmode);
-
 
   last_insn = mtcs_expr_emit_move_insn_1 (self,x, y);
   n_debug("mtcsexpr.c emit_move_insn 55 allRegs:%d mode:%d BLK:%d\n",allRegs,mode,mtcsMode->modes.M_BLKmode);
@@ -5447,16 +5441,14 @@ rtx mtcs_expr_expand_expr_real_1 (MtcsExpr *self,tree exp, rtx target, machine_m
     case RESULT_DECL:
       n_debug("mtcsexpr.cc mtcs_expr_expand_expr_real_1 99  变量处理 decl_rtl:%p expr:%p %s exp->decl_with_rtl.rtl:%p\n",
                decl_rtl,exp,get_tree_code_name(TREE_CODE(exp)),exp->decl_with_rtl.rtl);
-      aet_print_tree(exp);
+      if(TYPE_MODE(TREE_TYPE(exp))==19)
+         gcc_unreachable();
       if(exp && TREE_CODE(exp)==VAR_DECL){
          location_t loc=DECL_SOURCE_LOCATION(exp);
          n_debug("mtcsexpr.c  mtcs_expr_expand_expr_real_1 变量属性 :%p %d %d %d %d %d loc:%llu\n",exp->decl_with_rtl.rtl,
          VAR_P (exp),TREE_STATIC (exp),TREE_PUBLIC (exp), DECL_EXTERNAL (exp),DECL_REGISTER (exp),loc);
       }
-      n_debug("mtcsexpr.c mtcs_expr_expand_expr_real_1 xtt :%p\n",exp->decl_with_rtl.rtl);
       decl_rtl = mtcs_asm_decl_rtl/*!DECL_RTL*/(mtcsAsm,exp);
-      n_debug("mtcsexpr.c  mtcs_expr_expand_expr_real_1 xx %p expr:%p %d %d %d\n",
-            decl_rtl,exp,GET_MODE(decl_rtl),DECL_MODE (exp),mode);
  expand_decl_rtl:
       gcc_assert (decl_rtl);
       //declMode=mtcs_mode_host2device_by_tree(mtcsMode,exp,DECL_MODE (exp));
@@ -5532,16 +5524,17 @@ rtx mtcs_expr_expand_expr_real_1 (MtcsExpr *self,tree exp, rtx target, machine_m
 
       if (temp != 0){
           if (MEM_P (temp)
-              && modifier != EXPAND_WRITE
-              && modifier != EXPAND_MEMORY
-              && modifier != EXPAND_INITIALIZER
-              && modifier != EXPAND_CONST_ADDRESS
-              && modifier != EXPAND_SUM
-              && !inner_reference_p
-              && mode != mtcsMode->modes.M_BLKmode
-              && mtcs_rtl_get_mem_align/*!MEM_ALIGN*/(mtcsRTL,temp) < mtcs_mode_get_alignment/*!GET_MODE_ALIGNMENT*/(mtcsMode,mode))
-            temp = expand_misaligned_mem_ref(self,temp, mode, unsignedp,mtcs_rtl_get_mem_align/*!MEM_ALIGN*/(mtcsRTL,temp), NULL_RTX, NULL);
-          n_debug("mtcsexpr.c  mtcs_expr_expand_expr_real_1 expand_decl_rtl 44aa %p expr:%p\n",decl_rtl,exp);
+                 && modifier != EXPAND_WRITE
+                 && modifier != EXPAND_MEMORY
+                 && modifier != EXPAND_INITIALIZER
+                 && modifier != EXPAND_CONST_ADDRESS
+                 && modifier != EXPAND_SUM
+                 && !inner_reference_p
+                 && mode != mtcsMode->modes.M_BLKmode
+                 && mtcs_rtl_get_mem_align/*!MEM_ALIGN*/(mtcsRTL,temp) <
+                 mtcs_mode_get_alignment/*!GET_MODE_ALIGNMENT*/(mtcsMode,mode))
+             temp = expand_misaligned_mem_ref(self,
+                   temp, mode, unsignedp,mtcs_rtl_get_mem_align/*!MEM_ALIGN*/(mtcsRTL,temp), NULL_RTX, NULL);
 
           return EXTEND_BITINT (temp);
       }
@@ -8071,7 +8064,6 @@ rtx mtcs_expr_store_expr (MtcsExpr *self,tree exp, rtx target, int call_param_p,
   }
   if (TREE_CODE (exp) == COMPOUND_EXPR){
      n_debug("mtcsexpr.c mtcs_expr_store_expr 22 COMPOUND_EXPR\n");
-
       /* Perform first part of compound expression, then assign from second
      part.  */
       mtcs_expr_expand_expr/*!expand_expr*/(self,TREE_OPERAND (exp, 0), const0_rtx, VOIDmode,
@@ -8079,7 +8071,6 @@ rtx mtcs_expr_store_expr (MtcsExpr *self,tree exp, rtx target, int call_param_p,
       return mtcs_expr_store_expr/*!store_expr*/(self,TREE_OPERAND (exp, 1), target,call_param_p, nontemporal, reverse);
   }else if (TREE_CODE (exp) == COND_EXPR && GET_MODE (target) ==mtcsMode->modes.M_BLKmode){
      n_debug("mtcsexpr.c mtcs_expr_store_expr 33 COND_EXPR\n");
-
       /* For conditional expression, get safe form of the target.  Then
      test the condition, doing the appropriate assignment on either
      side.  This avoids the creation of unnecessary temporaries.
@@ -8103,7 +8094,6 @@ rtx mtcs_expr_store_expr (MtcsExpr *self,tree exp, rtx target, int call_param_p,
       return NULL_RTX;
   }else if (GET_CODE (target) == SUBREG && SUBREG_PROMOTED_VAR_P (target)){
      n_debug("mtcsexpr.c mtcs_expr_store_expr 44 SUBREG\n");
-
     /* If this is a scalar in a register that is stored in a wider mode
        than the declared mode, compute the result into its declared mode
        and then convert to the wider mode.  Our value is the computed
@@ -8137,8 +8127,6 @@ rtx mtcs_expr_store_expr (MtcsExpr *self,tree exp, rtx target, int call_param_p,
       }
 
       temp = mtcs_expr_expand_expr/*!expand_expr*/(self,exp, inner_target, VOIDmode,call_param_p ? EXPAND_STACK_PARM : EXPAND_NORMAL);
-
-
       /* If TEMP is a VOIDmode constant, use convert_modes to make
      sure that we properly convert it.  */
       if (CONSTANT_P (temp) && GET_MODE (temp) == VOIDmode){
@@ -8218,12 +8206,9 @@ normal_expr:
       tree rexp = exp;
       if (TREE_CODE (exp) == STRING_CST && tmp_target == target
          && GET_MODE (target) == mtcsMode->modes.M_BLKmode && TYPE_MODE (TREE_TYPE (exp)) == mtcsMode->modes.M_BLKmode){
-         n_debug("mtcsexpr.c mtcs_expr_store_expr 66aa \n");
-
           rtx size = mtcs_expr_expr_size/*!expr_size*/(self,exp);
           if (CONST_INT_P (size) && size != const0_rtx
               && (UINTVAL (size) > ((unsigned HOST_WIDE_INT) TREE_STRING_LENGTH (exp) + 32))){
-             n_debug("mtcsexpr.c mtcs_expr_store_expr 66bb \n");
 
               /* If the STRING_CST has much larger array type than
              TREE_STRING_LENGTH, only emit the TREE_STRING_LENGTH part of
@@ -8552,25 +8537,20 @@ void mtcs_expr_expand_assignment(MtcsExpr *self,tree to, tree from, bool nontemp
       mtcs_expr_expand_normal/*!expand_normal*/(self,from);
       return;
   }
-  n_debug("mtcsexpr.c mtcs_expr_expand_assignment 00aa\n");
 
   /* Optimize away no-op moves without side-effects.  */
   if (operand_equal_p (to, from, 0))
     return;
-  n_debug("mtcsexpr.c mtcs_expr_expand_assignment 11aa\n");
-  aet_print_tree(to);
-  aet_print_tree(from);
 
   /* Handle misaligned stores.  */
   mode = TYPE_MODE (TREE_TYPE (to));
   if ((TREE_CODE (to) == MEM_REF || TREE_CODE (to) == TARGET_MEM_REF
        || DECL_P (to)) && mode != mtcsMode->modes.M_BLKmode
-      && !mem_ref_refers_to_non_mem_p (to)
+      && !mtcs_expr_mem_ref_refers_to_non_mem_p/*!mem_ref_refers_to_non_mem_p*/(self,to)
       && ((align = mtcs_builtins_get_object_alignment/*!get_object_alignment*/(mtcsBuiltins,to))
             < mtcs_mode_get_alignment/*!GET_MODE_ALIGNMENT*/(mtcsMode,mode))
       && (((icode = mtcs_opinit_optab_handler/*!optab_handler*/(mtcsOpinit,movmisalign_optab, mode)) != CODE_FOR_nothing)
       || mtcsTarget/*!targetm.slow_unaligned_access*/->slow_unaligned_access(mtcsTarget,mode, align))){
-     n_debug("mtcsexpr.cmtcs_expr_expand_assignment 00\n");
       rtx reg, mem;
       reg = mtcs_expr_expand_expr/*!expand_expr*/(self,from, NULL_RTX, VOIDmode, EXPAND_NORMAL);
       /* Handle PARALLEL.  */
@@ -8579,7 +8559,6 @@ void mtcs_expr_expand_assignment(MtcsExpr *self,tree to, tree from, bool nontemp
       mem = mtcs_expr_expand_expr/*!expand_expr*/(self,to, NULL_RTX, VOIDmode, EXPAND_WRITE);
       if (TREE_CODE (to) == MEM_REF && REF_REVERSE_STORAGE_ORDER (to))
           reg = mtcs_expmed_flip_storage_order/*!flip_storage_order*/(mtcsExpmed,mode, reg);
-
       if (icode != CODE_FOR_nothing){
           class expand_operand ops[2];
           create_fixed_operand (&ops[0], mem);
@@ -8601,8 +8580,6 @@ void mtcs_expr_expand_assignment(MtcsExpr *self,tree to, tree from, bool nontemp
       && (REF_REVERSE_STORAGE_ORDER (to)
             || mtcs_expr_mem_ref_refers_to_non_mem_p/*!mem_ref_refers_to_non_mem_p*/(self,to)))
             || TREE_CODE (TREE_TYPE (to)) == ARRAY_TYPE){
-     n_debug("mtcsexpr.c mtcs_expr_expand_assignment 11\n");
-
       machine_mode mode1;
       poly_int64 bitsize, bitpos;
       poly_uint64 bitregion_start = 0;
@@ -8800,7 +8777,6 @@ void mtcs_expr_expand_assignment(MtcsExpr *self,tree to, tree from, bool nontemp
      of the VLA type.  */
       else if (!MEM_P (to_rtx)  && TREE_CODE (from) == CALL_EXPR
            && COMPLETE_TYPE_P (TREE_TYPE (from))  && TREE_CODE (TYPE_SIZE (TREE_TYPE (from))) != INTEGER_CST){
-         n_debug("mtcsexpr.c mtcs_expr_expand_assignment 22\n");
           rtx temp = mtcs_func_assign_stack_temp/*!assign_stack_temp*/(mtcsFunc,GET_MODE (to_rtx),
                         mtcs_mode_get_size/*!GET_MODE_SIZE*/(mtcsMode,GET_MODE (to_rtx)));
           result = store_field(self,temp, bitsize, bitpos, bitregion_start,
@@ -8808,8 +8784,6 @@ void mtcs_expr_expand_assignment(MtcsExpr *self,tree to, tree from, bool nontemp
                     nontemporal, reversep);
           mtcs_expr_emit_move_insn/*!emit_move_insn*/(self,to_rtx, temp);
       }else{
-         n_debug("mtcsexpr.c mtcs_expr_expand_assignment 33\n");
-
           if (MEM_P (to_rtx)){
               /* If the field is at offset zero, we could have been given the
              DECL_RTX of the parent struct.  Don't munge it.  */
@@ -8877,7 +8851,6 @@ void mtcs_expr_expand_assignment(MtcsExpr *self,tree to, tree from, bool nontemp
       && COMPLETE_TYPE_P (TREE_TYPE (from)) && TREE_CODE (TYPE_SIZE (TREE_TYPE (from))) == INTEGER_CST
       && ! (((VAR_P (to) || TREE_CODE (to) == PARM_DECL  || TREE_CODE (to) == RESULT_DECL)
          && REG_P (mtcs_asm_decl_rtl/*!DECL_RTL*/(mtcsAsm,to))) || TREE_CODE (to) == SSA_NAME)){
-     n_debug("mtcsexpr.c mtcs_expr_expand_assignment 44\n");
       rtx value;
       mtcs_func_push_temp_slots/*!push_temp_slots*/(mtcsFunc);
       value = mtcs_expr_expand_normal/*!expand_normal*/(self,from);
@@ -8913,22 +8886,17 @@ void mtcs_expr_expand_assignment(MtcsExpr *self,tree to, tree from, bool nontemp
       mtcs_func_pop_temp_slots/*!pop_temp_slots*/(mtcsFunc);
       return;
   }
-  n_debug("mtcsexpr.c mtcs_expr_expand_assignment 55\n");
 
   /* Ordinary treatment.  Expand TO to get a REG or MEM rtx.  */
   to_rtx = mtcs_expr_expand_expr/*!expand_expr*/(self,to, NULL_RTX, VOIDmode, EXPAND_WRITE);
-  n_debug("mtcsexpr.c mtcs_expr_expand_assignment 55-- 打印 rtx\n");
-  mtcs_print_rtl(stderr,to_rtx);
   /* Don't move directly into a return register.  */
   if (TREE_CODE (to) == RESULT_DECL && (REG_P (to_rtx) || GET_CODE (to_rtx) == PARALLEL)){
-     n_debug("mtcsexpr.c mtcs_expr_expand_assignment 66\n");
-
       rtx temp;
       mtcs_func_push_temp_slots/*!push_temp_slots*/(mtcsFunc);
       /* If the source is itself a return value, it still is in a pseudo at
      this point so we can move it back to the return register directly.  */
       if (REG_P (to_rtx)  && TYPE_MODE (TREE_TYPE (from)) == mtcsMode->modes.M_BLKmode  && TREE_CODE (from) != CALL_EXPR)
-          temp = copy_blkmode_to_reg (GET_MODE (to_rtx), from);
+          temp = mtcs_expr_copy_blkmode_to_reg/*!copy_blkmode_to_reg*/(self,GET_MODE (to_rtx), from);
       else
           temp = mtcs_expr_expand_expr/*!expand_expr*/(self,from, NULL_RTX, GET_MODE (to_rtx), EXPAND_NORMAL);
 
@@ -8954,8 +8922,6 @@ void mtcs_expr_expand_assignment(MtcsExpr *self,tree to, tree from, bool nontemp
   if (TREE_CODE (to) == RESULT_DECL  && TREE_CODE (from) == INDIRECT_REF
       && ADDR_SPACE_GENERIC_P(TYPE_ADDR_SPACE (TREE_TYPE (TREE_TYPE (TREE_OPERAND (from, 0)))))
       && refs_may_alias_p (to, from) && cfun->returns_struct && !cfun->returns_pcc_struct){
-     n_debug("mtcsexpr.c mtcs_expr_expand_assignment 77\n");
-
       rtx from_rtx, size;
       mtcs_func_push_temp_slots/*!push_temp_slots*/(mtcsFunc);
       size = mtcs_expr_expr_size/*!expr_size*/(self,from);
@@ -8969,10 +8935,7 @@ void mtcs_expr_expand_assignment(MtcsExpr *self,tree to, tree from, bool nontemp
   /* Compute FROM and store the value in the rtx we got.  */
 
   mtcs_func_push_temp_slots/*!push_temp_slots*/(mtcsFunc);
-  n_debug("mtcsexpr.c mtcs_expr_expand_assignment 88 store_expr\n");
   result = mtcs_expr_store_expr/*!store_expr*/(self,from, to_rtx, 0, nontemporal, false);
-  n_debug("mtcsexpr.c mtcs_expr_expand_assignment 99-- 打印 rtx\n");
-  mtcs_print_rtl_single(stderr,result);
   mtcs_func_preserve_temp_slots/*!preserve_temp_slots*/(mtcsFunc,result);
   mtcs_func_pop_temp_slots/*!pop_temp_slots*/(mtcsFunc);
   return;
@@ -10772,9 +10735,6 @@ rtx mtcs_expr_expand_expr_real_2 (MtcsExpr *self,sepops ops, rtx target, machine
          if (target == 0 || modifier == EXPAND_STACK_PARM)
             target = mtcs_emit_gen_reg_rtx/*!gen_reg_rtx*/(mtcsEmit,mode);
          mtcs_optabs_expand_fix/*!expand_fix*/(mtcsOptabs,target, op0, unsignedp);
-         n_debug("mtcsexpr.cc expand_expr_real_2 yy FIX_TRUNC_EXPR\n");
-         mtcs_print_rtl_single(stderr,target);
-         mtcs_print_rtl_single(stderr,op0);
          return target;
 
       case FLOAT_EXPR:
@@ -12466,6 +12426,7 @@ tree mtcs_expr_get_inner_reference (MtcsExpr *self,tree exp, poly_int64 *pbitsiz
             tree index = TREE_OPERAND (exp, 1);
             tree low_bound = mtcs_tree_array_ref_low_bound/*!array_ref_low_bound*/(mtcsTree,exp);
             tree unit_size = mtcs_tree_array_ref_element_size/*!array_ref_element_size*/(mtcsTree,exp);
+            /*
             tree elmt_type = TREE_TYPE (TREE_TYPE (TREE_OPERAND (exp, 0)));
             tree elemt0 = TREE_OPERAND (exp, 0);
             tree elemt0Type = TREE_TYPE (elemt0);
@@ -12482,23 +12443,22 @@ tree mtcs_expr_get_inner_reference (MtcsExpr *self,tree exp, poly_int64 *pbitsiz
                   treesizeunit,get_tree_code_name(TREE_CODE(treesizeunit)));
             n_debug("mtcsexpr.c get_inner_refere xx 44 treesizeunittype %p %s %d\n",
                   treesizeunittype,get_tree_code_name(TREE_CODE(treesizeunittype)),TYPE_MODE(treesizeunittype));
-
-
-
+            */
             /* We assume all arrays have sizes that are a multiple of a byte.
             First subtract the lower bound, if any, in the type of the
             index, then convert to sizetype and multiply by the size of
             the array element.  */
             if (! integer_zerop (low_bound)){
-               index = mtcs_const_fold_build2/*!fold_build2*/(mtcsConst,MINUS_EXPR, TREE_TYPE (index),index, low_bound);
-               n_debug("mtcsexpr.cc get_inner_reference 11\n");
+               index = mtcs_const_fold_build2/*!fold_build2*/(mtcsConst,
+                     MINUS_EXPR, TREE_TYPE (index),index, low_bound);
             }
-            tree t0= mtcs_const_fold_convert/*!fold_convert*/(mtcsConst,mtcs_sizetype, index);
-            tree unitsizeType=TREE_TYPE (unit_size);
-            n_debug("mtcsexpr.c get_inner_reference 22 %d\n",TYPE_MODE(unitsizeType));
-            //gcc_assert (int_binop_types_match_p (code, TREE_TYPE (arg0),TREE_TYPE (arg1)));
-            tree t1=mtcs_const_size_binop/*!size_binop*/(mtcsConst,MULT_EXPR,t0,unit_size);
-            tree t2=mtcs_const_size_binop/*!size_binop*/(mtcsConst,PLUS_EXPR, offset,t1);
+
+//            tree t0= mtcs_const_fold_convert/*!fold_convert*/(mtcsConst,mtcs_sizetype, index);
+//            tree unitsizeType=TREE_TYPE (unit_size);
+//            //gcc_assert (int_binop_types_match_p (code, TREE_TYPE (arg0),TREE_TYPE (arg1)));
+//            tree t1=mtcs_const_size_binop/*!size_binop*/(mtcsConst,MULT_EXPR,t0,unit_size);
+//            tree t2=mtcs_const_size_binop/*!size_binop*/(mtcsConst,PLUS_EXPR, offset,t1);
+
             offset = mtcs_const_size_binop/*!size_binop*/(mtcsConst,PLUS_EXPR, offset,
                   mtcs_const_size_binop/*!size_binop*/(mtcsConst,MULT_EXPR,
                         mtcs_const_fold_convert/*!fold_convert*/(mtcsConst,mtcs_sizetype, index),unit_size));
@@ -12894,6 +12854,10 @@ void mtcs_expr_generate_reflecting_code_standard (MtcsExpr *self,rtx *op)
 //原型 get_personality_function expr.h expr.cc
 rtx mtcs_expr_get_personality_function (MtcsExpr *self,tree decl)
 {
+   MtcsMode *mtcsMode=MTCS_GET_MODE_OBJECT(self);
+   MtcsTarget *mtcsTarget =(MtcsTarget *)mtcsMode->target;
+   MtcsAsm *mtcsAsm=mtcs_target_get_asm(mtcsTarget);
+
    tree personality = DECL_FUNCTION_PERSONALITY (decl);
    enum eh_personality_kind pk;
 
@@ -12907,7 +12871,7 @@ rtx mtcs_expr_get_personality_function (MtcsExpr *self,tree decl)
    if (pk == eh_personality_lang)
       gcc_assert (personality != NULL_TREE);
 
-   return XEXP (DECL_RTL (personality), 0);
+   return XEXP (mtcs_asm_decl_rtl/*!DECL_RTL*/(mtcsAsm,personality), 0);
 }
 
 /* A subroutine of clear_storage.  Expand a call to memset.
@@ -12947,11 +12911,137 @@ rtx mtcs_expr_set_storage_via_libcall (MtcsExpr *self,rtx object, rtx size, rtx 
    return mtcs_calls_expand_call(mtcsCalls,call_expr, NULL_RTX, false);
 }
 
+/* Copy BLKmode value SRC into a register of mode MODE_IN.  Return the
+   register if it contains any data, otherwise return null.
+
+   This is used on targets that return BLKmode values in registers.  */
+//原型 copy_blkmode_to_reg expr.h expr.cc
+rtx mtcs_expr_copy_blkmode_to_reg (MtcsExpr *self,machine_mode mode_in, tree src)
+{
+   MtcsMode *mtcsMode=MTCS_GET_MODE_OBJECT(self);
+   MtcsTarget *mtcsTarget=(MtcsTarget *)mtcsMode->target;
+   MtcsRTL *mtcsRTL=mtcs_target_get_rtl(mtcsTarget);
+   MtcsExplow *mtcsExplow=mtcs_target_get_explow(mtcsTarget);
+   MtcsExpmed *mtcsExpmed=mtcs_target_get_expmed(mtcsTarget);
+   MtcsMachine *mtcsMachine=mtcs_target_get_machine(mtcsTarget);
+   MtcsAlign *mtcsAlign = mtcs_target_get_align(mtcsTarget);
+   MtcsEmit *mtcsEmit=mtcs_target_get_emit(mtcsTarget);
+
+   int i, n_regs;
+   unsigned HOST_WIDE_INT bitpos, xbitpos, padding_correction = 0, bytes;
+   unsigned int bitsize;
+   rtx *dst_words, dst, x, src_word = NULL_RTX, dst_word = NULL_RTX;
+   /* No current ABI uses variable-sized modes to pass a BLKmnode type.  */
+   fixed_size_mode mode =mtcs_mode_as_a <fixed_size_mode> (mtcsMode,mode_in);
+   fixed_size_mode dst_mode;
+   scalar_int_mode min_mode;
+
+   gcc_assert (TYPE_MODE (TREE_TYPE (src)) == mtcsMode->modes.M_BLKmode);
+
+   x = mtcs_expr_expand_normal/*!expand_normal*/(self,src);
+
+   bytes = arg_int_size_in_bytes (TREE_TYPE (src));
+   if (bytes == 0)
+      return NULL_RTX;
+
+   /* If the structure doesn't take up a whole number of words, see
+   whether the register value should be padded on the left or on
+   the right.  Set PADDING_CORRECTION to the number of padding
+   bits needed on the left side.
+
+   In most ABIs, the structure will be returned at the least end of
+   the register, which translates to right padding on little-endian
+   targets and left padding on big-endian targets.  The opposite
+   holds if the structure is returned at the most significant
+   end of the register.  */
+   if (bytes % UNITS_PER_WORD != 0
+   && (target_calls_return_in_msb/*targetm.calls.return_in_msb*/(mtcsMachine->calls,TREE_TYPE (src))
+   ? !BYTES_BIG_ENDIAN : BYTES_BIG_ENDIAN))
+      padding_correction = (BITS_PER_WORD - ((bytes % UNITS_PER_WORD) * BITS_PER_UNIT));
+
+   n_regs = (bytes + UNITS_PER_WORD - 1) / UNITS_PER_WORD;
+   dst_words = XALLOCAVEC (rtx, n_regs);
+   bitsize = MIN (TYPE_ALIGN (TREE_TYPE (src)), BITS_PER_WORD);
+   min_mode = mtcs_mode_smallest_int_mode_for_size/*!smallest_int_mode_for_size*/(mtcsMode,bitsize);
+
+   /* Copy the structure BITSIZE bits at a time.  */
+   for (bitpos = 0, xbitpos = padding_correction;
+   bitpos < bytes * BITS_PER_UNIT; bitpos += bitsize, xbitpos += bitsize){
+      /* We need a new destination pseudo each time xbitpos is
+      on a word boundary and when xbitpos == padding_correction
+      (the first time through).  */
+      if (xbitpos % BITS_PER_WORD == 0 || xbitpos == padding_correction){
+         /* Generate an appropriate register.  */
+         dst_word = mtcs_emit_gen_reg_rtx/*!gen_reg_rtx*/(mtcsEmit,word_mode);
+         dst_words[xbitpos / BITS_PER_WORD] = dst_word;
+
+         /* Clear the destination before we move anything into it.  */
+         mtcs_expr_emit_move_insn/*!emit_move_insn*/(self,dst_word, CONST0_RTX (word_mode));
+      }
+
+      /* Find the largest integer mode that can be used to copy all or as
+      many bits as possible of the structure if the target supports larger
+      copies.  There are too many corner cases here w.r.t to alignments on
+      the read/writes.  So if there is any padding just use single byte
+      operations.  */
+      opt_scalar_int_mode mode_iter;
+      if (padding_correction == 0 && !mtcs_align_get_strict_alignment/*!STRICT_ALIGNMENT*/(mtcsAlign)){
+         FOR_EACH_MODE_FROM (mode_iter, min_mode){
+            unsigned int msize = mtcs_mode_get_bitsize/*!GET_MODE_BITSIZE*/(mtcsMode,mode_iter.require ());
+            if (msize <= ((bytes * BITS_PER_UNIT) - bitpos)  && msize <= BITS_PER_WORD)
+               bitsize = msize;
+            else
+               break;
+         }
+      }
+
+      /* We need a new source operand each time bitpos is on a word
+      boundary.  */
+      if (bitpos % BITS_PER_WORD == 0)
+         src_word = mtcs_rtl_operand_subword_force/*!operand_subword_force*/(mtcsRTL,
+                  x, bitpos / BITS_PER_WORD, mtcsMode->modes.M_BLKmode);
+
+      /* Use bitpos for the source extraction (left justified) and
+      xbitpos for the destination store (right justified).  */
+      mtcs_expmed_store_bit_field/*!store_bit_field*/(mtcsExpmed,
+            dst_word, bitsize, xbitpos % BITS_PER_WORD, 0, 0, word_mode,
+            mtcs_expmed_extract_bit_field/*!extract_bit_field*/(mtcsExpmed,src_word, bitsize,
+            bitpos % BITS_PER_WORD, 1, NULL_RTX, word_mode, word_mode, false, NULL),
+            false, false);
+   }
+
+   if (mode == mtcsMode->modes.M_BLKmode){
+      /* Find the smallest integer mode large enough to hold the
+      entire structure.  */
+      opt_scalar_int_mode mode_iter;
+      FOR_EACH_MODE_IN_CLASS (mode_iter, MODE_INT)
+         if (mtcs_mode_get_size/*!GET_MODE_SIZE*/(mtcsMode,mode_iter.require ()) >= bytes)
+            break;
+
+      /* A suitable mode should have been found.  */
+      mode = mode_iter.require ();
+   }
+
+   if (mtcs_mode_get_size/*!GET_MODE_SIZE*/(mtcsMode,mode) < mtcs_mode_get_size/*!GET_MODE_SIZE*/(mtcsMode,word_mode))
+      dst_mode = word_mode;
+   else
+      dst_mode = mode;
+   dst = mtcs_emit_gen_reg_rtx/*!gen_reg_rtx*/(mtcsEmit,dst_mode);
+
+   for (i = 0; i < n_regs; i++)
+      mtcs_expr_emit_move_insn/*!emit_move_insn*/(self,
+            mtcs_rtl_operand_subword/*!operand_subword*/(mtcsRTL,dst, i, 0, dst_mode), dst_words[i]);
+
+   if (mode != dst_mode)
+      dst = gen_lowpart (mode, dst);
+
+   return dst;
+}
 
 MtcsExpr *mtcs_expr_new(MtcsMode *mtcsMode)
 {
-     MtcsExpr *self = n_slice_alloc0 (sizeof(MtcsExpr));
-     mtcs_component_set_mode((MtcsComponent*)self,mtcsMode);
-     mtcsExprInit(self);
-     return self;
+   MtcsExpr *self = n_slice_alloc0 (sizeof(MtcsExpr));
+   mtcs_component_set_mode((MtcsComponent*)self,mtcsMode);
+   mtcsExprInit(self);
+   return self;
 }

@@ -804,6 +804,7 @@ alias_set_type mtcs_alias_get_alias_set (MtcsAlias *self,tree t)
    MtcsTree *mtcsTree=mtcs_target_get_tree(mtcsTarget);
    MtcsLang *mtcsLang=mtcs_target_get_lang(mtcsTarget);
    MtcsRTL *mtcsRTL=mtcs_target_get_rtl(mtcsTarget);
+   MtcsAsm *mtcsAsm=mtcs_target_get_asm(mtcsTarget);
    MtcsOptions *mtcsOptions=mtcs_target_get_options(mtcsTarget);
    MtcsOptionsItem *mtcsOptionsItem=mtcsOptions->global_options;
    //MtcsIpaDevirt *mtcsIpaDevirt=(MtcsIpaDevirt *)mtcs_target_get_pass(mtcsTarget,IPA_PASS,"devirt");
@@ -841,8 +842,8 @@ alias_set_type mtcs_alias_get_alias_set (MtcsAlias *self,tree t)
       /* If we've already determined the alias set for a decl, just return
       it.  This is necessary for C++ anonymous unions, whose component
       variables don't look like union members (boo!).  */
-      if (VAR_P (t)  && DECL_RTL_SET_P (t) && MEM_P (DECL_RTL (t)))
-         return mtcs_rtl_get_mem_alias/*!MEM_ALIAS_SET*/(mtcsRTL,DECL_RTL (t));
+      if (VAR_P (t)  && DECL_RTL_SET_P (t) && MEM_P (mtcs_asm_decl_rtl/*!DECL_RTL*/(mtcsAsm,t)))
+         return mtcs_rtl_get_mem_alias/*!MEM_ALIAS_SET*/(mtcsRTL,mtcs_asm_decl_rtl/*!DECL_RTL*/(mtcsAsm,t));
 
       /* Now all we care about is the type.  */
       t = TREE_TYPE (t);

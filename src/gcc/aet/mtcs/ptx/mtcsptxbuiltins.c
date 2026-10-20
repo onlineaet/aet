@@ -495,10 +495,6 @@ void mtcs_ptx_builtins_init_builtins(MtcsPtxBuiltins *self)
  */
 static void replaceFndecl (MtcsPtxBuiltins *self, gcall *s ,tree fn)
 {
-   MtcsMode *mtcsMode=MTCS_GET_MODE_OBJECT(self);
-   MtcsTarget *mtcsTarget=(MtcsTarget *)mtcsMode->target;
-   MtcsConst  *mtcsConst=mtcs_target_get_const(mtcsTarget);
-
    if (TREE_CODE (fn) == FUNCTION_DECL)
       fn = build_fold_addr_expr(fn);
    gimple_set_op (s, 1, fn);

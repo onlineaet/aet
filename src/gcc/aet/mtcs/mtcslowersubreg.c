@@ -141,10 +141,9 @@ static void compute_splitting_shift (MtcsLowerSubreg *self,bool speed_p, struct 
       else
           upper_cost = shift_cost (self,speed_p, rtxes, code, mtcsMode->word_mode, BITS_PER_WORD - 1);
 
-      //if (LOG_COSTS)
-      n_debug("mtcslowersubreg.c compute_splitting_shift %s %s by %d: original cost %d, split cost %d + %d\n",
-            mtcs_mode_get_name (mtcsMode,self->x_twice_word_mode), GET_RTX_NAME (code),
-         i + BITS_PER_WORD, wide_cost, narrow_cost, upper_cost);
+//      n_debug("mtcslowersubreg.c compute_splitting_shift %s %s by %d: original cost %d, split cost %d + %d\n",
+//            mtcs_mode_get_name (mtcsMode,self->x_twice_word_mode), GET_RTX_NAME (code),
+//            i + BITS_PER_WORD, wide_cost, narrow_cost, upper_cost);
 
       if (FORCE_LOWERING || wide_cost >= narrow_cost + upper_cost)
           splitting[i] = true;
@@ -572,6 +571,7 @@ static void decompose_register (MtcsLowerSubreg *self,unsigned int regno)
    MtcsTarget *mtcsTarget=(MtcsTarget *)mtcsMode->target;
    MtcsFunc *mtcsFunc=mtcs_target_get_func(mtcsTarget);
    MtcsRtlData *mtcsRtlData=mtcs_func_get_rtl_data(mtcsFunc);
+   MtcsRTL *mtcsRTL=mtcs_target_get_rtl(mtcsTarget);
 
    rtx reg;
    unsigned int size, words, i;
@@ -586,7 +586,8 @@ static void decompose_register (MtcsLowerSubreg *self,unsigned int regno)
 
    v = rtvec_alloc (words);
    for (i = 0; i < words; ++i)
-      RTVEC_ELT (v, i) = gen_reg_rtx_offset (reg, mtcsMode->word_mode, i * UNITS_PER_WORD);
+      RTVEC_ELT (v, i) = mtcs_rtl_gen_reg_rtx_offset/*!gen_reg_rtx_offset*/(mtcsRTL,
+            reg, mtcsMode->word_mode, i * UNITS_PER_WORD);
 
    PUT_CODE (reg, CONCATN);
    XVEC (reg, 0) = v;

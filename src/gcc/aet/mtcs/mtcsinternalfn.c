@@ -3138,7 +3138,8 @@ static void mtcs_expand_DEFERRED_INIT (MtcsInternalFn *self,internal_fn, gcall *
       tree lhs_base = lhs;
       while (handled_component_p (lhs_base))
          lhs_base = TREE_OPERAND (lhs_base, 0);
-      reg_lhs = (mem_ref_refers_to_non_mem_p (lhs_base) || non_mem_decl_p (lhs_base));
+      reg_lhs = (mtcs_expr_mem_ref_refers_to_non_mem_p/*!mem_ref_refers_to_non_mem_p*/(mtcsExpr,lhs_base)
+                  || non_mem_decl_p (lhs_base));
       /* If this expands to a register and the underlying decl is wrapped in
       a MEM_REF that just serves as an access type change expose the decl
       if it is of correct size.  This avoids a situation as in PR103271

@@ -20,6 +20,7 @@
 #ifndef __GCC_MTCS_GEN__
 #define __GCC_MTCS_GEN__
 
+
 #include "aet/nlib.h"
 typedef struct _MtcsGen MtcsGen;
 struct _MtcsGen{
@@ -37,6 +38,7 @@ struct _MtcsGen{
    char *cFile;
    char *hFile;
 };
+
 
 //原型 init_predicate_table (void) gensupport.cc
 MtcsGen *mtcs_gen_get();

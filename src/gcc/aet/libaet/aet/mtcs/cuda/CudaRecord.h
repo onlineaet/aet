@@ -21,7 +21,6 @@
 #ifndef __AET_CUDA_RECORD_H__
 #define __AET_CUDA_RECORD_H__
 
-#include <cuda_runtime.h>
 #include "../../../aet.h"
 #include "../MtcsRecord.h"
 

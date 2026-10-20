@@ -390,16 +390,10 @@ static inline rtx_insn *insnify (MtcsTarget *mtcsTarget,rtx x)
   mtcs_emit_start_sequence/*!start_sequence*/(mtcsEmit);
 
   enum rtx_code code = classify_insn (x);
-  n_debug("mtcsptx.c insnify ptx 00 ---- x:%p %d\n",x,code);
-  if(code==CODE_LABEL){
-     n_debug("mtcsptx.c insnify ptx 11 ---- x:%p %d CODE_LABEL\n",x,code);
-  }else if(code==JUMP_INSN){
-     n_debug("mtcsptx.c insnify ptx 22---- x:%p %d JUMP_INSN code:%d %s\n",x,code,GET_CODE(x),GET_RTX_NAME(GET_CODE(x)));
-  }
   mtcs_emit_emit/*!emit*/(mtcsEmit,x, false);
   rtx_insn *res = mtcs_rtl_data_get_insns/*!get_insns*/(mtcsRtlData);
   mtcs_emit_end_sequence/*!end_sequence*/(mtcsEmit);
-  n_debug("mtcsptx.c insnify ptx 33 --ttt-- x:%p %p JUMP_INSN res uid:%d\n",x,res,INSN_UID(res));
+  n_debug("mtcsptx.c insnify ptx 00 x:%p %p JUMP_INSN res uid:%d\n",x,res,INSN_UID(res));
 
   return res;
 }
@@ -430,12 +424,10 @@ static inline rtx_insn *insnify (MtcsTarget *mtcsTarget,rtx x)
 
 static const char * section_for_sym (rtx sym)
 {
-  ptx_data_area area = PTX_SYMBOL_DATA_AREA (sym);
-  /* Same order as nvptx_data_area enum.  */
-  static char const *const areas[] =
-    {"", ".global", ".shared", ".local", ".const", ".param"};
-
-  return areas[area];
+   ptx_data_area area = PTX_SYMBOL_DATA_AREA (sym);
+   /* Same order as nvptx_data_area enum.  */
+   static char const *const areas[] = {"", ".global", ".shared", ".local", ".const", ".param"};
+   return areas[area];
 }
 
 /* Similarly for a decl.  */
@@ -454,8 +446,6 @@ static const char * section_for_decl (MtcsPtx *self,const_tree decl)
    return ret;
 }
 
-
-
 //#define DATA_ALIGNMENT nvptx_data_alignment
 static unsigned int dataAlignment_cb(MtcsTarget *target,const_tree type, unsigned int basic_align)
 {
@@ -471,26 +461,26 @@ static unsigned int dataAlignment_cb(MtcsTarget *target,const_tree type, unsigne
     return basic_align;
 }
 
-#define STRICT_ALIGNMENT 1
 //原型ttargetm.slow_unaligned_access (DECL_MODE (decl),DECL_ALIGN (decl)) #define TARGET_SLOW_UNALIGNED_ACCESS default_slow_unaligned_access
 static bool slowUnalignedAccess_cb (MtcsTarget *self,machine_mode mode, unsigned int align)
 {
-  return STRICT_ALIGNMENT;
+   MtcsAlign *mtcsAlign = mtcs_target_get_align(self);
+   return mtcs_align_get_strict_alignment/*!STRICT_ALIGNMENT*/(mtcsAlign);
 }
 
 static void handle_ptx_version_option ( MtcsPtx *self)
 {
-    MtcsTarget *target=(MtcsTarget *)self;
-    int     isa=mtcs_target_get_isa(target);
-    int     version=mtcs_target_get_version(target);
-    nboolean valid=ptx_tool_valid_isa_version ((PtxIsa)isa,(PtxVersion)version);
-    if(!valid){
-       PtxVersion first =ptx_tool_get_first_version_supporting_sm ((PtxIsa)isa);
-       char *isaStr=ptx_tool_sm_version_to_string ((PtxIsa)isa);
-       char *versionStr=ptx_tool_version_to_string ((PtxVersion)version);
-       char *firstStr=ptx_tool_version_to_string ((PtxVersion)first);
-       error("为了支持架构 sm_%s，PTX 版本至少需要%s，当前设置的是:%s",isaStr,firstStr,versionStr);
-    }
+   MtcsTarget *target=(MtcsTarget *)self;
+   int     isa=mtcs_target_get_isa(target);
+   int     version=mtcs_target_get_version(target);
+   nboolean valid=ptx_tool_valid_isa_version ((PtxIsa)isa,(PtxVersion)version);
+   if(!valid){
+      PtxVersion first =ptx_tool_get_first_version_supporting_sm ((PtxIsa)isa);
+      char *isaStr=ptx_tool_sm_version_to_string ((PtxIsa)isa);
+      char *versionStr=ptx_tool_version_to_string ((PtxVersion)version);
+      char *firstStr=ptx_tool_version_to_string ((PtxVersion)first);
+      error("为了支持架构 sm_%s，PTX 版本至少需要%s，当前设置的是:%s",isaStr,firstStr,versionStr);
+   }
 }
 
 static int callCount=0;
@@ -514,52 +504,52 @@ static bool hardRegnoModeOk_cb (MtcsTarget *self,unsigned int reg, machine_mode 
 //函数体来自  default_scalar_mode_supported_p (mode);
 static bool scalarModeSupportedP_cb (MtcsTarget *mtcsTarget,mtcs_mode mode)
 {
-    MtcsMode *mtcsMode=mtcsTarget->mtcsMode;
-    MtcsOptions *mtcsOptions=mtcs_target_get_options(mtcsTarget);
-    PtxOptionsItem *ptxOptionsItem=(PtxOptionsItem *)mtcsOptions->global_options;
+   MtcsMode *mtcsMode=mtcsTarget->mtcsMode;
+   MtcsOptions *mtcsOptions=mtcs_target_get_options(mtcsTarget);
+   PtxOptionsItem *ptxOptionsItem=(PtxOptionsItem *)mtcsOptions->global_options;
 
-     n_debug("mtcsptx.c -----nvptx.cc -----68-- TARGET_SCALAR_MODE_SUPPORTED_P bool nvptx_scalar_mode_supported_p (scalar_mode mode) %d\n",mode);
-     if (ptxOptionsItem->x_nvptx_experimental && mode ==PTX_HFmode && TARGET_SM53)
-         return true;
-     // int precision = GET_MODE_PRECISION (mode);
-      int precision =mtcs_mode_get_precision(mtcsMode,mode);
-      unsigned char modeClass=mtcs_mode_get_class(mtcsMode,mode);
-      switch (modeClass){
-        case MODE_PARTIAL_INT:
-        case MODE_INT:
-          if (precision == CHAR_TYPE_SIZE)
-              return true;
-          if (precision == PTX_SHORT_TYPE_SIZE)
-              return true;
-          if (precision == PTX_INT_TYPE_SIZE)
-              return true;
-          if (precision == PTX_LONG_TYPE_SIZE)
-              return true;
-          if (precision == PTX_LONG_LONG_TYPE_SIZE)
-              return true;
-          if (precision == 2 * PTX_BITS_PER_WORD)
-              return true;
-          return false;
-        case MODE_FLOAT:
-          if (precision == PTX_FLOAT_TYPE_SIZE)
-              return true;
-          if (precision == PTX_DOUBLE_TYPE_SIZE)
-              return true;
-          if (precision == PTX_LONG_DOUBLE_TYPE_SIZE)
-              return true;
-          return false;
+   n_debug("mtcsptx.c -----nvptx.cc -----68-- TARGET_SCALAR_MODE_SUPPORTED_P bool nvptx_scalar_mode_supported_p (scalar_mode mode) %d\n",mode);
+   if (ptxOptionsItem->x_nvptx_experimental && mode ==PTX_HFmode && TARGET_SM53)
+      return true;
+   // int precision = GET_MODE_PRECISION (mode);
+   int precision =mtcs_mode_get_precision(mtcsMode,mode);
+   unsigned char modeClass=mtcs_mode_get_class(mtcsMode,mode);
+   switch (modeClass){
+      case MODE_PARTIAL_INT:
+      case MODE_INT:
+         if (precision == CHAR_TYPE_SIZE)
+            return true;
+         if (precision == PTX_SHORT_TYPE_SIZE)
+            return true;
+         if (precision == PTX_INT_TYPE_SIZE)
+            return true;
+         if (precision == PTX_LONG_TYPE_SIZE)
+            return true;
+         if (precision == PTX_LONG_LONG_TYPE_SIZE)
+            return true;
+         if (precision == 2 * PTX_BITS_PER_WORD)
+            return true;
+         return false;
+      case MODE_FLOAT:
+         if (precision == PTX_FLOAT_TYPE_SIZE)
+            return true;
+         if (precision == PTX_DOUBLE_TYPE_SIZE)
+            return true;
+         if (precision == PTX_LONG_DOUBLE_TYPE_SIZE)
+            return true;
+         return false;
 
-        case MODE_DECIMAL_FLOAT:
-        case MODE_FRACT:
-        case MODE_UFRACT:
-        case MODE_ACCUM:
-        case MODE_UACCUM:
-          return false;
+      case MODE_DECIMAL_FLOAT:
+      case MODE_FRACT:
+      case MODE_UFRACT:
+      case MODE_ACCUM:
+      case MODE_UACCUM:
+         return false;
 
-        default:
-          gcc_unreachable ();
-    }
-    return false;
+      default:
+         gcc_unreachable ();
+   }
+   return false;
 }
 
 //原型 targetm.libgcc_floating_mode_supported_p (mode) #define TARGET_LIBGCC_FLOATING_MODE_SUPPORTED_P

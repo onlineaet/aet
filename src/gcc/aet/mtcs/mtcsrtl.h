@@ -394,7 +394,8 @@ void mtcs_rtl_set_regstack_completed (MtcsRTL *self,int value);
 rtx mtcs_rtl_gen_reg_rtx_and_attrs (MtcsRTL *self,rtx x);
 //原型 gen_lowpart_common rtl.h emit-rtl.cc
 rtx mtcs_rtl_gen_lowpart_common (MtcsRTL *self,machine_mode mode, rtx x);
-
+//原型 gen_reg_rtx_offset rtl.h emit-rtl.cc
+rtx mtcs_rtl_gen_reg_rtx_offset (MtcsRTL *self,rtx reg, machine_mode mode, int offset);
 
 #endif
 

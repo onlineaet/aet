@@ -591,9 +591,11 @@ static void expand_all_functions(MtcsCompile *self)
          else if (node->process){
             expanded_func_count++;
             node->process = 0;
-            n_debug("mtcscompile.c mtcs_compile_expand_function 77 %s %s insn:%p\n",node->name(),node->dump_asm_name (),get_last_insn ());
+            n_debug("mtcscompile.c mtcs_compile_expand_function 77 %s %s insn:%p\n",
+                  node->name(),node->dump_asm_name (),get_last_insn ());
             mtcs_cgraph_node_expand(mtcsCgraph,node);//node->expand ();
-            n_debug("mtcscompile.c mtcs_compile_expand_function 88 expand end %s %s\n",node->name(),node->dump_asm_name ());
+            n_debug("mtcscompile.c mtcs_compile_expand_function 88 expand end %s %s\n",
+                  node->name(),node->dump_asm_name ());
          }
       }
       if (!gc_candidates || gc_candidates == prev_gc_candidates)
@@ -1069,21 +1071,31 @@ static void empty_function_body (struct cgraph_node *node)
    */
    ret_bb = create_empty_bb (entry_bb);
    ret_bb->count = entry_bb->count;
-
-   gcc_assert (ret_bb->count.initialized_p ());
+   //原来的这个断言有问题 -O0 时ret_bb->count.initialized_p ()=0
+   //因为O0不结过gimple pass profile_estimate profile_estimate pass会初始化 count
+   //所以这句屏蔽
+   //gcc_assert (ret_bb->count.initialized_p ());
 
    /*
    * 五、构造返回语句。
    *
    * 直接使用零值作为返回值，不额外创建 SSA 名称，
    * 避免引入不必要的 SSA 定义。
+   * gimple_build_return(result_decl) 不等于“将结构体返回值清零”。
+   * 如果需要返回値是零，还是需要创建临时变量并构造为零
+   * 像这样：
+   * tree tmp = create_tmp_var (ret_type, "empty_ret");
+   * tree zero_init = build_constructor (ret_type, NULL);
    */
+
+   tree result_decl = DECL_RESULT (decl);
    ret_type = TREE_TYPE (TREE_TYPE (decl));
-
-   if (!VOID_TYPE_P (ret_type))
-      ret_value = build_zero_cst (ret_type);
-
-   ret_stmt = gimple_build_return (ret_value);
+   if (VOID_TYPE_P (ret_type))
+      ret_stmt = gimple_build_return (NULL_TREE);
+   else if (AGGREGATE_TYPE_P (ret_type))
+      ret_stmt = gimple_build_return (result_decl);
+   else
+      ret_stmt = gimple_build_return (build_zero_cst (ret_type));
 
    /* 将返回语句插入新建的返回基本块。 */
    gsi = gsi_start_bb (ret_bb);
@@ -1154,8 +1166,10 @@ static nboolean collectFunc(MtcsCompile *self,struct function *fun)
 {
    tree decl = fun->decl;
    MtcsFuncType mtcsType = mtcs_info_get_func_type(decl);
+
    if(mtcsType==MTCS_FUNC_NOT)
       return FALSE;
+
    n_debug("mtcscompile.c collectFunc 00 收集核函数或设备函数 decl:%p TREE_ASM_WRITTEN (decl):%d\n",
          decl,TREE_ASM_WRITTEN (decl));
    int i=0;
@@ -1192,6 +1206,7 @@ static nboolean collectFunc(MtcsCompile *self,struct function *fun)
    }
 
    checkBB(self);
+   //清空主机的函数体
    if(mtcsType==MTCS_FUNC_KERNEL || mtcsType==MTCS_FUNC_DEVICE){
       empty_function_body(origNode);
       return TRUE;

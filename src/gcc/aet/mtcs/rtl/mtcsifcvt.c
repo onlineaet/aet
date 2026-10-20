@@ -913,7 +913,8 @@ static void noce_emit_move_insn (MtcsIfcvt *self,rtx x, rtx y)
             }
 
             gcc_assert (start < (MEM_P (op) ? BITS_PER_UNIT : BITS_PER_WORD));
-            mtcs_expmed_store_bit_field/*!store_bit_field*/(mtcsExpmed,op, size, start, 0, 0, GET_MODE (x), y, false,false);
+            mtcs_expmed_store_bit_field/*!store_bit_field*/(mtcsExpmed,
+                  op, size, start, 0, 0, GET_MODE (x), y, false,false);
             return;
          }
 

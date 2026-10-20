@@ -110,45 +110,45 @@ static tree getRtn(tree value)
 
 nboolean class_func_is_same_but_rtn(ClassFunc *self,ClassFunc *compare,tree readyDecl)
 {
-	//printf("class_func_is_same_but_rtn %s %s %s %s\n",self->rawMangleName,
-			//compare->rawMangleName,self->mangleFunName,compare->mangleFunName);
-    if(strcmp(self->rawMangleName,compare->rawMangleName)==0){
-        tree t1=getValid(self);
-        tree t2=readyDecl;//getValid(compare);
-       	//aet_print_tree(t1);
-        //aet_print_tree(t2);
-        if(t1 && t2){
-        	//printf("class_func_is_same_but_rtn 11 %s %s\n",self->rawMangleName,compare->rawMangleName);
-        	tree rtn1=getRtn(t1);
-        	tree rtn2=getRtn(t2);
-        	//aet_print_tree(rtn1);
-        	//aet_print_tree(rtn2);
-        	if(rtn1 && rtn2){
-               nboolean re=c_tree_equal(rtn1,rtn2);
-               return !re;
-        	}else{
-        		n_error("不应该出现这种情况.%s %s",self->orgiName,compare->orgiName);
-        	}
-        }else{
-    		n_error("不应该出现这种情况.%s %s",self->orgiName,compare->orgiName);
-        }
-    }
-    return FALSE;
+   //printf("class_func_is_same_but_rtn %s %s %s %s\n",self->rawMangleName,
+   //compare->rawMangleName,self->mangleFunName,compare->mangleFunName);
+   if(strcmp(self->rawMangleName,compare->rawMangleName)==0){
+      tree t1=getValid(self);
+      tree t2=readyDecl;//getValid(compare);
+      //aet_print_tree(t1);
+      //aet_print_tree(t2);
+      if(t1 && t2){
+         //printf("class_func_is_same_but_rtn 11 %s %s\n",self->rawMangleName,compare->rawMangleName);
+         tree rtn1=getRtn(t1);
+         tree rtn2=getRtn(t2);
+         //aet_print_tree(rtn1);
+         //aet_print_tree(rtn2);
+         if(rtn1 && rtn2){
+            nboolean re=c_tree_equal(rtn1,rtn2);
+            return !re;
+         }else{
+            n_error("不应该出现这种情况.%s %s",self->orgiName,compare->orgiName);
+         }
+      }else{
+         n_error("不应该出现这种情况.%s %s",self->orgiName,compare->orgiName);
+      }
+   }
+   return FALSE;
 }
 
 static nboolean checkRtn(ClassFunc *self)
 {
-    if(!aet_utils_valid_tree(self->fieldDecl) || !aet_utils_valid_tree(self->fromImplDefine))
-        return TRUE;
-    tree t1=getRtn(self->fieldDecl);
-    tree t2=getRtn(self->fromImplDefine);
-    nboolean re=c_tree_equal(t1,t2);
-    if(!re){
-        error_at(DECL_SOURCE_LOCATION(self->fieldDecl),
-        "在类中声明的函数或在类实现中声明或实现的函数，函数名和参数一样，但返回值不同。%qs",self->orgiName);
-        return FALSE;
-    }
-    return TRUE;
+   if(!aet_utils_valid_tree(self->fieldDecl) || !aet_utils_valid_tree(self->fromImplDefine))
+      return TRUE;
+   tree t1=getRtn(self->fieldDecl);
+   tree t2=getRtn(self->fromImplDefine);
+   nboolean re=c_tree_equal(t1,t2);
+   if(!re){
+      error_at(DECL_SOURCE_LOCATION(self->fieldDecl),
+      "类声明和定义函数，名称和参数一样，但返回值不同。%qs",self->orgiName);
+      return FALSE;
+   }
+   return TRUE;
 }
 
 nboolean class_func_set_decl(ClassFunc *self,tree decl,enum func_from_code code)
@@ -158,10 +158,9 @@ nboolean class_func_set_decl(ClassFunc *self,tree decl,enum func_from_code code)
 	}else if(code==CLASS_IMPL_DEFINE){
 		self->fromImplDefine=decl;
 	}
+	class_func_set_mtcs_info(self,DECL_SOURCE_LOCATION(decl),decl);
 	return checkRtn(self);
 }
-
-
 
 static nboolean compareGeneric(GenericModel *srcGen,tree args,int order)
 {
@@ -179,8 +178,6 @@ static nboolean compareGeneric(GenericModel *srcGen,tree args,int order)
 	}
 	return FALSE;
 }
-
-
 
 /**
  * fieldParms已从classfunc中移走
@@ -276,7 +273,6 @@ nboolean class_func_is_same_generic(ClassFunc *self)
 	return re;
 }
 
-
 /**
  * 是否泛型函数
  */
@@ -303,7 +299,6 @@ static void freeParmInfo_cb(ParmGenInfo *item)
 		n_free(item->str);
 	}
 }
-
 
 /**
  * 获取泛型在第几个参数上
@@ -628,6 +623,7 @@ ClassFunc  *class_func_clone(ClassFunc *self,tree newFieldDecl,char **names,tree
    dest->isDivide =self->isDivide;
    dest->divideSrc =self->divideSrc;
    dest->className = class_name_clone(className);//所在的class或接口
+   dest->parms = self->parms;
    return dest;
 }
 
@@ -694,6 +690,270 @@ int   class_func_get_param_count(ClassFunc *self)
       count++;
    }
    return count;
+}
+
+static void addMiiAttribute(ClassFunc *func,tree fndecl)
+{
+   ClassName *cn=func->className;
+   ClassInfo *info = class_mgr_get_class_info_by_class_name(class_mgr_get(),func->className);
+   if(class_info_is_mii(info) &&
+         class_func_is_static(func) &&
+         class_func_get_mtcs_type(func) == MTCS_FUNC_DEVICE &&
+         !lookup_attribute (MTCS_INTRINSIC_FUNCTION_IMPLEMENTS, DECL_ATTRIBUTES (fndecl))){
+      //说明函数已有属性 mii
+//      tree fnImplAtt=lookup_attribute (MTCS_INTRINSIC_FUNCTION_IMPLEMENTS, DECL_ATTRIBUTES (fndecl));
+//      if(fnImplAtt)
+//         return;
+      tree miiAtt=  class_info_get_mii_attribute(info);
+      gcc_assert(miiAtt);
+      tree intrinsic = NULL_TREE;
+      tree list = NULL_TREE;
+      //classinfo中的属性 __attribute__((mii("cuda","sm_35"))) 复制到函数中
+       int ix=0;
+       for (tree a = TREE_VALUE (miiAtt); a; a = TREE_CHAIN (a)){
+          tree d = TREE_VALUE (a);
+          list=tree_cons (NULL_TREE, d, list);
+          ix++;
+       }
+       if(ix==0){
+          list=tree_cons (NULL_TREE, get_identifier("default"), list);
+          list=tree_cons (NULL_TREE, get_identifier("default"), list);
+       }else if(ix==1){
+          list=tree_cons (NULL_TREE, get_identifier("default"), list);
+       }
+       list = nreverse(list);
+       intrinsic = build_tree_list (get_identifier(MTCS_INTRINSIC_FUNCTION_IMPLEMENTS),list);
+       tree attrs = DECL_ATTRIBUTES (fndecl);
+       if(!attrs)
+          DECL_ATTRIBUTES (fndecl) = tree_cons (intrinsic,NULL_TREE,DECL_ATTRIBUTES (fndecl));
+       else{
+          attrs=chainon (attrs, intrinsic);
+       }
+       /*
+       tree mtcs1=lookup_attribute (MTCS_INTRINSIC_FUNCTION_IMPLEMENTS, DECL_ATTRIBUTES (fndecl));
+       printf("测试是不是实现----\n");
+       aet_print_tree(DECL_ATTRIBUTES (fndecl));
+       aet_print_tree(mtcs1);
+       */
+   }
+}
+
+/**
+ * 是否有可变参数
+ */
+static nboolean haveVariableParam (tree decl)
+{
+   tree funcType=TREE_TYPE(decl);
+   if(TREE_CODE(funcType)==POINTER_TYPE)
+      funcType=TREE_TYPE(funcType);
+   if(TREE_CODE(funcType)==FUNCTION_TYPE){
+      for (tree al = TYPE_ARG_TYPES (funcType); al; al = TREE_CHAIN (al)){
+         tree type=TREE_VALUE(al);
+         if(type == void_type_node)
+            return FALSE;
+      }
+      return TRUE;
+   }
+   return FALSE;
+}
+
+static MtcsFuncType getMtcsFuncType(tree decl,location_t loc)
+{
+   tree g1 = lookup_attribute (MTCS_GLOBAL_STR, DECL_ATTRIBUTES (decl));
+   tree g2 = lookup_attribute (MTCS_DEVICE_STR, DECL_ATTRIBUTES (decl));
+   tree g3 = lookup_attribute (MTCS_HOST_STR, DECL_ATTRIBUTES (decl));
+   if(g1){
+      if(g2){
+         error_at(loc,"核函数不能定义为设备函数。111");
+      }
+      if(g3){
+         error_at(loc,"核函数不能定义为主机函数。222");
+      }
+      return MTCS_FUNC_KERNEL;//这是一个核函数
+   }
+
+   if(g2){
+      if(g3){
+         return MTCS_FUNC_DEVICE_HOST;//即是设备函数也是主机函数
+      }else{
+         return MTCS_FUNC_DEVICE;
+      }
+   }
+   return MTCS_FUNC_NOT;
+}
+
+static void appendMtcsAttributes(tree decl,int mtcsFuncType)
+{
+   if(mtcsFuncType == MTCS_FUNC_KERNEL)
+      DECL_ATTRIBUTES (decl) = tree_cons (get_identifier (MTCS_GLOBAL_STR),NULL_TREE, DECL_ATTRIBUTES (decl));
+   else if(mtcsFuncType == MTCS_FUNC_DEVICE_HOST){
+      DECL_ATTRIBUTES (decl) = tree_cons (get_identifier (MTCS_DEVICE_STR),NULL_TREE, DECL_ATTRIBUTES (decl));
+      DECL_ATTRIBUTES (decl) = tree_cons (get_identifier (MTCS_HOST_STR),NULL_TREE, DECL_ATTRIBUTES (decl));
+   }else
+      DECL_ATTRIBUTES (decl) = tree_cons (get_identifier (MTCS_DEVICE_STR),NULL_TREE, DECL_ATTRIBUTES (decl));
+}
+
+
+static nboolean setMtcsInfo(ClassFunc *self,location_t loc,tree decl,int mtcsFuncType)
+{
+   //找父类有没有相同的函数声明。如果有用父类的mtcs类型，给当前函数赋值
+   if(mtcsFuncType==MTCS_FUNC_NOT){
+      ClassName *className=self->className;
+      ClassInfo *info=class_mgr_get_class_info_by_class_name(class_mgr_get(),className);
+      while(info->parentName.sysName!=NULL){
+         ClassFunc *parentFunc=func_mgr_get_func_by_raw_mangle(func_mgr_get(),
+         info->parentName.sysName,self->rawMangleName);
+         if(parentFunc && parentFunc->fieldDecl && class_func_is_mtcs(parentFunc)){
+            if(!class_func_is_private(parentFunc)){
+               mtcsFuncType = class_func_get_mtcs_type(parentFunc);
+               appendMtcsAttributes(decl,mtcsFuncType);
+               self->permission = parentFunc->permission;
+               n_debug("从父类获取mtcs函数类型 %s %s %d\n",self->mangleFunName,info->parentName.sysName,mtcsFuncType);
+            }
+            break;
+         }
+         info=class_mgr_get_class_info(class_mgr_get(),info->parentName.sysName);
+      }
+   }
+   if(mtcsFuncType==MTCS_FUNC_NOT)
+      return FALSE;
+
+   class_func_set_mtcs(self,TRUE);
+   class_func_set_mtcs_type(self,(MtcsFuncType)mtcsFuncType);
+   addMiiAttribute(self,decl);
+   n_debug("classfunc.c setMtcsInfo 设函数类型 %s\n",mtcs_info_get_mtcs_type_string((MtcsFuncType)mtcsFuncType));
+   if(self->permission!=CLASS_PERMISSION_PRIVATE){ //
+      DECL_ATTRIBUTES (decl) = tree_cons (get_identifier (MTCS_FN_VISIBLE),NULL_TREE, DECL_ATTRIBUTES (decl));
+   }
+   nboolean isFuncGeneric = class_func_is_func_generic(self);
+   if(isFuncGeneric){
+      error_at(loc,"核函数或设备函数不能声明为泛型函数%qD",decl);
+   }
+   int genParamCount = class_func_get_generic_param_count(self);
+   char *sysName= class_func_get_class_name(self);
+   ClassName *className = class_mgr_get_class_name_by_sys(class_mgr_get(),sysName);
+   nboolean selfAboutGen = class_mgr_about_generic(class_mgr_get(),className);
+   //printf("是不是泛型func xx:%d genParamCount:%d className:%s selfAboutGen:%d\n",isFuncGeneric,genParamCount,sysName,selfAboutGen);
+   if(selfAboutGen && genParamCount-1>0){
+      error_at(loc,"核函数或设备函数的不能有泛型参数%qD",decl);
+   }
+   if(mtcsFuncType==MTCS_FUNC_KERNEL){
+      tree rtn = getRtn(decl);
+      if(rtn!=void_type_node){
+         error_at(loc,"核函数的返回值必须是void类型%qD",decl);
+      }
+   }
+   if(haveVariableParam(decl)){
+      error_at(loc,"核函数或设备函数不能有可变参数%qD",decl);
+   }
+   TREE_USED(decl) = 1;
+   DECL_PRESERVE_P (decl) = 1; //重要,否则经过gimple后，函数被移走
+   //bug 073
+   if(mtcsFuncType==MTCS_FUNC_KERNEL && TREE_CODE(decl)==FUNCTION_DECL){
+      tree attrs = DECL_ATTRIBUTES (decl);
+      //加 noinline
+      if (!lookup_attribute ("noinline", attrs))
+         attrs = tree_cons (get_identifier ("noinline"), NULL, attrs);
+      //加 noclone
+      if (!lookup_attribute ("noclone", attrs))
+         attrs = tree_cons (get_identifier ("noclone"), NULL, attrs);
+      DECL_ATTRIBUTES (decl) = attrs;
+      // 核心标志位：确保优化器尊重这些属性
+      DECL_UNINLINABLE (decl) = 1;
+   }
+   //如果编译选项有 -fsanitize=address 屏蔽，因为ptx不支持
+   if(flag_sanitize &&
+      (mtcsFuncType==MTCS_FUNC_KERNEL || mtcsFuncType==MTCS_FUNC_DEVICE ||  mtcsFuncType==MTCS_FUNC_DEVICE_HOST)
+      && TREE_CODE(decl)==FUNCTION_DECL)
+      add_no_sanitize_value (decl, "all");
+   return TRUE;
+}
+
+/**
+ * 设mtcs函数信息
+ */
+nboolean class_func_set_mtcs_info(ClassFunc *self,location_t loc,tree decl)
+{
+   int mtcsFuncType = MTCS_FUNC_NOT;
+   if(self->fieldDecl){
+      mtcsFuncType =getMtcsFuncType(self->fieldDecl,loc);
+      if(self->fromImplDefine){
+         int defineType =getMtcsFuncType(self->fromImplDefine,loc);
+         if(mtcsFuncType!=defineType && defineType!=MTCS_FUNC_NOT){
+            error_at(loc,"函数声明是:%s,定义是:%s 声明与定义不匹配。",
+                          mtcs_info_get_mtcs_type_string(mtcsFuncType),mtcs_info_get_mtcs_type_string(defineType));
+            return FALSE;
+         }
+      }
+   }else{
+      mtcsFuncType = getMtcsFuncType(self->fromImplDefine,loc);
+   }
+   return  setMtcsInfo(self,loc,decl,mtcsFuncType);
+}
+
+
+static MtcsFuncType getMtcsFuncTypeFromAttrs(tree attrs,location_t loc)
+{
+   if(!attrs)
+      return MTCS_FUNC_NOT;
+   tree g1 = lookup_attribute (MTCS_GLOBAL_STR, attrs);
+   tree g2 = lookup_attribute (MTCS_DEVICE_STR, attrs);
+   tree g3 = lookup_attribute (MTCS_HOST_STR, attrs);
+   if(g1){
+      if(g2){
+         error_at(loc,"核函数不能定义为设备函数。111");
+      }
+      if(g3){
+         error_at(loc,"核函数不能定义为主机函数。222");
+      }
+      return MTCS_FUNC_KERNEL;//这是一个核函数
+   }
+
+   if(g2){
+      if(g3){
+         return MTCS_FUNC_DEVICE_HOST;//即是设备函数也是主机函数
+      }else{
+         return MTCS_FUNC_DEVICE;
+      }
+   }
+   return MTCS_FUNC_NOT;
+}
+
+
+void class_func_set_mtcs_type(ClassFunc *self,location_t loc,tree allPrefixAttrs)
+{
+   MtcsFuncType type =  getMtcsFuncTypeFromAttrs(allPrefixAttrs,loc);
+   MtcsFuncType mtcsFuncType = MTCS_FUNC_NOT;
+   if(self->mtcsFuncType == MTCS_FUNC_NOT && type == MTCS_FUNC_NOT){
+      ClassName *className=self->className;
+      ClassInfo *info=class_mgr_get_class_info_by_class_name(class_mgr_get(),className);
+      while(info->parentName.sysName!=NULL){
+         ClassFunc *parentFunc=func_mgr_get_func_by_raw_mangle(func_mgr_get(),
+                     info->parentName.sysName,self->rawMangleName);
+         if(parentFunc && parentFunc->fieldDecl && class_func_is_mtcs(parentFunc)){
+            if(!class_func_is_private(parentFunc)){
+               mtcsFuncType = class_func_get_mtcs_type(parentFunc);
+               n_debug("从父类获取mtcs函数类型 %s %s %d\n",self->mangleFunName,info->parentName.sysName,mtcsFuncType);
+            }
+            break;
+         }
+         info=class_mgr_get_class_info(class_mgr_get(),info->parentName.sysName);
+      }
+      if(mtcsFuncType!= MTCS_FUNC_NOT){
+         class_func_set_mtcs(self,TRUE);
+         class_func_set_mtcs_type(self,mtcsFuncType);
+      }
+   }else if(self->mtcsFuncType != MTCS_FUNC_NOT && type == MTCS_FUNC_NOT){
+      ;
+   }else if(self->mtcsFuncType == type){
+      ;
+   }else if(self->mtcsFuncType == MTCS_FUNC_NOT && type!=MTCS_FUNC_NOT){
+      class_func_set_mtcs(self,TRUE);
+      class_func_set_mtcs_type(self,type);
+   }else{
+      error_at(loc,"原函数的mtcs类型是:%s,新的类型是:%s 不匹配。",
+                    mtcs_info_get_mtcs_type_string(self->mtcsFuncType),mtcs_info_get_mtcs_type_string(type));
+   }
 }
 
 ClassFunc *class_func_new()

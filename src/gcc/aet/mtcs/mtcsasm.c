@@ -1532,8 +1532,6 @@ static unsigned HOST_WIDE_INT output_constructor (MtcsAsm *self,tree exp, unsign
   constructor_elt *ce;
   oc_local_state local;
   n_debug("mtcsasm.c output_constructor 00 size:%d align:%d reverse:%d\n",size,align,reverse);
-  aet_print_tree(exp);
-  aet_print_tree(TREE_TYPE (exp));
 
   /* Setup our local state to communicate with helpers.  */
   local.exp = exp;
@@ -1574,7 +1572,6 @@ static unsigned HOST_WIDE_INT output_constructor (MtcsAsm *self,tree exp, unsign
   for (cnt = 0;vec_safe_iterate (CONSTRUCTOR_ELTS (exp), cnt, &ce);cnt++, local.field = local.field ? DECL_CHAIN (local.field) : 0){
       local.val = ce->value;
       n_debug("mtcsasm.c output_constructor 11 val:\n");
-      aet_print_tree(local.val);
       local.index = NULL_TREE;
 
       /* The element in a union constructor specifies the proper field
@@ -4047,7 +4044,7 @@ void mtcs_asm_make_decl_rtl (MtcsAsm *self,tree decl)
   gcc_assert (TREE_CODE (decl) != TYPE_DECL   && TREE_CODE (decl) != LABEL_DECL);
 
   char *declName=IDENTIFIER_POINTER (DECL_NAME(decl));
-  n_debug("mtcsasm.c mtcs_asm_make_decl_rtl 00 %s\n",declName);
+  n_debug("mtcsasm.c mtcs_asm_make_decl_rtl 00 %s decl:%p\n",declName,decl);
 
   /* For a duplicate declaration, we can be called twice on the
      same DECL node.  Don't discard the RTL already made.  */
@@ -4788,7 +4785,7 @@ rtx mtcs_asm_make_decl_rtl_for_debug (MtcsAsm *self,tree decl)
    rtx rtl;
 
    if (DECL_RTL_SET_P (decl))
-      return DECL_RTL (decl);
+      return mtcs_asm_decl_rtl/*!DECL_RTL*/(self,decl);
 
    /* Kludge alert!  Somewhere down the call chain, make_decl_rtl will
    call new_alias_set.  If running with -fcompare-debug, sometimes

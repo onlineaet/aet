@@ -58,8 +58,10 @@ struct _VarMgr
 VarMgr    *var_mgr_get();
 nboolean   var_mgr_add(VarMgr *self,ClassName *className,tree varDecl);
 nboolean   var_mgr_set_permission(VarMgr *self,ClassName *className,tree decl,ClassPermissionType permission);
-nboolean   var_mgr_change_static_decl(VarMgr *self,ClassName *className,struct c_declspecs *specs,struct c_declarator *declarator);
-nboolean   var_mgr_set_static_decl(VarMgr *self,ClassName *className,tree decl,struct c_expr *initExpr,ClassPermissionType permi,nboolean isFinal);
+nboolean   var_mgr_change_static_decl(VarMgr *self,ClassName *className,
+                  struct c_declspecs *specs,struct c_declarator *declarator);
+nboolean   var_mgr_set_static_decl(VarMgr *self,ClassName *className,
+                  tree decl,struct c_expr *initExpr,ClassPermissionType permi,nboolean isFinal);
 tree       var_mgr_get_static_var(VarMgr *self,ClassName *className,tree component);
 ClassName *var_mgr_get_class_by_static_component(VarMgr *self,ClassName *srcName,tree component);
 tree       var_mgr_find_func_pointer(VarMgr *self,ClassName *srcName,tree component,char **belongClass);

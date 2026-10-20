@@ -375,6 +375,7 @@ static int max_slot_level (MtcsFunc *self)
 static class mtcs_temp_slot **temp_slots_at_level (MtcsFunc *self,int level)
 {
    MtcsRtlData *mtcsRtlData=self->mtcsRtlData;
+
    if (level >= (int) vec_safe_length (mtcsRtlData->x_used_temp_slots/*!used_temp_slots*/))
       vec_safe_grow_cleared (mtcsRtlData->x_used_temp_slots/*!used_temp_slots*/, level + 1, true);
 
@@ -2557,6 +2558,9 @@ static void assign_parms (MtcsFunc *self,tree fndecl)
       tree result = DECL_RESULT (current_function_decl);
       rtx addr = mtcs_asm_decl_rtl/*!DECL_RTL*/(mtcsAsm,all.function_result_decl);
       rtx x;
+      n_debug("mtcsfunc.c assign_parms 107aa %s all.function_result_decl %p %p\n",fnName,
+            all.function_result_decl,result);
+      mtcs_print_rtl(stderr,addr);
 
       if (DECL_BY_REFERENCE (result)){
          n_debug("mtcsfunc.c assign_parms 108 %s all.function_result_decl DECL_BY_REFERENCE\n",fnName);
@@ -2567,14 +2571,28 @@ static void assign_parms (MtcsFunc *self,tree fndecl)
           SET_DECL_VALUE_EXPR (result,
                        build1 (INDIRECT_REF, TREE_TYPE (result),
                            all.function_result_decl));
+          n_debug("mtcsfunc.c assign_parms 109aa %s all.function_result_decl \n",fnName);
+
           addr = mtcs_explow_convert_memory_address/*!convert_memory_address*/(mtcsExplow,
                   mtcs_mode_get_Pmode(mtcsMode), addr);
+          n_debug("mtcsfunc.c assign_parms 109bb %s all.function_result_decl \n",fnName);
+          mtcs_print_rtl(stderr,addr);
+
+
           x = gen_rtx_MEM (DECL_MODE (result), addr);
+          n_debug("mtcsfunc.c assign_parms 109cc %s %p %d\n",fnName,x,REG_P(x));
+
+          mtcs_print_rtl(stderr,x);
+
           mtcs_rtl_set_mem_attributes/*!set_mem_attributes*/(mtcsRTL,x, result, 1);
+          n_debug("mtcsfunc.c assign_parms 109dd %s %p %d %p\n",fnName,x,REG_P(x),result);
+
       }
 
       DECL_HAS_VALUE_EXPR_P (result) = 1;
       mtcs_expand_set_parm_rtl/*!set_parm_rtl*/(mtcsExpand,result, x);
+      n_debug("mtcsfunc.c assign_parms 109ee %s %p %d %p\n",fnName,x,REG_P(x),result);
+
   }
 
   /* We have aligned all the args, so add space for the pretend args.  */
@@ -3409,9 +3427,9 @@ static void combine_temp_slots (MtcsFunc *self)
 //原型 move_slot_to_level function.cc
 static void move_slot_to_level (MtcsFunc *self,class mtcs_temp_slot *temp, int level)
 {
-  cut_slot_from_list(temp, temp_slots_at_level(self,temp->level));
-  insert_slot_to_list (temp, temp_slots_at_level(self,level));
-  temp->level = level;
+   cut_slot_from_list(temp, temp_slots_at_level(self,temp->level));
+   insert_slot_to_list (temp, temp_slots_at_level(self,level));
+   temp->level = level;
 }
 
 /* If X could be a reference to a temporary slot, mark that slot as
@@ -3440,15 +3458,15 @@ void mtcs_func_preserve_temp_slots (MtcsFunc *self,rtx x)
     p = find_temp_slot_from_address (self,XEXP (x, 0));
 
   if (p != 0){
-      if (p->level == temp_slot_level)
-          move_slot_to_level (self,p, temp_slot_level - 1);
+      if (p->level == self->mtcsRtlData->x_temp_slot_level/*!temp_slot_level*/)
+          move_slot_to_level (self,p, self->mtcsRtlData->x_temp_slot_level/*!temp_slot_level*/ - 1);
       return;
   }
 
   /* Otherwise, preserve all non-kept slots at this level.  */
-  for (p = *temp_slots_at_level(self,temp_slot_level); p; p = next){
+  for (p = *temp_slots_at_level(self,self->mtcsRtlData->x_temp_slot_level/*!temp_slot_level*/); p; p = next){
       next = p->next;
-      move_slot_to_level(self,p, temp_slot_level - 1);
+      move_slot_to_level(self,p, self->mtcsRtlData->x_temp_slot_level/*!temp_slot_level*/ - 1);
   }
 }
 

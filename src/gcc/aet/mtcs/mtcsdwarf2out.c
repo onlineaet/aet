@@ -21393,6 +21393,7 @@ static void gen_variable_die (MtcsDwarf2Out *self,tree decl, tree origin, dw_die
    MtcsMode *mtcsMode=MTCS_GET_MODE_OBJECT(self);
    MtcsTarget *mtcsTarget=(MtcsTarget *)mtcsMode->target;
    MtcsRTL  *mtcsRTL=mtcs_target_get_rtl(mtcsTarget);
+   MtcsAsm *mtcsAsm=mtcs_target_get_asm(mtcsTarget);
 
    HOST_WIDE_INT off = 0;
    tree com_decl;
@@ -21646,8 +21647,9 @@ static void gen_variable_die (MtcsDwarf2Out *self,tree decl, tree origin, dw_die
          && !get_AT (var_die, DW_AT_location)
          && !get_AT (var_die, DW_AT_const_value)
          && DECL_RTL_SET_P (decl_or_origin)
-         && REG_P (DECL_RTL (decl_or_origin))){
-            dw_loc_descr_ref descr = reg_loc_descriptor(self,DECL_RTL (decl_or_origin),VAR_INIT_STATUS_INITIALIZED);
+         && REG_P (mtcs_asm_decl_rtl/*!DECL_RTL*/(mtcsAsm,decl_or_origin))){
+            dw_loc_descr_ref descr = reg_loc_descriptor(self,
+                  mtcs_asm_decl_rtl/*!DECL_RTL*/(mtcsAsm,decl_or_origin),VAR_INIT_STATUS_INITIALIZED);
             if (descr)
                add_AT_loc (var_die, DW_AT_location, descr);
          }
@@ -24695,7 +24697,8 @@ create_label:
          else if (MEM_P (x)
          && mtcs_rtl_get_mem_expr/*!MEM_EXPR*/(mtcsRTL,x)
          && TREE_CODE (mtcs_rtl_get_mem_expr/*!MEM_EXPR*/(mtcsRTL,x)) == FUNCTION_DECL)
-            ca_loc->symbol_ref = XEXP (DECL_RTL (mtcs_rtl_get_mem_expr/*!MEM_EXPR*/(mtcsRTL,x)), 0);
+            ca_loc->symbol_ref = XEXP (mtcs_asm_decl_rtl/*!DECL_RTL*/(mtcsAsm,
+                  mtcs_rtl_get_mem_expr/*!MEM_EXPR*/(mtcsRTL,x)), 0);
       }
 
       ca_loc->block = insn_scope (prev);

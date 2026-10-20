@@ -494,18 +494,19 @@ int class_interface_add_to_class(ClassInterface *self,location_t loc,ClassInfo *
               ClassFunc *interfaceMethod=n_ptr_array_index(funcArray,j);
               if(class_func_is_interface_reserve(interfaceMethod)) //是接口需要保留的ref和unref
                     continue;
-              ClassFunc *func =func_mgr_get_func_by_raw_mangle(func_mgr_get(),&info->className,interfaceMethod->rawMangleName);
+              ClassFunc *func =func_mgr_get_func_by_raw_mangle(func_mgr_get(),
+                    &info->className,interfaceMethod->rawMangleName);
               if(func!=NULL){
-                 n_info("重复的接口方法:接口:%s 函数名:%s 已在接口%s中声明。\n",iface->sysName,func->orgiName,func->className->sysName);
+                 n_info("重复的接口方法:接口:%s 函数名:%s 已在接口%s中声明。\n",
+                       iface->sysName,func->orgiName,func->className->sysName);
                  continue;
               }
               //复制一份接口中的方法。
               tree decl= copyInterfaceFiled(loc,interfaceMethod->orgiName, interfaceMethod->fieldDecl,info);
               char *result[5];
-              func_mgr_create_mangle_name(func_mgr_get(),decl,&info->className,result);
+              func_mgr_create_mangle_name(func_mgr_get(),decl,&info->className,result,interfaceMethod->parms);
               DECL_NAME(decl)=get_identifier(result[1]);
               finish_decl (decl, loc, NULL_TREE, NULL_TREE, NULL_TREE);
-
               ClassFunc  *cloneFunc=class_func_clone(interfaceMethod,decl,result,info->record,&info->className);
               n_debug("new name:%s %s %s %s\n",
                     cloneFunc->orgiName,cloneFunc->mangleFunName,cloneFunc->mangleNoSelfName,cloneFunc->rawMangleName);

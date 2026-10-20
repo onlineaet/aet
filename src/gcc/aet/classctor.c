@@ -402,7 +402,6 @@ tree   class_ctor_create_default_decl(ClassCtor *self,ClassName *className,tree 
    struct c_arg_info *args=createParam(parser,className->sysName);
    struct c_declarator *fundecl = build_function_declarator (args, pointer);
    struct c_declarator *pointerLast= make_pointer_declarator (quals_attrs, fundecl);
-   // nboolean change=func_mgr_change_class_func_decl(func_mgr_get(),pointerLast,className,structType,NULL);
    int errInfo=0;
    ClassFunc *newFunc=func_mgr_change_class_func_decl(func_mgr_get(),pointerLast,className,structType,&errInfo);
 

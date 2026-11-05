@@ -25,10 +25,10 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 #include "nlib.h"
 
 nboolean parser_help_compare(tree funcType1,tree funcType2);
-void     parser_help_add_magic(location_t loc);//为类声明和接口声明加一个变量作为魔数
 nboolean parser_help_set_class_or_enum_type(c_token *who);
 nboolean parser_help_parser_left_package_dot_class();
 nboolean parser_help_parser_right_package_dot_class(char *firstId);
+void     parser_help_add_magic(NString *codes);//为类声明和接口声明加一个变量作为魔数
 
 #endif
 

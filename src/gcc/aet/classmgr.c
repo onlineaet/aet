@@ -338,6 +338,7 @@ static int getParentByClassName(char *my,char *other)
 	}
 }
 
+
 /**
  * my与other的关系
  * my是other的父
@@ -375,6 +376,38 @@ ClassRelationship   class_mgr_relationship(ClassMgr *self,char *my,char *other)
 		return ship;
 	}
 	return CLASS_RELATIONSHIP_UNKNOWN;
+}
+
+ClassRelationship   class_mgr_relationship_by_info(ClassMgr *self,ClassInfo *my,ClassInfo *other)
+{
+   if(my==NULL || other==NULL)
+      return CLASS_RELATIONSHIP_UNKNOWN;
+   ClassInfo *info = my;
+   ClassInfo *otherInfo = other;
+   if(info==NULL || otherInfo==NULL)
+      return CLASS_RELATIONSHIP_UNKNOWN;
+   ClassRelationship ship=getParentByClassName(my->className.sysName,other->className.sysName);
+   //n_debug("class_mgr_relationship 00 my:%s other:%s %d",my,other,ship);
+   if(ship==CLASS_RELATIONSHIP_UNKNOWN){
+      ship=getParentByClassName(other->className.sysName,my->className.sysName);
+      if(ship==CLASS_RELATIONSHIP_UNKNOWN){
+         if(class_info_is_interface(info) && !class_info_is_interface(otherInfo)){
+            nboolean re=class_info_is_impl_by_recursion(otherInfo,my->className.sysName);
+            if(re)
+               return CLASS_RELATIONSHIP_OTHER_IMPL;
+         }else if(!class_info_is_interface(info) && class_info_is_interface(otherInfo)){
+            nboolean re=class_info_is_belong(info,other->className.sysName);
+            if(re)
+              return CLASS_RELATIONSHIP_IMPL;
+         }
+
+      }else{
+           return CLASS_RELATIONSHIP_PARENT;
+      }
+   }else{
+      return ship;
+   }
+   return CLASS_RELATIONSHIP_UNKNOWN;
 }
 
 tree  class_mgr_get_field_by_name(ClassMgr *self,ClassName *className,char *idName)
@@ -981,7 +1014,7 @@ NPtrArray *class_mgr_get_func_with_generic_block(ClassMgr *self)
       int i;
       for(i=0;i<funcArray->len;i++){
          ClassFunc *f=n_ptr_array_index(funcArray,i);
-         printf("classmgr.c class_mgr_get_func_with_generic_block %s define:%p %d\n",
+         n_debug("classmgr.c class_mgr_get_func_with_generic_block %s define:%p %d\n",
                f->orgiName,f->fromImplDefine,class_func_have_generic_block(f));
          if(f->fromImplDefine && class_func_have_generic_block(f)){
             n_ptr_array_add(array,f);
@@ -989,6 +1022,31 @@ NPtrArray *class_mgr_get_func_with_generic_block(ClassMgr *self)
       }
    }
    return array;
+}
+
+ClassInfo *class_mgr_get_class_info_by_record(ClassMgr *self,tree recordType)
+{
+   if(TREE_CODE(recordType)!=RECORD_TYPE)
+      return NULL;
+   tree name=TYPE_NAME(recordType);
+   if(!aet_utils_valid_tree(name) || TREE_CODE(name)!=TYPE_DECL)
+      return FALSE;
+   return class_mgr_get_class_info(class_mgr_get(),IDENTIFIER_POINTER(DECL_NAME (name)));
+}
+
+ClassInfo *class_mgr_get_class_info_by_type(ClassMgr *self,tree type)
+{
+   if(TREE_CODE(type)!=RECORD_TYPE){
+      if(TREE_CODE(type)==POINTER_TYPE || TREE_CODE(type)==ARRAY_TYPE)
+         return class_mgr_get_class_info_by_type(self,TREE_TYPE(type));
+
+      return NULL;
+   }
+   tree name=TYPE_NAME(type);
+   if(!aet_utils_valid_tree(name) || TREE_CODE(name)!=TYPE_DECL)
+      return NULL;
+
+   return class_mgr_get_class_info(class_mgr_get(),IDENTIFIER_POINTER(DECL_NAME (name)));
 }
 
 ClassMgr *class_mgr_get()

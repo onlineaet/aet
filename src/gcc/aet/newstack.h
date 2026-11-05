@@ -47,6 +47,8 @@ nboolean  new_stack_modify_object(NewStack *self,tree var);
 void      new_stack_finish(NewStack *self);
 void      new_stack_create_object_no_name(NewStack *self,ClassName *className,GenericModel *genericDefine,
                char *ctorStr,tree mtcsPlatType);
+//加入清理函数
+void      new_statck_add_cleanup(NewStack *self);
 
 #endif
 

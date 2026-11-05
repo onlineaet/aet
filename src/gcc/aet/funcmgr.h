@@ -35,6 +35,9 @@ struct _FuncMgr
 	NHashTable *hashTable;
 	NHashTable *staticHashTable;
 	tree tempParms;//从struct c_arg_info *args=funcdel->u.arg_info; args->parms;
+	ClassFunc *aobjectRef;    //AObject 的 ref 因为常用在这里缓存
+   ClassFunc *aobjectUnref;
+
 };
 
 typedef enum{
@@ -113,9 +116,18 @@ nboolean      func_mgr_parent_have_final(FuncMgr *self,location_t loc,ClassFunc 
 /**
  * 引用的对象方法可以在外部使用吗
  */
-nboolean func_mgr_can_use_outside(FuncMgr *self,tree decl);
+nboolean   func_mgr_can_use_outside(FuncMgr *self,tree decl);
 //根据mic fndecl 找出 mii fndecl
 ClassFunc *func_mgr_get_mii_func(FuncMgr *self,ClassFunc *micFunc);
-nboolean func_mgr_have_mtcs_func(FuncMgr *self);
+nboolean   func_mgr_have_mtcs_func(FuncMgr *self);
+//获取 AET_GET_ACLASS_FUNC_NAME 的方法
+ClassFunc *func_mgr_get_static_get_class(FuncMgr *self,ClassName *className);
+nboolean   func_mgr_add_self_to_declarator(FuncMgr *self,ClassName *className,
+               struct c_declarator *declarator,nboolean isConstructor,nboolean isClassDecl);
+//获取当前函数是不是fwgb函数，并当前函数对应的ClassFunc
+ClassFunc *func_mgr_get_current_fwgb(FuncMgr *self);
+ClassFunc *func_mgr_get_ref(FuncMgr *self);
+ClassFunc *func_mgr_get_unref(FuncMgr *self);
+
 
 #endif

@@ -35,7 +35,6 @@ typedef struct _SuperInfo{
 	char *sysName;
 }SuperInfo;
 
-
 typedef struct _ClassCtor ClassCtor;
 /* --- structures --- */
 struct _ClassCtor
@@ -51,15 +50,11 @@ struct _ClassCtor
 	NPtrArray *artificialCtors;
 	//记录调用的构造函数
    NPtrArray *recordCtorArray;;
-
-
 };
-
 
 ClassCtor *class_ctor_new();
 void       class_ctor_parser_return(ClassCtor *self,nboolean isConstructor);
 nboolean   class_ctor_add_return_stmt(ClassCtor *self);
-nboolean   class_ctor_parser_constructor(ClassCtor *self,ClassName *className);
 nboolean   class_ctor_have_default_field(ClassCtor *self,ClassName *className);
 tree       class_ctor_create_default_decl(ClassCtor *self,ClassName *className,tree structType);
 void       class_ctor_build_default_define(ClassCtor *self,ClassName *className);
@@ -80,6 +75,8 @@ void       class_ctor_set_tag_for_self_and_super_call(ClassCtor *self,tree ref);
  */
 nboolean   class_ctor_is_artificial(ClassCtor *self,ClassName *className);
 void       class_ctor_add_call(ClassCtor *self,tree call);
+
+nboolean   class_ctor_parser_from_specs(ClassCtor *self,ClassName *className,struct c_declspecs *specs);
 
 #endif
 

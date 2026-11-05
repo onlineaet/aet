@@ -26,7 +26,6 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 #include "system.h"
 #include "coretypes.h"
 #include "target.h"
-
 #include "function.h"
 #include "tree.h"
 #include "timevar.h"
@@ -34,7 +33,6 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 #include "cgraph.h"
 #include "attribs.h"
 #include "toplev.h"
-
 #include "stor-layout.h"
 #include "varasm.h"
 #include "trans-mem.h"
@@ -42,9 +40,8 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 #include "gcc-rich-location.h"
 #include "c-family/c-common.h"
 #include "gimple-expr.h"
-
+#include "tree-iterator.h"
 #include "c/c-tree.h"
-
 #include "c-family/name-hint.h"
 #include "c-family/known-headers.h"
 #include "c-family/c-spellcheck.h"
@@ -52,7 +49,6 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 #include "../libcpp/internal.h"
 #include "c/c-parser.h"
 #include "c/gimple-parser.h"
-
 #include "../libcpp/include/cpplib.h"
 #include "aet-c-parser-header.h"
 
@@ -86,7 +82,8 @@ static int exitsFunc(ClassRef *self,char *sysClassName,tree component)
 	return ret;//re==ISAET_FIND_FUNC;
 }
 
-static tree createNormalOrSuperRef(ClassRef *self,location_t loc,location_t component_loc,tree component,tree exprValue,nboolean isSuper)
+static tree createNormalOrSuperRef(ClassRef *self,location_t loc,location_t component_loc,
+      tree component,tree exprValue,nboolean isSuper)
 {
 	 c_parser *parser =((ClassAccess*)self)->parser->parser;
 	 char *lows[4];
@@ -100,21 +97,36 @@ static tree createNormalOrSuperRef(ClassRef *self,location_t loc,location_t comp
 	 char *lowestClass=lows[2];
 	 char *className=lows[3];
 	 tree newComponent=aet_utils_create_temp_func_name(className,IDENTIFIER_POINTER(component));
-	 n_debug("class_ref_build_deref 22 className:%s component:%s 根类:%s 根变量:%s lowestClass:%s 当前所在函数：%s 是否super调用:%d\n",
-			 className,IDENTIFIER_POINTER(newComponent),lows[0],lows[1],lowestClass,IDENTIFIER_POINTER(DECL_NAME(current_function_decl)),isSuper);
+	 n_debug("createNormalOrSuperRef className:%s component:%s 根类:%s 根变量:%s lowestClass:%s 所在函数：%s super调用:%d\n",
+			 className,IDENTIFIER_POINTER(newComponent),lows[0],lows[1],lowestClass,
+			 IDENTIFIER_POINTER(DECL_NAME(current_function_decl)),isSuper);
 	 //检查有没有component的函数名
 	 int haveFunc=exitsFunc(self,isSuper?className:lowestClass,component);
-	 //if(!haveFunc){
 	 if(haveFunc!=ISAET_FIND_FUNC && haveFunc!=ISAET_FIND_STATIC_FUNC){
 		 n_debug("找不到需要的函数 class:%s func:%s\n",isSuper?className:lowestClass,IDENTIFIER_POINTER(component));
-		 return NULL_TREE;
+		 ClassInfo *ifaceInfo = class_mgr_get_class_info(class_mgr_get(),lowestClass);
+       //接口调用 unref ref,源代码可能 iface->unref(),iface->ref()
+       //变成 iface->atClass123->unref(),iface->atClass123->ref()
+		 if(ifaceInfo && class_info_is_interface(ifaceInfo)
+		    && (!strcmp(IDENTIFIER_POINTER(component),"unref") || !strcmp(IDENTIFIER_POINTER(component),"ref"))
+		    && !isSuper){
+		    if(!strcmp(IDENTIFIER_POINTER(component),"unref")){
+             tree  actualRef=build_indirect_ref (loc,exprValue,RO_ARROW);
+             tree atClassVarName=aet_utils_create_ident(IFACE_AT_CLASS);
+             exprValue = build_component_ref (loc,actualRef,atClassVarName, loc,loc);//
+             ClassInfo *rootInfo = class_mgr_get_root(class_mgr_get());
+             newComponent=aet_utils_create_temp_func_name(rootInfo->className.sysName,IDENTIFIER_POINTER(component));
+             lowestClass = rootInfo->className.sysName;
+		    }else{
+		       ;
+		    }
+		 }else{
+		    return NULL_TREE;
+		 }
 	 }
 	 //把函数名变成_A3Abc4open1。
-	 tree tempField=class_access_create_temp_field((ClassAccess*)self,isSuper?className:lowestClass,newComponent,component_loc);
-	 if(!tempField || tempField==error_mark_node){
-		 error_at(loc,"创建临时的类%qs成员%qs失败。",className,IDENTIFIER_POINTER(component));
-		 return error_mark_node;
-	 }
+	 tree tempField=class_access_create_temp_field((ClassAccess*)self,isSuper?className:lowestClass,
+	       newComponent,component_loc);
 	 tree datum=build_indirect_ref (loc,exprValue,RO_ARROW);
 	 tree ref=class_access_build_field_ref((ClassAccess *)self,loc,datum,tempField);
 	 if(!isSuper)
@@ -146,8 +158,7 @@ static tree processVar(ClassRef *self,location_t loc,location_t component_loc,tr
       return exprValue;
    tree staticVar=NULL_TREE;
    tree oldExpr = exprValue;
-   exprValue=var_call_pass_one_convert(((ClassAccess*)self)->varCall,
-   component_loc,exprValue,component,item,&staticVar);
+   exprValue=var_call_pass_one_convert(((ClassAccess*)self)->varCall,component_loc,exprValue,component,item,&staticVar);
    if(staticVar!=NULL_TREE){
       //printf("class_ref_build_deref 变量处理 11 是静态变量----\n");
       return staticVar;
@@ -204,33 +215,29 @@ tree  class_ref_build_deref(ClassRef *self,location_t loc,location_t component_l
    }
 
    nboolean isFun=c_parser_peek_token (parser)->type==CPP_OPEN_PAREN;
-   n_debug("class_ref_build_deref ----是不是调用泛型函数 %s isFun:%d\n",IDENTIFIER_POINTER(component),isFun);
-   aet_print_token(c_parser_peek_token (parser));
+   n_debug("class_ref_build_deref 00 是不是调用泛型函数 %s isFun:%d\n",IDENTIFIER_POINTER(component),isFun);
    if(isFun){
       char *idStr=IDENTIFIER_POINTER(component);
       ClassName *className=class_mgr_get_class_name_by_user(class_mgr_get(),idStr);
       if(className==NULL)
          className=class_mgr_get_class_name_by_sys(class_mgr_get(),idStr);
       ClassInfo *info=class_mgr_get_class_info_by_class_name(class_mgr_get(),className);
-      n_debug("class_ref_build_deref 00 className:%s component:%s 当前所在函数：%s",
+      n_debug("class_ref_build_deref 11 className:%s component:%s 当前所在函数：%s",
       className==NULL?"null":className->sysName,idStr,IDENTIFIER_POINTER(DECL_NAME(current_function_decl)));
       if(info!=NULL){
          //这是构造函数
          char *lows[4];
          int relationShip=class_access_get_last_class_and_var((ClassAccess*)self,loc,component,exprValue,lows);
          if(relationShip<0){
-            n_error("class_ref_build_deref 11 是构造函数 className:%s component:%s 根类:%s 根变量:%s 当前所在函数：%s",
-            className->sysName,IDENTIFIER_POINTER(component),lows[0],lows[1],IDENTIFIER_POINTER(DECL_NAME(current_function_decl)));
+            n_error("class_ref_build_deref 22 是构造函数 className:%s component:%s 根类:%s 根变量:%s 当前所在函数：%s",
+            className->sysName,IDENTIFIER_POINTER(component),lows[0],lows[1],
+            IDENTIFIER_POINTER(DECL_NAME(current_function_decl)));
             return error_mark_node;
          }
          tree tempField=class_access_create_temp_field((ClassAccess*)self,className->sysName,component,component_loc);
-         if(!tempField || tempField==error_mark_node){
-            error_at(loc,"创建临时的类%qs成员%qs失败。",className->sysName,IDENTIFIER_POINTER(component));
-            return error_mark_node;
-         }
          tree datum=build_indirect_ref (loc,exprValue,RO_ARROW);
          tree ref=class_access_build_field_ref((ClassAccess *)self,loc,datum, tempField);
-         n_debug("class_ref_build_deref 00-----%s\n",className->sysName);
+         n_debug("class_ref_build_deref 33-----%s\n",className->sysName);
          AET_LANG_FLAG_4(ref)=1;//这时构造函数的标记
          c_aet_set_func_generics_model(ref,funcDefineModel);
          if(lanuchList!=NULL){
@@ -239,11 +246,8 @@ tree  class_ref_build_deref(ClassRef *self,location_t loc,location_t component_l
          return ref;
       }else{
          /*
-         * 如果是接口调用ref或unref把component转成
-         *#define IFACE_REF_FIELD_NAME            "_iface_reserve_ref_field_123"
-         *#define IFACE_UNREF_FIELD_NAME          "_iface_reserve_unref_field_123"
+         * 如果是接口调用ref或unref进入 createNormalOrSuperRef 接口的 ref是动态生成的
          */
-         component=class_interface_transport_ref_and_unref(self->classInterface,component,exprValue);
          //如果是调用外部的函数指针，把它当作变量处理
          nboolean super =TREE_CODE(exprValue)==NOP_EXPR && AET_LANG_FLAG_5(exprValue)==1;
          tree ref=createNormalOrSuperRef(self,loc,component_loc,component,exprValue,super);
@@ -252,12 +256,12 @@ tree  class_ref_build_deref(ClassRef *self,location_t loc,location_t component_l
          if(ref==NULL_TREE){
             //重新在变量中找 可能是函数指针
             ref=processVar(self,loc,component_loc,component,exprValue);
-            n_debug("重新在变量中找 可能是函数指针 11 %p\n",ref);
+            n_debug("class_ref_build_deref 44 重新在变量中找 可能是函数指针 11 %p\n",ref);
          }
          //printf("调用的泛型函数 %s\n",generic_model_tostring(funcDefineModel));
          c_aet_set_func_generics_model(ref,funcDefineModel);
          if(lanuchList!=NULL){
-            n_debug("引用的函数有MTCS启动参数 ----%s ref:%p",IDENTIFIER_POINTER(component),ref);
+            n_debug("class_ref_build_deref 55 引用的函数有MTCS启动参数 %s ref:%p",IDENTIFIER_POINTER(component),ref);
             mtcs_lanuch_add_func_and_lanch_params(mtcs_parser_get()->mtcsLanuch,loc,ref,lanuchList);
          }
          return ref;

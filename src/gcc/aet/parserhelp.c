@@ -202,33 +202,13 @@ nboolean parser_help_compare(tree funcType1,tree funcType2)
 }
 
 /**
- * 为类声明和接口声明加一个变量作为魔数
+ * 为类声明和接口声明加一个变量作为魔数,只加在AObject.h中
  * 并作为第一个参数。
  * private$ int _aet_magic$_123;
  */
-void     parser_help_add_magic(location_t loc)
+void  parser_help_add_magic(NString *codes)
 {
-   ClassParser *classParser=class_parser_get();
-   c_parser *parser=aet_parser_get()->parser;
-   c_token *token = c_parser_peek_token (parser);
-   int addTokenCount=4;
-   int tokenCount=parser->tokens_avail;
-   if(tokenCount+addTokenCount>AET_MAX_TOKEN){
-      error("token太多了");
-      return FALSE;
-   }
-   int i;
-   for(i=tokenCount;i>0;i--){
-      aet_utils_copy_token(&parser->tokens[i-1],&parser->tokens[i-1+addTokenCount]);
-   }
-   aet_utils_create_private$_token(&parser->tokens[0],loc);
-   aet_utils_create_int_token(&parser->tokens[1],loc);
-   aet_utils_create_token(&parser->tokens[2],CPP_NAME,AET_MAGIC_NAME,strlen(AET_MAGIC_NAME));
-   aet_utils_create_token(&parser->tokens[3],CPP_SEMICOLON,";",1);
-   for(i=0;i<addTokenCount;i++)
-      parser->tokens[i].location=loc;
-   parser->tokens_avail=tokenCount+addTokenCount;
-   aet_print_token_in_parser("parser_help_add_magic ---- ",classParser->currentClassName->sysName);
+   n_string_append_printf(codes,"private$ int %s;\n",AET_MAGIC_NAME);
 }
 
 /**

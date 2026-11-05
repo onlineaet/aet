@@ -661,8 +661,8 @@ tree  generic_call_build_call(GenericCall *self,ClassFunc *func,GenericModel *fu
    c_parser *parser=aetParser->parser;
    c_token backups[30];
    int backCount=backupToken(parser,backups);
-   aet_utils_add_token(parse_in,codes->str,codes->len);
-   n_string_free(codes,TRUE);
+   aet_utils_add_token_free(parse_in,codes->str,codes->len);
+   n_string_free(codes,FALSE);
    location_t endloc;
    tree compound = aet_parser_c_parser_compound_statement/*!c_c_parser_compound_statement*/(aetParser, &endloc);
    restore(parser,backups,backCount);

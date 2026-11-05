@@ -65,396 +65,6 @@ static void classInitInit(ClassInit *self)
 {
 }
 
-static nboolean isValidDeclOrDefine(tree func)
-{
-	return (func && func!=NULL_TREE && func!=error_mark_node);
-}
-
-
-//_Z10HomeOffice10HomeOfficeEPN11_HomeOfficeE
-static int getRemainParmString(char *newName,char *className,char *funcName,char *remainParm)
-{
-	if(newName[0]!='_')
-		return 0;
-	if(newName[1]!='Z')
-		return 0;
-    if(!n_ascii_isdigit(newName[2]))
-    	return 0;
-    char classNameLen[strlen(newName)];
-    int i=2;
-    int count=0;
-    while(n_ascii_isdigit(newName[i])){
-    	classNameLen[count++]=newName[i];
-        i++;
-    }
-    classNameLen[count]='\0';
-    int len=atoi((const char*)classNameLen);
-    memcpy(className,newName+i,len);
-    className[len]='\0';
-    i+=len;
-    count=0;
-    while(n_ascii_isdigit(newName[i])){
-    	classNameLen[count++]=newName[i];
-        i++;
-    }
-    classNameLen[count]='\0';
-    len=atoi((const char*)classNameLen);
-    memcpy(funcName,newName+i,len);
-    funcName[len]='\0';
-    i+=len;
-    char *remain=newName+i;
-    i+=3;//跳过EPN
-    char *remain1=newName+i;
-    count=0;
-    while(n_ascii_isdigit(newName[i])){
-    	classNameLen[count++]=newName[i];
-        i++;
-    }
-    classNameLen[count]='\0';
-    len=atoi((const char*)classNameLen);
-    i+=len;
-    char *last=newName+i;
-    int remainStrLen=strlen(newName)-i;
-    memcpy(remainParm,newName+i,remainStrLen);
-    remainParm[remainStrLen]='\0';
-    return len;
-}
-
-static nboolean compareMangle(char *childMangle,char *parentMangle)
-{
-	char childName[255];
-	char childOrgiName[255];
-	char childRemainParm[255];
-	int len=getRemainParmString(childMangle,childName,childOrgiName,childRemainParm);
-	if(len==0)
-		return FALSE;
-	char parentName[255];
-	char parentOrgiName[255];
-	char parentRemainParm[255];
-	len=getRemainParmString(parentMangle,parentName,parentOrgiName,parentRemainParm);
-	if(len==0)
-		return FALSE;
-	n_debug("class_init compareMangle %s %s %s %s %s %s\n",childName,childOrgiName,childRemainParm,parentName,parentOrgiName,parentRemainParm);
-	return strcmp(childRemainParm,parentRemainParm)==0;
-}
-
-/**
- * 比较两个域的返回值是否相同
- */
-static nboolean compareFunctionType(tree define,tree field)
-{
-    tree returnType=NULL_TREE;
-    if(TREE_CODE(define)!=FIELD_DECL){
-        tree funType=TREE_TYPE(define);
-        returnType=TREE_TYPE(funType);
-    }else{
-        tree fieldType0=TREE_TYPE(define);
-        tree fieldFunType0=TREE_TYPE(fieldType0);
-        returnType=TREE_TYPE(fieldFunType0);
-    }
-    tree fieldType=TREE_TYPE(field);
-    tree fieldFunType=TREE_TYPE(fieldType);
-    tree fieldReturnType=TREE_TYPE(fieldFunType);
-    bool re=c_tree_equal (returnType,fieldReturnType);
-    return re;
-}
-
-typedef struct _OverrideFuncs{
-	 ClassName *childName;
-	 ClassName *belongChildClass;
-	 char *childMangleName;
-	 ClassName *parentName;
-	 ClassName *belongParentClass;
-	 char *parentOrgiName;
-	 char *parentMangleName;
-	 int   error;
-	 tree  childFieldDecl;
-}OverrideFuncs;
-
-static void freeOverrideFuncData_cb(OverrideFuncs *item)
-{
-	if(item->childName!=NULL){
-		class_name_free(item->childName);
-	}
-	if(item->belongChildClass!=NULL){
-		class_name_free(item->belongChildClass);
-	}
-	if(item->childMangleName!=NULL){
-		n_free(item->childMangleName);
-	}
-	if(item->parentName!=NULL){
-		class_name_free(item->parentName);
-	}
-	if(item->belongParentClass!=NULL){
-		class_name_free(item->belongParentClass);
-	}
-	if(item->parentOrgiName!=NULL){
-		n_free(item->parentOrgiName);
-	}
-	if(item->parentMangleName!=NULL){
-		n_free(item->parentMangleName);
-	}
-	n_slice_free(OverrideFuncs,item);
-}
-
-static void createSourceCode(OverrideFuncs *item,NPtrArray *codes,char *varName)
-{
-	NString *str=n_string_new("");
-	nboolean parentIsFace=class_mgr_is_interface(class_mgr_get(),item->parentName);
-	if(parentIsFace){
-		 char ifaceVar[255];
-	     aet_utils_create_in_class_iface_var(item->parentName->userName,ifaceVar);//一定与classparser中创建的接口变量名相同
-	     //把self转成parentClassName 形式:(parentClassName *)self,再转接口
-	     //(&((parentClassName *)self)->ifaceVar)->parentMangleName=((childName *)self)->childMangleName;
-	 	 nboolean childIsFace=class_mgr_is_interface(class_mgr_get(),item->childName);
-	 	 if(!childIsFace){
-	 	    printf("class_init createSourceCode 00 父类%s是接口，所在的类是:%s,子类是类:%s\n",
-	 	    		item->parentName->sysName,item->belongParentClass->sysName,item->childName->sysName);
-	        n_string_append_printf(str,"(&((%s *)%s)->%s)->%s=",item->belongParentClass->sysName,varName,ifaceVar,item->parentMangleName);
-	        n_string_append_printf(str,"((%s *)%s)->%s;\n",item->childName->sysName,varName,item->childMangleName);
-	 	 }else{
-	 		char ifaceChildVar[255];
-	 	    aet_utils_create_in_class_iface_var(item->childName->userName,ifaceChildVar);//一定与classparser中创建的接口变量名相同
-		 	printf("class_init createSourceCode 11 父类%s是接口,belong:%s 子类也是接口:%s belong:%s\n",
-		 			item->parentName->sysName,item->belongParentClass->sysName,item->childName->sysName,item->belongChildClass->sysName);
-	 	    n_string_append_printf(str,"(&((%s *)%s)->%s)->%s=",item->belongParentClass->sysName,varName,ifaceVar,item->parentMangleName);
-	 	    n_string_append_printf(str,"(&((%s *)%s)->%s)->%s;\n",item->belongChildClass->sysName,varName,ifaceChildVar,item->childMangleName);
-	 	 }
-
-	}else{
-		 //把self转成parentClassName 形式:(parentClassName *)self,再赋值
-		//((parentClassName *)self)->ifaceVar)->parentMangleName==((childName *)self)->childMangleName;
-	 	 nboolean childIsFace=class_mgr_is_interface(class_mgr_get(),item->childName);
-	 	 if(!childIsFace){
-		 	printf("class_init createSourceCode 22 父类是类%s,子类是类:%s\n",item->parentName->sysName,item->childName->sysName);
-	        n_string_append_printf(str,"((%s *)%s)->%s=",item->parentName->sysName,varName,item->parentMangleName);
-		    n_string_append_printf(str,"((%s *)%s)->%s;\n",item->childName->sysName,varName,item->childMangleName);
-	 	 }else{
-	 		char ifaceChildVar[255];
-	 		aet_utils_create_in_class_iface_var(item->childName->userName,ifaceChildVar);//一定与classparser中创建的接口变量名相同
-		 	printf("class_init createSourceCode 33 父类是类%s,子类是接口:%s belong:%s\n",
-		 			item->parentName->sysName,item->childName->sysName,item->belongChildClass->sysName);
-	        n_string_append_printf(str,"((%s *)%s)->%s=",item->parentName->sysName,varName,item->parentMangleName);
-	 	    n_string_append_printf(str,"(&((%s *)%s)->%s)->%s;\n",item->belongChildClass->sysName,varName,ifaceChildVar,item->childMangleName);
-	 	 }
-	}
-	n_ptr_array_add(codes,n_string_free(str,FALSE));
-}
-
-
-static void addResult(NPtrArray *array,int error,ClassName *childName,ClassName *belongChildClass,
-		ClassName *parentName,ClassName *belongParentClass,ClassFunc *parentItem,tree childFieldDecl,char *childMangleName)
-{
-	OverrideFuncs *data=(OverrideFuncs *)n_slice_new0(OverrideFuncs);
-	data->childName=class_name_clone(childName);
-	data->belongChildClass=class_name_clone(belongChildClass);
-	if(childMangleName)
-		data->childMangleName=n_strdup(childMangleName);
-	data->parentName=class_name_clone(parentName);
-	data->belongParentClass=class_name_clone(belongParentClass);
-	data->parentOrgiName=n_strdup(parentItem->orgiName);
-	data->parentMangleName=n_strdup(parentItem->mangleFunName);
-	data->error=error;
-	data->childFieldDecl=childFieldDecl;
-	n_ptr_array_add(array,data);
-}
-
-
-static tree findFieldFromChildFuns(NPtrArray *childFuncs,ClassName *childName,ClassFunc *parentItem,int *error,char **childMangleName)
-{
-    int i=0;
-    for(i=0;i<childFuncs->len;i++){
-    	ClassFunc *childItem=(ClassFunc *)n_ptr_array_index(childFuncs,i);
-	   if(strcmp(childItem->orgiName,parentItem->orgiName)==0 && isValidDeclOrDefine(childItem->fieldDecl)
-	                && !childItem->isAbstract && !childItem->isCtor && !parentItem->isCtor){
-		  location_t loc;
-		  nboolean equal=compareMangle(childItem->mangleFunName,parentItem->mangleFunName);
-		  n_debug("class_init 类的func定义与接口的函数名是相同的。 index:%d %s %s 参数是否相同:%d\n",
-				  i,parentItem->mangleFunName,childItem->mangleFunName,equal);
-		  if(equal){
-			 nboolean returnValue=compareFunctionType(childItem->fieldDecl,parentItem->fieldDecl);
-			 if(!returnValue){
-				 *error= -1;
-			 }else{
-				 //成功一个了
-				 *error=0;
-			 }
-			 *childMangleName=n_strdup(childItem->mangleFunName);
-			 return childItem->fieldDecl;
-		  }
-	   }
-    }
-   *error=-2;
-	return NULL_TREE;
-}
-
-
-/**
- * 如果childName是接口，belongChildClass就是childName的实现类
- * 当childName不是接口时，belongChildClass与childName相同
- * parentClass,belongParentClass同上解释
- */
-static void fillReplaceParentFuncInfo(ClassInit *self,NPtrArray *array,ClassName *childName,ClassName *belongChildClass,
-		ClassName *parentClass,ClassName *belongParentClass)
-{
-   ClassInfo *parentInfo=class_mgr_get_class_info_by_class_name(class_mgr_get(),parentClass);
-   NPtrArray *parentFuncs=func_mgr_get_funcs(func_mgr_get(),parentClass);
-   if(parentFuncs==NULL || parentFuncs->len==0)
-      return;
-   NPtrArray *childFuncs=func_mgr_get_funcs(func_mgr_get(),childName);
-   int i=0;
-   for(i=0;i<parentFuncs->len;i++){
-      ClassFunc *parentItem=(ClassFunc *)n_ptr_array_index(parentFuncs,i);
-      if(isValidDeclOrDefine(parentItem->fieldDecl)){
-         n_debug("class_init fillReplaceParentFuncInfo index:%d orgiFun:%s mangleFun:%s child:%s parent:%s\n",
-         i,parentItem->orgiName,parentItem->mangleFunName,childName->sysName,parentClass->sysName);
-         int error=0;
-         char *childMangleName=NULL;
-         tree childFieldDecl=findFieldFromChildFuns(childFuncs,childName,parentItem,&error,&childMangleName);
-         addResult(array,error,childName,belongChildClass,parentClass,belongParentClass,parentItem,childFieldDecl,childMangleName);
-      }
-   }
-}
-
-
-static void twoStepRelace(ClassInit *self,ClassName *childName,ClassName *parent,NPtrArray *codes,char *varName)
-{
-   if(!strcmp(childName->sysName,parent->sysName)){
-	   n_debug("class_init twoStepRelace %s类不能替换同类%s的方法\n",childName->sysName,parent->sysName);
-	   return ;
-   }
-   ClassInfo *info=class_mgr_get_class_info_by_class_name(class_mgr_get(),childName);
-   if(info==NULL){
-	   return ;
-   }
-   ClassInfo *parentInfo=class_mgr_get_class_info_by_class_name(class_mgr_get(),parent);
-   if(parentInfo==NULL){
-	   return ;
-   }
-   NPtrArray *array=n_ptr_array_new();
-   //有4种情况
-   //1.用子类的field方法替换父类的方法
-   //2.用子类实现的接口的field方法替换父类的方法
-   //3.用子类的field方法替换父类的接口的方法
-   //4.用子类实现的接口的field方法替换父类的接口方法
-   n_debug("class_init replace 00 index:%d  用子类%s,替换父类%s的方法\n",childName->sysName,parent->sysName);
-	fillReplaceParentFuncInfo(self,array,childName,childName,parent,parent);
-   int i;
-   for(i=0;i<info->ifaceCount;i++){
-      ClassName iface=info->ifaces[i];
-      n_debug("class_init replace 11 index:%d  用子类%s的接口%s,替换父类%s的方法\n",i,childName->sysName,iface.sysName,parent->sysName);
-	  fillReplaceParentFuncInfo(self,array,&iface,childName,parent,parent);
-   }
-   //用子类和子类实现的接口的field方法替换父类的接口方法
-   for(i=0;i<parentInfo->ifaceCount;i++){
-	   ClassName iface=parentInfo->ifaces[i];
-	   n_debug("class_init replace 22 index:%d 用子类%s,替换父类%s的接口%s的方法\n",i,childName->sysName,parent->sysName,iface.sysName);
-	  fillReplaceParentFuncInfo(self,array,childName,childName,&iface,parent);
-   }
-   for(i=0;i<parentInfo->ifaceCount;i++){
-	  ClassName iface=parentInfo->ifaces[i];
-      int j;
-      for(j=0;j<info->ifaceCount;j++){
-          n_debug("class_init replace 33 i:%d j:%d 用子类%s的接口%s,替换父类%s的接口%s的方法\n",
-    			  i,j,childName->sysName,info->ifaces[j].sysName,parent->sysName,iface.sysName);
-    	  fillReplaceParentFuncInfo(self,array,&info->ifaces[j],childName,&iface,parent);
-      }
-   }
-   for(i=0;i<array->len;i++){
-	   OverrideFuncs *item=(OverrideFuncs *)n_ptr_array_index(array,i);
-	   if(item->error==-1){
-		  location_t ploc = DECL_SOURCE_LOCATION (item->childFieldDecl);
-		  error_at(ploc,"bb--父类%qs声明的方法%qs与子类%qs实现的方法相同，但返回值不同。",item->parentName->sysName,item->parentOrgiName,item->childName->sysName);
-	   }else if(item->error==-2){
-	   }else{
-		   createSourceCode(item,codes,varName);
-	   }
-   }
-  	n_ptr_array_set_free_func(array,freeOverrideFuncData_cb);
-  	n_ptr_array_unref(array);
-}
-
-
-/**
- * array 里是类名
- * 存放顺序如:
- * 0 AObject 1 Second 2 Abc,从根类到子类
- */
-static void oneStep(ClassInit *self,NPtrArray *array,ClassName *childClass,NPtrArray *codes,char *varName)
-{
-   int i;
-   for(i=0;i<array->len;i++){
-      ClassName *parent=n_ptr_array_index(array,array->len-i-1);
-      n_debug("class_init oneStep index:%d %s类替换%s类的方法\n",i,childClass->sysName,parent->sysName);
-      twoStepRelace(self,childClass,parent,codes,varName);
-   }
-}
-
-static void traversing(ClassName *className,NPtrArray *data)
-{
-   ClassInfo *info=class_mgr_get_class_info_by_class_name(class_mgr_get(),className);
-   if(info!=NULL){
-      n_ptr_array_insert(data,0,className);
-      traversing(&info->parentName,data);
-   }
-}
-
-/**
- * 用子类的方法覆盖父类的方法。
- * Class A{
- *  go();
- * }
- * Class B Extends A{
- *   go();
- * }
- * void test(A){
- *   A->go()
- * }
- * void main(){
- *   b =new$ B
- *   test(b)
- * }
- * A->go就会调到B的go方法
- * 因为A的go函数指针在创建B对象时被指到b的go上了
- *
- */
-char *class_init_override_parent_ref(ClassInit *self,ClassName *childName,char *varName)
-{
-   ClassInfo *info=class_mgr_get_class_info_by_class_name(class_mgr_get(),childName);
-   n_debug("class_init_override_parent_ref---- %s %p\n",childName->sysName,info);
-   if(info==NULL){
-	   return NULL;
-   }
-   NPtrArray *codes=n_ptr_array_new();
-   NPtrArray *classArray=n_ptr_array_new();
-   traversing(childName,classArray);
-   int i;
-   for(i=0;i<classArray->len;i++){
-	   ClassName *topClass=n_ptr_array_index(classArray,i);
-	   n_debug("class_init 00 开始覆盖父类的方法 index:%d 最低层的子类:%s i层的类:%s\n",i,childName->sysName,topClass->sysName);
-	   NPtrArray *topArray=n_ptr_array_new();
-	   traversing(topClass,topArray);
-	   oneStep(self,topArray,topClass,codes,varName);
-	   n_ptr_array_unref(topArray);
-   }
- 	n_ptr_array_unref(classArray);
- 	n_debug("class_init 有代码吗 %d\n",codes->len);
- 	if(codes->len==0){
- 	    n_ptr_array_unref(codes);
- 		return NULL;
- 	}
-   NString *source=n_string_new("");
-   for(i=0;i<codes->len;i++){
-      char *code=n_ptr_array_index(codes,i);
-      n_debug("class_init 11 原代码是 index:%d childName:%s source:%s\n",i,childName->sysName,code);
-      n_string_append(source,n_strdup(code));
-   }
-   char *result=  n_string_free(source,FALSE);
-   n_ptr_array_set_free_func(codes,n_free);
-   n_ptr_array_unref(codes);
-   return result;
-}
-
 /**
  * 加入初始化函数声明 Abc *Abc_AET_INIT_GLOBAL_METHOD_STRING_Abc(Abc *self);
  */
@@ -496,34 +106,25 @@ void  class_init_create_init_decl(ClassInit *self,location_t loc,ClassName *clas
  * 给AObject的 free_child 函数指针赋值
  * ((AObject*)self)->free_child=((Abc*)self)->Abc_unref_692658582
  */
-char      *class_init_modify_root_object_free_child(ClassInit *self,ClassName *className,char *varName)
+char *class_init_modify_root_object_free_child(ClassInit *self,ClassName *className,char *varName)
 {
 	ClassName *rootClassName=class_mgr_get_class_name_by_user(class_mgr_get(),AET_ROOT_OBJECT);
-	if(rootClassName==NULL)
-		return NULL;
 	char *freeChildMangle=func_mgr_get_mangle_func_name(func_mgr_get(),rootClassName,"free_child");
-	if(freeChildMangle==NULL)
-		return NULL;
+	gcc_assert(rootClassName && freeChildMangle);
  	char unrefName[255];
  	aet_utils_create_unref_name(className->userName,unrefName);
 	char *unrefMangle=func_mgr_get_mangle_func_name(func_mgr_get(),className,unrefName);
 	if(unrefMangle==NULL)
 		return NULL;
-
- 	NString *source=n_string_new("");
- 	n_string_append_printf(source,"((%s *)%s)->%s=%s->%s;\n",
+ 	return n_strdup_printf("((%s *)%s)->%s=%s->%s;\n",
  	      rootClassName->sysName,varName,freeChildMangle,varName,unrefMangle);
- 	return n_string_free(source,FALSE);
 }
 
 static void fillFreeChildMethodForAObject(ClassName *className,NString *codes)
 {
 	ClassName *rootClassName=class_mgr_get_class_name_by_user(class_mgr_get(),AET_ROOT_OBJECT);
-	if(rootClassName==NULL)
-		return ;
 	char *freeChildMangle=func_mgr_get_mangle_func_name(func_mgr_get(),rootClassName,"free_child");
-	if(freeChildMangle==NULL)
-		return ;
+   gcc_assert(rootClassName && freeChildMangle);
  	char unrefName[255];
  	aet_utils_create_unref_name(className->userName,unrefName);
 	char *unrefMangle=func_mgr_get_mangle_func_name(func_mgr_get(),className,unrefName);
@@ -562,9 +163,7 @@ void class_init_create_init_define_for_interface(ClassInit *self,char *sysName,N
 	 char *initMethod=aet_utils_create_init_method(sysName);
 	 n_string_append_printf(buf,"void * %s(%s *self)\n{\n",initMethod,sysName);
 	 n_free(initMethod);
-	 char getAClassFuncName[255];
-	 class_build_create_func_name(className,getAClassFuncName);
-	 n_string_append_printf(buf,"\treturn (void *)%s((AObject *)self);\n",getAClassFuncName);
+	 n_string_append(buf,"\treturn (void *)self;\n");
 	 n_string_append(buf,"}\n");
 }
 
@@ -1080,16 +679,13 @@ static char *createFieldModifyCodes(ClassInit *self,ClassName *className)
  * 初始化方法定义
  * void * debug_ASecond_init_1234ergR5678_debug_ASecond(debug_ASecond *self)
 {
-   if(self==NULL){
-       return (void *)_createAClass_debug_ASecond_123((AObject *)self);
-   }
    debug_ARandom_init_1234ergR5678_debug_ARandom((debug_ARandom *)self);
-self->_Z7ASecond7ASecondEPN7ASecondE=_Z7ASecond7ASecondEPN7ASecondE;
-self->_Z7ASecond26ASecond_finalize_485302655EPN7ASecondE=_Z7ASecond26ASecond_finalize_485302655EPN7ASecondE;
-self->_Z7ASecond24ASecond_unref_1856585347EPN7ASecondE=_Z7ASecond24ASecond_unref_1856585347EPN7ASecondE;
-((debug_AObject *)self)->_Z7AObject10free_childEPN7AObjectE=_Z7ASecond24ASecond_unref_1856585347EPN7ASecondE;
-((debug_AObject *)self)->_Z7AObject8getClassEPN7AObjectE=_createAClass_debug_ASecond_123;
-((debug_ARandom *)self)->_Z7ARandom6setvxdEPN7ARandomEf=_Z7ASecond6setvxdEPN7ASecondEf;
+   self->_Z7ASecond7ASecondEPN7ASecondE=_Z7ASecond7ASecondEPN7ASecondE;
+   self->_Z7ASecond26ASecond_finalize_485302655EPN7ASecondE=_Z7ASecond26ASecond_finalize_485302655EPN7ASecondE;
+   self->_Z7ASecond24ASecond_unref_1856585347EPN7ASecondE=_Z7ASecond24ASecond_unref_1856585347EPN7ASecondE;
+   ((debug_AObject *)self)->_Z7AObject10free_childEPN7AObjectE=_Z7ASecond24ASecond_unref_1856585347EPN7ASecondE;
+   ((debug_AObject *)self)->_Z7AObject8getClassEPN7AObjectE=_createAClass_debug_ASecond_123;
+   ((debug_ARandom *)self)->_Z7ARandom6setvxdEPN7ARandomEf=_Z7ASecond6setvxdEPN7ASecondEf;
    return (void*)self;
 }
  */
@@ -1112,17 +708,13 @@ char *class_init_create_init_func(ClassInit *self,ClassName *className)
    char *initMethod=aet_utils_create_init_method(className->sysName);
    n_string_append_printf(buf,"void * %s(%s *self)\n{\n",initMethod,className->sysName);
    n_free(initMethod);
-   n_string_append(buf,"\tif(self==NULL){\n");//说明要获取class类信息
-   char getAClassFuncName[255];
-   class_build_create_func_name(className,getAClassFuncName);
-   n_string_append_printf(buf,"\t\treturn (void *)%s((AObject *)self);\n",getAClassFuncName);
-   n_string_append(buf,"\t}\n");
 
    if(info->parentName.sysName){
       char *parentInitMethod=aet_utils_create_init_method(info->parentName.sysName);
       n_string_append_printf(buf,"\t%s((%s *)self);\n",parentInitMethod,info->parentName.sysName);
       n_free(parentInitMethod);
    }
+
 
 //   {
 //      //测试代码
@@ -1169,8 +761,9 @@ char *class_init_create_init_func(ClassInit *self,ClassName *className)
 
    //生成  ((debug_AObject *)self)->_Z7AObject10free_childEPN7AObjectE=_Z6TFirst22TFirst_unref_290629480EPN6TFirstE;
    fillFreeChildMethodForAObject(className,buf);
-   //生成  ((debug_AObject *)self)->_Z7AObject8getClassEPN7AObjectE=_createAClass_TFirst_123;
-   fillGetClassMethodForAObject(className,getAClassFuncName,buf);
+   //生成  ((debug_AObject *)self)->_Z7AObject8getClassEPN7AObjectE=_Z6TFirst9get_classEPN6TFirstE;
+   ClassFunc * ret = func_mgr_get_static_get_class(func_mgr_get(),className);
+   fillGetClassMethodForAObject(className,ret->mangleFunName,buf);
    //生成 覆盖父类方法的代码
    char *newCodes=modifyParentMethod(self,className);
    if(newCodes!=NULL){
@@ -1208,7 +801,6 @@ char *class_init_create_init_func(ClassInit *self,ClassName *className)
  */
 static void optimizeGenericCall(ClassInit *self,ClassName *className,NString *codes)
 {
-   //return;
    if(!className)
       return;
    ClassInfo *info=class_mgr_get_class_info_by_class_name(class_mgr_get(),className);

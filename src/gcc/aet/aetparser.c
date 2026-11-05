@@ -61,6 +61,8 @@
 #include "mtcsparser.h"
 #include "middlefile.h"
 #include "funcpointer.h"
+#include "namelesscall.h"
+#include "objectreturn.h"
 
 #include "aetparser.h"
 
@@ -70,7 +72,7 @@
 //原型 c_parser_type_name c-parser.h c-parser.cc
 static struct c_type_name * parserTypeName (AetParser *self, bool alignas_ok = false);
 //4个方法运行在 c_parser_declspecs 中
-static int      aet_parser_c_parser_declspecs_c_id (AetParser *self,struct c_typespec *t,tree ident);
+static bool     aet_parser_c_parser_declspecs_c_id (AetParser *self,struct c_typespec *t,tree ident);
 static void     aet_parser_c_parser_declspecs_enum_dot (AetParser *self,struct c_typespec *t);
 //在 c_parser_declspecs中解析 AET 关键字
 static nboolean aet_parser_c_parser_declspecs_keyword (AetParser *self,location_t loc,
@@ -221,7 +223,6 @@ static void c_lex_one_token (c_parser *parser, c_token *token, bool raw = false)
                break;
             }
          }
-
          token->id_kind = C_ID_ID;
       }
          break;
@@ -1320,10 +1321,8 @@ static void c_parser_translation_unit (c_parser *parser)
       mark_valid_location_for_stdc_pragma (false);
       int testcount=0;
       do{
-        // printf("外部声明  00 --- count:%d  %s, %s, %d \n", testcount,__FILE__, __FUNCTION__, __LINE__);
          ggc_collect ();
          c_parser_external_declaration (parser);
-         //printf("外部声明  11 --- count:%d  %s, %s, %d \n", testcount,__FILE__, __FUNCTION__, __LINE__);
          obstack_free (&parser_obstack, obstack_position);
          testcount++;
       }while (c_parser_next_token_is_not (parser, CPP_EOF));
@@ -1711,25 +1710,20 @@ static tree c_parser_declaration_or_fndef (c_parser *parser, bool fndef_ok,
       c_parser_consume_token (parser);//consume public$、protected$、private$
    }
 
-   //zclei 在这里把Abc( 变成 Abc* Abc(
+   //zclei CPP_LESS可能是<T>泛型函数
    if(aetParser->isAet){
       if(c_parser_next_token_is (parser, CPP_LESS)){
          funcGenericModel= generic_model_new (TRUE,GEN_FROM_DECLARATION_OR_FNDEF);
          classImpl->currentFuncModel = funcGenericModel;//generic_func_parameter_declaration 需要
          n_debug("分析声明说明符 --- 在声明说明符之前有一个泛型函数定义或声明---- %p\n",funcGenericModel);
       }
-      if(c_parser_next_token_is (parser, CPP_COMPL)){
-         n_info("分析声明说明符 进这里处理析构函数====finalize class:%s",classImpl->className->sysName);
-         class_finalize_parser(classImpl->classFinalize,classImpl->className);
-      }else{
-         if(c_parser_next_token_is (parser, CPP_NAME)){
-            c_token *token=c_parser_peek_token (parser);
-            //printf("是一TTT个泛型吗------ %s\n",IDENTIFIER_POINTER(token->value));
-            if(generic_util_valid_id(token->value)){
-               generic_impl_replace_token(generic_impl_get(),token);
-            }
+
+      if(c_parser_next_token_is (parser, CPP_NAME)){
+         c_token *token=c_parser_peek_token (parser);
+         //printf("是一TTT个泛型吗------ %s\n",IDENTIFIER_POINTER(token->value));
+         if(generic_util_valid_id(token->value)){
+            generic_impl_replace_token(generic_impl_get(),token);
          }
-         class_ctor_parser_constructor(classImpl->classCtor,classImpl->className);
       }
    }
    //zclei
@@ -1746,7 +1740,6 @@ static tree c_parser_declaration_or_fndef (c_parser *parser, bool fndef_ok,
    if(aet_parser_is_generic_state(aetParser)){
       if(c_parser_next_token_is (parser, CPP_NAME)){
          c_token *token=c_parser_peek_token (parser);
-         //printf("是一xxxxxTTT个泛型吗------ %s\n",IDENTIFIER_POINTER(token->value));
          if(generic_util_valid_id(token->value)){
             //printf("是一xxxxxTTT个泛型吗----xxxxxxx-- %s\n",IDENTIFIER_POINTER(token->value));
             const char *genStr=IDENTIFIER_POINTER(token->value);
@@ -1757,7 +1750,6 @@ static tree c_parser_declaration_or_fndef (c_parser *parser, bool fndef_ok,
    }
 
    specs = build_null_declspecs ();
-
    /* Handle any standard attributes parsed in the caller.  */
    if (have_attrs){
       declspecs_add_attrs (here, specs, attrs);
@@ -1790,10 +1782,6 @@ static tree c_parser_declaration_or_fndef (c_parser *parser, bool fndef_ok,
          richloc.add_fixit_insert_before ("enum ");
          error_at (&richloc,"unknown type name %qE; use %<enum%> keyword to refer to the type",name);
       }else{
-         //zclei 解决函数定义有两个连续的mtcs修饰符问题  __device__ __host__ void testkernel() bug 015
-//         if(aetParser->isAet && mtcs_parser_is_attribute(mtcs_parser_get(),c_parser_peek_token (parser))){
-//            goto mtcs_label;
-//         }
          auto_diagnostic_group d;
          name_hint hint = lookup_name_fuzzy (name, FUZZY_LOOKUP_TYPENAME, here);
          if (const char *suggestion = hint.suggestion ()){
@@ -1818,11 +1806,6 @@ static tree c_parser_declaration_or_fndef (c_parser *parser, bool fndef_ok,
    if (c_parser_nth_token_starts_std_attributes (parser, 1))
       have_attrs = true;
    n_debug("分析声明说明符 22： have_attrs:%d ", have_attrs);
-   //在这里匹配的是public$  __global__  int   setData(void *data);
-//   if(mtcs_parser_is_attribute(mtcs_parser_get(),c_parser_peek_token (parser))){
-//      n_debug("分析声明说明符 是一个MTCS 属性");
-//      mtcs_parser_add_attribute(mtcs_parser_get());
-//   }
    // 分析声明说明符,也就是 struct 或 fun 函数声明语句中的符号“ int ”
    aet_parser_c_parser_declspecs/*!c_parser_declspecs*/(aetParser, specs, true, true, start_attr_ok,
          true, true, start_attr_ok, true, cla_nonabstract_decl);
@@ -1836,25 +1819,31 @@ static tree c_parser_declaration_or_fndef (c_parser *parser, bool fndef_ok,
       c_parser_skip_to_end_of_block_or_statement (parser);
       return result;
    }
-//   if(aetParser->isAet && mtcs_parser_is_attribute(mtcs_parser_get(),c_parser_peek_token (parser))){
-//      //解决两个连续的MTCS修饰问题 __device__ __host__ void testkernel(
-//mtcs_label:
-//      mtcs_parser_add_attribute(mtcs_parser_get());
-//      aet_parser_c_parser_declspecs/*!c_parser_declspecs*/(aetParser,specs, true, true, start_attr_ok,
-//            true, true, start_attr_ok, true, cla_nonabstract_decl);
-//   }
+
+   //zclei 试一下是不是析构函数
+   if (aetParser->isAet && c_parser_next_token_is (parser, CPP_COMPL) && !specs->declspecs_seen_p)
+      class_finalize_parser_by_specs(classImpl->classFinalize,classImpl->className,specs);
+
    // 此函数把声明说明符的类型信息设置到 specs 上
    // 这个函数执行完,符号“ int ”对应的树节点就设置完了
    finish_declspecs (specs);
-   genericDefineModel=generic_impl_pop_generic_from_declspecs(generic_impl_get(),specs);//zclei 10.4.0
+   //zclei
+   genericDefineModel=generic_impl_pop_generic_from_declspecs(generic_impl_get(),specs);
+   nboolean isConstructor = FALSE;
+   if(aetParser->isAet){
+      isConstructor =  class_ctor_parser_from_specs(classImpl->classCtor,classImpl->className,specs);
+   }
    if(genericDefineModel!=NULL){
       nboolean isClass=class_util_is_class(specs);
       if(!isClass){
          c_parser_error (parser, "泛型只能用在类中。");
       }
    }
-   //n_debug("分析声明说明符 33 解决在 impl 中有修饰如static等声明或定义的泛型函数 static <T> AObject<E> * getCats()
-   //funcGenericModel:%p genericDefineModel:%p\n",funcGenericModel);
+   //zclei 试一下是不是析构函数
+   if (aetParser->isAet && c_parser_next_token_is (parser, CPP_COMPL))
+      class_finalize_parser_by_specs(classImpl->classFinalize,classImpl->className,specs);
+
+
    n_debug("分析声明说明符 33：finish_declspecs storage_class:%d genericDefineModel:%p",
          specs->storage_class,genericDefineModel);
    bool gnu_auto_type_p = specs->typespec_word == cts_auto_type;
@@ -1928,7 +1917,8 @@ static tree c_parser_declaration_or_fndef (c_parser *parser, bool fndef_ok,
          if (!handled_assume)
             pedwarn (here, 0, "empty declaration");
       }
-      class_parser_complete_enum(classParser,specs,haveAccessControl,permission,NULL);//zclei 估计是枚举也可能不是 必须在add_stmt之前
+      //zclei 估计是枚举也可能不是 必须在add_stmt之前
+      class_parser_complete_enum(classParser,specs,haveAccessControl,permission,NULL);
       /* We still have to evaluate size expressions.  */
       if (specs->expr)
          add_stmt (fold_convert (void_type_node, specs->expr));
@@ -2025,28 +2015,16 @@ static tree c_parser_declaration_or_fndef (c_parser *parser, bool fndef_ok,
       warning_at (here, OPT_Wattributes, "%<assume%> attribute not followed by %<;%>");
 
    auto_vec<c_token> omp_declare_simd_attr_clauses;
-   c_parser_handle_directive_omp_attributes (specs->attrs,
-   omp_declare_simd_clauses, &omp_declare_simd_attr_clauses);
+   c_parser_handle_directive_omp_attributes (specs->attrs,omp_declare_simd_clauses, &omp_declare_simd_attr_clauses);
    pending_xref_error ();
    prefix_attrs = specs->attrs;
    all_prefix_attrs = prefix_attrs;
    specs->attrs = NULL_TREE;
    bool more_than_one_decl = false;
    int testcount=0;
-   //zclei 在这里加参数Abc *self
-   if(aetParser->isAet && !genericBlockFuncDefine && nested==0){
-      n_info("分析声明说明符 00aa:进入了impl Abc{};实现模式 如果是函数，要加入Abc *self： count:%d name:%s",
-      testcount++,classImpl->className->sysName);
-      nboolean ok=class_impl_add_self_to_param(classImpl);
-      if(ok){
-         ok=class_impl_add_static_to_declspecs(classImpl,here,specs);
-         n_info("分析声明说明符 00cc:进入了impl Abc{};实现模式 如果是函数，加入static count:%d name:%s ok:%d",
-         testcount++,classImpl->className->sysName,ok);
-      }
-   }
+
    while (true){
       n_debug("分析声明说明符 99: 在这里分析声明符： count:%d fndef_ok:%d", testcount++,fndef_ok);
-      aet_print_token(c_parser_peek_token (parser));
       struct c_declarator *declarator;
       bool dummy = false;
       timevar_id_t tv;
@@ -2058,7 +2036,9 @@ static tree c_parser_declaration_or_fndef (c_parser *parser, bool fndef_ok,
       function definition (in which case the diagnostic for
       implicit int suffices).  */
       declarator = aet_parser_c_parser_declarator/*!c_parser_declarator*/(aetParser,
-      specs->typespec_kind != ctsk_none, C_DTR_NORMAL, &dummy);
+            specs->typespec_kind != ctsk_none, C_DTR_NORMAL, &dummy);
+      //n_debug("print declator----");
+      //aet_print_declarator(declarator);
       if (declarator == NULL){
          n_debug("分析声明说明符 100： count:%d declarator:%p", testcount,declarator);
          if (omp_declare_simd_clauses)
@@ -2099,6 +2079,11 @@ static tree c_parser_declaration_or_fndef (c_parser *parser, bool fndef_ok,
          while (d->kind != cdk_id)
             d = d->declarator;
          underspec_name = d->u.id.id;
+      }
+      //zclei 加入self参数到类函数中
+      if(aetParser->isAet && !genericBlockFuncDefine && nested==0){
+         if(func_mgr_add_self_to_declarator(func_mgr_get(),classImpl->className,declarator,isConstructor,FALSE))
+            class_impl_add_static_to_declspecs(classImpl,here,specs);
       }
       if (c_parser_next_token_is (parser, CPP_EQ)
       || c_parser_next_token_is (parser, CPP_COMMA)
@@ -2218,7 +2203,8 @@ static tree c_parser_declaration_or_fndef (c_parser *parser, bool fndef_ok,
                n_debug("分析声明说明符 109：初始化变量 token是等号=EQ 所以进入 c_parser_initializer count:%d", testcount);
                //zclei
                nboolean genblock=FALSE;
-               if(c_parser_peek_token (parser)->type==CPP_KEYWORD && c_parser_peek_token (parser)->keyword==RID_AET_GENERIC_BLOCK){
+               if(c_parser_peek_token (parser)->type==CPP_KEYWORD
+                     && c_parser_peek_token (parser)->keyword==RID_AET_GENERIC_BLOCK){
                   n_debug("分析声明说明符 初始化变量时  发现genericblock");
                   genblock=TRUE;
                   block_mgr_set_lhs(block_mgr_get(),d);
@@ -2239,8 +2225,8 @@ static tree c_parser_declaration_or_fndef (c_parser *parser, bool fndef_ok,
                      c_finish_omp_declare_simd (parser, d, NULL_TREE, &omp_dsimd_idattr_clauses);
                }
                finish_init ();
-               if(genblock) //zclei 10.4.0
-                  block_mgr_set_lhs(block_mgr_get(),NULL_TREE);//zclei 10.4.0
+               if(genblock) //zclei
+                  block_mgr_set_lhs(block_mgr_get(),NULL_TREE);//zclei
                n_debug("分析声明说明符 110：完成初始化变量 token是等号 count:%d init:%p %s",
                      testcount,init.value,get_tree_code_name(TREE_CODE(init.value)));
             }//end auto_type_p
@@ -2267,7 +2253,8 @@ static tree c_parser_declaration_or_fndef (c_parser *parser, bool fndef_ok,
                      generic_query_check_var_and_parm(generic_query_get(),d,init.value);
                   }
                }
-               class_impl_in_finish_decl(classImpl,init_loc,d);
+               class_cast_in_finish_decl(classImpl->classCast,init_loc,d);
+               object_return_add_var(object_return_get(),init_loc,d);
             }
          }else{ //c_parser_next_token_is (parser, CPP_EQ) 声明符右边不是等号
             if (any_auto_type_p || specs->constexpr_p){
@@ -2277,8 +2264,9 @@ static tree c_parser_declaration_or_fndef (c_parser *parser, bool fndef_ok,
             }
             n_debug("分析声明说明符 114 start_decl 22 ：构建完整的 fun 函数声明语句的树结构 specs中有int 声明说明符树 declarator有fun及参数据的树 count:%d",testcount);
             nboolean setFundecl=FALSE;//zclei 10.4.0
-            if(aetParser->isAet && !genericBlockFuncDefine && nested==0){ //zclei 10.4.0
-               nboolean isQueryFunction=generic_query_is_function_declarator(generic_query_get(),classImpl->className,declarator);
+            if(aetParser->isAet && !genericBlockFuncDefine && nested==0){ //zclei
+               nboolean isQueryFunction=generic_query_is_function_declarator(generic_query_get(),
+                     classImpl->className,declarator);
                n_debug("分析声明说明符 115 :把函数声明符改了 count:%d name:%s isQueryFunction:%d",testcount,classImpl->className->sysName,isQueryFunction);
                if(isQueryFunction && !funcGenericModel)
                   generic_query_add_parm_to_declarator(generic_query_get(),declarator);
@@ -2362,7 +2350,7 @@ static tree c_parser_declaration_or_fndef (c_parser *parser, bool fndef_ok,
                }//zclei
                finish_decl (d, UNKNOWN_LOCATION, NULL_TREE, NULL_TREE, asm_name);
                mtcs_parser_set_mtcs_var(mtcs_parser_get(),d);//zclei 检查是不是mtcs变量
-
+               object_return_add_var(object_return_get(),DECL_SOURCE_LOCATION(d),d);
                n_debug("分析声明说明符 119-xx context:%p extern:%d static:%d pub:%d ",
                      DECL_CONTEXT(d),DECL_EXTERNAL(d),TREE_STATIC(d),TREE_PUBLIC(d));
                if(aetParser->isAet && setFundecl){//zclei
@@ -2443,7 +2431,8 @@ static tree c_parser_declaration_or_fndef (c_parser *parser, bool fndef_ok,
          pedwarn (here, OPT_Wpedantic, "ISO C forbids nested functions");
          c_push_function_context ();
       }
-      n_debug("分析声明说明符 124： 分析函数定义 count:%d declarator:%p", testcount,declarator);
+      n_debug("分析声明说明符 124： 分析函数定义 aet:%d declarator:%p genericBlockFuncDefine:%p nested:%d",
+            aetParser->isAet,declarator,genericBlockFuncDefine,nested);
       nboolean changeNameOk=FALSE; //zclei
       if(aetParser->isAet && !genericBlockFuncDefine && nested==0){//zclei
          changeNameOk=class_impl_start_function(classImpl,
@@ -6410,12 +6399,6 @@ again:
          }else{
             goto class_dot_access;
          }
-      /*}else if(mtcs_parser_is_attribute(mtcs_parser_get(),c_parser_peek_token (parser))){
-         //fprintf(stderr,"处理 __shared__ ----\n");
-         //跳到 class_do_access 利用 c_parser_declaration_or_fndef 处理在mtcs_parser_add_attribute加入的 _attribute_((global)) 属性
-         mtcs_parser_add_attribute (mtcs_parser_get());
-         goto class_dot_access;
-         */
       }else if (c_parser_next_tokens_start_declaration (parser)
       || (have_std_attrs
       && !c_parser_handle_statement_omp_attributes (parser, std_attrs, &have_std_attrs)
@@ -7126,12 +7109,10 @@ expr_stmt:
          n_debug("语句标签后 100xx 把整个赋值表达式语句的树结构挂接到语句列表上 ");
          stmt = c_finish_expr_stmt (loc, c_parser_expression_conv (parser).value);
          //zclei
-         class_impl_in_finish_stmt(classImpl,loc,stmt);
+         class_cast_in_finish_stmt(classImpl->classCast,loc,stmt);
 expect_semicolon:
          c_parser_skip_until_found (parser, CPP_SEMICOLON, "expected %<;%>");
          n_debug("语句标签后 100 把整个赋值表达式语句的树结构挂接到语句列表上 ");
-         aet_print_token(c_parser_peek_token (parser));
-
          break;
    }
    /* Two cases cannot and do not have line numbers associated: If stmt
@@ -8411,9 +8392,9 @@ static struct c_expr c_parser_expr_no_commas (c_parser *parser, struct c_expr *a
               //cpp_type2name(c_parser_peek_token (parser)->type,0),get_tree_code_name(code),lhs.value);
          //zclei
          if(c_parser_next_token_is_keyword(parser,RID_AET_VAROF)){
-            lhs=class_impl_varof_parser(classImpl,lhs);
+            lhs=aet_expr_varof_parser(classImpl->aetExpr,lhs);
          }else{
-            lhs=class_impl_nameless_call(classImpl,lhs);
+            lhs.value=nameless_call_parser(nameless_call_get(),lhs.value);
          }
          mtcs_parser_modify_check(mtcsParser,op_location,NULL_TREE,lhs.value);//zclei
          set_c_expr_source_range (&lhs, op_location, c_parser_peek_token (parser)->location);
@@ -8910,8 +8891,6 @@ c_parser_binary_expression (c_parser *parser, struct c_expr *after,
     POP;
   n_debug("c_parser_binary_expression 33 二元表达式 expr.value:%p %s ",
           stack[0].expr.value,stack[0].expr.value?get_tree_code_name(TREE_CODE(stack[0].expr.value)):"NULL");
-
-
   return stack[0].expr;
 #undef POP
 }
@@ -9015,7 +8994,10 @@ static struct c_expr c_parser_cast_expression (c_parser *parser, struct c_expr *
 
       expr.value= generic_impl_cast(generic_impl_get(),type_name,expr.value);//zclei 10.4.0
       ret.value = c_cast_expr (cast_loc, type_name, expr.value);
+      n_debug("start 00\n");
       ret.value=class_cast_cast(classImpl->classCast,cast_loc,type_name,ret.value);//zclei 10.4.0
+      n_debug("start 11\n");
+
       generic_impl_ready_check_cast(generic_impl_get(),type_name,ret.value);//zclei 10.4.0
      // n_debug("c_parser_cast_expression 33 %p %s",ret.value,get_tree_code_name(TREE_CODE(ret.value)));
       if (ret.value && expr.value)
@@ -12033,15 +12015,15 @@ static struct c_expr c_parser_postfix_expression_after_primary (c_parser *parser
                  int ix;
                  tree arg;
                  for (ix = 0; exprlist->iterate (ix, &arg); ++ix){
-                    n_debug("c_parser_postfix_expression_after_primary ttcc %p %s %d\n",
+                    n_debug("c_parser_postfix_expression_after_primary 参数 %p %s %d\n",
                           arg,get_tree_code_name(TREE_CODE(TREE_TYPE(arg))),TYPE_MODE(TREE_TYPE(arg)));
+                    aet_print_tree(arg);
 
                  }
                }
             }
             */
 
-            //parens.skip_until_found_close (parser);
             new_object_set_parser_parms_state(new_object_get(),FALSE);//zclei 10.4.0
             parens.skip_until_found_close (parser);//zclei 10.4.0源代码是： c_parser_skip_until_found (parser, CPP_CLOSE_PAREN,"expected %<)%>");
             n_debug("c_parser_postfix_expression_after_primary 22 函数参数处理完成 expr.value:%s %p 参数个数:%d",
@@ -12087,13 +12069,15 @@ static struct c_expr c_parser_postfix_expression_after_primary (c_parser *parser
             //zclei
             expr.value =class_impl_build_function_call_vec(classImpl,expr_loc, arg_loc,
                   expr.value, exprlist, origtypes,&selectFunc,&defineGenModel);
+            /*
             if(selectFunc.classFunc){
                n_debug("c_parser_postfix_expression_after_primary 44 整合 expr.value:%p %s origtypes:%p classfunc:%p name:%s",
                      expr.value,get_tree_code_name(TREE_CODE(expr.value)),origtypes,
                      selectFunc.classFunc,selectFunc.classFunc->mangleFunName);
             }
+            */
             expr.value=generic_call_convert_generic_to_user(generic_call_get(),expr.value);//zclei 10.4.0
-            expr=class_impl_nameless_call(classImpl,expr);//zclei 10.4.0
+            expr.value=nameless_call_parser(nameless_call_get(),expr.value);//zclei
             class_impl_add_implicitly_actual_param(classImpl,expr.value, exprlist,origtypes);//zclei
             //处理核函数，转为MtcsLanuch的lanuch调用。
             expr.value=class_impl_record_mtcs_call(classImpl,expr_loc,selectFunc.funcdecl,
@@ -27987,25 +27971,22 @@ location_t c_parser_parse_rtl_body (c_parser *parser, char *start_with_pass)
 }
 
 /////////////////-----------------c-parser.cc 调用 aet的方法------------------
-static int aet_parser_c_parser_declspecs_c_id (AetParser *self,struct c_typespec *t,tree ident)
+/*
+ * 把在函数声明 或变量声明中的类型 E 换成 aet_generic_E
+ */
+static inline bool aet_parser_c_parser_declspecs_c_id (AetParser *self,struct c_typespec *t,tree ident)
 {
-   c_parser *parser = self->parser;
-   int ret=0;
+   n_debug("aet_parser_c_parser_declspecs_c_id xxx %s\n",IDENTIFIER_POINTER(ident));
    if(generic_util_valid_id(ident)){
       //zclei
       tree value=generic_util_get_type_by_decl_string(IDENTIFIER_POINTER(ident));
       n_debug("aet_parser_c_parser_declspecs_c_id token是泛型声明:%s\n",IDENTIFIER_POINTER(ident));
+      aet_print_tree(value);
       t->kind = ctsk_typedef;
       t->spec = value;
-      ret=1;
-
-   }else{
-      n_debug("特别的:是不是在AObject声明中，并且是方法 “AClass *getClass()“,如果是返回void *");
-      if(class_parser_exception(classParser,ident)){
-         ret = 2;
-      }
+      return true;
    }
-   return ret;
+   return false;
 }
 
 //解析 AObject.EnumName
@@ -28061,17 +28042,8 @@ static nboolean aet_parser_c_parser_declspecs_keyword (AetParser *self,location_
          //触发加入<aet.h>,如果需要加入，返回FALSE，留到加完#include <aet.h>后再进入这里。
          if(class_parser_add_include(classParser))
             return FALSE;
-         if(c_parser_peek_token (parser)->id_kind!=C_ID_CLASSNAME){
-            class_parser_replace_class_to_typedef(classParser);
-            *attrs_ok = true;
-            declspecs_add_scspec (loc, specs,c_parser_peek_token (parser)->value);
-            //aet_print_specs(specs);
-            c_parser_consume_token (parser); //consume typedef
-         }else{
-            //c_parser_peek_token 在class_parser_parser_class_specifier中被consume
-            t=class_parser_parser_class_specifier(classParser);
-            declspecs_add_type (loc, specs, t);
-         }
+         t= class_parser_parser_class(classParser);
+         declspecs_add_type (loc, specs, t);
          break;
       case RID_AET_ABSTRACT:
          //触发加入<aet.h>,如果需要加入，返回FALSE，留到加完#include <aet.h>后再进入这里。
@@ -28460,17 +28432,13 @@ void aet_parser_c_parser_declspecs (AetParser *self, struct c_declspecs *specs,
 
    while (c_parser_next_token_is (parser, CPP_NAME)
    || c_parser_next_token_is (parser, CPP_KEYWORD)
-   || (c_dialect_objc () && c_parser_next_token_is (parser, CPP_LESS))){
+   || (c_dialect_objc ()  && c_parser_next_token_is (parser, CPP_LESS))){
       count++;
       struct c_typespec t;
       tree attrs;
       tree align;
       location_t loc = c_parser_peek_token (parser)->location;
       //n_debug("声明说明符语法 00 count:%d  %d",count,(!typespec_ok || specs->typespec_kind == ctsk_tagdef));
-//      if(mtcs_parser_is_attribute(mtcs_parser_get(),c_parser_peek_token (parser))){
-//         if(mtcs_parser_add_attribute(mtcs_parser_get()))
-//            continue;
-//      }
       /* If we cannot accept a type, exit if the next token must start
       one.  Also, if we already have seen a tagged definition,
       a typename would be an error anyway and likely the user
@@ -28515,8 +28483,7 @@ void aet_parser_c_parser_declspecs (AetParser *self, struct c_declspecs *specs,
          seen_type = true;
          attrs_ok = true;
          if (kind == C_ID_ID){
-            int ret = aet_parser_c_parser_declspecs_c_id(aetParser,&t,value);//zclei
-            if(ret ==0){ //zclei
+            if(!aet_parser_c_parser_declspecs_c_id(aetParser,&t,value)){ //zclei
                auto_diagnostic_group d;
                name_hint hint = lookup_name_fuzzy (value, FUZZY_LOOKUP_TYPENAME,loc);
                if (const char *suggestion = hint.suggestion ()){
@@ -28527,15 +28494,15 @@ void aet_parser_c_parser_declspecs (AetParser *self, struct c_declspecs *specs,
                   error_at (loc, "unknown type name %qE", value);
                t.kind = ctsk_typedef;
                t.spec = error_mark_node;
-            }else if(ret==2) //zclei
-               continue;     //zclei
+            }
          }else if (kind == C_ID_TYPENAME && (!c_dialect_objc () || c_parser_next_token_is_not (parser, CPP_LESS))){
             t.kind = ctsk_typedef;
             /* For a typedef name, record the meaning, not the name.
             In case of 'foo foo, bar;'.  */
             t.spec = lookup_name (value);
             n_debug("类型 是 t.spec:%p %s value :%s  %s",
-                  t.spec,get_tree_code_name(TREE_CODE(t.spec)),IDENTIFIER_POINTER(value),get_tree_code_name(TREE_CODE(TREE_TYPE(t.spec) )));
+                  t.spec,get_tree_code_name(TREE_CODE(t.spec)),IDENTIFIER_POINTER(value),
+                  get_tree_code_name(TREE_CODE(TREE_TYPE(t.spec) )));
          }else{
             tree proto = NULL_TREE;
             gcc_assert (c_dialect_objc ());
@@ -28630,7 +28597,7 @@ void aet_parser_c_parser_declspecs (AetParser *self, struct c_declspecs *specs,
             attrs_ok = true;
             seen_type = true;
             if (c_dialect_objc ())
-            parser->objc_need_raw_identifier = true;
+               parser->objc_need_raw_identifier = true;
             t.kind = ctsk_resword;
             t.spec = c_parser_peek_token (parser)->value;
             t.expr = NULL_TREE;

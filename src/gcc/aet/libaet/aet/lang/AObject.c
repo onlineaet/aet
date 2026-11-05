@@ -58,10 +58,6 @@ impl$ AObject{
       }
    }
 
-   void toggle_refs_notify(aboolean isLastRef){
-
-   }
-
    auint getRefCount(){
       aint old_ref;
       old_ref = a_atomic_int_get ((int *)&refCount);
@@ -69,35 +65,26 @@ impl$ AObject{
    }
 
    void unref(){
-      AClass *myClass = getClass();
       aint old_ref;
       /* 这里我们想要自动做: if (refCount>1) { refCount--; return; } */
 retry_atomic_decrement1:
       old_ref = a_atomic_int_get (&refCount);
       if (old_ref > 1){
          /* 如果此unref调用和toggle refs拥有最后2个ref，则有效 */
-         aboolean has_toggle_ref =FALSE;// OBJECT_HAS_TOGGLE_REF (object);
-
          if (!a_atomic_int_compare_and_exchange ((int *)&refCount, old_ref, old_ref - 1))
             goto retry_atomic_decrement1;
-         a_debug("引用计数器不是1 ------ :%d %d %p %s",old_ref,refCount,self,myClass->getName());
-
-         /* 如果我们从2->1开始，我们需要通知toggle refs */
-         if (old_ref == 2 && has_toggle_ref) /* 本例中持有的最后一个ref由toggle_ref所有 */
-            toggle_refs_notify (TRUE);
+         a_debug("引用计数器不是1 ------ :%d %d %p",old_ref,refCount,self);
+         return;
       }else{
          /*可能同时被重新引用 */
-         retry_atomic_decrement2:
+retry_atomic_decrement2:
          old_ref = a_atomic_int_get ((int *)&refCount);
          if (old_ref > 1){
             /* 如果此unref调用和toggle_ref拥有最后2个ref，则有效*/
             aboolean has_toggle_ref = FALSE;//OBJECT_HAS_TOGGLE_REF (object);
-            a_debug("引用计数器不是1 -- :%d %d %p %s",old_ref,refCount,self,myClass->getName());
+            a_debug("引用计数器不是1 -- :%d %d %p",old_ref,refCount,self);
             if (!a_atomic_int_compare_and_exchange ((int *)&refCount, old_ref, old_ref - 1))
                goto retry_atomic_decrement2;
-            /* 如果我们从2->1开始，我们需要通知toggle refs */
-            if (old_ref == 2 && has_toggle_ref) /* 本例中持有的最后一个ref由toggle_ref所有 */
-               toggle_refs_notify (TRUE);
             return;
          }
          /* 递减最后一个引用 */

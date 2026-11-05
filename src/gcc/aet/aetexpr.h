@@ -34,12 +34,17 @@ typedef struct _AetExpr AetExpr;
 struct _AetExpr
 {
 	AetParser *parser;
+	nboolean useVarOf;
+	int      state;
+
 };
 
 
 AetExpr      *aet_expr_new();
 struct c_expr aet_expr_varof_parser(AetExpr *self,struct c_expr lhs);
-
+void          aet_expr_compile_ready(AetExpr *self);
+void          aet_expr_compile(AetExpr *self);
+const char   *aet_expr_get_compile_codes(AetExpr *self);
 
 
 

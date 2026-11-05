@@ -127,7 +127,7 @@ void parser_static_replace_dimension(ParserStatic *self,struct c_declarator *dec
  *原型 finish_function c-decl.cc
  *解决BUG
  *原因:当调用finish_function时，会调用cgraph_node::finalize_function (fndecl, false);再调用    ggc_collect ();
- *这时class声明还没有全部完成。所以class_parser_parser_class_specifier contents = chainon (decls, contents); contents
+ *这时class声明还没有全部完成。所以class_parser_parser_class contents = chainon (decls, contents); contents
  *变成@1      ggc_freed        addr: 7f93550dbd10 内存出错。
 */
 static void aet_finish_function (location_t end_loc)
@@ -487,7 +487,12 @@ static void parser_var_or_fun_declaration(ParserStatic *self,struct c_declspecs 
             if (d){
                n_debug("静态声明分析 103： finish_decl count:%d permission:%d isFuncOk:%d", testcount,permi,isFuncOk);
                finish_decl (d, UNKNOWN_LOCATION, NULL_TREE,NULL_TREE, asm_name);
-               checkAtInterface(className,d);
+               n_debug("static ---name----%s\n", IDENTIFIER_POINTER(DECL_NAME(d)));
+               n_debug("static  public=%d\n", TREE_PUBLIC(d));
+               n_debug("static  external=%d\n", DECL_EXTERNAL(d));
+               n_debug("static  static=%d\n", TREE_STATIC(d));
+               n_debug("static  context=%p\n", DECL_CONTEXT(d));
+               //checkAtInterface(className,d);
                if(isFuncOk){
                   func_mgr_set_static_func_decl(func_mgr_get(),d,className,FALSE);
                   func_mgr_set_static_func_premission(func_mgr_get(),className,d,permi,isFinal);
@@ -763,6 +768,13 @@ void     parser_static_set_func(ParserStatic *self,TargetIntrinsicFunc func,void
 {
    self->tqrgetIntrinsicFunc = func;
    self->userData = userData;
+}
+
+void parser_static_add_aclass(ParserStatic *self,NString *codes,ClassName *className)
+{
+   n_string_append(codes,"private$ static AClass *aclass;\n");
+   n_string_append_printf(codes,"public$  static AClass *%s(%s *obj);\n",
+         AET_GET_ACLASS_FUNC_NAME,className->userName);
 }
 
 

@@ -20,7 +20,6 @@
 #ifndef __GCC_MTCS_GEN__
 #define __GCC_MTCS_GEN__
 
-
 #include "aet/nlib.h"
 typedef struct _MtcsGen MtcsGen;
 struct _MtcsGen{

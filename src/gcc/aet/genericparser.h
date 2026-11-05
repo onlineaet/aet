@@ -106,5 +106,9 @@ void        generic_parser_record_const_decl(GenericParser *self,location_t loc,
 NPtrArray  *generic_parser_create_fwgb_text(char *content);
 void        generic_parser_ready(GenericParser *self,NPtrArray **arrays,int alen,int pos);
 Directive **generic_parser_get_directive(GenericParser *self,int *count);
+/**
+ * 用directive替换replaced中未定义的 GenericUnit
+ */
+void        generic_parser_replace_model(GenericParser *self,GenericModel *replaced);
 
 #endif

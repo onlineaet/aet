@@ -76,50 +76,51 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 #include "genericutil.h"
 #include "blockmgr.h"
 #include "genericinfo.h"
+#include "funcmgr.h"
 
 static void newHeapInit(NewHeap *self)
 {
-	   ((NewStrategy*)self)->nest=0;
+   ((NewStrategy*)self)->nest=0;
 }
 
 static void setVarProperties(NewHeap *self,NewObjectType varType)
 {
-	c_parser *parser=((NewStrategy *)self)->parser->parser;
-    new_strategy_set_var_type((NewStrategy*)self,varType);
+   c_parser *parser=((NewStrategy *)self)->parser->parser;
+   new_strategy_set_var_type((NewStrategy*)self,varType);
 }
 
 static char * getRemainToken(NewHeap *self)
 {
-	  NString *codes=n_string_new("");
-	  c_parser *parser=((NewStrategy *)self)->parser->parser;
-	  int tokenCount=parser->tokens_avail;
-	  int i;
-	  for(i=0;i<tokenCount;i++){
-		 c_token *token;
-		 if(i==0){
-			token=c_parser_peek_token (parser);
-		 }else if(i==1){
-			token=c_parser_peek_2nd_token (parser);
-		 }else{
-			token=c_parser_peek_nth_token (parser,i);
-		 }
-		 n_debug("getRemainToken backupToken -- %d %d\n",i,tokenCount);
-		 char *re=aet_utils_convert_token_to_string(token);
-		 if(re==NULL){
-			 n_error("token不能转成字符!!!");
-			 return NULL;
-		 }
-		 n_string_append(codes,re);
-	  }
-	  for(i=0;i<tokenCount;i++){
-		 c_parser_consume_token (parser);
-	  }
-	  char *result=NULL;
-	  if(codes->len>0)
-		  result=n_string_free(codes,FALSE);
-	  else
-	     n_string_free(codes,TRUE);
-	  return result;
+   NString *codes=n_string_new("");
+   c_parser *parser=((NewStrategy *)self)->parser->parser;
+   int tokenCount=parser->tokens_avail;
+   int i;
+   for(i=0;i<tokenCount;i++){
+      c_token *token;
+      if(i==0){
+         token=c_parser_peek_token (parser);
+      }else if(i==1){
+         token=c_parser_peek_2nd_token (parser);
+      }else{
+         token=c_parser_peek_nth_token (parser,i);
+      }
+      n_debug("getRemainToken backupToken -- %d %d\n",i,tokenCount);
+      char *re=aet_utils_convert_token_to_string(token);
+      if(re==NULL){
+         n_error("token不能转成字符!!!");
+         return NULL;
+      }
+      n_string_append(codes,re);
+   }
+   for(i=0;i<tokenCount;i++){
+      c_parser_consume_token (parser);
+   }
+   char *result=NULL;
+   if(codes->len>0)
+      result=n_string_free(codes,FALSE);
+   else
+      n_string_free(codes,TRUE);
+   return result;
 }
 
 /**
@@ -127,18 +128,18 @@ static char * getRemainToken(NewHeap *self)
  */
 static nboolean isUnpointerClass(tree var)
 {
-    tree type=TREE_TYPE(var);
-    if(TREE_CODE(type)!=RECORD_TYPE)
-    	return FALSE;
-	tree next=TYPE_NAME(type);
-	if(TREE_CODE(next)!=TYPE_DECL)
-		return FALSE;
-	tree decl=DECL_NAME(next);
-	char *sysClassName=IDENTIFIER_POINTER(decl);
-	ClassName *className=class_mgr_get_class_name_by_sys(class_mgr_get(),sysClassName);
-	if(className==NULL)
-		return FALSE;
-	return TRUE;
+   tree type=TREE_TYPE(var);
+   if(TREE_CODE(type)!=RECORD_TYPE)
+      return FALSE;
+   tree next=TYPE_NAME(type);
+   if(TREE_CODE(next)!=TYPE_DECL)
+      return FALSE;
+   tree decl=DECL_NAME(next);
+   char *sysClassName=IDENTIFIER_POINTER(decl);
+   ClassName *className=class_mgr_get_class_name_by_sys(class_mgr_get(),sysClassName);
+   if(className==NULL)
+      return FALSE;
+   return TRUE;
 }
 
 
@@ -162,33 +163,34 @@ static void createInitCodes(NewHeap *self,tree var,ClassName *className,NString 
 	char *tempVarName=class_util_create_new_object_temp_var_name(className->sysName,CREATE_OBJECT_METHOD_HEAP);
 	new_strategy_new_object((NewStrategy *)self,tempVarName,genericDefine,
 	      className,ctorStr,codes,TRUE,mtcsPlatType,TRUE);
+   free(tempVarName);
 }
 
 static void setInitGlobalVar(NewHeap *self,tree var,ClassName *className)
 {
-	char *varName=IDENTIFIER_POINTER(DECL_NAME(var));
-	struct timeval tv;
+   char *varName=IDENTIFIER_POINTER(DECL_NAME(var));
+   struct timeval tv;
    gettimeofday (&tv, NULL);
-	long local_tick = (unsigned) tv.tv_sec * 1000 + tv.tv_usec / 1000;
-	long randNumber=local_tick+rand ();
-	char ctorName[255];
-	sprintf(ctorName,"%s_%s_%ld",className->sysName,varName,randNumber);
-	NString *codes=n_string_new("");
-	if(!current_function_decl){
-	  n_string_append_printf(codes,"static __attribute__((constructor)) void %s_ctor()\n",ctorName);
-	  n_string_append(codes,"{\n");
-     createInitCodes(self,var,className,codes,FALSE);
-	  n_string_append(codes,"}\n");
+   long local_tick = (unsigned) tv.tv_sec * 1000 + tv.tv_usec / 1000;
+   long randNumber=local_tick+rand ();
+   char ctorName[255];
+   sprintf(ctorName,"%s_%s_%ld",className->sysName,varName,randNumber);
+   NString *codes=n_string_new("");
+   if(!current_function_decl){
+      n_string_append_printf(codes,"static __attribute__((constructor)) void %s_ctor()\n",ctorName);
+      n_string_append(codes,"{\n");
+      createInitCodes(self,var,className,codes,FALSE);
+      n_string_append(codes,"}\n");
       //不能加因为_cpp_pop_buffer 会把最后一个}省略了 n_string_append(codes,"}\n");//结否constructor函数
-	}
-	location_t ctorLoc= c_aet_get_ctor_location(var);
-	if(ctorLoc==0){
-	     error_at(input_location,"newheap.c中的setInitGlobalVar 不应该出现的错误，构造函数的位置是零，报告此错误。");
-	     return ;
-	}
-	aet_utils_add_token_with_location(parse_in,codes->str,codes->len,ctorLoc);
-	n_debug("setInitGlobalVar 源代码:\n%s\n",codes->str);
-	n_string_free(codes,TRUE);
+   }
+   location_t ctorLoc= c_aet_get_ctor_location(var);
+   if(ctorLoc==0){
+      error_at(input_location,"newheap.c中的setInitGlobalVar 不应该出现的错误，构造函数的位置是零，报告此错误。");
+      return ;
+   }
+   aet_utils_add_token_with_location(parse_in,codes->str,codes->len,ctorLoc);
+   n_debug("setInitGlobalVar 源代码:\n%s\n",codes->str);
+   n_string_free(codes,FALSE);
 }
 
 /**
@@ -198,13 +200,12 @@ static void setInitGlobalVar(NewHeap *self,tree var,ClassName *className)
 static void setInitLocalVar(NewHeap *self,location_t loc,tree var,ClassName *className,nboolean modify)
 {
    char *varName=IDENTIFIER_POINTER(DECL_NAME(var));
-   NString *codes=n_string_new("");
+   NString *codes=n_string_sized_new(512);
    createInitCodes(self,var,className,codes,modify);
    if(modify){
       char *remain= getRemainToken(self);
       if(remain!=NULL){
          n_string_append_printf(codes,"%s\n",remain);
-         printf("remain setInitLocalVar is :%s\n",remain);
          n_free(remain);
       }
    }
@@ -213,9 +214,15 @@ static void setInitLocalVar(NewHeap *self,location_t loc,tree var,ClassName *cla
       error_at(input_location,"setInitLocalVar 不应该出现的错误，构造函数的位置是零，报告此错误。");
       return ;
    }
+   tree currentFunction = current_function_decl;
+   if(currentFunction){
+    // nboolean isMtcs = func_mgr_is_mtcs_func(func_mgr_get(),currentFunction);
+     //printf("setInitLocalVar 当前function---- %d\n",isMtcs);
+      ;
+   }
    aet_utils_add_token_with_location(parse_in,codes->str,codes->len,loc);
    n_debug("new_heap setInitLocalVar 源代码:varName:%s file:%s\n%s\n",varName,in_fnames[0],codes->str);
-   n_string_free(codes,TRUE);
+   n_string_free(codes,FALSE);
 }
 
 /**
@@ -258,7 +265,7 @@ static nboolean newHeapObject(NewHeap *self,location_t loc,tree var,nboolean mod
 		error_at(input_location,"newHeapObject 不应该出现的错误，报告。");
 		return FALSE;
 	}
-	char *varSysClassName=class_util_get_class_name_by_pointer(TREE_TYPE(var));
+	char *varSysClassName=class_util_get_class_name/*!class_util_get_class_name_by_pointer*/(TREE_TYPE(var));
 	char *ctorSysClassName=IDENTIFIER_POINTER(ctorSysClassNameTree);
 	if(strcmp(varSysClassName,ctorSysClassName)){
 		n_warning("变量的类型与new$的类型不一样。%s %s",varSysClassName,ctorSysClassName);
@@ -323,20 +330,20 @@ static tree createNamelessVar(char *sysName,char *varName)
 void new_heap_create_object_no_decl(NewHeap *self,ClassName *className,GenericModel *genericDefine,
       char *ctorStr,nboolean isParserParmsState,location_t loc,tree mtcsPlatType)
 {
-   char *tempVarName=class_util_create_new_object_temp_var_name(className->sysName,CREATE_OBJECT_METHOD_NO_DECL_HEAP);
+   char *tempVarName=class_util_create_new_object_temp_var_name(className->sysName,
+         CREATE_OBJECT_METHOD_NO_DECL_HEAP);
    ClassInit *classInit=((NewStrategy *)self)->classInit;
    if(aet_utils_valid_tree(current_function_decl) && isParserParmsState){
       //printf("在函数内调用new$ Object() isParserParmsState:%d\n",isParserParmsState);
       c_parser *parser=((NewStrategy *)self)->parser->parser;
       tree decl=createNamelessVar(className->sysName,tempVarName);
-      tree  attr = NULL_TREE;
-      tree cleanupId = build_tree_list (NULL_TREE, get_identifier(AET_CLEANUP_NAMELESS_OBJECT_METHOD));
-      attr=tree_cons (get_identifier ("cleanup"), cleanupId, attr);
-      DECL_ATTRIBUTES(decl)=attr;
-      location_t  loc = DECL_SOURCE_LOCATION(decl);
       tree type=TREE_TYPE(decl);
       c_bind(loc,decl,FALSE);
       finish_decl (decl, loc, NULL_TREE,type, NULL_TREE);
+      tree cleanupExpr = class_util_build_unref_call(loc,decl);
+      push_cleanup(decl, cleanupExpr, false);
+      TREE_USED(decl) = 1;   // 避免 “unused” 警告
+
    }
    NString *codes=n_string_new("");
    //(aet_utils_valid_tree(current_function_decl) && isParserParmsState)=TRUE不需要第一行变量声明
@@ -360,7 +367,8 @@ void new_heap_create_object_no_decl(NewHeap *self,ClassName *className,GenericMo
 //   }
    aet_utils_add_token_with_location(parse_in,codes->str,codes->len,loc);
    n_debug("new_heap new_heap_create_object_no_decl 源代码:\n%s\n",codes->str);
-   n_string_free(codes,TRUE);
+   n_string_free(codes,FALSE);
+   free(tempVarName);
 }
 
 nboolean new_heap_create_object(NewHeap *self,location_t loc,tree var)
@@ -384,7 +392,7 @@ char *new_heap_create_object_for_static(NewHeap *self,tree var)
       error_at(input_location,"newHeapObject 不应该出现的错误，报告。");
       return FALSE;
    }
-   char *varSysClassName=class_util_get_class_name_by_pointer(TREE_TYPE(var));
+   char *varSysClassName=class_util_get_class_name/*!class_util_get_class_name_by_pointer*/(TREE_TYPE(var));
    char *ctorSysClassName=IDENTIFIER_POINTER(ctorSysClassNameTree);
    if(strcmp(varSysClassName,ctorSysClassName)){
       n_warning("变量的类型与new$的类型不一样。%s %s",varSysClassName,ctorSysClassName);

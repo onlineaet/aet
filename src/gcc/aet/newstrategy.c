@@ -428,41 +428,42 @@ void new_strategy_add_close_brace(NewStrategy *self)
 static void addMiddleCodes(NewStrategy *self,char *varName,ClassName *className,
         char *modifyGenericCodes, char *ctorStr,nboolean fromHeap,NString *codes)
 {
-    ClassInit *classInit=((NewStrategy *)self)->classInit;
-    ClassInfo *info=class_mgr_get_class_info_by_class_name(class_mgr_get(),className);
-    if(modifyGenericCodes!=NULL)
-       n_string_append(codes,modifyGenericCodes);
+   ClassInit *classInit=((NewStrategy *)self)->classInit;
+   ClassInfo *info=class_mgr_get_class_info_by_class_name(class_mgr_get(),className);
+   if(modifyGenericCodes!=NULL)
+      n_string_append(codes,modifyGenericCodes);
 
-     char *initFuncName=aet_utils_create_init_method(className->sysName);
-     n_string_append_printf(codes,"\t%s(%s);\n",initFuncName,varName);
-    /**
-      * class_init_override_parent_ref不再调用，该方法被classinit.c 中的modifyParentMethod替换，并且在
-      * class_init_create_init_define中调用,比较重大的改变。解决BUG，子类定义的函数（没有声明的情况下）不能
-      * 替换父类的同名同参数函数的问题。
-      */
-     char *freeChild=class_init_modify_root_object_free_child(classInit,className,varName);
-     if(freeChild!=NULL){
-       n_string_append(codes,"\t");
-       n_string_append(codes,freeChild);
-       n_free(freeChild);
-     }
-     //如果不是堆分配的内存把objectSize设为0
-     if(!fromHeap)
-        n_string_append_printf(codes,"\t%s->objectSize=0;\n",varName);
+   char *initFuncName=aet_utils_create_init_method(className->sysName);
+   n_string_append_printf(codes,"\t%s(%s);\n",initFuncName,varName);
+   /**
+   * class_init_override_parent_ref不再调用，该方法被classinit.c 中的modifyParentMethod替换，并且在
+   * class_init_create_init_define中调用,比较重大的改变。解决BUG，子类定义的函数（没有声明的情况下）不能
+   * 替换父类的同名同参数函数的问题。
+   */
+   char *freeChild=class_init_modify_root_object_free_child(classInit,className,varName);
+   //printf("newstrategy.c addMiddleCodes %s\n",freeChild);
+   if(freeChild!=NULL){
+      n_string_append(codes,"\t");
+      n_string_append(codes,freeChild);
+      n_free(freeChild);
+   }
+   //如果不是堆分配的内存把objectSize设为0
+   if(!fromHeap)
+      n_string_append_printf(codes,"\t%s->objectSize=0;\n",varName);
 
-     if(ctorStr!=NULL){
-       n_string_append_printf(codes,"\t%s *tempObject123=%s->%s;\n",className->sysName,varName,ctorStr);
-       n_string_append(codes,"\tif(tempObject123==NULL){\n");
-       n_string_append_printf(codes,"\t\tprintf(\"执行构造函数%s时，返回空值。\\n\");\n",className->userName);
-       n_string_append_printf(codes,"\t\tif(%s->objectSize>0){\n",varName);
-       n_string_append_printf(codes,"\t\t\t%s->unref();\n",varName);
-       n_string_append_printf(codes,"\t\t\t%s=NULL;\n",varName);
-       n_string_append(codes,"\t\t}\n");
-       n_string_append(codes,"\t}\n");
-     }else{
-         //因该报错
-         n_error("类%s没有构造函数，报告此错误。",className->userName);
-     }
+   if(ctorStr!=NULL){
+      n_string_append_printf(codes,"\t%s *ctorObj=%s->%s;\n",className->sysName,varName,ctorStr);
+      n_string_append(codes,"\tif(ctorObj==NULL){\n");
+      n_string_append_printf(codes,"\t\tprintf(\"执行构造函数%s时，返回空值。\\n\");\n",className->userName);
+      n_string_append_printf(codes,"\t\tif(%s->objectSize>0){\n",varName);
+      n_string_append_printf(codes,"\t\t\t%s->unref();\n",varName);
+      n_string_append_printf(codes,"\t\t\t%s=NULL;\n",varName);
+      n_string_append(codes,"\t\t}\n");
+      n_string_append(codes,"\t}\n");
+   }else{
+      //应该报错
+      n_error("类%s没有构造函数，报告此错误。",className->userName);
+   }
 }
 
 /**
@@ -495,9 +496,9 @@ static void new_strategy_create_common_heap_codes(NewStrategy *self,char *varNam
      n_ptr_array_add(self->mtcsPlatformAndDevnum,mtcsPlatType);
    }
    if(mtcsPlatType==NULL_TREE)
-      n_string_append(codes,"\tunsigned int _mtcsPlatType0=0;\n");
+      n_string_append(codes,"\tunsigned int _mtcsPlatType=0;\n");
    else
-      n_string_append_printf(codes,"\tint _mtcsPlatType0=%s %d %lu;\n",
+      n_string_append_printf(codes,"\tint _mtcsPlatType=%s %d %lu;\n",
             RID_AET_GOTO_STR,GOTO_MTCS_CREATE_OBJ,(unsigned long)mtcsPlatType);
    nboolean atClassFunc=FALSE;
    if(self->parser->isAet){
@@ -508,18 +509,16 @@ static void new_strategy_create_common_heap_codes(NewStrategy *self,char *varNam
          atClassFunc=TRUE;
       }
    }
-
    n_string_append_printf(codes,"\tint _isMtcs=((AClass *)%s.class)->isMtcsClass();\n",className->sysName);
    if(atClassFunc){
       n_string_append(codes,"\tif(!_isMtcs)\n");
       n_string_append(codes,"\t\t_isMtcs=self->getClass()->isMtcsClass();\n");
    }
-
-   n_string_append_printf(codes,"\t%s=%s.newObject(sizeof(%s),_isMtcs,_mtcsPlatType0,\"%s\");\n",
+   n_string_append_printf(codes,"\t%s=%s.newObject(sizeof(%s),_isMtcs,_mtcsPlatType,\"%s\");\n",
                   varName, className->sysName,className->sysName,className->userName);
 
    n_string_append_printf(codes,"\t%s->objectSize=sizeof(%s);\n",varName,className->sysName);
-   n_string_append_printf(codes,"\t%s->%s=_mtcsPlatType0;\n",varName,AET_MTCS_PLATFORM_TYPE_VAR_NAME);
+   n_string_append_printf(codes,"\t%s->%s=_mtcsPlatType;\n",varName,AET_MTCS_PLATFORM_TYPE_VAR_NAME);
    n_string_append_printf(codes,"\t%s->%s=%d;\n",varName,AET_MAGIC_NAME,AET_MAGIC_NAME_VALUE);
    addMiddleCodes(self,varName,className,undefineImplCodes, ctorStr,TRUE,codes);
    n_string_append_printf(codes,"\t%s;\n",varName);
@@ -576,7 +575,8 @@ static void modifyParentGenericCodes(NString *codes,int i,char *varName,RunGener
 /**
  * 收集新建对象的父类的泛型信息。
  */
-static void collectNewObjectParentGeneric(NewStrategy *self,char *varName,RunGenericInfo **childRunGenInfos,ClassName *child,NString *codes)
+static void collectNewObjectParentGeneric(NewStrategy *self,char *varName,
+      RunGenericInfo **childRunGenInfos,ClassName *child,NString *codes)
 {
    ClassInfo *childInfo=class_mgr_get_class_info_by_class_name(class_mgr_get(),child);
    while(childInfo->parentName.sysName!=NULL){
@@ -691,7 +691,7 @@ static char *newObject(NewStrategy *self,char *tempVarName,GenericModel *generic
    ClassInfo *info=class_mgr_get_class_info_by_class_name(class_mgr_get(),className);
    //生成代码给对象_generic_1234_array赋值
    RunGenericInfo **infos = collectNewObjectGeneric(self,genericDefine,className);
-   NString *codes=n_string_new("");
+   NString *codes=n_string_sized_new(512);
    if(infos!=NULL){
       ClassName *atClassName = class_impl_get()->className;
       ClassInfo *atInfo=class_mgr_get_class_info_by_class_name(class_mgr_get(),atClassName);
@@ -751,6 +751,23 @@ void new_strategy_new_object_from_field_stack(NewStrategy *self,tree var,ClassNa
 }
 
 /**
+ * 如果当前正在编译fwgb函数，并且函数内有new$ Object<E>()
+ * E,应该被替换为真实的类型
+ */
+static void replaceGenericModel(NewStrategy *self,tree var)
+{
+   if(aet_parser_is_generic_state(self->parser)){
+      ClassFunc *func=func_mgr_get_current_fwgb(func_mgr_get());
+      if(func){
+         GenericModel *genericDefine= c_aet_get_generics_model(var);
+         if(genericDefine){
+            generic_parser_replace_model(generic_parser_get(),genericDefine);
+         }
+      }
+   }
+}
+
+/**
  * 创建栈对象
  * TFirst evvrtcs=new$ TFirst();
  * 代码是:
@@ -764,6 +781,7 @@ void new_strategy_new_object_from_field_stack(NewStrategy *self,tree var,ClassNa
 void new_strategy_new_object_from_stack(NewStrategy *self,tree var,ClassName *className,NString *codes)
 {
     char *varName=IDENTIFIER_POINTER(DECL_NAME(var));
+    replaceGenericModel(self,var);
     GenericModel *genericDefine= c_aet_get_generics_model(var);
     ClassInfo *info=class_mgr_get_class_info_by_class_name(class_mgr_get(),className);
     tree ctor=c_aet_get_ctor_codes(var);
@@ -788,13 +806,15 @@ void new_strategy_new_object_from_stack(NewStrategy *self,tree var,ClassName *cl
        n_free(genericCodes);
     }
     if(mtcsPlatType==NULL_TREE)
-       n_string_append(codes,"\tunsigned int _mtcsPlatType0=0;\n");
+       n_string_append(codes,"\tunsigned int _mtcsPlatType=0;\n");
     else
-       n_string_append_printf(codes,"\tint _mtcsPlatType0=%s %d %lu;\n",
+       n_string_append_printf(codes,"\tint _mtcsPlatType=%s %d %lu;\n",
              RID_AET_GOTO_STR,GOTO_MTCS_CREATE_OBJ,(unsigned long)mtcsPlatType);
 
-    n_string_append_printf(codes,"\t%s->%s=_mtcsPlatType0;\n",tempVarName,AET_MTCS_PLATFORM_TYPE_VAR_NAME);
+    n_string_append_printf(codes,"\t%s->%s=_mtcsPlatType;\n",tempVarName,AET_MTCS_PLATFORM_TYPE_VAR_NAME);
     addMiddleCodes(self,tempVarName,className,undefineImplCodes, ctorStr,FALSE,codes);
+    free(tempVarName);
+
 }
 
 /**
@@ -803,18 +823,19 @@ void new_strategy_new_object_from_stack(NewStrategy *self,tree var,ClassName *cl
 void new_strategy_new_object_from_stack_no_name(NewStrategy *self,char *varName,GenericModel *genericDefine,
         char *ctorStr,ClassName *className,NString *codes,tree mtcsPlatType)
 {
-    ClassInfo *info=class_mgr_get_class_info_by_class_name(class_mgr_get(),className);
-    char *tempVarName=class_util_create_new_object_temp_var_name(className->sysName,CREATE_OBJECT_METHOD_STACK);
-    char *undefineImplCodes=newObject(self,tempVarName,genericDefine,className);
-    n_string_append_printf(codes,"\t%s *%s=(%s *)(&%s);\n",className->sysName,tempVarName,className->sysName,varName);
-    if(mtcsPlatType==NULL_TREE)
-       n_string_append(codes,"\tunsigned int _mtcsPlatType0=0;\n");
-    else
-       n_string_append_printf(codes,"\tint _mtcsPlatType0=%s %d %lu;\n",
-             RID_AET_GOTO_STR,GOTO_MTCS_CREATE_OBJ,(unsigned long)mtcsPlatType);
+   ClassInfo *info=class_mgr_get_class_info_by_class_name(class_mgr_get(),className);
+   char *tempVarName=class_util_create_new_object_temp_var_name(className->sysName,CREATE_OBJECT_METHOD_STACK);
+   char *undefineImplCodes=newObject(self,tempVarName,genericDefine,className);
+   n_string_append_printf(codes,"\t%s *%s=(%s *)(&%s);\n",className->sysName,tempVarName,className->sysName,varName);
+   if(mtcsPlatType==NULL_TREE)
+      n_string_append(codes,"\tunsigned int _mtcsPlatType=0;\n");
+   else
+      n_string_append_printf(codes,"\tint _mtcsPlatType=%s %d %lu;\n",
+               RID_AET_GOTO_STR,GOTO_MTCS_CREATE_OBJ,(unsigned long)mtcsPlatType);
 
-    n_string_append_printf(codes,"\t%s->%s=_mtcsPlatType0;\n",tempVarName,AET_MTCS_PLATFORM_TYPE_VAR_NAME);
-    addMiddleCodes(self,tempVarName,className,undefineImplCodes, ctorStr,FALSE,codes);
+   n_string_append_printf(codes,"\t%s->%s=_mtcsPlatType;\n",tempVarName,AET_MTCS_PLATFORM_TYPE_VAR_NAME);
+   addMiddleCodes(self,tempVarName,className,undefineImplCodes, ctorStr,FALSE,codes);
+   free(tempVarName);
 }
 
 tree  new_strategy_get_mtcs_plat_and_dev(NewStrategy *self,unsigned long address)
@@ -836,9 +857,8 @@ tree  new_strategy_get_mtcs_plat_and_dev(NewStrategy *self,unsigned long address
 
 void  new_strategy_init(NewStrategy *self)
 {
-     self->parser=aet_parser_get();
-     if(!self->classInit)
-         self->classInit=class_init_new();
-     self->mtcsPlatformAndDevnum=n_ptr_array_new();
-
+   self->parser=aet_parser_get();
+   if(!self->classInit)
+      self->classInit=class_init_new();
+   self->mtcsPlatformAndDevnum=n_ptr_array_new();
 }

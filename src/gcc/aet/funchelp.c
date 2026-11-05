@@ -194,66 +194,67 @@ static tree castInterfaceRef(tree parmOrVar,ClassName *parentName,ClassName *ifa
 tree  func_help_component_ref_interface(FuncHelp *self,tree orgiComponentRef,tree parmOrVar,
 		ClassName *refVarClassName,ClassName *className,ClassFunc *selectedFunc,location_t loc,tree *firstParm)
 {
-        tree selectedField=selectedFunc->fieldDecl;
-        //相同并且是接口
-		ClassName *iface=className;
-		if(!strcmp(refVarClassName->sysName,iface->sysName)){
-			tree indirect=TREE_OPERAND(orgiComponentRef,0);
-			if(TREE_CODE(indirect)==COMPONENT_REF){ //这里匹配 形式: ((RandomGenerator*)getRandom())->evaluate();getRandom()返回是对象 然后转成接口RandomGenerator
-			   // printf("func_help_component_ref_interface 000\n");
-                TREE_TYPE(orgiComponentRef)=TREE_TYPE(selectedField);
-                TREE_OPERAND(orgiComponentRef,1)= selectedField;
-			    return orgiComponentRef;
-			}else if(TREE_CODE(indirect)==INDIRECT_REF){//这里匹配 形式: iface->evaluate();iface是接口
-#if 0
-			    //这是原来的设计2020-4-20
-                tree exprValue=TREE_OPERAND(indirect,0);
-                tree funcCallVar=build_indirect_ref (loc,exprValue,RO_ARROW);
-                tree interfaceCall = createComponentRef (funcCallVar,selectedField,loc);//这里可以现成的取出type,再附给老的
-                TREE_TYPE(orgiComponentRef)=TREE_TYPE(interfaceCall);
-                TREE_OPERAND(orgiComponentRef,0)= TREE_OPERAND(interfaceCall,0);
-                TREE_OPERAND(orgiComponentRef,1)=selectedField;
-                printf("func_help_compoent_ref_itself 00 是接口，换field返回 并且refVarClassName==className var:%s 匹配的类:%s\n",
-                        refVarClassName->sysName,className->sysName);
-                *firstParm=exprValue;
-                return orgiComponentRef;
-#endif
-                 tree exprValue=TREE_OPERAND(indirect,0);
-                 TREE_TYPE(orgiComponentRef)=TREE_TYPE(selectedField);
-                 TREE_OPERAND(orgiComponentRef,1)=selectedField;
-                 n_debug("func_help_compoent_ref_itself 00 是接口，换field返回 并且refVarClassName==className var:%s 匹配的类:%s\n",
-                                      refVarClassName->sysName,className->sysName);
-                *firstParm=exprValue;
-                 return orgiComponentRef;
+   tree selectedField=selectedFunc->fieldDecl;
+   //相同并且是接口
+   ClassName *iface=className;
+   if(!strcmp(refVarClassName->sysName,iface->sysName)){
+      tree indirect=TREE_OPERAND(orgiComponentRef,0);
+      //这里匹配 形式: ((RandomGenerator*)getRandom())->evaluate();getRandom()返回是对象 然后转成接口RandomGenerator
+      if(TREE_CODE(indirect)==COMPONENT_REF){
+         // printf("func_help_component_ref_interface 000\n");
+         TREE_TYPE(orgiComponentRef)=TREE_TYPE(selectedField);
+         TREE_OPERAND(orgiComponentRef,1)= selectedField;
+         return orgiComponentRef;
+      }else if(TREE_CODE(indirect)==INDIRECT_REF){//这里匹配 形式: iface->evaluate();iface是接口
+   #if 0
+         //这是原来的设计2020-4-20
+         tree exprValue=TREE_OPERAND(indirect,0);
+         tree funcCallVar=build_indirect_ref (loc,exprValue,RO_ARROW);
+         tree interfaceCall = createComponentRef (funcCallVar,selectedField,loc);//这里可以现成的取出type,再附给老的
+         TREE_TYPE(orgiComponentRef)=TREE_TYPE(interfaceCall);
+         TREE_OPERAND(orgiComponentRef,0)= TREE_OPERAND(interfaceCall,0);
+         TREE_OPERAND(orgiComponentRef,1)=selectedField;
+         printf("func_help_compoent_ref_itself 00 是接口，换field返回 并且refVarClassName==className var:%s 匹配的类:%s\n",
+         refVarClassName->sysName,className->sysName);
+         *firstParm=exprValue;
+         return orgiComponentRef;
+   #endif
+         tree exprValue=TREE_OPERAND(indirect,0);
+         TREE_TYPE(orgiComponentRef)=TREE_TYPE(selectedField);
+         TREE_OPERAND(orgiComponentRef,1)=selectedField;
+         n_debug("func_help_compoent_ref_itself 00 是接口，换field返回 并且refVarClassName==className var:%s 匹配的类:%s\n",
+         refVarClassName->sysName,className->sysName);
+         *firstParm=exprValue;
+         return orgiComponentRef;
 
-			}else{
-			    aet_print_tree_skip_debug(orgiComponentRef);
-			    n_error("调用接口:%s，还未支持。\n",iface->sysName);
-			}
-	    }else{
-            //找到接口所在的父类，然后强转,如果找不到，不处理，返回原来的orgiComponentRef
-	    	/**
-	    	 * 第二
-	    	 */
-	    	ClassName *belongClass=findInterfaceAtClass(refVarClassName,iface);
-		    printf("func_help_compoent_ref_itself 11 是接口，找接口所属类  var:%s 匹配的类:%s 所属类:%s\n",
-		    		refVarClassName->sysName,className->sysName,belongClass->sysName);
-	    	if(belongClass==NULL){
-	    		return error_mark_node;
-	    	}else{
-	    		tree refVar=castInterfaceRef(parmOrVar,belongClass,iface,loc);
-	    		if(!refVar || refVar==NULL_TREE || refVar==error_mark_node)
-	    			return error_mark_node;
-	    		tree funcCallVar=build_indirect_ref (loc,refVar,RO_ARROW);
-	    	    tree interfaceCall = createComponentRef (funcCallVar,selectedField,loc);//这里可以现成的取出type,再附给老的
-	    	    TREE_TYPE(orgiComponentRef)=TREE_TYPE(interfaceCall);
-			    TREE_OPERAND(orgiComponentRef,0)= TREE_OPERAND(interfaceCall,0);
-			    TREE_OPERAND(orgiComponentRef,1)=selectedField;
-			    *firstParm=refVar;
-			    return orgiComponentRef;
-	    	}
-		}
-		return error_mark_node;
+      }else{
+         aet_print_tree_skip_debug(orgiComponentRef);
+         n_error("调用接口:%s，还未支持。\n",iface->sysName);
+      }
+   }else{
+      //找到接口所在的父类，然后强转,如果找不到，不处理，返回原来的orgiComponentRef
+      /**
+      * 第二
+      */
+      ClassName *belongClass=findInterfaceAtClass(refVarClassName,iface);
+      printf("func_help_compoent_ref_itself 11 是接口，找接口所属类  var:%s 匹配的类:%s 所属类:%s\n",
+      refVarClassName->sysName,className->sysName,belongClass->sysName);
+      if(belongClass==NULL){
+         return error_mark_node;
+      }else{
+         tree refVar=castInterfaceRef(parmOrVar,belongClass,iface,loc);
+         if(!refVar || refVar==NULL_TREE || refVar==error_mark_node)
+            return error_mark_node;
+         tree funcCallVar=build_indirect_ref (loc,refVar,RO_ARROW);
+         tree interfaceCall = createComponentRef (funcCallVar,selectedField,loc);//这里可以现成的取出type,再附给老的
+         TREE_TYPE(orgiComponentRef)=TREE_TYPE(interfaceCall);
+         TREE_OPERAND(orgiComponentRef,0)= TREE_OPERAND(interfaceCall,0);
+         TREE_OPERAND(orgiComponentRef,1)=selectedField;
+         *firstParm=refVar;
+         return orgiComponentRef;
+      }
+   }
+   return error_mark_node;
 
 }
 
@@ -483,65 +484,64 @@ tree  func_help_create_itself_iface_deref(FuncHelp *self,tree func,ClassName *cl
  */
 tree  func_help_create_itself_deref_new(FuncHelp *self,tree func,tree field,location_t loc,tree *firstParm)
 {
-        int hasNamelessCall= class_util_has_nameless_call(func);
-        char *fieldName=IDENTIFIER_POINTER(DECL_NAME(field));
-        tree value=NULL_TREE;
-        tree valueType=NULL_TREE;
-        tree componentRef=NULL_TREE;
-        if(TREE_CODE(func)==FUNCTION_DECL){
-            n_debug("func_help_create_itself_deref_new 00 创建本身的引用 fieldname:%s 来自函数 :hasNamelessCall:%d\n",fieldName,hasNamelessCall);
-            tree selfTree=lookup_name(aet_utils_create_ident("self"));
-            tree datum=build_indirect_ref (loc,selfTree,RO_ARROW);
-            componentRef= build_component_ref (loc, datum,DECL_NAME(field), loc,UNKNOWN_LOCATION);
-            *firstParm=selfTree;
-            return componentRef;
-        }else{
-            value=TREE_OPERAND(func,0);
-            valueType=TREE_TYPE(value);
-            n_debug("func_help_create_itself_deref_new 11 创建本身的引用 fieldname:%s 来自函数 :hasNamelessCall:%d\n",
-                    fieldName,hasNamelessCall,get_tree_code_name(TREE_CODE(valueType)),hasNamelessCall);
-        }
-        if(TREE_CODE(valueType)==POINTER_TYPE){
-            //从abc->getData变成 abc->getData();
-            if(TREE_CODE(value)==INDIRECT_REF)
-                componentRef= build_component_ref (loc, value,DECL_NAME(field), loc,UNKNOWN_LOCATION);
-            else{
-              tree datum=build_indirect_ref (loc,value,RO_ARROW);
-              componentRef= build_component_ref (loc, datum,DECL_NAME(field), loc,UNKNOWN_LOCATION);
+   int hasNamelessCall= class_util_has_nameless_call(func);
+   char *fieldName=IDENTIFIER_POINTER(DECL_NAME(field));
+   tree value=NULL_TREE;
+   tree valueType=NULL_TREE;
+   tree componentRef=NULL_TREE;
+   if(TREE_CODE(func)==FUNCTION_DECL){
+      n_debug("func_help_create_itself_deref_new 00 fieldname:%s 来自函数 :hasNamelessCall:%d\n",
+               fieldName,hasNamelessCall);
+      tree selfTree=lookup_name(aet_utils_create_ident("self"));
+      tree datum=build_indirect_ref (loc,selfTree,RO_ARROW);
+      componentRef= build_component_ref (loc, datum,DECL_NAME(field), loc,UNKNOWN_LOCATION);
+      *firstParm=selfTree;
+      return componentRef;
+   }else{
+      value=TREE_OPERAND(func,0);
+      valueType=TREE_TYPE(value);
+      n_debug("func_help_create_itself_deref_new 11 fieldname:%s valuetype:%s 来自函数 :hasNamelessCall:%d\n",
+            fieldName,get_tree_code_name(TREE_CODE(valueType)),hasNamelessCall);
+   }
+
+   if(TREE_CODE(valueType)==POINTER_TYPE){
+      //从abc->getData变成 abc->getData();
+      if(TREE_CODE(value)==INDIRECT_REF)
+         componentRef= build_component_ref (loc, value,DECL_NAME(field), loc,UNKNOWN_LOCATION);
+      else{
+         tree datum=build_indirect_ref (loc,value,RO_ARROW);
+         componentRef= build_component_ref (loc, datum,DECL_NAME(field), loc,UNKNOWN_LOCATION);
+      }
+      // *firstParm=(hasNamelessCall==0)?value:null_pointer_node;
+      *firstParm=(hasNamelessCall==0)?*firstParm:null_pointer_node;
+
+   }else{
+      //从abc.getData变成 abc.getData();
+      n_debug("func_help_create_itself_deref_new 22 如果 value是 indirect 它的类型是 record,是用RO_ARROW 创建的 %d",hasNamelessCall);
+      nboolean change=FALSE;
+      componentRef = build_component_ref (loc, value,DECL_NAME(field), loc,UNKNOWN_LOCATION);
+      if(TREE_CODE(value)==INDIRECT_REF){
+         tree op=TREE_OPERAND (value, 0);
+         tree type=TREE_TYPE(op);
+         if(TREE_CODE(type)==POINTER_TYPE){
+            if(*firstParm==NULL){
+               n_debug("func_help_create_itself_deref_new 33 POINTER_TYPE 如果 value是 indirect 它的类型是 record,是用RO_ARROW 创建的 %d",
+                     hasNamelessCall);
+               *firstParm=(hasNamelessCall==0)?op:null_pointer_node;
+               change=TRUE;
             }
-         // *firstParm=(hasNamelessCall==0)?value:null_pointer_node;
-          *firstParm=(hasNamelessCall==0)?*firstParm:null_pointer_node;
-
-        }else{
-            //从abc.getData变成 abc.getData();
-            n_debug("func_help_create_itself_deref_new 22 POINTER_TYPE 如果 value是 indirect 它的类型是 record,是用RO_ARROW 创建的 %d",hasNamelessCall);
-           nboolean change=FALSE;
-           componentRef = build_component_ref (loc, value,DECL_NAME(field), loc,UNKNOWN_LOCATION);
-           if(TREE_CODE(value)==INDIRECT_REF){
-               tree op=TREE_OPERAND (value, 0);
-               tree type=TREE_TYPE(op);
-               if(TREE_CODE(type)==POINTER_TYPE){
-                   if(*firstParm==NULL){
-                       n_debug("func_help_create_itself_deref_new 33 POINTER_TYPE 如果 value是 indirect 它的类型是 record,是用RO_ARROW 创建的 %d",hasNamelessCall);
-
-                     *firstParm=(hasNamelessCall==0)?op:null_pointer_node;
-                     change=TRUE;
-                   }
-               }
-           }
-           if(!change){
-               *firstParm=(hasNamelessCall==0)?*firstParm:null_pointer_node;
-               if(*firstParm==NULL && hasNamelessCall==0){
-                   n_debug("func_help_create_itself_deref_new 如果 value是 indirect 它的类型是 record,是用RO_ARROW 创建的 %d",hasNamelessCall);
-                   *firstParm=build1 (ADDR_EXPR, build_pointer_type(valueType), value);
-                }
-           }
-
-
-          //*firstParm=(hasNamelessCall==0)?build1 (ADDR_EXPR, build_pointer_type(valueType), value):null_pointer_node;
-         // *firstParm=(hasNamelessCall==0)?*firstParm:null_pointer_node;
-        }
-        return componentRef;
+         }
+      }
+      if(!change){
+         *firstParm=(hasNamelessCall==0)?*firstParm:null_pointer_node;
+         if(*firstParm==NULL && hasNamelessCall==0){
+            n_debug("func_help_create_itself_deref_new 如果 value是 indirect 它的类型是 record,是用RO_ARROW 创建的 %d",
+                  hasNamelessCall);
+            *firstParm=build1 (ADDR_EXPR, build_pointer_type(valueType), value);
+         }
+      }
+   }
+   return componentRef;
 }
 
 

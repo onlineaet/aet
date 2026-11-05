@@ -42,10 +42,12 @@ ClassMgr * class_mgr_get();
 nboolean   class_mgr_is_class(ClassMgr *self,char *className);
 nboolean   class_mgr_add(ClassMgr *self,char *sysClassName,char *userClassName,char *package);
 nboolean   class_mgr_set_type(ClassMgr *self,location_t loc,char *sysClassName,
-      ClassType classType,ClassPermissionType permission,nboolean isFinal);
+                  ClassType classType,ClassPermissionType permission,nboolean isFinal);
 ClassName *class_mgr_get_class_name_by_user(ClassMgr *self,char *userClassName);
 ClassName *class_mgr_get_class_name_by_sys(ClassMgr *self,char *sysClassName);
 ClassInfo *class_mgr_get_class_info(ClassMgr *self,char *sysClassName);
+ClassInfo *class_mgr_get_class_info_by_record(ClassMgr *self,tree recordType);
+ClassInfo *class_mgr_get_class_info_by_type(ClassMgr *self,tree type);
 ClassInfo *class_mgr_get_class_info_by_underline_sys_name(ClassMgr *self,char *_sysClassName);
 ClassInfo *class_mgr_get_class_info_by_class_name(ClassMgr *self,ClassName *className);
 ClassName *class_mgr_clone_class_name(ClassMgr *self,char *sysClassName);
@@ -88,5 +90,8 @@ nboolean   class_mgr_have_indirect_relationship(ClassMgr *self,ClassInfo *ifaceI
  * 获取有泛型块的函数
  */
 NPtrArray *class_mgr_get_func_with_generic_block(ClassMgr *self);
+
+ClassRelationship   class_mgr_relationship_by_info(ClassMgr *self,ClassInfo *my,ClassInfo *other);
+
 
 #endif

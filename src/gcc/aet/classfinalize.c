@@ -205,49 +205,6 @@ static tree createUnrefOrFinalizeDecl(ClassFinalize *self,ClassName *className,t
    return decls;
 }
 
-
-nboolean class_finalize_parser(ClassFinalize *self,ClassName *className)
-{
-   if(className==NULL)
-      return FALSE;
-   c_parser *parser=self->parser->parser;
-   if(class_mgr_is_interface(class_mgr_get(),className)){
-      location_t  loc = c_parser_peek_token(parser)->location;
-      error_at(loc,"接口不能有释放函数:%qs",className->userName);
-      return FALSE;
-   }
-
-   if(c_parser_peek_2nd_token(parser)->type==CPP_NAME){
-      tree ident = c_parser_peek_2nd_token(parser)->value;
-      const char *str1=IDENTIFIER_POINTER (ident);
-      if(strcmp(str1,className->sysName)){
-         n_warning("class_finalize_parser %s %s\n",str1,className->userName);
-         return FALSE;
-      }
-      //printf("这里一个释放函数---- %s %s\n",className->userName,className->sysName);
-      c_parser_consume_token (parser); //消耗掉~
-      if(c_parser_peek_2nd_token(parser)->type==CPP_OPEN_PAREN){
-         c_parser_consume_token (parser); //消耗掉className
-         c_token *who=c_parser_peek_2nd_token (parser);//应该是 void 或)
-         if (who->keyword == RID_VOID  || who->type == CPP_CLOSE_PAREN){
-            rearrangeFinalize(parser,className);
-            return TRUE;
-         }else{
-            location_t  loc = c_parser_peek_token(parser)->location;
-            error_at(loc,"类%qs的释放函数不能带参数。",className->userName);
-            return FALSE;
-         }
-
-         //检查有没有参数
-      }else{
-         location_t  loc = c_parser_peek_token(parser)->location;
-         error_at(loc,"这不是类%qs的释放函数。",className->userName);
-         return FALSE;
-      }
-   }
-   return FALSE;
-}
-
 nboolean  class_finalize_have_field(ClassFinalize *self,ClassName *className)
 {
 	return haveFieldOrDefine(self,className,TRUE);
@@ -292,7 +249,7 @@ nboolean  class_finalize_build_unref_define(ClassFinalize *self,location_t loc,C
    n_string_append(codes,";\n");//只有加一个分号才不会出错.
    n_debug("重要的方法源代码:\n%s\n",codes->str);
    aet_utils_add_token_with_location(parse_in,codes->str,strlen(codes->str),loc);
-   n_string_free(codes,TRUE);
+   n_string_free(codes,FALSE);
    return TRUE;
 }
 
@@ -319,6 +276,78 @@ void  class_finalize_build_finalize_define(ClassFinalize *self,ClassName *classN
    aet_utils_create_token(&parser->tokens[5],CPP_CLOSE_BRACE,"}",1);
    parser->tokens_avail=tokenCount+6;
    aet_print_token_in_parser("class_finalize_build_finalize_define className ---- %s finalize:%s",className->sysName,finalizeName);
+}
+
+static void createFinalize(ClassFinalize *self,location_t loc,ClassName *className,struct c_declspecs *specs)
+{
+   c_parser *parser=self->parser->parser;
+
+   //说明在~TFirst之前有属性或其它非类型说明符
+   if(specs->typespec_word == cts_int && specs->default_int_p){
+      specs->typespec_word = cts_void;
+      specs->default_int_p = false;
+      specs->type = void_type_node;
+   }else if(!specs->declspecs_seen_p){
+      struct c_typespec t;
+      t.kind = ctsk_resword;
+      t.spec = get_identifier("void");
+      t.expr = NULL_TREE;
+      t.expr_const_operands = true;
+      t.has_enum_type_specifier = false;
+      declspecs_add_type (loc, specs, t);
+   }else{
+      error_at(loc,"析构函数不能有返回类型。");
+      return ;
+   }
+   int tokenCount=parser->tokens_avail;
+   for(int i=tokenCount;i>0;i--)
+      aet_utils_copy_token(&parser->tokens[i-1],&parser->tokens[i-1+1]);
+   char finalizeName[255];
+   aet_utils_create_finalize_name(className->userName,finalizeName);
+   aet_utils_create_token(&parser->tokens[0],CPP_NAME,finalizeName,strlen(finalizeName));
+   parser->tokens[0].location = loc;
+   parser->tokens_avail=tokenCount+1;
+}
+
+nboolean  class_finalize_parser_by_specs(ClassFinalize *self,ClassName *className,struct c_declspecs *specs)
+{
+   if(className==NULL)
+      return FALSE;
+   c_parser *parser=self->parser->parser;
+   if(class_mgr_is_interface(class_mgr_get(),className)){
+      location_t  loc = c_parser_peek_token(parser)->location;
+      error_at(loc,"接口不能有析构函数:%qs",className->userName);
+      return FALSE;
+   }
+
+   if(c_parser_peek_2nd_token(parser)->type==CPP_NAME){
+      const char *str1=IDENTIFIER_POINTER (c_parser_peek_2nd_token(parser)->value);
+      if(strcmp(str1,className->sysName)){
+         n_warning("class_finalize_parser_by_specs %s %s\n",str1,className->userName);
+         return FALSE;
+      }
+      //printf("这里一个释放函数---- %s %s\n",className->userName,className->sysName);
+      c_parser_consume_token (parser); //消耗掉 ~
+      if(c_parser_peek_2nd_token(parser)->type==CPP_OPEN_PAREN){
+         location_t loc = c_parser_peek_token(parser)->location;
+         c_parser_consume_token (parser); //消耗掉className
+         c_token *who=c_parser_peek_2nd_token (parser);//应该是 void 或)
+         if (who->keyword == RID_VOID  || who->type == CPP_CLOSE_PAREN){
+            createFinalize(self,loc,className,specs);
+            return TRUE;
+         }else{
+            location_t  loc = c_parser_peek_token(parser)->location;
+            error_at(loc,"类%qs的析构函数不能带参数。",className->userName);
+            return FALSE;
+         }
+      //检查有没有参数
+      }else{
+         location_t  loc = c_parser_peek_token(parser)->location;
+         error_at(loc,"这不是类%qs的析构函数。",className->userName);
+         return FALSE;
+      }
+   }
+   return FALSE;
 }
 
 

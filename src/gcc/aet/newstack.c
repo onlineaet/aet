@@ -55,7 +55,7 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 
 static void newStackInit(NewStack *self)
 {
-	   ((NewStrategy*)self)->nest=0;
+      ((NewStrategy*)self)->nest=0;
 }
 
 /**
@@ -65,72 +65,46 @@ static nboolean isUnpointerClass(tree var)
 {
     tree type=TREE_TYPE(var);
     if(TREE_CODE(type)!=RECORD_TYPE)
-    	return FALSE;
-	tree next=TYPE_NAME(type);
-	if(TREE_CODE(next)!=TYPE_DECL)
-		return FALSE;
-	tree decl=DECL_NAME(next);
-	char *sysClassName=IDENTIFIER_POINTER(decl);
-	ClassName *className=class_mgr_get_class_name_by_sys(class_mgr_get(),sysClassName);
-	if(className==NULL)
-		return FALSE;
-	return TRUE;
-}
-
-static void setCleanup(NewStack *self,tree decl)
-{
-	  tree attr = lookup_attribute ("cleanup", DECL_ATTRIBUTES (decl));
-	  if (attr){
-		  printf("用户自设的cleanup %s\n",IDENTIFIER_POINTER(DECL_NAME(decl)));
-		  return;
-	  }
-	  tree cleanup_id = aet_utils_create_ident(AET_CLEANUP_OBJECT_METHOD);
-	  tree cleanup_decl = lookup_name (cleanup_id);
-	  tree cleanup;
-	  vec<tree, va_gc> *v;
-
-	  /* Build "cleanup(&decl)" for the destructor.  */
-	  cleanup = build_unary_op (input_location, ADDR_EXPR, decl, false);
-	  vec_alloc (v, 1);
-	  v->quick_push (cleanup);
-	  cleanup = c_build_function_call_vec (DECL_SOURCE_LOCATION (decl), vNULL, cleanup_decl, v, NULL);
-	  vec_free (v);
-
-	  /* Don't warn about decl unused; the cleanup uses it.  */
-	  TREE_USED (decl) = 1;
-	  TREE_USED (cleanup_decl) = 1;
-	  DECL_READ_P (decl) = 1;
-	  push_cleanup (decl, cleanup, false);
+      return FALSE;
+   tree next=TYPE_NAME(type);
+   if(TREE_CODE(next)!=TYPE_DECL)
+      return FALSE;
+   tree decl=DECL_NAME(next);
+   char *sysClassName=IDENTIFIER_POINTER(decl);
+   ClassName *className=class_mgr_get_class_name_by_sys(class_mgr_get(),sysClassName);
+   if(className==NULL)
+      return FALSE;
+   return TRUE;
 }
 
 static void createInitCodes(NewStack *self,tree var,ClassName *className,NString *codes)
 {
-	new_strategy_new_object_from_stack((NewStrategy *)self,var,className,codes);
+   new_strategy_new_object_from_stack((NewStrategy *)self,var,className,codes);
 }
 
 static void setInitGlobalVar(NewStack *self,tree var,ClassName *className)
 {
-	char *varName=IDENTIFIER_POINTER(DECL_NAME(var));
-	struct timeval tv;
+   char *varName=IDENTIFIER_POINTER(DECL_NAME(var));
+   struct timeval tv;
     gettimeofday (&tv, NULL);
-	long local_tick = (unsigned) tv.tv_sec * 1000 + tv.tv_usec / 1000;
-	long randNumber=local_tick+rand ();
-	char ctorName[255];
-	sprintf(ctorName,"%s_%s_%ld",className->sysName,varName,randNumber);
-	NString *codes=n_string_new("");
-	if(!current_function_decl){
-	  n_string_append_printf(codes,"static __attribute__((destructor)) void %s_dctor()\n",ctorName);
-	  n_string_append(codes,"{\n");
-	  n_string_append_printf(codes,"(&%s)->unref();\n",varName);
-	  n_string_append(codes,"}\n");
-	  n_string_append_printf(codes,"static __attribute__((constructor)) void %s_ctor()\n",ctorName);
-	  n_string_append(codes,"{\n");
+   long local_tick = (unsigned) tv.tv_sec * 1000 + tv.tv_usec / 1000;
+   long randNumber=local_tick+rand ();
+   char ctorName[255];
+   sprintf(ctorName,"%s_%s_%ld",className->sysName,varName,randNumber);
+   NString *codes=n_string_new("");
+   if(!current_function_decl){
+     n_string_append_printf(codes,"static __attribute__((destructor)) void %s_dctor()\n",ctorName);
+     n_string_append(codes,"{\n");
+     n_string_append_printf(codes,"(&%s)->unref();\n",varName);
+     n_string_append(codes,"}\n");
+     n_string_append_printf(codes,"static __attribute__((constructor)) void %s_ctor()\n",ctorName);
+     n_string_append(codes,"{\n");
       createInitCodes(self,var,className,codes);
       //不能加因为_cpp_pop_buffer 会把最后一个}省略了 n_string_append(codes,"}\n");//结否constructor函数
-	}else{
-	    n_string_append(codes,"{\n");
-	    createInitCodes(self,var,className,codes);
-	}
+   }else{
+       n_string_append(codes,"{\n");
+       createInitCodes(self,var,className,codes);
+   }
     n_string_append(codes,"}\n");
     location_t ctorLoc= c_aet_get_ctor_location(var);
     if(ctorLoc==0){
@@ -138,8 +112,8 @@ static void setInitGlobalVar(NewStack *self,tree var,ClassName *className)
            return ;
     }
     aet_utils_add_token_with_location(parse_in,codes->str,codes->len,ctorLoc);
-	n_debug("setInitGlobalVar 源代码:\n%s\n",codes->str);
-	n_string_free(codes,TRUE);
+   n_debug("setInitGlobalVar 源代码:\n%s\n",codes->str);
+   n_string_free(codes,FALSE);
 }
 
 static void setInitLocalStaticVar(NewStack *self,tree var,ClassName *className)
@@ -151,15 +125,15 @@ static void setInitLocalStaticVar(NewStack *self,tree var,ClassName *className)
    n_string_append(codes,"->refCount<=0){\n");
    createInitCodes(self,var,className,codes);
    n_string_append(codes,"}\n");
-   aet_utils_add_token(parse_in,codes->str,codes->len);
+   aet_utils_add_token_free(parse_in,codes->str,codes->len);
    n_debug("setInitLocalStaticVar 源代码:\n%s\n",codes->str);
-   n_string_free(codes,TRUE);
+   n_string_free(codes,FALSE);
 }
 
 static void setInitLocalVar(NewStack *self,tree var,ClassName *className)
 {
    char *varName=IDENTIFIER_POINTER(DECL_NAME(var));
-   NString *codes=n_string_new("");
+   NString *codes=n_string_sized_new(512);
    n_string_append(codes,"{\n");
    createInitCodes(self,var,className,codes);
    n_string_append(codes,"}\n");
@@ -170,7 +144,7 @@ static void setInitLocalVar(NewStack *self,tree var,ClassName *className)
    }
    aet_utils_add_token_with_location(parse_in,codes->str,codes->len,ctorLoc);
    n_debug("newstack setInitLocalVar 源代码:\n%s\n",codes->str);
-   n_string_free(codes,TRUE);
+   n_string_free(codes,FALSE);
 }
 
 static void setVarProperties(NewStack *self,NewObjectType varType)
@@ -179,53 +153,67 @@ static void setVarProperties(NewStack *self,NewObjectType varType)
    new_strategy_set_var_type((NewStrategy*)self,varType);
 }
 
+/**
+ * 加入变量退出作用域后的清理表达式
+ * 调用 obj->unref()
+ */
+static void addCleanup(NewStack *self,location_t loc,tree decl)
+{
+   /* 变量decl转成指针*/
+   tree var = build_unary_op (loc, ADDR_EXPR, decl, false);
+   tree ceanupExpr = class_util_build_unref_call(loc, var);
+   TREE_USED (decl) = 1;
+   push_cleanup (decl, ceanupExpr, false);
+}
+
+
 static nboolean initObject(NewStack *self,tree var)
 {
-	c_parser *parser=((NewStrategy *)self)->parser->parser;
-	if(!VAR_P(var))
-		return FALSE;
-	int external= DECL_EXTERNAL(var);
-	int isPublic= TREE_PUBLIC(var);
-	int isStatic=TREE_STATIC(var);
-	char *declName=IDENTIFIER_POINTER(DECL_NAME(var));
-	tree scpe =DECL_CONTEXT(var);
-	nboolean re=isUnpointerClass(var);
-	//printf("new_stack_check 00 var is name:%s isExternal:%d isPublic:%d isStatic:%d isUnpointerClass:%d\n",declName,external,isPublic,isStatic,re);
-	//aet_print_token(c_parser_peek_token (parser));
-	if(!re)
-		return FALSE;
-	int isFileStatic=0;
-	if(!isPublic && isStatic && (scpe==NULL || scpe==NULL_TREE || scpe==error_mark_node)){
-		//检查
-		isFileStatic=1;
-	}
-	char *sysClassName=class_util_get_class_name_by_record(TREE_TYPE(var));
-	ClassName *className=class_mgr_clone_class_name(class_mgr_get(),sysClassName);
-	new_strategy_add_new((NewStrategy*)self,className,declName);
-	c_aet_set_create_method(var,CREATE_OBJECT_METHOD_STACK);//因该不需要了
-	if(isPublic || isFileStatic){
-		setInitGlobalVar(self,var,className);
-		n_debug("new_stack_check 11 全局变量 var is name:%s className:%s isExternal:%d isPublic:%d isStatic:%d isFileStatic:%d\n",
-				declName,className->sysName,external,isPublic,isStatic,isFileStatic);
-		setVarProperties(self,NEW_OBJECT_GLOBAL);
-		return TRUE;
-	}else{
-		if(isStatic){
-			setInitLocalStaticVar(self,var,className);
-			n_debug("new_stack_check 22 局部静态变量 var is name:%s className:%s isExternal:%d isPublic:%d isStatic:%d\n",
-						declName,className->sysName,external,isPublic,isStatic);
-			setVarProperties(self,NEW_OBJECT_LOCAL_STATIC);
-			return TRUE;
-		}else{
-			setCleanup(self,var);
-			setInitLocalVar(self,var,className);
-			n_debug("new_stack_check 33 局部变量 var is name:%s className:%s isExternal:%d isPublic:%d isStatic:%d\n",
-						declName,className->sysName,external,isPublic,isStatic);
-			setVarProperties(self,NEW_OBJECT_LOCAL);
-			return TRUE;
-		}
-	}
-	return FALSE;
+   c_parser *parser=((NewStrategy *)self)->parser->parser;
+   if(!VAR_P(var))
+      return FALSE;
+   int external= DECL_EXTERNAL(var);
+   int isPublic= TREE_PUBLIC(var);
+   int isStatic=TREE_STATIC(var);
+   char *declName=IDENTIFIER_POINTER(DECL_NAME(var));
+   tree scpe =DECL_CONTEXT(var);
+   nboolean re=isUnpointerClass(var);
+   //printf("new_stack_check 00 var is name:%s isExternal:%d isPublic:%d isStatic:%d isUnpointerClass:%d\n",declName,external,isPublic,isStatic,re);
+   //aet_print_token(c_parser_peek_token (parser));
+   if(!re)
+      return FALSE;
+   int isFileStatic=0;
+   if(!isPublic && isStatic && (scpe==NULL || scpe==NULL_TREE || scpe==error_mark_node)){
+      //检查
+      isFileStatic=1;
+   }
+   char *sysClassName=class_util_get_class_name/*!class_util_get_class_name_by_record*/(TREE_TYPE(var));
+   ClassName *className=class_mgr_clone_class_name(class_mgr_get(),sysClassName);
+   new_strategy_add_new((NewStrategy*)self,className,declName);
+   c_aet_set_create_method(var,CREATE_OBJECT_METHOD_STACK);//因该不需要了
+   if(isPublic || isFileStatic){
+      setInitGlobalVar(self,var,className);
+      n_debug("new_stack_check 11 全局变量 var is name:%s className:%s isExternal:%d isPublic:%d isStatic:%d isFileStatic:%d\n",
+            declName,className->sysName,external,isPublic,isStatic,isFileStatic);
+      setVarProperties(self,NEW_OBJECT_GLOBAL);
+      return TRUE;
+   }else{
+      if(isStatic){
+         setInitLocalStaticVar(self,var,className);
+         n_debug("new_stack_check 22 局部静态变量 var is name:%s className:%s isExternal:%d isPublic:%d isStatic:%d\n",
+                  declName,className->sysName,external,isPublic,isStatic);
+         setVarProperties(self,NEW_OBJECT_LOCAL_STATIC);
+         return TRUE;
+      }else{
+         addCleanup(self,DECL_SOURCE_LOCATION(var),var);
+         setInitLocalVar(self,var,className);
+         n_debug("new_stack_check 33 局部变量 var is name:%s className:%s isExternal:%d isPublic:%d isStatic:%d\n",
+                  declName,className->sysName,external,isPublic,isStatic);
+         setVarProperties(self,NEW_OBJECT_LOCAL);
+         return TRUE;
+      }
+   }
+   return FALSE;
 }
 
 /**
@@ -239,9 +227,8 @@ void  new_stack_finish(NewStack *self)
    NewObjectType varType=new_strategy_get_var_type((NewStrategy*)self);
    if(((NewStrategy*)self)->nest==0){
      n_warning("new_stack_finish 没有初始化变量 返回");
-	 return ;
+    return ;
    }
-  // printf("new_stack_finish 00 %s %s varType:%d\n",className->sysName,varName,varType);
    new_strategy_recude_new((NewStrategy*)self);
 }
 
@@ -251,7 +238,7 @@ void  new_stack_finish(NewStack *self)
  */
 nboolean new_stack_init_object(NewStack *self,tree var)
 {
-	return initObject(self,var);
+   return initObject(self,var);
 }
 
 /**
@@ -260,7 +247,7 @@ nboolean new_stack_init_object(NewStack *self,tree var)
  */
 nboolean new_stack_modify_object(NewStack *self,tree var)
 {
-	return initObject(self,var);
+   return initObject(self,var);
 }
 
 static char * getRemainToken(NewStack *self)
@@ -296,6 +283,8 @@ static char * getRemainToken(NewStack *self)
    return result;
 }
 
+#define NO_NAME_VAR_NAME "catObject"
+
 void new_stack_create_object_no_name(NewStack *self,ClassName *className,GenericModel *genericDefine,
       char *ctorStr,tree mtcsPlatType)
 {
@@ -303,30 +292,47 @@ void new_stack_create_object_no_name(NewStack *self,ClassName *className,Generic
    ClassInit *classInit=((NewStrategy *)self)->classInit;
    NString *codes=n_string_new("");
    n_string_append(codes,"({\n");
-   char *varName="catObject";
-   n_string_append_printf(codes,"\t__attribute__((cleanup(%s))) %s %s;\n",AET_CLEANUP_OBJECT_METHOD,className->sysName,varName);
+   char *varName=NO_NAME_VAR_NAME;
+   n_string_append_printf(codes,"\t %s %s;\n",className->sysName,varName);
+   n_string_append_printf(codes,"%s %d\n",RID_AET_GOTO_STR,GOTO_ADD_CLEANUP);
+
    //完成如 return new Abc();返回的是对象而不是指针。
-   new_strategy_new_object_from_stack_no_name((NewStrategy *)self,varName,genericDefine,ctorStr,className,codes,mtcsPlatType);
+   new_strategy_new_object_from_stack_no_name((NewStrategy *)self,varName,
+         genericDefine,ctorStr,className,codes,mtcsPlatType);
    n_string_append_printf(codes,"\t%s;\n",varName);
    n_string_append(codes,"})");
 
    char *remain= getRemainToken(self);
    if(remain!=NULL){
       n_string_append_printf(codes,"%s\n",remain);
-      printf("remain is :%s\n",remain);
       n_free(remain);
    }
    new_strategy_add_new((NewStrategy*)self,className,varName);
    new_strategy_set_var_type((NewStrategy*)self,NEW_OBJECT_LOCAL);
-   aet_utils_add_token(parse_in,codes->str,codes->len);
-   printf("new_stack_create_object_no_name 源代码:\n%s\n",codes->str);
-   n_string_free(codes,TRUE);
+   aet_utils_add_token_free(parse_in,codes->str,codes->len);
+   n_debug("new_stack_create_object_no_name 源代码:\n%s\n",codes->str);
+   n_string_free(codes,FALSE);
+   free(tempVarName);
+}
+
+/**
+ * 加入清理函数:
+ * 代码像这样：
+   TFirst getvalue(){
+      return new$ TFirst();
+   }
+ */
+void new_statck_add_cleanup(NewStack *self)
+{
+   tree varDecl = lookup_name(get_identifier(NO_NAME_VAR_NAME));
+   gcc_assert(varDecl);
+   addCleanup(self,input_location,varDecl);
 }
 
 NewStack *new_stack_new()
 {
-	NewStack *self = n_slice_alloc0 (sizeof(NewStack));
-	newStackInit(self);
-	return self;
+   NewStack *self = n_slice_alloc0 (sizeof(NewStack));
+   newStackInit(self);
+   return self;
 }
 

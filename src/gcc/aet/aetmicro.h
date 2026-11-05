@@ -25,8 +25,6 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 #define AET_MAX_TOKEN                       30
 #define AET_ROOT_OBJECT                    "AObject"
 #define AET_ROOT_CLASS                     "AClass"
-#define AET_CLEANUP_OBJECT_METHOD          "a_object_cleanup_local_object_from_static_or_stack"
-#define AET_CLEANUP_NAMELESS_OBJECT_METHOD "a_object_cleanup_nameless_object" //释放实参是new$ Object()的变量
 
 #define AET_MAX_INTERFACE                   5 //一个类同时只能实现5个接口
 //为每个类生成一个全局方法 com.aet.类名_init_object_类名的hash值
@@ -39,7 +37,7 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 
 #define AET_GET_GENERIC_INFO_FUNC_NAME     "generic_info$" //该方法定义在aobject.h头文件中
 #define AET_GENERIC_INFO_STRUCT_NAME       "aet_generic_info"
-#define AET_GENERIC_FUNC_THREAD_BLOCK_ADDR  "_gen_func_block_addr_128347" //泛型函数中块函数的地址 __thread _gen_func_block_add_128347
+#define AET_GENERIC_FUNC_THREAD_BLOCK_ADDR "_gen_func_block_addr_128347" //泛型函数中块函数的地址 __thread _gen_func_block_add_128347
 //新加 11-20
 //填充泛型类中的泛型块变量地址 AET_GENERIC_BLOCK_ARRAY_VAR_NAME 在generic.c中定义
 #define AET_GENERIC_CLASS_FILL_ARRAY_ADDR   "aet_generic_class_fill_address"
@@ -56,13 +54,8 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 
 //接口声明中的变量，由aet加入，变量指向实现该接口的类对象 IfaceCommonData123 定义在AObject.h中。
 #define IFACE_AT_CLASS                     "_atClass123"
-#define IFACE_COMMON_STRUCT_NAME           "IfaceCommonData123"
-#define IFACE_COMMON_STRUCT_VAR_NAME       "_iface_common_var"
-#define IFACE_REF_FIELD_NAME               "_iface_reserve_ref_field_123"
-#define IFACE_UNREF_FIELD_NAME             "_iface_reserve_unref_field_123"
-#define IFACE_REF_FUNC_DEFINE_NAME         "_iface_reserve_ref_func_define_123"
-#define IFACE_UNREF_FUNC_DEFINE_NAME       "_iface_reserve_unref_func_define_123"
 #define IFACE_IMPL_FILE_LIST_NAME          "aet_iface_compile_list.o"
+
 
 //super方法实现 在AObject.h中定义
 #define AET_SUPER_ADDRESS_ARRAY             "_superAddressArray" //用来保存类方法实现的地址
@@ -75,6 +68,8 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 
 #define AET_INIT_GLOBAL_SUPER_FUNC_NAME            "init_global_super_data_1"    //全局初始化本类的super数据函数名
 #define AET_INIT_INNER_SUPER_FUNC_NAME             "init_inner_super_data_2"      //内部初始化本类的super数据的函数名
+//定义类中获取AClass的静态函数名和AClass类的静态实例
+#define AET_GET_ACLASS_FUNC_NAME "get_class"
 
 //加入判断是不是MTCS_CLASS的变量
 //static char _IS_MTCS_CLASS
@@ -99,6 +94,8 @@ typedef enum{
    GOTO_ENTER_COMPILE_GENERIC_BLOCK_FUNC=16,//开始编译泛型块函数。
    GOTO_ADD_H_FILE=17,//自动加入头文件
    GOTO_COMPILE_TYPE = 18,//进入 temp_func_track_45.c
+   GOTO_COMPILE_VAROF = 19,//解析varof$
+   GOTO_ADD_CLEANUP = 20,//为返回new$ XXX(...)加入清理函数
 }AetGotoTag;
 
 #define LIB_GLOBAL_IFACE_VAR_NAME_PREFIX   "_global_aet_iface_A_$_"
@@ -110,7 +107,7 @@ typedef enum{
 #define AET_MAGIC_NAME                       "_aet_magic$_123"  //存放魔数的变量名
 #define AET_MAGIC_NAME_VALUE                 1725348960 //类魔数
 #define AET_IFACE_MAGIC_NAME_VALUE           (AET_MAGIC_NAME_VALUE+1)//接口魔数
-#define AET_VAR_OF_FUNC_NAME                 "varof_object_or_interface"  //varof具体实现。定义在AObject.h。
+#define AET_VAR_OF_FUNC_NAME                 "varof_object_or_interface"  //varof具体实现。定义在aetexpr.c中。
 #define AET_DYNAMIC_CLASS_TO_IFACE_FUNC_NAME "dynamic_class_to_iface"  //类转接口的动态实现函数，定义在AObject.h。
 #define AET_DYNAMIC_IFACE_TO_CLASS_FUNC_NAME "dynamic_iface_to_class"  //接口转类的动态实现函数，定义在AObject.h。
 

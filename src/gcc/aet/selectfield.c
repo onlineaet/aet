@@ -1050,7 +1050,6 @@ static CandidateFunc *selectFuncByLocal(SelectField *self,ClassName *className,
    return result;
 }
 
-
 static void selectFuncByRecursion(SelectField *self,ClassName *className,
         char *orgiName,vec<tree, va_gc> *exprlist,
         vec<tree, va_gc> *origtypes,vec<location_t> arg_loc,

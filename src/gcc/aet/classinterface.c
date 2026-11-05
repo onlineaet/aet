@@ -51,6 +51,7 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 #include "c/c-parser.h"
 #include "c/gimple-parser.h"
 #include "../libcpp/include/cpplib.h"
+#include "gimplify.h"
 
 #include "aet-c-parser-header.h"
 #include "aetutils.h"
@@ -163,8 +164,10 @@ static void eachInterface(ClassInterface *self,NString *codes,ClassName *from,Cl
       if(!func){
          n_error("接口%s函数%s没有在实现类%s中找到",iface->sysName,interfaceMethod->orgiName,from->sysName);
       }
-      n_string_append_printf(codes,"\t((%s *)&self->%s)->%s=self->%s;\n",
-             iface->sysName,ifaceVar,interfaceMethod->mangleFunName,func->mangleFunName);
+      //n_string_append_printf(codes,"\t((%s *)&self->%s)->%s=self->%s;\n",
+           //  iface->sysName,ifaceVar,interfaceMethod->mangleFunName,func->mangleFunName);
+      n_string_append_printf(codes,"\tself->%s.%s=self->%s;\n",
+                ifaceVar,interfaceMethod->mangleFunName,func->mangleFunName);
    }
    n_debug("class_interface 获取的接口赋值原代码：%s\n",codes->str);
 }
@@ -193,7 +196,7 @@ static void assignmentAtClass(ClassInfo *info,NString *codes)
       ClassInfo *faceInfo=class_mgr_get_class_info_by_class_name(class_mgr_get(),&iface);
       char ifaceVar[255];
       aet_utils_create_in_class_iface_var(faceInfo->className.userName,ifaceVar);//一定与classparser中创建的接口变量名相同
-      n_string_append_printf(codes,"\tself->%s.%s.%s=(void *)self;\n",ifaceVar,IFACE_COMMON_STRUCT_VAR_NAME,IFACE_AT_CLASS);
+      n_string_append_printf(codes,"\tself->%s.%s = (AObject *)self;\n",ifaceVar,IFACE_AT_CLASS);
    }
 }
 
@@ -210,31 +213,6 @@ static char *getRefOrUnrefMangleName(ClassInfo *info,char *refOrUnref)
 }
 
 /**
- * 给接口方法ref和unref赋值
- * object->ifaceVar._iface_reserve_ref_field_123=_iface_reserve_ref_func_define_123;
- * object->ifaceVar._iface_reserve_unref_field_123=_iface_reserve_unref_func_define_123;
- */
-static void assignmentIfaceRefFunction(ClassInfo *info,NString *codes)
-{
-   int i;
-   for(i=0;i<info->ifaceCount;i++){
-      ClassName iface=info->ifaces[i];
-      ClassInfo *faceInfo=class_mgr_get_class_info_by_class_name(class_mgr_get(),&iface);
-      char ifaceVar[255];
-      aet_utils_create_in_class_iface_var(faceInfo->className.userName,ifaceVar);//一定与classparser中创建的接口变量名相同
-
-      char *refMangle=getRefOrUnrefMangleName(faceInfo,IFACE_REF_FIELD_NAME);
-      char *unRefMangle=getRefOrUnrefMangleName(faceInfo,IFACE_UNREF_FIELD_NAME);
-      if(refMangle==NULL || unRefMangle==NULL){
-         n_error("报告此错误，在接口%s找不到方法 %s %s",faceInfo->className.userName,IFACE_REF_FIELD_NAME,IFACE_UNREF_FIELD_NAME);
-         return;
-      }
-      n_string_append_printf(codes,"\tself->%s.%s=%s;\n",ifaceVar,refMangle,IFACE_REF_FUNC_DEFINE_NAME);
-      n_string_append_printf(codes,"\tself->%s.%s=%s;\n",ifaceVar,unRefMangle,IFACE_UNREF_FUNC_DEFINE_NAME);
-   }
-}
-
-/**
  * 给接口变量AET_MAGIC_NAME设置魔数AET_MAGIC_NAME_VALUE
  * 接口的magic是AET_MAGIC_NAME_VALUE+1
  */
@@ -246,8 +224,8 @@ static void assignmentMagic(ClassInfo *info,NString *codes)
       ClassInfo *faceInfo=class_mgr_get_class_info_by_class_name(class_mgr_get(),&iface);
       char ifaceVar[255];
       aet_utils_create_in_class_iface_var(faceInfo->className.userName,ifaceVar);//一定与classparser中创建的接口变量名相同
-      n_string_append_printf(codes,"\tself->%s.%s.%s=%d;\n",
-            ifaceVar,IFACE_COMMON_STRUCT_VAR_NAME,AET_MAGIC_NAME,AET_IFACE_MAGIC_NAME_VALUE);
+      n_string_append_printf(codes,"\tself->%s.%s = %d;\n",
+            ifaceVar,AET_MAGIC_NAME,AET_IFACE_MAGIC_NAME_VALUE);
    }
 }
 
@@ -273,74 +251,15 @@ char *class_interface_create_codes(ClassInterface *self,ClassName *className)
 	   eachInterface(self,codes,className,&iface);
    }
 
-   //给接口设魔数    self->ifaceRandomGenerator2066046634._iface_common_var._aet_magic$_123=1725348961;
+   //给接口设魔数    self->_aet_magic$_123=1725348961;
    assignmentMagic(info,codes);
-   //给接口的变量_iface_common_var的域成员_atClass1234赋值=(void*)self;
-   //self->ifaceRandomGenerator2066046634._iface_common_var._atClass123=(void *)self;
+   //给接口的变量 self->_atClass123=(void *)self;
    assignmentAtClass(info,codes);
-   //给接口的变量_iface_common_var的域成员ref和unref赋值=_iface_ref_function_123
-   //self->ifaceRandomGenerator2066046634._Z15RandomGenerator28_iface_reserve_ref_field_123EPN15RandomGeneratorE=_iface_reserve_ref_func_define_123;
-   //self->ifaceRandomGenerator2066046634._Z15RandomGenerator30_iface_reserve_unref_field_123EPN15RandomGeneratorE=_iface_reserve_unref_func_define_123;
-   assignmentIfaceRefFunction(info,codes);
-
    if(codes->len==0){
       n_string_free(codes,TRUE);
       return NULL;
    }
    return n_string_free(codes,FALSE);
-}
-
-/**
- * interface$ XXX{
- * };
- * 以classparser.c中调用该方法给接口加入第一个变量IfaceCommonData123。
- * 所以接口名XXX也可强转成IfaceCommonData123.
- * 生成的接口内部声明如下:
- * interface$ IFACE{
- *   IfaceCommonData123 _iface_common_var;
- *   IfaceCommonData123 *_iface_reserve_ref_field_123();
- *   void _iface_reserve_unref_field_123();
- *   //下面是用户的代码。
- *   ....
- * }
- */
-void class_interface_add_var_ref_unref_method(ClassInterface *self,location_t loc)
-{
-   c_parser *parser=self->parser->parser;
-   int addTokenCount=14;
-   int tokenCount=parser->tokens_avail;
-   if(tokenCount+addTokenCount>AET_MAX_TOKEN){
-      error("token太多了");
-      return FALSE;
-   }
-   int i;
-   for(i=tokenCount;i>0;i--){
-      aet_utils_copy_token(&parser->tokens[i-1],&parser->tokens[i-1+addTokenCount]);
-   }
-
-   aet_utils_create_token(&parser->tokens[0],CPP_NAME,IFACE_COMMON_STRUCT_NAME,strlen(IFACE_COMMON_STRUCT_NAME));
-   parser->tokens[0].id_kind=C_ID_TYPENAME;//关键
-   aet_utils_create_token(&parser->tokens[1],CPP_NAME,IFACE_COMMON_STRUCT_VAR_NAME,strlen(IFACE_COMMON_STRUCT_VAR_NAME));
-   aet_utils_create_token(&parser->tokens[2],CPP_SEMICOLON,";",1);
-
-   aet_utils_create_token(&parser->tokens[3],CPP_NAME,IFACE_COMMON_STRUCT_NAME,strlen(IFACE_COMMON_STRUCT_NAME));
-   parser->tokens[3].id_kind=C_ID_TYPENAME;//关键
-   aet_utils_create_token(&parser->tokens[4],CPP_MULT,"*",1);
-   aet_utils_create_token(&parser->tokens[5],CPP_NAME,IFACE_REF_FIELD_NAME,strlen(IFACE_REF_FIELD_NAME));
-   aet_utils_create_token(&parser->tokens[6],CPP_OPEN_PAREN,"(",1);
-   aet_utils_create_token(&parser->tokens[7],CPP_CLOSE_PAREN,")",1);
-   aet_utils_create_token(&parser->tokens[8],CPP_SEMICOLON,";",1);
-
-   aet_utils_create_void_token(&parser->tokens[9],input_location);
-   aet_utils_create_token(&parser->tokens[10],CPP_NAME,IFACE_UNREF_FIELD_NAME,strlen(IFACE_UNREF_FIELD_NAME));
-   aet_utils_create_token(&parser->tokens[11],CPP_OPEN_PAREN,"(",1);
-   aet_utils_create_token(&parser->tokens[12],CPP_CLOSE_PAREN,")",1);
-   aet_utils_create_token(&parser->tokens[13],CPP_SEMICOLON,";",1);
-   for(i=0;i<addTokenCount;i++)
-      parser->tokens[i].location=loc;
-   parser->tokens_avail=tokenCount+addTokenCount;
-   aet_print_token_in_parser("class_interface_add_var_ref_unref_method ----");
-   return TRUE;
 }
 
 /**
@@ -359,49 +278,6 @@ static nboolean isCallRefOrUnrefByInterface(tree component,tree expr,char *refOr
 	  }
   }
   return FALSE;
-}
-
-/**
- * 把接口引用的ref unref替换为_iface_reserve_ref_field_123或_iface_reserve_unref_field_123
- */
-static tree replaceRefOrUnref(tree component,tree ref)
-{
-	if(isCallRefOrUnrefByInterface(component,ref,"ref")){
-		tree id=aet_utils_create_ident(IFACE_REF_FIELD_NAME);
-		return id;
-	}else if(isCallRefOrUnrefByInterface(component,ref,"unref")){
-	    tree id=aet_utils_create_ident(IFACE_UNREF_FIELD_NAME);
-	    return id;
-	}else{
-		return component;
-	}
-}
-
-/**
- * Iface *var;
- * var->ref();
- * 或
- * Iface var;
- * var.unref();
- * ref或unref变成 需要转成
- * #define IFACE_REF_FIELD_NAME            "_iface_reserve_ref_field_123"
- *#define IFACE_UNREF_FIELD_NAME          "_iface_reserve_unref_field_123"
- */
-tree  class_interface_transport_ref_and_unref(ClassInterface *self,tree component,tree expr)
-{
-	c_parser *parser=self->parser->parser;
-	c_token *closeParen=c_parser_peek_2nd_token (parser);//")";
-	if(closeParen->type!=CPP_CLOSE_PAREN)
-		return component;
-	tree type=TREE_TYPE(expr);
-    nboolean isPointer=(TREE_CODE(type)==POINTER_TYPE);
-	if(TREE_CODE(expr)==PARM_DECL || TREE_CODE(expr)==VAR_DECL){
-		return replaceRefOrUnref(component,expr);
-	}else if(TREE_CODE(expr)==COMPONENT_REF){
-		tree field=TREE_OPERAND (expr, 1);
-		return replaceRefOrUnref(component,field);
-	}
-    return component;
 }
 
 //是一个接口中声明的host device函数吗
@@ -544,7 +420,220 @@ ClassInterface *class_interface_new()
 	return self;
 }
 
+//
+//int _aet_magic$_123;
+//AObject *_atClass123;
+void class_interface_add_sys_field(ClassInterface *self,ClassName *iface,NString *codes)
+{
+   n_string_append_printf(codes,"int %s;\n",AET_MAGIC_NAME);
+   n_string_append_printf(codes,"AObject * %s;\n",IFACE_AT_CLASS);
+}
 
+
+/*
+ * 创建：
+ *
+ * static Iface *ref(Iface *iface)
+ * {
+ *     iface->_atClass123->ref();
+ *     return iface;
+ * }
+ *
+ * ifaceType       : Iface 的 RECORD_TYPE
+ * atClassField    : Iface::_atClass123 的 FIELD_DECL
+ * refMethodField  : AObject::ref 的函数指针 FIELD_DECL
+ */
+static tree  createIfaceRef (location_t loc,char *funcName,tree ifaceType, tree atClassField, tree refMethodField)
+{
+   /* -------------------------------------------------
+   1. 准备类型
+   ------------------------------------------------- */
+
+   tree ifacePtrType = build_pointer_type (ifaceType);
+   tree aobjectPtrType = TREE_TYPE (atClassField);
+   /*
+   * ref 函数的类型：
+   * static Iface *ref(Iface *iface)
+   */
+   tree argTypes = tree_cons (NULL_TREE, ifacePtrType, void_list_node);
+   tree funcType = build_function_type (ifacePtrType, argTypes);
+
+   /* -------------------------------------------------
+   2. 创建 FUNCTION_DECL
+   ------------------------------------------------- */
+   tree fndecl =  build_decl (loc, FUNCTION_DECL, get_identifier (funcName), funcType);
+   TREE_STATIC (fndecl) = 1;
+   TREE_PUBLIC (fndecl) = 0;
+   DECL_EXTERNAL (fndecl) = 0;
+   DECL_ARTIFICIAL (fndecl) = 1;
+   DECL_CONTEXT (fndecl) = NULL_TREE;
+
+   /* -------------------------------------------------
+   3. 创建参数 iface
+   ------------------------------------------------- */
+   tree parm = build_decl (loc, PARM_DECL, get_identifier ("iface"),ifacePtrType);
+   DECL_CONTEXT (parm) = fndecl;
+   DECL_ARG_TYPE (parm) = ifacePtrType;
+   DECL_ARGUMENTS (fndecl) = parm;
+
+   /* -------------------------------------------------
+   4. 创建返回值 RESULT_DECL
+   ------------------------------------------------- */
+
+   tree resultDecl = build_decl (loc, RESULT_DECL, NULL_TREE, ifacePtrType);
+   DECL_CONTEXT (resultDecl) = fndecl;
+   DECL_RESULT (fndecl) = resultDecl;
+
+   /* -------------------------------------------------
+   5. 构造 iface->_atClass123
+   ------------------------------------------------- */
+
+   /*
+   * (*iface)
+   */
+   tree ifaceDeref = build_indirect_ref (loc, parm, RO_ARROW);
+   /*
+   * (*iface)._atClass123
+   *
+   * 类型：AObject *
+   */
+   tree aobjectPtr =  build_component_ref (loc,ifaceDeref,DECL_NAME(atClassField),loc,loc);
+
+   if (aobjectPtr == error_mark_node)
+      return error_mark_node;
+
+   /* -------------------------------------------------
+   6. 构造 iface->_atClass123->ref()
+   ------------------------------------------------- */
+
+   /*
+   * *(iface->_atClass123)
+   */
+   tree aobjectDeref = build_indirect_ref (loc, aobjectPtr, RO_ARROW);
+
+   /*
+   * (*aobjectPtr).ref
+   *
+   * refMethodField 是 AObject 中的函数指针字段。
+   */
+   tree refFunc = build_component_ref (loc,aobjectDeref,DECL_NAME(refMethodField),loc,loc);
+
+   if (refFunc == error_mark_node)
+      return error_mark_node;
+
+   /*
+   * 调用参数：AObject *
+   */
+   tree callArgs[1];
+   callArgs[0] = aobjectPtr;
+   /*
+   * ref() 的返回类型使用函数指针类型中的返回类型。
+   */
+   tree refFuncType = TREE_TYPE (refMethodField);
+
+   tree refReturnType =TREE_TYPE (TREE_TYPE (refFuncType));
+
+   tree callExpr = build_call_array_loc (loc,refReturnType,refFunc,1,callArgs);
+
+   /* -------------------------------------------------
+   7. 构造 return iface
+   ------------------------------------------------- */
+   /*
+   * RESULT_DECL = iface
+   */
+   tree resultAssign = build2_loc (loc,MODIFY_EXPR,ifacePtrType,resultDecl,parm);
+
+   /*
+   * RETURN_EXPR
+   */
+   tree returnExpr = build1_loc (loc,RETURN_EXPR,void_type_node,resultAssign);
+
+   /* -------------------------------------------------
+   8. 构造函数体
+   ------------------------------------------------- */
+   tree stmtList = alloc_stmt_list ();
+   /*
+   * iface->_atClass123->ref();
+   */
+   append_to_statement_list (callExpr, &stmtList);
+
+   /*
+   * return iface;
+   */
+   append_to_statement_list (returnExpr, &stmtList);
+   tree block = make_node (BLOCK);
+
+   /* 创建最外层 BLOCK（必须） */
+   BLOCK_VARS (block) = NULL_TREE;
+   BLOCK_SUBBLOCKS (block) = NULL_TREE;
+   BLOCK_SUPERCONTEXT (block) = fndecl;     // 必须
+   BLOCK_CHAIN (block) = NULL_TREE;
+
+   tree bindExpr =  build3_loc (loc,BIND_EXPR,void_type_node,NULL_TREE,stmtList,block);
+
+   DECL_SAVED_TREE (fndecl) = bindExpr;
+   DECL_INITIAL (fndecl) = block;           // ★ 关键！没有这句就会在 lower_function_body 崩
+   /* -------------------------------------------------
+   9. 注册函数
+   ------------------------------------------------- */
+   struct function *saved_cfun = cfun;
+   tree saved_fndecl = current_function_decl;
+
+   /* 7. （可选但推荐）让 GCC 后续能正确处理这个函数 */
+   allocate_struct_function (fndecl, false);
+   set_cfun (NULL, true);
+   current_function_decl = NULL_TREE;
+
+   /* 切换到新函数 */
+   push_cfun (DECL_STRUCT_FUNCTION (fndecl));
+   gimplify_function_tree (fndecl);
+   pop_cfun ();
+   cgraph_node *node = cgraph_node::get_create (fndecl);
+   cgraph_node::finalize_function (fndecl, false);
+   set_cfun (saved_cfun);
+   current_function_decl = saved_fndecl;
+   return fndecl;
+}
+
+
+
+/**
+ * 每个接口都动态的创建一个ref函数定义
+ * 函数名是:_iface_123
+ */
+tree class_interface_create_ref_function_define(ClassInterface *self,location_t loc,ClassName *className,char *funcName)
+{
+   ClassInfo *info=class_mgr_get_class_info_by_class_name(class_mgr_get(),className);
+   if(!class_info_is_interface(info) || strcmp(funcName,"ref"))
+      return NULL_TREE;
+
+   char funcname[255];
+   sprintf(funcname,"_%s_123",className->sysName);
+   tree fndecl = lookup_name(get_identifier(funcname));
+   if(fndecl)
+      return fndecl;
+
+   tree iface =lookup_name(get_identifier(className->sysName));
+   tree ifacetype = TREE_TYPE(iface);
+   tree atclassfield;
+   for (atclassfield = TYPE_FIELDS (ifacetype); atclassfield; atclassfield = DECL_CHAIN (atclassfield)){
+      char *name =  IDENTIFIER_POINTER(DECL_NAME(atclassfield));
+      if(!strcmp(name,IFACE_AT_CLASS))
+         break;
+   }
+   tree reffield = NULL_TREE;
+   ClassInfo *rootinfo = class_mgr_get_root(class_mgr_get());
+   NPtrArray    *arrays = func_mgr_get_funcs(func_mgr_get(),&rootinfo->className);
+   for(int i=0;i<arrays->len;i++){
+      ClassFunc *f=n_ptr_array_index(arrays,i);
+      if(!strcmp(f->orgiName,"ref")){
+         reffield = f->fieldDecl;
+         break;
+      }
+   }
+   fndecl = createIfaceRef (loc,funcname,ifacetype, atclassfield, reffield);
+   return fndecl;
+}
 
 
 

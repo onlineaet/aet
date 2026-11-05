@@ -77,6 +77,7 @@ typedef struct _BlockFuncIndex
    char *genericModel;//泛型定义 不是E 是具体的类型如 int
    char *sysName;  //所在类名
    int index; //泛型块在类中的序号，从0开始
+   char *directive;//编译指示
 }BlockFuncIndex;
 
 typedef struct _GenericParams
@@ -133,10 +134,11 @@ static char *formatGenericUnitForCompile(GenericObj *obj)
 /**
  * 创建建立块函数调用的索引信息
  * defineFuncUnits 泛型函数的泛型单元字符化 格式 如:_float_0
- * defineClassUnits 泛型类的泛型单元字会化  格式 如:_int_0
+ * defineClassUnits 泛型类的泛型单元字符化  格式 如:_int_0
+ * directive编译指示 E_int_0_4,F_float_0_4
  */
 static BlockFuncIndex *createBlockFuncIndex(char *funcName,char *sysName,
-      char *defineFuncUnits,char *defineClassUnits,int index)
+      char *defineFuncUnits,char *defineClassUnits,int index,char *directive)
 {
    BlockFuncIndex *f=n_slice_new0(BlockFuncIndex);
    NString *codes=n_string_new("");
@@ -148,10 +150,13 @@ static BlockFuncIndex *createBlockFuncIndex(char *funcName,char *sysName,
    f->sysName=n_strdup(sysName);
    f->genericModel=n_string_free(codes,FALSE);
    f->index=index;
+   f->directive=n_strdup(directive);
    return f;
 }
 /**
  * 泛型模型+原泛型块函数名组成新的函数名
+ * _float_0_Second__gen_block_func_0(Second * self)
+ * 这里获取的就是 _float_0
  */
 static char *formatGenericUnitForFuncName(GenericObj *obj)
 {
@@ -331,8 +336,8 @@ static char *createCodesForGenfunc(GenericObj *funObj,GenericInfo *info,
    NPtrArray *funcContentArray=n_ptr_array_new();
    NString *codes=n_string_new("");
 
-   char *genFunUnitsForCompile=formatGenericUnitForCompile(funObj);
-   char *funcDefineUnits=formatGenericUnitForFuncName(funObj);//格式 name+"_"+pointercount+"_"
+   char *genFunUnitsForCompile = formatGenericUnitForCompile(funObj);
+   char *funcDefineUnits       = formatGenericUnitForFuncName(funObj);//格式 name+"_"+pointercount+"_"
    nboolean havaeCodes=FALSE;
    if(!info->isGenericClass){
       //泛型函数所在的类不是泛型类
@@ -353,7 +358,8 @@ static char *createCodesForGenfunc(GenericObj *funObj,GenericInfo *info,
             n_string_append(codes,funcdefine);
             n_string_append(codes,"\n");
             gcc_assert(block->index==i);
-            BlockFuncIndex *bi=createBlockFuncIndex(newFuncName,blockAtClassName,funcDefineUnits,NULL,block->index);
+            BlockFuncIndex *bi=createBlockFuncIndex(newFuncName,blockAtClassName,
+                  funcDefineUnits,NULL,block->index,directive);
             n_ptr_array_add(funcNameArray,bi);
             n_free(funcdefine);
             havaeCodes=TRUE;
@@ -383,7 +389,7 @@ static char *createCodesForGenfunc(GenericObj *funObj,GenericInfo *info,
                   n_string_append(codes,"\n");
                   gcc_assert(block->index==i);
                   BlockFuncIndex *bi=createBlockFuncIndex(newFuncName,
-                        blockAtClassName,funcDefineUnits,defineClassObjUnits,block->index);
+                        blockAtClassName,funcDefineUnits,defineClassObjUnits,block->index,directive);
                   n_ptr_array_add(funcNameArray,bi);
                   n_ptr_array_add(dependClassGenObj,classObj);
                   n_free(classObjUnitForCompile);
@@ -439,11 +445,11 @@ static char *createCodesForClass(GenericObj *classGenObj,GenericInfo *info,NPtrA
          //生成"E_int_0_4"
          n_string_append_printf(codes,"\"%s\"\n",directive);
       }
-      char *newFuncName=createFuncName(block->name,NULL,classDefineUnits);
-      char *blockFuncCode=createBlockFuncCode(classGenObj,block,newFuncName);
+      char *newFuncName   = createFuncName(block->name,NULL,classDefineUnits);
+      char *blockFuncCode = createBlockFuncCode(classGenObj,block,newFuncName);
       n_string_append_printf(codes,"%s\n\n",blockFuncCode);
       gcc_assert(block->index==i);
-      BlockFuncIndex *bi=createBlockFuncIndex(newFuncName,blockAtClassName,classDefineUnits,NULL,block->index);
+      BlockFuncIndex *bi=createBlockFuncIndex(newFuncName,blockAtClassName,classDefineUnits,NULL,block->index,directive);
       n_ptr_array_add(funcNameArray,bi);
    }
    n_free(genClassUnitsForCompile);
@@ -552,7 +558,7 @@ static void addGenInfo(CompileFile *cf,GenericInfo *info)
 
 
 /**
- *生成带泛型块的真实函数
+ *生成带泛型块的函数
  */
 static char *genFuncWithGbCode(GenericInfo *info,NPtrArray *blockIndexArray)
 {
@@ -571,9 +577,12 @@ static char *genFuncWithGbCode(GenericInfo *info,NPtrArray *blockIndexArray)
       char *newfunc = replace_genericblock(code,blockIndexArray,item->firstNumber);
       char *replace = replaceFuncName(newfunc,item->mangleFunName,b->genericModel);
       n_string_append(codes,"\n");
+      n_string_append_printf(codes,"%s %d \n",RID_AET_GOTO_STR,GOTO_ENTER_COMPILE_GENERIC_BLOCK_FUNC);
+      //生成"E_int_0_4"
+      n_string_append_printf(codes,"\"%s\"\n",b->directive);
       n_string_append(codes,replace);
       n_string_append(codes,"\n");
-      //printf("genFuncWithGbCode 11 %s %s %s\n",b->genericModel,item->mangleFunName,replace);
+      //printf("genFuncWithGbCode 11 %s %s replace:%s newfunc:%s\n",b->genericModel,item->mangleFunName,replace,newfunc);
       free(newfunc);
       free(replace);
    }

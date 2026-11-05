@@ -38,14 +38,9 @@ tree        generic_convert(location_t location,tree type,tree rhs,nboolean repl
 char       *generic_util_create_block_func_type_decl_name(char *sysName,int index);
 char       *generic_util_create_block_func_name(char *sysName,int index);
 
-static   inline nboolean  generic_util_valid_by_str(char *str)
+static inline nboolean  generic_util_valid_by_str(char *str)
 {
-   if(str==NULL || strlen(str)!=1 )
-      return FALSE;
-   char min='A';
-   char max='Z';
-   char v=str[0];
-   return (v>=min && v<=max);
+   return (str && strlen(str)==1 && str[0]>='A' && str[0]<='Z');
 }
 
 
@@ -64,12 +59,9 @@ static   inline nboolean generic_util_valid_all(tree id)
 
 static   inline nboolean generic_util_valid_id(tree id)
 {
-   char *str=IDENTIFIER_POINTER(id);
-   return generic_util_valid_by_str(str);
+   return generic_util_valid_by_str(IDENTIFIER_POINTER(id));
 }
 
-tree      generic_util_create_target(char *codes);
-tree      generic_util_create_target_loc(char *codes,location_t loc);
 
 nboolean  generic_util_get_array_type_and_parm_name(tree arg,char **typeStr,char **parmName,char *oldParmName);
 void      generic_util_parameter_declaration ();//解析函数定义中的形参

@@ -154,7 +154,7 @@ static tree setAddrExpr(tree nopexpr,int *nest)
       tree var=TREE_OPERAND (op, 1);
       if(TREE_CODE(var)==FIELD_DECL){
          tree type=TREE_TYPE(var);
-         char *className=class_util_get_class_name_by_record(type);
+         char *className=class_util_get_class_name/*!class_util_get_class_name_by_record*/(type);
          //printf("class_ref class_ref setAddrExpr 00 11 op是 COMPONENT_REF %s class:%s\n",IDENTIFIER_POINTER(DECL_NAME(var)),className);
          if(className!=NULL)
          return var;
@@ -167,7 +167,7 @@ static tree setAddrExpr(tree nopexpr,int *nest)
             tree type=TREE_TYPE(var);
             if(TREE_CODE(type)==ARRAY_TYPE)
                type=TREE_TYPE(type);
-            char *className=class_util_get_class_name_by_record(type);
+            char *className=class_util_get_class_name/*!class_util_get_class_name_by_record*/(type);
             //printf("class_ref class_ref setAddrExpr 00 22 op是 COMPONENT_REF %s class:%s\n",IDENTIFIER_POINTER(DECL_NAME(var)),className);
             if(className!=NULL)
                return var;
@@ -278,7 +278,7 @@ static tree getLastVar(tree decl,int *nest)
 static char *getClassFromVarAtAddrExpr(tree var)
 {
    tree type=TREE_TYPE(var);
-   return class_util_get_class_name_by_record(type);
+   return class_util_get_class_name/*!class_util_get_class_name_by_record*/(type);
 }
 
 /**
@@ -295,7 +295,7 @@ static char **getLastClassAndVar(ClassAccess *self,tree exprValue,char **lows)
 		  if(lows[0]==NULL && TREE_CODE(exprValue)==ADDR_EXPR){
 			  lows[0]=getClassFromVarAtAddrExpr(result);
 		  }else if(lows[0]==NULL && TREE_CODE(TREE_TYPE(result))==RECORD_TYPE){
-			  lows[0]=class_util_get_class_name_by_record(TREE_TYPE(result));
+			  lows[0]=class_util_get_class_name/*!class_util_get_class_name_by_record*/(TREE_TYPE(result));
 		  }else if(lows[0]==NULL && TREE_CODE(TREE_TYPE(result))==ARRAY_TYPE){
 		      //Abc *ax[2]; ax是var_decl 类型是 array_type array_type的类型才是Abc *
 	          lows[0]=class_util_get_class_name(TREE_TYPE(TREE_TYPE(result)));
@@ -309,7 +309,7 @@ static char **getLastClassAndVar(ClassAccess *self,tree exprValue,char **lows)
 		  if(TREE_CODE(result)==ARRAY_REF){
       	     tree op=TREE_OPERAND (result, 0);
       	     if(TREE_CODE(op)==VAR_DECL){
-			   lows[0]=class_util_get_class_name_by_record(TREE_TYPE(result));
+			   lows[0]=class_util_get_class_name/*!class_util_get_class_name_by_record*/(TREE_TYPE(result));
 			   lows[1]=IDENTIFIER_POINTER(DECL_NAME(op));
       	     }
 		  }else if(TREE_CODE(result)==FIELD_DECL){
@@ -451,27 +451,27 @@ VarRefRelation *class_access_create_relation_ship(ClassAccess *self,location_t l
 
 tree class_access_create_temp_field(ClassAccess *self,char *sysName, tree component,location_t loc)
 {
-	 tree classId=aet_utils_create_ident(sysName);
-	 tree record=lookup_name(classId);
-	 if(!record || record==error_mark_node){
-		 error_at(loc,"类%qs找不到",sysName);
-		 return error_mark_node;
-	 }
-	 tree recordType=NULL_TREE;
-	 if(TREE_CODE(record)==FUNCTION_DECL){
-	     if(strcmp(IDENTIFIER_POINTER(DECL_NAME(record)),sysName)==0){
-	         printf("说明在构造函数内调用了同类的方法:%s\n",sysName);
-	         ClassInfo *info=class_mgr_get_class_info(class_mgr_get(),sysName);
-	         record=info->recordTypeDecl;
-	     }else{
-	         n_error("在函数class_access_create_temp_field发生不可知的错误。报告此错误。");
-	         return NULL_TREE;
-	     }
-	 }
-     recordType=TREE_TYPE(record);
-	 tree type=build_pointer_type(recordType);
-	 tree  field = build_decl (loc,FIELD_DECL, component, type);
-	 return tree_cons (NULL_TREE, field, NULL_TREE);
+   tree classId=aet_utils_create_ident(sysName);
+   tree record=lookup_name(classId);
+   if(!record || record==error_mark_node){
+      error_at(loc,"类%qs找不到",sysName);
+      return error_mark_node;
+   }
+   tree recordType=NULL_TREE;
+   if(TREE_CODE(record)==FUNCTION_DECL){
+      if(strcmp(IDENTIFIER_POINTER(DECL_NAME(record)),sysName)==0){
+         printf("说明在构造函数内调用了同类的方法:%s\n",sysName);
+         ClassInfo *info=class_mgr_get_class_info(class_mgr_get(),sysName);
+         record=info->recordTypeDecl;
+      }else{
+         n_error("在函数class_access_create_temp_field发生不可知的错误。报告此错误。");
+         return NULL_TREE;
+      }
+   }
+   recordType=TREE_TYPE(record);
+   tree type=build_pointer_type(recordType);
+   tree  field = build_decl (loc,FIELD_DECL, component, type);
+   return tree_cons (NULL_TREE, field, NULL_TREE);
 }
 
 /**

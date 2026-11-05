@@ -35,6 +35,7 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 #include "plugin.h"
 #include "stringpool.h"
 #include "attribs.h"
+#include "function.h"
 
 #include "c-aet.h"
 #include "aetutils.h"
@@ -285,35 +286,6 @@ static void updateClassName(ClassImpl *self,char *sysClassName)
       self->className=class_mgr_clone_class_name(class_mgr_get(),sysClassName);
 }
 
-static void freeIfaceCode_cb(IFaceSourceCode *item)
-{
-   if(item->define!=NULL){
-      n_free(item->define);
-   }
-   if(item->modify!=NULL){
-      n_free(item->modify);
-   }
-   n_slice_free(IFaceSourceCode,item);
-}
-
-static char *strCat(char *one,char *two)
-{
-   NString *codes=n_string_new("");
-   if(one!=NULL){
-      n_string_append(codes,one);
-      n_string_append(codes,"\n");
-   }
-   if(two!=NULL){
-      n_string_append(codes,two);
-   }
-   char *result=NULL;
-   if(codes->len>0)
-      result= n_string_free(codes,FALSE);
-   else
-      n_string_free(codes,TRUE);
-   return result;
-}
-
 /**
  * 解析助记符
  * impl$ XXX extends$ Parent
@@ -470,12 +442,14 @@ void class_impl_parser(ClassImpl *self)
       n_string_append(buf,deviceFuncPointersCodes);
       free(deviceFuncPointersCodes);
    }
-   //生成函数static  AClass *_createAClass_MtcsFirst_123(AObject *self)定义
-   char *createAClassFuncCodes  = class_build_create_codes(self->classBuild,self->className);
+
+   //生成类的静态函数get_class代码
+   char *createAClassFuncCodes  = class_build_create_get_aclass_codes(self->classBuild,self->className);
    if(createAClassFuncCodes){
       n_string_append(buf,createAClassFuncCodes);
       free(createAClassFuncCodes);
    }
+
    //在初化代码前生成super内部函数声明static void TFirst_init_inner_super_data_2_TFirst(),初始化中调用该方法
    char *innerFuncName = aet_utils_create_init_inner_super_func_name(self->className->sysName);
    n_string_append_printf(buf,"\nstatic void %s();\n\n",innerFuncName);
@@ -495,11 +469,15 @@ void class_impl_parser(ClassImpl *self)
       n_string_append(buf,staticVarCodes);
       free(staticVarCodes);
    }
+   const char *varofCodes = aet_expr_get_compile_codes(self->aetExpr);
+   if(varofCodes){
+      n_string_append(buf,varofCodes);
+   }
    //创建类的类型
    n_debug("重要的初始化方法源代码 ----addInitDefine---- :\n%s\n",buf->str);
    aet_print_token(c_parser_peek_token (parser));
    aet_utils_add_token_with_force(parse_in,buf->str,buf->len,input_location,FALSE);
-   n_string_free(buf,TRUE);
+   n_string_free(buf,FALSE);
    tempClassName=class_name_clone(self->className);
    updateClassName(self,NULL);
    n_debug("impl 结束 %s %s",IDENTIFIER_POINTER (ident),in_fnames[0]);
@@ -509,106 +487,21 @@ void class_impl_parser(ClassImpl *self)
 }
 
 /**
- * 把 getName( 重整为  getName(Abc *self
- */
-static void rearrangeMode(ClassImpl *self,int openParenPos)
-{
-   c_parser *parser=self->parser->parser;
-   ClassName *className=self->className;
-   location_t loc = c_parser_peek_token (parser)->location;
-   c_token *who=c_parser_peek_nth_token (parser,openParenPos+1);
-   c_token *who1=c_parser_peek_nth_token (parser,openParenPos+2);
-   int tokenCount=parser->tokens_avail;
-   int i;
-   nboolean dhaoAfter=FALSE;//逗号加后面还是前面
-   if (who->keyword == RID_VOID  && who1->type == CPP_CLOSE_PAREN){
-      n_debug("class_impl rearrangeMode 进这里了---000 who->keyword == RID_VOID  && who1->type == CPP_CLOSE_PAREN %d openParenPos:%d\n",
-            tokenCount,openParenPos);
-      //需要加2个token 因为 void被替换了
-      //getName(void) getName 1 ( 2 void 3 )4
-      parser->tokens_avail=tokenCount+2;
-      for(i=tokenCount;i>openParenPos+1;i--){
-         aet_utils_copy_token(&parser->tokens[i-1],&parser->tokens[i-1+2]);
-      }
-   }else{//()->(Abc *self)
-      //需要加2个token 因为 void被替换了
-      int offset=(who->type == CPP_CLOSE_PAREN)?3:4;
-      n_debug("class_impl rearrangeMode 进这里了---111 who->type == CPP_CLOSE_PAREN %d openParenPos:%d offset:%d\n",
-            tokenCount,openParenPos,offset);
-      parser->tokens_avail=tokenCount+offset;
-      for(i=tokenCount;i>openParenPos;i--){
-         aet_utils_copy_token(&parser->tokens[i-1],&parser->tokens[i-1+offset]);
-      }
-      if(offset==4){
-         aet_utils_create_token(&parser->tokens[openParenPos+3],CPP_COMMA,",",1);
-         dhaoAfter=TRUE;
-      }
-   }
-   aet_utils_create_token(&parser->tokens[openParenPos+2],CPP_NAME,"self",4);
-   aet_utils_create_token(&parser->tokens[openParenPos+1],CPP_MULT,"*",1);
-   aet_utils_create_token(&parser->tokens[openParenPos],CPP_NAME,className->sysName,(int)strlen(className->sysName));
-   parser->tokens[openParenPos].id_kind=C_ID_TYPENAME;//关键
-   parser->tokens[openParenPos+2].location = loc;
-   parser->tokens[openParenPos+1].location = loc;
-   parser->tokens[openParenPos].location = loc;
-   aet_print_token_in_parser("class_impl rearrangeMode className ---- %s openParenPos:%d",className->sysName,openParenPos);
-}
-
-/**
- * 加self参数
- */
-nboolean  class_impl_add_self_to_param(ClassImpl *self)
-{
-	  c_parser *parser=self->parser->parser;
-	  if(self->className==NULL)
-		  error_at(input_location,"加入self到当前函数时出错。因为没有在类实现中。");
-	  nboolean ok=FALSE;
-	  if(c_parser_next_token_is (parser, CPP_MULT) && c_parser_peek_2nd_token(parser)->type==CPP_NAME
-			  && !c_token_starts_typename(c_parser_peek_2nd_token(parser)) && c_parser_peek_nth_token(parser,3)->type==CPP_OPEN_PAREN){
-		  n_debug("在classimpl实现中，加入self --11--int * getName('重整为'int *getName(Abc *self'  ");
-		  /*匹配 * getName(*/
-		  ok=TRUE;
-		  rearrangeMode(self,3);
-	  }else  if(c_parser_next_token_is (parser, CPP_NAME) && c_parser_peek_2nd_token(parser)->type==CPP_OPEN_PAREN){
-		  n_debug("在classimpl实现中，加入self --22--int  getName('重整为'int getName(Abc *self'\n");
-		  /*匹配 getName(*/
-		  ok=TRUE;
-		  rearrangeMode(self,2);
-	  }else if(c_parser_next_token_is (parser, CPP_MULT) && c_parser_peek_2nd_token(parser)->type==CPP_MULT &&
-			  c_parser_peek_nth_token(parser,3)->type==CPP_NAME
-			  && !c_token_starts_typename(c_parser_peek_nth_token(parser,3)) && c_parser_peek_nth_token(parser,4)->type==CPP_OPEN_PAREN){
-		  n_debug("在classimpl实现中，加入self --33--int ** getName('重整为'int ** getName(Abc *self' \n");
-		  /*匹配 ** getName(*/
-		  ok=TRUE;
-		  rearrangeMode(self,4);
-	  }else if(c_parser_next_token_is (parser, CPP_MULT) && c_parser_peek_2nd_token(parser)->type==CPP_MULT &&
-			  c_parser_peek_nth_token(parser,3)->type==CPP_MULT &&
-			  c_parser_peek_nth_token(parser,4)->type==CPP_NAME
-			  && !c_token_starts_typename(c_parser_peek_nth_token(parser,4)) && c_parser_peek_nth_token(parser,5)->type==CPP_OPEN_PAREN){
-		  n_debug("在classimpl实现中，加入self --33--int ** getName('重整为'int ** getName(Abc *self'  ");
-		  /*匹配 ** getName(*/
-		  ok=TRUE;
-		  rearrangeMode(self,5);
-	  }
-	  return ok;
-}
-
-/**
  * 如果specs中已有static 返回
  */
-nboolean  class_impl_add_static_to_declspecs(ClassImpl *self,location_t loc,struct c_declspecs *specs)
+void  class_impl_add_static_to_declspecs(ClassImpl *self,location_t loc,struct c_declspecs *specs)
 {
-	  if(specs->storage_class ==csc_static){
-		  n_debug("已经存在static存储声明说明符了 %s",self->className->sysName);
-		  return TRUE;
-	  }
-	  if(specs->storage_class!=csc_none){
-		  n_debug("已经有其它存储声明说明符了 %d %s %s",specs->storage_class,aet_print_get_storage_class_string(specs->storage_class),self->className->sysName);
-          return FALSE;
-	  }
-	  specs->storage_class=csc_static;
-	  specs->locations[cdw_storage_class] = loc;
-	  return TRUE;
+   if(specs->storage_class ==csc_static){
+      n_debug("已经存在static存储声明说明符了 %s",self->className->sysName);
+      return ;
+   }
+   if(specs->storage_class!=csc_none){
+      n_debug("已经有其它存储声明说明符了 %d %s %s",specs->storage_class,
+            aet_print_get_storage_class_string(specs->storage_class),self->className->sysName);
+      return ;
+   }
+   specs->storage_class=csc_static;
+   specs->locations[cdw_storage_class] = loc;
 }
 
 /**
@@ -685,8 +578,10 @@ nboolean  class_impl_start_function(ClassImpl *self,struct c_declspecs *specs,st
       if((func->permission==CLASS_PERMISSION_DEFAULT || func->permission==CLASS_PERMISSION_PROTECTED) &&
               (permission==CLASS_PERMISSION_DEFAULT || permission==CLASS_PERMISSION_PROTECTED))
           return TRUE;
-      if(func->permission!=permission && permission!=CLASS_PERMISSION_DEFAULT && aet_utils_valid_tree(func->fieldDecl)){
-          warning_at(permissionLoc,0,"在类实现中函数%qs的访问控制方法与类声明中的不一致。%d %d",func->orgiName,func->permission,permission);
+      if(func->permission!=permission && permission!=CLASS_PERMISSION_DEFAULT
+            && aet_utils_valid_tree(func->fieldDecl)){
+          warning_at(permissionLoc,0,"在类实现中函数%qs的访问控制方法与类声明中的不一致。%d %d",
+                func->orgiName,func->permission,permission);
           return TRUE;
       }
    }
@@ -720,16 +615,6 @@ static tree createTempStaticFunction(char *sysClassName,tree component,nboolean 
    DECL_ARTIFICIAL (decl) = fromDot?1:0;
    AET_LANG_FLAG_3(decl)=1;
    return decl;
-}
-
-/**
- * 是否是正在编译泛型块函数
- */
-static nboolean atCompileGenericBlock(ClassImpl *self)
-{
-   return (current_function_decl
-      && aet_parser_is_generic_state(self->parser)
-      && generic_util_is_block_func_name(IDENTIFIER_POINTER(DECL_NAME(current_function_decl))));
 }
 
 /**
@@ -797,12 +682,12 @@ fun_entry:
    if(fun){
       FuncAndVarMsg msg=func_call_get_process_express_method(self->funcCall,id,className);
       n_debug("class_impl_process_expression 00 找函数 %s className:%s re:%d",
-            IDENTIFIER_POINTER(id),className==NULL?"null":className->sysName,msg);
+            IDENTIFIER_POINTER(id),className==NULL?"NULL":className->sysName,msg);
       if(msg==ID_IS_CONSTRUCTOR){
          error_at(loc,"构造函数%qs只能通过new或super调用。",IDENTIFIER_POINTER(id));
       }else if(msg==ISAET_FIND_FUNC){
          n_debug("class_impl_process_expression 11 找到类函数 -----------className:%s funcName:%s\n",
-               className==NULL?"null":className->sysName,IDENTIFIER_POINTER(id));
+               className==NULL?"NULL":className->sysName,IDENTIFIER_POINTER(id));
          *action=2;
          tree  result=func_call_create_temp_func(self->funcCall,className, id);//在这里已向函数加入参数self
          source_range tok_range = c_parser_peek_token (parser)->get_range ();
@@ -814,12 +699,12 @@ fun_entry:
          //调用核函数，有启动参数
          if(lanuchList){
             n_debug("class_impl_process_expression 11aa 启动的核函数 -----------className:%s funcName:%s expr.value:%p\n",
-                  className==NULL?"null":className->sysName,IDENTIFIER_POINTER(id),expr.value);
+                  className==NULL?"NULL":className->sysName,IDENTIFIER_POINTER(id),expr.value);
             mtcs_lanuch_add_func_and_lanch_params(mtcs_parser_get()->mtcsLanuch,loc,expr.value,lanuchList);
          }
       }else if(msg==ISAET_FIND_STATIC_FUNC){
          n_debug("class_impl_process_expression 22 找到类静态函数 -----------className:%s funcName:%s",
-         className==NULL?"null":className->sysName,IDENTIFIER_POINTER(id));
+         className==NULL?"NULL":className->sysName,IDENTIFIER_POINTER(id));
          *action=2;
          if(className==NULL){
             n_error("class_impl_process_expression 不可出现的错误：报告此错误。");
@@ -854,7 +739,7 @@ fun_entry:
                //调用核函数，有启动参数
                if(lanuchList){
                   n_debug("class_impl_process_expression 11bb 启动的核函数 -----------className:%s funcName:%s expr.value:%p\n",
-                        className==NULL?"null":className->sysName,IDENTIFIER_POINTER(id),expr.value);
+                        className==NULL?"NULL":className->sysName,IDENTIFIER_POINTER(id),expr.value);
                   mtcs_lanuch_add_func_and_lanch_params(mtcs_parser_get()->mtcsLanuch,loc,expr.value,lanuchList);
                }
             }
@@ -875,7 +760,7 @@ fun_entry:
       }
       FuncAndVarMsg msg=var_call_get_process_var_method(self->varCall,loc,id,className);
       n_debug("class_impl_process_expression 77 找变量 %s className:%s FuncAndVarMsg:%d",
-      IDENTIFIER_POINTER(id),className==NULL?"null":className->sysName,msg);
+      IDENTIFIER_POINTER(id),className==NULL?"NULL":className->sysName,msg);
       if(msg==ISAET_FIND_VAL){
          *action=1;
          var_call_add_deref(self->varCall,id,className);
@@ -883,7 +768,7 @@ fun_entry:
          VarEntity *var=var_mgr_get_static_entity_by_recursion(var_mgr_get(),className,id);
          if(var!=NULL){
             n_debug("class_impl_process_expression 88 找变量 %s className:%s FuncAndVarMsg:%d",
-            IDENTIFIER_POINTER(id),className==NULL?"null":className->sysName,msg);
+            IDENTIFIER_POINTER(id),className==NULL?"NULL":className->sysName,msg);
             *action=2;
             source_range tok_range = c_parser_peek_token (parser)->get_range ();
             expr.value =var_entity_get_tree(var);
@@ -959,11 +844,11 @@ GenericModel *class_impl_get_func_generic_model(ClassImpl *self,tree id)
    }
    FuncAndVarMsg msg=func_call_get_process_express_method(self->funcCall,id,className);
    n_debug("class_impl_check_func_generic_define 00 找函数 %s className:%s re:%d",
-         IDENTIFIER_POINTER(id),className==NULL?"null":className->sysName,msg);
+         IDENTIFIER_POINTER(id),className==NULL?"NULL":className->sysName,msg);
    if(msg!=ISAET_FIND_FUNC)
 	   return NULL;
    n_debug("class_impl_check_func_generic_define 11 创建 -----------className:%s funcName:%s",
-			   className==NULL?"null":className->sysName,IDENTIFIER_POINTER(id));
+			   className==NULL?"NULL":className->sysName,IDENTIFIER_POINTER(id));
    GenericModel *funcgen= generic_model_new(TRUE,GEN_FROM_CLASS_IMPL);
    if(!generic_impl_check_func_at_call(generic_impl_get(), IDENTIFIER_POINTER(id),funcgen)){
 	   return NULL;
@@ -977,21 +862,21 @@ GenericModel *class_impl_get_func_generic_model(ClassImpl *self,tree id)
  */
 static CreateClassMethod getCreateObjectMethod(tree func)
 {
-	 tree indirectRef=TREE_OPERAND(func,0);
-	 if(TREE_CODE(indirectRef)!=INDIRECT_REF)
-		 return CREATE_CLASS_METHOD_UNKNOWN;
-	 tree varDecl=TREE_OPERAND(indirectRef,0);
-	 if(TREE_CODE(varDecl)!=VAR_DECL)
-		return CREATE_CLASS_METHOD_UNKNOWN;
-	 tree pointer=TREE_TYPE(varDecl);
-	 if(TREE_CODE(pointer)!=POINTER_TYPE)
-		 return CREATE_CLASS_METHOD_UNKNOWN;
-     char *sysClassName=class_util_get_class_name_by_pointer(pointer);
-	 if(sysClassName==NULL)
-		 return CREATE_CLASS_METHOD_UNKNOWN;
-	 char *varName=IDENTIFIER_POINTER(DECL_NAME(varDecl));
-	 CreateClassMethod method=class_util_get_new_object_method(varName);
-	 return method;
+   tree indirectRef=TREE_OPERAND(func,0);
+   if(TREE_CODE(indirectRef)!=INDIRECT_REF)
+      return CREATE_CLASS_METHOD_UNKNOWN;
+   tree varDecl=TREE_OPERAND(indirectRef,0);
+   if(TREE_CODE(varDecl)!=VAR_DECL)
+      return CREATE_CLASS_METHOD_UNKNOWN;
+   tree pointer=TREE_TYPE(varDecl);
+   if(TREE_CODE(pointer)!=POINTER_TYPE)
+      return CREATE_CLASS_METHOD_UNKNOWN;
+   char *sysClassName=class_util_get_class_name/*!class_util_get_class_name_by_pointer*/(pointer);
+   if(sysClassName==NULL)
+      return CREATE_CLASS_METHOD_UNKNOWN;
+   char *varName=IDENTIFIER_POINTER(DECL_NAME(varDecl));
+   CreateClassMethod method=class_util_get_new_object_method(varName);
+   return method;
 }
 
 /**
@@ -1044,8 +929,8 @@ struct c_expr class_impl_replace_func_id(ClassImpl *self,struct c_expr expr,vec<
       }
       fName=IDENTIFIER_POINTER(id);
    }
-   n_debug("class_impl_replace_func_id 33 fName:%s returnType:%s func:%p",
-         fName,get_tree_code_name(TREE_CODE (returnType)),func);
+   n_debug("class_impl_replace_func_id 33 fName:%s returnType:%s func:%p exprlist:%p",
+         fName,get_tree_code_name(TREE_CODE (returnType)),func,exprlist);
    tree last=NULL_TREE;
    FuncPointerError *errors =NULL;
    //对于构造函数的调用一定是指针引用
@@ -1126,13 +1011,18 @@ struct c_expr class_impl_replace_func_id(ClassImpl *self,struct c_expr expr,vec<
          return expr;
       }
    }else if(TREE_CODE (func)==COMPONENT_REF && AET_LANG_FLAG_6(func)==1){
-   label_1:
+label_1:
       tree field=TREE_OPERAND(func,1);
       tree id=DECL_NAME (field);
       char *funcName=IDENTIFIER_POINTER(DECL_NAME (field));
-      n_debug("class_impl_replace_func_id 77 这是指针引用  funcName:%s",funcName);
+      n_debug("class_impl_replace_func_id 77 这是指针引用  funcName:%s exprlist:%p",funcName,exprlist);
+      //如果是函数调用再调用函数，最后的被调函数是空的，通过namelesscall重新补回
       last=func_call_deref_select(self->funcCall,
             func,exprlist,origtypes,arg_loc,expr_loc,&errors,selectFunc);
+      if(selectFunc->ifaceCallRef){
+         expr.value=last;
+         return expr;
+      }
       class_cast_parm_convert_from_deref(self->classCast,last,exprlist);
       //是否优化为函数调用
       last = cmp_ref_opt_outside(self->cmpRefOpt,last,selectFunc->classFunc,exprlist,expr_loc);
@@ -1289,37 +1179,37 @@ AET_LANG_FLAG_6(func);通过objc->method 或 object.method 非super方法 要加
  */
 nboolean class_impl_is_aet_class_component_ref_call(ClassImpl *self,struct c_expr expr)
 {
-    tree func=expr.value;
-    if(!aet_utils_valid_tree(func))
-        return FALSE;
-    if(TREE_CODE (func) != FUNCTION_DECL && TREE_CODE (func)!=COMPONENT_REF)
-        return FALSE;
+   tree func=expr.value;
+   if(!aet_utils_valid_tree(func))
+      return FALSE;
+   if(TREE_CODE (func) != FUNCTION_DECL && TREE_CODE (func)!=COMPONENT_REF)
+      return FALSE;
 
-    tree returnType=TREE_TYPE(func);
-    if(!aet_utils_valid_tree(returnType)){
-        n_warning("class_impl_is_aet_class_component_ref_call 00 func 类型无效。 type:%p", returnType);
-        return FALSE;
-    }
-    if(TREE_CODE (func) == FUNCTION_DECL){
-        tree id=DECL_NAME (func);
-        if(!aet_utils_valid_tree(id) ){
-            n_warning("class_impl_is_aet_class_component_ref_call 11 func 的id或类型无效。id:%p type:%p", id,returnType);
-            return FALSE;
-        }
-    }
-    if(TREE_CODE (func)==COMPONENT_REF && AET_LANG_FLAG_4(func)==1){
-        return TRUE;
-    }else if(TREE_CODE (func)==FUNCTION_DECL && AET_LANG_FLAG_2(func)==1){
-        return FALSE;
-    }else if(TREE_CODE (func)==FUNCTION_DECL && AET_LANG_FLAG_3(func)==1 && TREE_STATIC(func)){
-        return FALSE;
-    }else if(TREE_CODE (func)==COMPONENT_REF && AET_LANG_FLAG_6(func)==1){
-        return TRUE;
-    }else if(TREE_CODE (func)==COMPONENT_REF && AET_LANG_FLAG_5(func)==1){
-        return TRUE;
-    }else{
-        return FALSE;
-    }
+   tree returnType=TREE_TYPE(func);
+   if(!aet_utils_valid_tree(returnType)){
+      n_warning("class_impl_is_aet_class_component_ref_call 00 func 类型无效。 type:%p", returnType);
+      return FALSE;
+   }
+   if(TREE_CODE (func) == FUNCTION_DECL){
+      tree id=DECL_NAME (func);
+      if(!aet_utils_valid_tree(id) ){
+         n_warning("class_impl_is_aet_class_component_ref_call 11 func 的id或类型无效。id:%p type:%p", id,returnType);
+         return FALSE;
+      }
+   }
+   if(TREE_CODE (func)==COMPONENT_REF && AET_LANG_FLAG_4(func)==1){
+      return TRUE;
+   }else if(TREE_CODE (func)==FUNCTION_DECL && AET_LANG_FLAG_2(func)==1){
+      return FALSE;
+   }else if(TREE_CODE (func)==FUNCTION_DECL && AET_LANG_FLAG_3(func)==1 && TREE_STATIC(func)){
+      return FALSE;
+   }else if(TREE_CODE (func)==COMPONENT_REF && AET_LANG_FLAG_6(func)==1){
+      return TRUE;
+   }else if(TREE_CODE (func)==COMPONENT_REF && AET_LANG_FLAG_5(func)==1){
+      return TRUE;
+   }else{
+      return FALSE;
+   }
 }
 
 /**
@@ -1440,7 +1330,7 @@ void class_impl_build_class_dot (ClassImpl *self, location_t loc,struct c_expr *
             if(!exits){
                if(!strcmp(IDENTIFIER_POINTER(component),"class")){
                   n_debug("这是一个获取AClass的方法 类:%s\n",sysClassName);
-                  expr->value =class_build_get_func(self->classBuild,&info->className);
+                  expr->value =class_build_build_get_class_call(self->classBuild,loc,&info->className);
                   set_c_expr_source_range (expr, loc, end_loc);
                   return;
                }else{
@@ -1484,11 +1374,6 @@ void class_impl_build_class_dot (ClassImpl *self, location_t loc,struct c_expr *
             n_debug("找到了变量:%s %s\n",varEntity->sysName,varEntity->orgiName);
             var=var_entity_get_tree(varEntity);
             access_controls_access_var(access_controls_get(),loc,varEntity->orgiName,varEntity->sysName);
-//            ClassInfo *info =class_mgr_get_class_info(class_mgr_get(),varEntity->sysName);
-//            if(info && class_info_is_interface(info) && varEntity->isStatic){
-//               printf("找到了变量 取变量的初始值:%s %s %p\n",varEntity->sysName,varEntity->orgiName,varEntity->init);
-//               var = varEntity->init;
-//            }
          }
          expr->value =var;
          set_c_expr_source_range (expr, loc, end_loc);
@@ -1638,13 +1523,14 @@ void  class_impl_finish_function(ClassImpl *self,tree fndecl,location_t endLoc)
       //检查覆盖了final$方法
       ClassFunc    *cf= func_mgr_get_func(func_mgr_get(),fndecl);
       if(cf){
-         n_debug("class_impl_finish_function -- %s\n",cf->orgiName);
          class_func_set_end_location(cf,endLoc);
          func_mgr_parent_have_final(func_mgr_get(),DECL_SOURCE_LOCATION(fndecl),cf);
       }
    }
    object_return_finish_function(object_return_get(),fndecl);
    cmp_ref_opt_add(self->cmpRefOpt,fndecl);
+   //实现varof$的代码
+   aet_expr_compile_ready(self->aetExpr);
 }
 
 /**
@@ -1667,7 +1553,7 @@ tree   class_impl_add_return(ClassImpl *self,location_t loc,tree retExpr,tree ex
             c_parser *parser=self->parser->parser;
             c_token backups[30];
             int backCount=aet_parser_backup_token(self->parser,backups);
-            aet_utils_add_token(parse_in,codes,strlen(codes));
+            aet_utils_add_token_free(parse_in,codes,strlen(codes));
             struct c_expr expr = aet_parser_c_parser_expression_conv (self->parser);
             aet_parser_restore_token(self->parser,backups,backCount);
             //清除；
@@ -1680,8 +1566,6 @@ tree   class_impl_add_return(ClassImpl *self,location_t loc,tree retExpr,tree ex
    }
    //解析泛型块中的返回语句
    retExpr = generic_parser_return(generic_parser_get(),retExpr);
-   retExpr = object_return_convert_block(object_return_get(),retExpr);
-   object_return_add_return(object_return_get(),retExpr);
    retExpr = object_return_convert(object_return_get(),loc,retExpr);
    return retExpr;
 }
@@ -1691,7 +1575,8 @@ tree   class_impl_add_return(ClassImpl *self,location_t loc,tree retExpr,tree ex
  * 例如:printf("data is :%f\n",getdata());
  * getdata可能是一个隐藏函数，由implicitly_call_set_funcall_impl_conv方法确定是不是
  */
-void class_impl_add_implicitly_actual_param(ClassImpl *self,tree funcCall,vec<tree, va_gc> *exprlist, vec<tree, va_gc> *origtypes)
+void class_impl_add_implicitly_actual_param(ClassImpl *self,tree funcCall,
+      vec<tree, va_gc> *exprlist, vec<tree, va_gc> *origtypes)
 {
    if(exprlist==NULL)
       return;
@@ -1705,23 +1590,6 @@ void class_impl_add_implicitly_actual_param(ClassImpl *self,tree funcCall,vec<tr
          implicitly_call_set_funcall_impl_conv(self->implicitlyCall,funcCall,arg,origtype,ix,self->className->sysName);
       }
    }
-}
-
-
-void  class_impl_in_finish_decl(ClassImpl *self ,location_t loc,tree decl)
-{
-  	class_cast_in_finish_decl(self->classCast,loc,decl);
-}
-
-void class_impl_in_finish_stmt(ClassImpl *self ,location_t loc,tree stmt)
-{
-    class_cast_in_finish_stmt(self->classCast,loc,stmt);
-}
-
-struct c_expr class_impl_nameless_call(ClassImpl *self,struct c_expr expr)
-{
-    expr.value=nameless_call_parser(nameless_call_get(),expr.value);
-    return expr;
 }
 
 /**
@@ -1818,14 +1686,6 @@ tree  class_impl_build_deref(ClassImpl *self,location_t loc,location_t component
       class_ctor_set_tag_for_self_and_super_call(self->classCtor,result);
    }
    return result;
-}
-
-/**
- * 解析关键字varof$
- */
-struct c_expr   class_impl_varof_parser(ClassImpl *self,struct c_expr lhs)
-{
-   return aet_expr_varof_parser(self->aetExpr,lhs);
 }
 
 /**

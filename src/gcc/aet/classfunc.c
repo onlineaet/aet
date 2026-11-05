@@ -456,15 +456,12 @@ nboolean    class_func_is_private(ClassFunc *self)
 /**
  * 是不是接口保留的方法名。
  * 在class_parser.c中加入接口的两个方法是 ref和unref具体名字见下:
- *#define IFACE_REF_FIELD_NAME            "_iface_reserve_ref_field_123"
- *#define IFACE_UNREF_FIELD_NAME          "_iface_reserve_unref_field_123"
  */
 nboolean    class_func_is_interface_reserve(ClassFunc *self)
 {
    if(self==NULL)
       return FALSE;
-   //n_debug("class_func_is_interface_reserve %s %s %s",self->orgiName,IFACE_REF_FIELD_NAME,IFACE_UNREF_FIELD_NAME);
-   return (!strcmp(self->orgiName,IFACE_REF_FIELD_NAME) || !strcmp(self->orgiName,IFACE_UNREF_FIELD_NAME));
+   return (!strcmp(self->orgiName,"ref") || !strcmp(self->orgiName,"unref"));
 }
 
 nboolean  class_func_is_static(ClassFunc *self)

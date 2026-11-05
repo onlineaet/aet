@@ -102,8 +102,9 @@ static void funcMgrInit(FuncMgr *self)
 	self->staticHashTable = n_hash_table_new_full (n_str_hash, n_str_equal,n_free, freeClass_cb);
 	self->mangle=aet_mangle_new();
 	aet_mangle_set_callback(self->mangle,getAnonymousTypeName_cb,(npointer)self);
+   self->aobjectRef =NULL;    //AObject 的 ref 因为常用在这里缓存
+   self->aobjectUnref =NULL;
 }
-
 
 static nboolean existsStaticFuncAtField(FuncMgr *self,char *funcName,ClassName *className)
 {
@@ -406,6 +407,7 @@ static ClassFunc *addFunc(FuncMgr *self,tree structTree,ClassName *className,enu
    //获取没有self的函数名，用在static函数
    tree noSelfArgTypes = TREE_CHAIN (argTypes);
    tree funName=funid->u.id.id;
+   //没有tempParms，aet_mangle_create write_type会出空错
    self->tempParms = funcdecl->u.arg_info->parms;
    char *orgiName=n_strdup(IDENTIFIER_POINTER(funName));
    char *newName       = aet_mangle_create(self->mangle,funName,argTypes,className->userName);
@@ -413,6 +415,10 @@ static ClassFunc *addFunc(FuncMgr *self,tree structTree,ClassName *className,enu
    char *staticNewName = aet_mangle_create(self->mangle,funName,noSelfArgTypes,className->sysName);
    char *rawMangleName = aet_mangle_create(self->mangle,funName,noSelfArgTypes,"");
    self->tempParms = NULL_TREE;
+   if(strcmp(className->userName,AET_ROOT_OBJECT) && (!strcmp(orgiName,"unref")||!strcmp(orgiName,"ref"))){
+      error_at(id_loc, "ref或unref函数名是系统保留的，不能覆盖。");
+      return NULL;
+   }
    //检查与静态函数是否重名
    ClassFunc *func=NULL;
    func = getStaticFunc(self,staticNewName,className);
@@ -1155,9 +1161,7 @@ int func_mgr_get_max_serial_number(FuncMgr *self,ClassName *className)
  */
 nboolean    func_mgr_is_mtcs_func(FuncMgr *self,tree fndecl)
 {
-   if(!fndecl)
-      return FALSE;
-   if(TREE_CODE(fndecl)!=FUNCTION_DECL && TREE_CODE(fndecl)!=FIELD_DECL)
+   if(!fndecl || (TREE_CODE(fndecl)!=FUNCTION_DECL && TREE_CODE(fndecl)!=FIELD_DECL))
       return FALSE;
    ClassFunc    *func = func_mgr_get_func_by_mangle(self,IDENTIFIER_POINTER(DECL_NAME(fndecl)));
    if(!func){
@@ -1170,22 +1174,16 @@ nboolean    func_mgr_is_mtcs_func(FuncMgr *self,tree fndecl)
 
 ClassFunc  *func_mgr_get_func(FuncMgr *self,tree fndecl)
 {
-   if(!fndecl)
+   if(!fndecl || (TREE_CODE(fndecl)!=FUNCTION_DECL && TREE_CODE(fndecl)!=FIELD_DECL))
       return FALSE;
-   if(TREE_CODE(fndecl)!=FUNCTION_DECL && TREE_CODE(fndecl)!=FIELD_DECL)
-      return FALSE;
-   ClassFunc    *func = func_mgr_get_func_by_mangle(self,IDENTIFIER_POINTER(DECL_NAME(fndecl)));
-   return func;
+   return  func_mgr_get_func_by_mangle(self,IDENTIFIER_POINTER(DECL_NAME(fndecl)));
 }
 
 ClassFunc  *func_mgr_get_static_func(FuncMgr *self,tree fndecl)
 {
-   if(!fndecl)
+   if(!fndecl || TREE_CODE(fndecl)!=FUNCTION_DECL)
       return FALSE;
-   if(TREE_CODE(fndecl)!=FUNCTION_DECL)
-      return FALSE;
-   ClassFunc    *func = func_mgr_get_static_entity_by_mangle(self,IDENTIFIER_POINTER(DECL_NAME(fndecl)));
-   return func;
+   return  func_mgr_get_static_entity_by_mangle(self,IDENTIFIER_POINTER(DECL_NAME(fndecl)));
 }
 
 /**
@@ -1559,6 +1557,133 @@ nboolean func_mgr_have_mtcs_func(FuncMgr *self)
    return haveMtcsFunc(self->staticHashTable);
 }
 
+//获取 AET_GET_ACLASS_FUNC_NAME 的方法
+ClassFunc *func_mgr_get_static_get_class(FuncMgr *self,ClassName *className)
+{
+   const NPtrArray    *arrays= func_mgr_get_static_funcs(self,className);
+   int i;
+   int count =0;
+   ClassFunc *ret=NULL;
+   for(i=0;i<arrays->len;i++){
+      ClassFunc *f=n_ptr_array_index(arrays,i);
+      if(!strcmp(f->orgiName,AET_GET_ACLASS_FUNC_NAME)){
+         ret = f;
+         count++;
+      }
+   }
+   gcc_assert(ret);
+   if(count>1){
+      error_at(DECL_SOURCE_LOCATION(ret->fieldDecl),"重复的函数名。%qs",ret->orgiName);
+      return NULL;
+   }
+   return ret;
+}
+
+/**
+ * 重构 declarator 满足域函数声明的要求,并加入self参数
+ */
+nboolean func_mgr_add_self_to_declarator(FuncMgr *self,ClassName *className,
+      struct c_declarator *declarator,nboolean isConstructor,nboolean isClassDecl)
+{
+   struct c_declarator *temp = declarator;
+   struct c_declarator *func=NULL;
+   struct c_declarator *id=NULL;
+   while (temp){
+      enum c_declarator_kind kind=temp->kind;
+      if(kind == cdk_function)
+         func = temp;
+      if(kind == cdk_id)
+         id = temp;
+      temp=temp->declarator;
+   }
+
+   if(func && id){
+      tree objTypeDecl = lookup_name(get_identifier(className->sysName));
+      tree objtype=build_pointer_type(TREE_TYPE(objTypeDecl));
+      struct c_arg_info *arginfo = func->u.arg_info;
+      int count = 0;
+      for (tree t = arginfo->types; t != NULL_TREE; t = TREE_CHAIN (t))
+          count++;
+      if(count == 0)
+         arginfo->types = tree_cons (NULL_TREE, void_type_node, NULL_TREE);
+      arginfo->types = tree_cons (NULL_TREE, objtype, arginfo->types);
+      if(!strcmp(IDENTIFIER_POINTER(id->u.id.id),className->sysName) && !isConstructor)
+         error_at(id->id_loc,"不能使用类名作为函数名。");
+      tree selfTree= build_decl (id->id_loc, PARM_DECL, get_identifier("self"),objtype);
+      DECL_CHAIN (selfTree) = arginfo->parms;
+      arginfo->parms = selfTree;
+      //重要，不加ipa-split.cc调用useless_type_conversion_p出错
+      DECL_ARG_TYPE (selfTree) = objtype;
+      if(isClassDecl && func->declarator == id){
+         struct c_declarator *pointer= make_pointer_declarator (NULL,id);
+         func-> declarator = pointer;
+      }
+   }
+   return (func && id);
+}
+
+
+/**
+ * 获取当前函数是不是fwgb函数，并当前函数对应的ClassFunc
+ */
+ClassFunc *func_mgr_get_current_fwgb(FuncMgr *self)
+{
+   if(!current_function_decl)
+      return NULL;
+   const char *currentName = IDENTIFIER_POINTER(DECL_NAME(current_function_decl));
+   NHashTableIter iter;
+   npointer key, value;
+   n_hash_table_iter_init(&iter, self->hashTable);
+   int count=0;
+   while (n_hash_table_iter_next(&iter, &key, &value)) {
+      char *sysName = (char *)key;
+      NPtrArray *arrays=(NPtrArray *)value;
+      for(int i=0;i<arrays->len;i++){
+         ClassFunc *f=n_ptr_array_index(arrays,i);
+         if(endswith(currentName,f->mangleFunName))
+            return f;
+      }
+   }
+   return NULL;
+}
+
+static ClassFunc *getRefOrUnref(FuncMgr *self,char *refOrUnref)
+{
+   NHashTableIter iter;
+   npointer key, value;
+   n_hash_table_iter_init(&iter, self->hashTable);
+   int count=0;
+   while (n_hash_table_iter_next(&iter, &key, &value)) {
+      char *sysName = (char *)key;
+      if(endswith(sysName,AET_ROOT_OBJECT)){
+         NPtrArray *arrays=(NPtrArray *)value;
+         for(int i=0;i<arrays->len;i++){
+            ClassFunc *f=n_ptr_array_index(arrays,i);
+            if(strcmp(f->orgiName,refOrUnref)==0)
+               return f;
+         }
+      }
+   }
+   return NULL;
+}
+
+ClassFunc *func_mgr_get_ref(FuncMgr *self)
+{
+   if(self->aobjectRef)
+      return self->aobjectRef;
+   self->aobjectRef = getRefOrUnref(self,"ref");
+   gcc_assert(self->aobjectRef);
+   return self->aobjectRef;
+}
+
+ClassFunc *func_mgr_get_unref(FuncMgr *self)
+{
+   if(self->aobjectUnref)
+      return self->aobjectUnref;
+   self->aobjectUnref = getRefOrUnref(self,"unref");
+   gcc_assert(self->aobjectUnref);
+   return self->aobjectUnref;
+}
 
 FuncMgr *func_mgr_get()
 {

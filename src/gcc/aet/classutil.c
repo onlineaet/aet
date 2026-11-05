@@ -46,64 +46,14 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 #include "classmgr.h"
 #include "c-aet.h"
 #include "genericutil.h"
+#include "classfunc.h"
+#include "funcmgr.h"
 
-
-char *class_util_get_class_name_by_record(tree type)
+const char *class_util_get_class_name(tree type)
 {
-   if(TREE_CODE(type)!=RECORD_TYPE){
-      //n_warning("class_util_get_class_name_by_record 00 不是record_type %s",get_tree_code_name(TREE_CODE(type)));
-      if(TREE_CODE(type)==POINTER_TYPE){
-         //n_warning("class_util_get_class_name_by_record 11 可能是 Abc **obj %s",get_tree_code_name(TREE_CODE(type)));
-         return class_util_get_class_name_by_record(TREE_TYPE(type));
-      }
-      return NULL;
-   }
-   tree next=TYPE_NAME(type);
-   if(!aet_utils_valid_tree(next))
-      return NULL;
-   if(TREE_CODE(next)!=TYPE_DECL){
-      //n_warning("class_util_get_class_name_by_record 11 不是TYPE_DECL %s",get_tree_code_name(TREE_CODE(next)));
-      return NULL;
-   }
-   char *declClassName=IDENTIFIER_POINTER(DECL_NAME (next));
-   if(!class_mgr_is_class(class_mgr_get(),declClassName)){
-      //n_warning("class_util_get_class_name_by_record 22 找不类 %s",declClassName);
-      return NULL;
-   }
-   return declClassName;
-}
-
-static tree getTypeFromPointer(tree pointerType)
-{
-   if(TREE_CODE(pointerType)!=POINTER_TYPE)
-      return pointerType;
-   pointerType=TREE_TYPE(pointerType);
-   return getTypeFromPointer(pointerType);
-}
-
-char *class_util_get_class_name_by_pointer(tree pointerType)
-{
-   if(TREE_CODE(pointerType)!=POINTER_TYPE)
-      return NULL;
-   tree record=getTypeFromPointer(pointerType);
-   return class_util_get_class_name_by_record(record);
-}
-
-char *class_util_get_class_name(tree type)
-{
-   if(!aet_utils_valid_tree(type))
-      return NULL;
-   if(TREE_CODE(type)==POINTER_TYPE)
-      return class_util_get_class_name_by_pointer(type);
-   else if(TREE_CODE(type)==RECORD_TYPE)
-      return class_util_get_class_name_by_record(type);
-   else if(TREE_CODE(type)==ARRAY_TYPE){
-      tree vt=TREE_TYPE(type);
-      if(TREE_CODE(vt)==POINTER_TYPE)
-         return class_util_get_class_name_by_pointer(vt);
-      else if(TREE_CODE(vt)==RECORD_TYPE)
-         return class_util_get_class_name_by_record(vt);
-   }
+   ClassInfo *info = class_mgr_get_class_info_by_type(class_mgr_get(),type);
+   if(info)
+      return info->className.sysName;
    return NULL;
 }
 
@@ -167,8 +117,6 @@ static int fillLink(tree call,NString *linkStr,nboolean tailed)
       }
       type=TREE_TYPE(field);
       parm=type;
-      //printf("函数返回值:xxxxx %s\n",name);
-
       if(TREE_CODE(type)==POINTER_TYPE){
          type=TREE_TYPE(type);//函数返回值
          if(TREE_CODE(type)==FUNCTION_TYPE){
@@ -269,7 +217,7 @@ static tree findSelf(tree value)
       tree type=TREE_TYPE(indirectRef);
       if(TREE_CODE(type)==RECORD_TYPE){
          //此种情况(&abc)->getName(5);
-         char *className=class_util_get_class_name_by_record(type);
+         char *className=class_util_get_class_name/*!class_util_get_class_name_by_record*/(type);
          n_debug("这是一个点引用。");
          if(className){
             selfTree = build_unary_op (input_location, ADDR_EXPR, indirectRef, false);
@@ -281,13 +229,13 @@ static tree findSelf(tree value)
       tree type=TREE_TYPE(indirectRef);
       if((TREE_CODE(var)==VAR_DECL || TREE_CODE(var)==PARM_DECL) && TREE_CODE(field)==FIELD_DECL && TREE_CODE(type)==RECORD_TYPE){
          //此种情况(&(abc.ytx))->getName(5);
-         char *className=class_util_get_class_name_by_record(type);
+         char *className=class_util_get_class_name/*!class_util_get_class_name_by_record*/(type);
          n_debug("这是一个点点引用 %s\n",className);
          if(className){
             selfTree = build_unary_op (input_location, ADDR_EXPR, indirectRef, false);
          }
       }else if(TREE_CODE(var)==INDIRECT_REF && TREE_CODE(field)==FIELD_DECL && TREE_CODE(type)==RECORD_TYPE){
-         char *className=class_util_get_class_name_by_record(type);
+         char *className=class_util_get_class_name/*!class_util_get_class_name_by_record*/(type);
          //此种情况(&(self->ytx))->getName(5);
          n_debug("这是一个指针到点引用 %s\n",className);
          if(className){
@@ -296,7 +244,7 @@ static tree findSelf(tree value)
       }
    }else if(TREE_CODE(indirectRef)==ARRAY_REF){
       tree type=TREE_TYPE(indirectRef);
-      char *className=class_util_get_class_name_by_record(type);
+      char *className=class_util_get_class_name/*!class_util_get_class_name_by_record*/(type);
       n_debug("这是一个数组引用 %s\n",className);
       //此种情况(&(abc.ytx[0]))->getName(5);
       if(className){
@@ -305,7 +253,7 @@ static tree findSelf(tree value)
    }else  if(TREE_CODE(indirectRef)==CALL_EXPR){
       tree type=TREE_TYPE(indirectRef);
       if(TREE_CODE(type)==RECORD_TYPE){
-         char *sysName=class_util_get_class_name_by_record(type);
+         char *sysName=class_util_get_class_name/*!class_util_get_class_name_by_record*/(type);
          n_debug("这是一个函数返回值是类对象的点调用 %s\n",sysName);
          if(sysName){
             selfTree = null_pointer_node;
@@ -339,25 +287,11 @@ nboolean  class_util_add_self(struct c_expr expr,vec<tree, va_gc> **exprlist,vec
       arg_loc->safe_push (input_location);
       *exprlist=ret;
       *porigtypes=orig_types;
-      //printf("class_util_add_self 00 没有参数\n");
    }else{
       vec<tree, va_gc> *args=*exprlist;
-      //        int ix;
-      //        tree arg;
-      //	    for (ix = 0; args->iterate (ix, &arg); ++ix){
-      //	        printf("class_util_add_self 11 有参数 %d\n",ix);
-      //	        aet_print_tree(arg);
-      //	    }
       vec_safe_insert(*exprlist,0,selfTree);
       vec_safe_insert(*porigtypes,0,TREE_TYPE(selfTree));
       arg_loc->safe_insert (0,input_location);
-      //	    args=*exprlist;
-      //	    arg=NULL_TREE;
-      //        printf("class_util_add_self 22 有参数\n");
-      //	    for (ix = 0; args->iterate (ix, &arg); ++ix){
-      //	        printf("class_util_add_self 33 有参数 %d\n",ix);
-      //	        aet_print_tree(arg);
-      //	    }
    }
    return TRUE;
 }
@@ -407,140 +341,138 @@ nboolean class_util_is_class(struct c_declspecs *declspecs)
 
 
 static unsigned int tempVarSerial=0;
+#define TEMP_VAR_PREFIX "_notv"
+/**
+ * 格式与class_util_get_new_object_method必须匹配。
+ */
 char  *class_util_create_new_object_temp_var_name(char *sysClassName,CreateClassMethod method)
 {
-   char buffer[256];
-   sprintf(buffer,"_notv%d_%d%s%d",method,strlen(sysClassName),sysClassName,tempVarSerial++);
-   if(tempVarSerial>N_MAXUINT)
-	   tempVarSerial=0;
-   char *re=n_strdup(buffer);
-   return re;
+   return n_strdup_printf("%s%d_%d%s%d",TEMP_VAR_PREFIX,method,strlen(sysClassName),sysClassName,tempVarSerial++);
 }
 
 CreateClassMethod class_util_get_new_object_method(char *var)
 {
-	  if(var==NULL)
-		  return CREATE_CLASS_METHOD_UNKNOWN;
-	  int len=strlen(var);
-	  char *temp=var;
-	  //printf("class_util_get_new_object_method 00 %s\n",temp);
-	  if(len<10 || strncmp(var,"_notv",5)){
-		  return  CREATE_CLASS_METHOD_UNKNOWN;
-	  }
-	  temp=var+5;
-	  //printf("class_util_get_new_object_method 11 %s %d\n",temp,temp[0]);
-	  if(!n_ascii_isdigit(temp[0])){
-		  return  CREATE_CLASS_METHOD_UNKNOWN;
-	  }
-	  CreateClassMethod method=n_ascii_digit_value(temp[0]);
-	 // printf("class_util_get_new_object_method 22 %s %d\n",temp,method);
+   if(var==NULL)
+      return CREATE_CLASS_METHOD_UNKNOWN;
+   int len=strlen(var);
+   char *temp=var;
+   //printf("class_util_get_new_object_method 00 %s\n",temp);
+   if(len<10 || strncmp(var,TEMP_VAR_PREFIX,5)){
+      return  CREATE_CLASS_METHOD_UNKNOWN;
+   }
+   temp=var+5;
+   //printf("class_util_get_new_object_method 11 %s %d\n",temp,temp[0]);
+   if(!n_ascii_isdigit(temp[0])){
+      return  CREATE_CLASS_METHOD_UNKNOWN;
+   }
+   CreateClassMethod method=n_ascii_digit_value(temp[0]);
+   // printf("class_util_get_new_object_method 22 %s %d\n",temp,method);
 
-	  if(!(method>=CREATE_OBJECT_METHOD_STACK && method<=CREATE_OBJECT_USE_HEAP)){
-		  return  CREATE_CLASS_METHOD_UNKNOWN;
-	  }
-	  temp=var+6;
-	  //printf("class_util_get_new_object_method 33 %s %d\n",temp,method);
+   if(!(method>=CREATE_OBJECT_METHOD_STACK && method<=CREATE_OBJECT_USE_HEAP)){
+      return  CREATE_CLASS_METHOD_UNKNOWN;
+   }
+   temp=var+6;
+   //printf("class_util_get_new_object_method 33 %s %d\n",temp,method);
 
-	  if(temp[0]!='_'){
-		  return  CREATE_CLASS_METHOD_UNKNOWN;
-	  }
-	  temp=var+7;
-	  //printf("class_util_get_new_object_method 44 %s %d\n",temp,method);
+   if(temp[0]!='_'){
+      return  CREATE_CLASS_METHOD_UNKNOWN;
+   }
+   temp=var+7;
+   //printf("class_util_get_new_object_method 44 %s %d\n",temp,method);
 
-	  if(!n_ascii_isdigit(temp[0]))
-		  return  CREATE_CLASS_METHOD_UNKNOWN;
-	  char classNameLen[20];
-	  int i=0;
-	  while(n_ascii_isdigit(temp[i])){
-	     classNameLen[i]=temp[i];
-	     i++;
-	  }
-	  classNameLen[i]='\0';
-	  //printf("class_util_get_new_object_method 55 %s %s\n",temp,classNameLen);
+   if(!n_ascii_isdigit(temp[0]))
+      return  CREATE_CLASS_METHOD_UNKNOWN;
+   char classNameLen[20];
+   int i=0;
+   while(n_ascii_isdigit(temp[i])){
+      classNameLen[i]=temp[i];
+      i++;
+   }
+   classNameLen[i]='\0';
+   //printf("class_util_get_new_object_method 55 %s %s\n",temp,classNameLen);
 
-	  int objLen=atoi((const char*)classNameLen);
-	  temp=var+7+i;
-	  char className[255];
-	  memcpy(className,temp,objLen);
-	  className[objLen]='\0';
- 	  ClassInfo *info=class_mgr_get_class_info(class_mgr_get(),className);
- 	  if(info==NULL)
- 		  return CREATE_CLASS_METHOD_UNKNOWN;
+   int objLen=atoi((const char*)classNameLen);
+   temp=var+7+i;
+   char className[255];
+   memcpy(className,temp,objLen);
+   className[objLen]='\0';
+   ClassInfo *info=class_mgr_get_class_info(class_mgr_get(),className);
+   if(info==NULL)
+      return CREATE_CLASS_METHOD_UNKNOWN;
 
-	  temp=var+7+i+objLen;
-	  int diff=len-(7+i+objLen);
-	 // printf("class_util_get_new_object_method 66 %s %d\n",temp,diff);
+   temp=var+7+i+objLen;
+   int diff=len-(7+i+objLen);
+   // printf("class_util_get_new_object_method 66 %s %d\n",temp,diff);
 
-	  for(i=0;i<diff;i++){
-	    char a=temp[i];
-	    if(!n_ascii_isdigit(a)){
-		  return  CREATE_CLASS_METHOD_UNKNOWN;
-	    }
-	  }
-      return method;
+   for(i=0;i<diff;i++){
+      char a=temp[i];
+      if(!n_ascii_isdigit(a))
+         return  CREATE_CLASS_METHOD_UNKNOWN;
+   }
+   return method;
 }
 
 static char* getClassFromNopExpr(tree nopexpr)
 {
-	   enum tree_code  nopexprTypeCode=TREE_CODE(TREE_TYPE(nopexpr));
-	   tree op=TREE_OPERAND (nopexpr, 0);
-	   //printf("class_ref getClassFromNopExpr 00 %s %s\n",get_tree_code_name(nopexprTypeCode),get_tree_code_name(TREE_CODE(op)));
-	   if(nopexprTypeCode==POINTER_TYPE && TREE_CODE(op)==CALL_EXPR){
-		    printf("class_util 从设setNopExpr CALL_EXPR-----\n");
-			return class_util_get_class_name_by_pointer(TREE_TYPE(nopexpr));
-	   }else  if(nopexprTypeCode==POINTER_TYPE && TREE_CODE(op)==TARGET_EXPR){
-		    printf("class_util 从设setNopExpr 再设setTargetExpr----- 不处理\n");
-	   }else  if(nopexprTypeCode==POINTER_TYPE && TREE_CODE(op)==VAR_DECL){
-		    printf("class_util 从设setNopExpr 再设setVarDecl---eee--\n");
-			return class_util_get_class_name_by_pointer(TREE_TYPE(nopexpr));
-	   }else  if(nopexprTypeCode==POINTER_TYPE && TREE_CODE(op)==PARM_DECL){
-			return class_util_get_class_name_by_pointer(TREE_TYPE(nopexpr));
-	   }else if(nopexprTypeCode==POINTER_TYPE && TREE_CODE(op)==POINTER_PLUS_EXPR){
-		    printf("class_util 从设setNopExpr POINTER_PLUS_EXPR-----不处理 \n");
-	   }else if(nopexprTypeCode==POINTER_TYPE && TREE_CODE(op)==ADDR_EXPR){
-			return class_util_get_class_name_by_pointer(TREE_TYPE(nopexpr));
-	   }
-	   return NULL;
+   enum tree_code  nopexprTypeCode=TREE_CODE(TREE_TYPE(nopexpr));
+   tree op=TREE_OPERAND (nopexpr, 0);
+   //printf("class_ref getClassFromNopExpr 00 %s %s\n",get_tree_code_name(nopexprTypeCode),get_tree_code_name(TREE_CODE(op)));
+   if(nopexprTypeCode==POINTER_TYPE && TREE_CODE(op)==CALL_EXPR){
+      printf("class_util 从设setNopExpr CALL_EXPR-----\n");
+      return class_util_get_class_name/*!class_util_get_class_name_by_pointer*/(TREE_TYPE(nopexpr));
+   }else  if(nopexprTypeCode==POINTER_TYPE && TREE_CODE(op)==TARGET_EXPR){
+      printf("class_util 从设setNopExpr 再设setTargetExpr----- 不处理\n");
+   }else  if(nopexprTypeCode==POINTER_TYPE && TREE_CODE(op)==VAR_DECL){
+      printf("class_util 从设setNopExpr 再设setVarDecl---eee--\n");
+      return class_util_get_class_name/*!class_util_get_class_name_by_pointer*/(TREE_TYPE(nopexpr));
+   }else  if(nopexprTypeCode==POINTER_TYPE && TREE_CODE(op)==PARM_DECL){
+      return class_util_get_class_name/*!class_util_get_class_name_by_pointer*/(TREE_TYPE(nopexpr));
+   }else if(nopexprTypeCode==POINTER_TYPE && TREE_CODE(op)==POINTER_PLUS_EXPR){
+      printf("class_util 从设setNopExpr POINTER_PLUS_EXPR-----不处理 \n");
+   }else if(nopexprTypeCode==POINTER_TYPE && TREE_CODE(op)==ADDR_EXPR){
+      return class_util_get_class_name/*!class_util_get_class_name_by_pointer*/(TREE_TYPE(nopexpr));
+   }
+   return NULL;
 }
 
 static char* getClassFromAddrExpr(tree addrexpr)
 {
-	   char *className=NULL;
-	   enum tree_code  addrexprTypeCode=TREE_CODE(TREE_TYPE(addrexpr));
-	   tree op=TREE_OPERAND (addrexpr, 0);
-	   if(addrexprTypeCode==POINTER_TYPE && TREE_CODE(op)==VAR_DECL){
-		  className=class_util_get_class_name_by_pointer(TREE_TYPE(addrexpr));
-		  printf("class_ref getClassFromAddrExpr 00 op是 VAR_DECL %s %s class:%s\n",get_tree_code_name(addrexprTypeCode),
-				  get_tree_code_name(TREE_CODE(op)),className);
-	   }else if(addrexprTypeCode==POINTER_TYPE && TREE_CODE(op)==COMPONENT_REF){
-		  tree var=TREE_OPERAND (op, 1);
-		  if(TREE_CODE(var)==FIELD_DECL){
-			  tree type=TREE_TYPE(var);
-			   className=class_util_get_class_name_by_record(type);
-			  printf("class_ref getClassFromAddrExpr 11 op是 COMPONENT_REF %s %s class:%s\n",get_tree_code_name(addrexprTypeCode),
-						  get_tree_code_name(TREE_CODE(op)),className);
-		  }
-	   }else if(addrexprTypeCode==POINTER_TYPE && TREE_CODE(op)==ARRAY_REF){
-		    tree type=TREE_TYPE(op);
-			if(TREE_CODE(type)==RECORD_TYPE){
-			   className=class_util_get_class_name_by_record(type);
-				  printf("class_ref getClassFromAddrExpr 22 op是 ARRAY_REF %s %s class:%s\n",get_tree_code_name(addrexprTypeCode),
-								  get_tree_code_name(TREE_CODE(op)),className);
-			}
-	   }
+   char *className=NULL;
+   enum tree_code  addrexprTypeCode=TREE_CODE(TREE_TYPE(addrexpr));
+   tree op=TREE_OPERAND (addrexpr, 0);
+   if(addrexprTypeCode==POINTER_TYPE && TREE_CODE(op)==VAR_DECL){
+      className=class_util_get_class_name/*!class_util_get_class_name_by_pointer*/(TREE_TYPE(addrexpr));
+      printf("class_ref getClassFromAddrExpr 00 op是 VAR_DECL %s %s class:%s\n",
+            get_tree_code_name(addrexprTypeCode),get_tree_code_name(TREE_CODE(op)),className);
+   }else if(addrexprTypeCode==POINTER_TYPE && TREE_CODE(op)==COMPONENT_REF){
+      tree var=TREE_OPERAND (op, 1);
+      if(TREE_CODE(var)==FIELD_DECL){
+         tree type=TREE_TYPE(var);
+         className=class_util_get_class_name/*!class_util_get_class_name_by_record*/(type);
+         printf("class_ref getClassFromAddrExpr 11 op是 COMPONENT_REF %s %s class:%s\n",
+               get_tree_code_name(addrexprTypeCode),get_tree_code_name(TREE_CODE(op)),className);
+      }
+   }else if(addrexprTypeCode==POINTER_TYPE && TREE_CODE(op)==ARRAY_REF){
+      tree type=TREE_TYPE(op);
+      if(TREE_CODE(type)==RECORD_TYPE){
+         className=class_util_get_class_name/*!class_util_get_class_name_by_record*/(type);
+         printf("class_ref getClassFromAddrExpr 22 op是 ARRAY_REF %s %s class:%s\n",get_tree_code_name(addrexprTypeCode),
+         get_tree_code_name(TREE_CODE(op)),className);
+      }
+   }
 
-	   return className;
+   return className;
 }
 
 static char* getClassFromComponentRef(tree componentRef)
 {
-	   char *className=NULL;
-	   tree op=TREE_OPERAND (componentRef, 1);
-	   if(TREE_CODE(op)==FIELD_DECL){
-		   tree type=TREE_TYPE(op);
-		   className=class_util_get_class_name_by_pointer(type);
-	   }
-       return className;
+   char *className=NULL;
+   tree op=TREE_OPERAND (componentRef, 1);
+   if(TREE_CODE(op)==FIELD_DECL){
+      tree type=TREE_TYPE(op);
+      className=class_util_get_class_name/*!class_util_get_class_name_by_pointer*/(type);
+   }
+   return className;
 }
 
 static char *getClass(tree exprValue)
@@ -548,7 +480,7 @@ static char *getClass(tree exprValue)
   char *className=NULL;
   if(TREE_CODE(exprValue)==VAR_DECL || TREE_CODE(exprValue)==PARM_DECL){
       tree pointerType=TREE_TYPE(exprValue);
-	  return class_util_get_class_name_by_pointer(pointerType);
+	  return class_util_get_class_name/*!class_util_get_class_name_by_pointer*/(pointerType);
   }else if(TREE_CODE(exprValue)==NOP_EXPR){
 	  className=getClassFromNopExpr(exprValue);
 	  printf("class_ref exprValue 是NOP_EXPR %s className:%s\n",get_tree_code_name(TREE_CODE(exprValue)),className);
@@ -564,7 +496,7 @@ static char *getClass(tree exprValue)
 	  printf("class_ref exprValue 是引用 %s className:%s\n",get_tree_code_name(TREE_CODE(exprValue)),className);
   }else if(TREE_CODE(exprValue)==CALL_EXPR){
 	  aet_print_tree(TREE_TYPE(exprValue));
-	  return class_util_get_class_name_by_pointer(TREE_TYPE(exprValue));
+	  return class_util_get_class_name/*!class_util_get_class_name_by_pointer*/(TREE_TYPE(exprValue));
   }
   return className;
 }
@@ -1012,14 +944,7 @@ nboolean   class_util_have_error()
    return errors>0;
 }
 
-
 //////////////////////////返回类型名---------------------
-#include "config.h"
-#include "system.h"
-#include "coretypes.h"
-#include "tree.h"
-#include "c-family/c-pretty-print.h"
-
 /* 判断 type 是否是用户写的 typedef */
 static bool is_typedef_p (tree type)
 {
@@ -1120,5 +1045,30 @@ char *class_util_get_fndecl_type_name (tree fndecl)
    }
    pp_c_right_paren (&pp);
    return xstrdup (pp_formatted_text (&pp));
+}
+
+/**
+ * 创建call_expr
+ * 对应的代码：obj->unref()
+ * decl是指针类型
+ */
+tree class_util_build_unref_call(location_t loc, tree decl)
+{
+   ClassInfo *rootInfo = class_mgr_get_root(class_mgr_get());
+   tree aobjectType = rootInfo->record;
+   tree aobjectPtrType = build_pointer_type(aobjectType);
+   // 将对象指针转换为 AObject *
+   tree obj = fold_convert(aobjectPtrType, decl);
+   // 获取 AObject 中的 unref 字段
+   ClassFunc *unrefFunc = func_mgr_get_unref(func_mgr_get());
+   tree unref_field = unrefFunc->fieldDecl;
+   // obj->unref
+   tree deref = build_indirect_ref (loc, obj, RO_ARROW);
+   tree fn = build_component_ref(loc, deref, DECL_NAME(unref_field),loc,loc);
+   tree fntype = TREE_TYPE(TREE_TYPE(fn));          // 真正的函数类型
+   tree ret_type = TREE_TYPE(fntype);               // 通常是 void
+   tree args[1] = { obj };
+   tree cleanup_expr = build_call_array_loc(loc, ret_type, fn, 1, args);
+   return cleanup_expr;
 }
 

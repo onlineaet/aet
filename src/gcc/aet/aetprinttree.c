@@ -160,187 +160,140 @@ static void printNode(tree node)
 
 void  aet_print_specs_from(struct c_declspecs *specs,char *file,char *func,int linen)
 {
-	if(!n_log_is_debug())
-	   return ;
-    nboolean re=n_log_is_debug_file(file,func);
-    if(!re){
-	  return;
-    }
-	char line[20];
-	sprintf(line,"%d",linen);
-    tree_debug(file,func,line,"打印 c_declspecs 开始。:%p",specs);
-	location_t locations[cdw_number_of_elements];
-    location_t loc;
-    expanded_location xloc;
-    int countStrogeClass=0;
-    int countType=0;
-	if(specs->storage_class != csc_none){
-		loc=specs->locations[cdw_storage_class];//用一个枚举作为数组index c-tree.h中定义
-	    xloc = expand_location(loc);
-		tree_info(file,func,line,"是存储类型的声明说明符 count:%d %s %s %d %d\n",countStrogeClass++,
-		        aet_print_get_storage_class_string(specs->storage_class),xloc.file, xloc.line, xloc.column);
+   if(!n_log_is_debug() || !n_log_is_debug_file(file,func))
+      return;
 
-	}
-    if(specs->inline_p){
-		loc=specs->locations[cdw_inline];
-		xloc = expand_location(loc);
-		tree_info(file,func,line,"是存储类型的声明说明符 INLINE count:%d  %s %d %d\n",countStrogeClass++,xloc.file, xloc.line, xloc.column);
-    }
-    if(specs->noreturn_p){
-		loc=specs->locations[cdw_noreturn];
-		xloc = expand_location(loc);
-		tree_info(file,func,line,"是存储类型的声明说明符 NORETURN count:%d  %s %d %d\n",countStrogeClass++,xloc.file, xloc.line, xloc.column);
-	}
-    if(specs->thread_p){
-		loc=specs->locations[cdw_thread];
-		xloc = expand_location(loc);
-		tree_info(file,func,line,"是存储类型的声明说明符 THREAD count:%d  %s %d %d\n",countStrogeClass++,xloc.file, xloc.line, xloc.column);
-	}
+   char line[20];
+   sprintf(line,"%d",linen);
+   tree_debug(file,func,line,"打印 c_declspecs 开始。:%p",specs);
+   location_t locations[cdw_number_of_elements];
+   location_t loc;
+   expanded_location xloc;
+   int countStrogeClass=0;
+   int countType=0;
+   if(specs->storage_class != csc_none){
+      loc=specs->locations[cdw_storage_class];//用一个枚举作为数组index c-tree.h中定义
+      xloc = expand_location(loc);
+      tree_info(file,func,line,"是存储类型的声明说明符 count:%d %s %s %d %d\n",countStrogeClass++,
+      aet_print_get_storage_class_string(specs->storage_class),xloc.file, xloc.line, xloc.column);
+   }
+   if(specs->inline_p){
+      loc=specs->locations[cdw_inline];
+      xloc = expand_location(loc);
+      tree_info(file,func,line,"是存储类型的声明说明符 INLINE count:%d  %s %d %d\n",
+            countStrogeClass++,xloc.file, xloc.line, xloc.column);
+   }
+   if(specs->noreturn_p){
+      loc=specs->locations[cdw_noreturn];
+      xloc = expand_location(loc);
+      tree_info(file,func,line,"是存储类型的声明说明符 NORETURN count:%d  %s %d %d\n",
+            countStrogeClass++,xloc.file, xloc.line, xloc.column);
+   }
+   if(specs->thread_p){
+      loc=specs->locations[cdw_thread];
+      xloc = expand_location(loc);
+      tree_info(file,func,line,"是存储类型的声明说明符 THREAD count:%d  %s %d %d\n",
+            countStrogeClass++,xloc.file, xloc.line, xloc.column);
+   }
 
-    //类型说明符
-    char *typespec_kind_str=NULL;
-    if(specs->typespec_kind!=ctsk_none){
-    	typespec_kind_str=aet_c_typespec_kind_str[specs->typespec_kind];
-		loc=specs->locations[cdw_typespec];
-	     xloc = expand_location(loc);
-	     tree_info(file,func,line,"是类型的声明说明符  typespec_word:%s count:%d  typespec_kind:%s %s %d %d\n",
-				aet_c_typespec_keyword_str[specs->typespec_word],countType++,typespec_kind_str,xloc.file, xloc.line, xloc.column);
-	}
-    if(specs->long_p){
-		loc=specs->locations[cdw_long];
-	    xloc = expand_location(loc);
-	    tree_info(file,func,line,"是类型的声明说明符 RID_LONG  count:%d  typespec_kind:%s %s %d %d\n",
-	    		countType++,typespec_kind_str,xloc.file, xloc.line, xloc.column);
-    }
+   //类型说明符
+   char *typespec_kind_str=NULL;
+   if(specs->typespec_kind!=ctsk_none){
+      typespec_kind_str=aet_c_typespec_kind_str[specs->typespec_kind];
+      loc=specs->locations[cdw_typespec];
+      xloc = expand_location(loc);
+      tree_info(file,func,line,"是类型的声明说明符  typespec_word:%s count:%d  typespec_kind:%s %s %d %d\n",
+            aet_c_typespec_keyword_str[specs->typespec_word],countType++,
+            typespec_kind_str,xloc.file, xloc.line, xloc.column);
+   }
+   if(specs->long_p){
+      loc=specs->locations[cdw_long];
+      xloc = expand_location(loc);
+      tree_info(file,func,line,"是类型的声明说明符 RID_LONG  count:%d  typespec_kind:%s %s %d %d\n",
+               countType++,typespec_kind_str,xloc.file, xloc.line, xloc.column);
+   }
 
-    if(specs->short_p){
-		loc=specs->locations[cdw_short];
-	    xloc = expand_location(loc);
-	    tree_info(file,func,line,"是类型的声明说明符 RID_SHORT  count:%d  typespec_kind:%s %s %d %d\n",countType++,typespec_kind_str,xloc.file, xloc.line, xloc.column);
-    }
+   if(specs->short_p){
+      loc=specs->locations[cdw_short];
+      xloc = expand_location(loc);
+      tree_info(file,func,line,"是类型的声明说明符 RID_SHORT  count:%d  typespec_kind:%s %s %d %d\n",
+            countType++,typespec_kind_str,xloc.file, xloc.line, xloc.column);
+   }
 
-    if(specs->signed_p){
-		loc=specs->locations[cdw_signed];
-	    xloc = expand_location(loc);
-	    tree_info(file,func,line,"是类型的声明说明符 RID_SIGNED  count:%d  typespec_kind:%s %s %d %d\n",
-	    		countType++,typespec_kind_str,xloc.file, xloc.line, xloc.column);
-    }
+   if(specs->signed_p){
+      loc=specs->locations[cdw_signed];
+      xloc = expand_location(loc);
+      tree_info(file,func,line,"是类型的声明说明符 RID_SIGNED  count:%d  typespec_kind:%s %s %d %d\n",
+            countType++,typespec_kind_str,xloc.file, xloc.line, xloc.column);
+   }
 
-    if(specs->unsigned_p){
-		loc=specs->locations[cdw_unsigned];
-	    xloc = expand_location(loc);
-	    tree_info(file,func,line,"是类型的声明说明符 RID_UNSIGNED  count:%d  typespec_kind:%s %s %d %d\n",
-	    		countType++,typespec_kind_str,xloc.file, xloc.line, xloc.column);
-    }
+   if(specs->unsigned_p){
+      loc=specs->locations[cdw_unsigned];
+      xloc = expand_location(loc);
+      tree_info(file,func,line,"是类型的声明说明符 RID_UNSIGNED  count:%d  typespec_kind:%s %s %d %d\n",
+            countType++,typespec_kind_str,xloc.file, xloc.line, xloc.column);
+   }
 
-    if(specs->complex_p){
-		loc=specs->locations[cdw_complex];
-	    xloc = expand_location(loc);
-		tree_info(file,func,line,"是类型的声明说明符 RID_COMPLEX  count:%d  typespec_kind:%s %s %d %d\n",
-				countType++,typespec_kind_str,xloc.file, xloc.line, xloc.column);
-    }
+   if(specs->complex_p){
+      loc=specs->locations[cdw_complex];
+      xloc = expand_location(loc);
+      tree_info(file,func,line,"是类型的声明说明符 RID_COMPLEX  count:%d  typespec_kind:%s %s %d %d\n",
+            countType++,typespec_kind_str,xloc.file, xloc.line, xloc.column);
+   }
 
-    if(specs->saturating_p){
-		loc=specs->locations[cdw_saturating];
-	    xloc = expand_location(loc);
-	    tree_info(file,func,line,"是类型的声明说明符 RID_SAT  count:%d  typespec_kind:%s %s %d %d\n",countType++,typespec_kind_str,xloc.file, xloc.line, xloc.column);
+   if(specs->saturating_p){
+      loc=specs->locations[cdw_saturating];
+      xloc = expand_location(loc);
+      tree_info(file,func,line,"是类型的声明说明符 RID_SAT  count:%d  typespec_kind:%s %s %d %d\n",
+            countType++,typespec_kind_str,xloc.file, xloc.line, xloc.column);
+   }
+
+   tree_debug(file,func,line,"c_declspecs的 type:");
+   printNode(specs->type);
+   tree_debug(file,func,line,"c_declspecs的 expr:");
+   printNode(specs->expr);
+   tree_debug(file,func,line,"c_declspecs的 decl_attr:");
+   printNode(specs->decl_attr);
+   tree_debug(file,func,line,"c_declspecs的 attrs:");
+   printNode(specs->attrs);
+   tree_debug(file,func,line,"打印 c_declspecs 结束。:%p",specs);
+}
+
+static void print_arg_info( struct c_arg_info *arginfo )
+{
+    if(!arginfo)
+       return;
+    if(arginfo->types){
+       printNode(arginfo->types);
+       printNode(arginfo->parms);
     }
-    tree_debug(file,func,line,"c_declspecs的 type:");
-    printNode(specs->type);
-    tree_debug(file,func,line,"c_declspecs的 expr:");
-    printNode(specs->expr);
-    tree_debug(file,func,line,"c_declspecs的 decl_attr:");
-    printNode(specs->decl_attr);
-    tree_debug(file,func,line,"c_declspecs的 attrs:");
-    printNode(specs->attrs);
-    tree_debug(file,func,line,"打印 c_declspecs 结束。:%p",specs);
 }
 
 void     aet_print_declarator_from(struct c_declarator *declarator,char *file,char *func,int linen)
 {
-    if(!n_log_is_debug())
-       return ;
-    nboolean re=n_log_is_debug_file(file,func);
-    if(!re){
-       return;
-    }
-	char line[20];
-	sprintf(line,"%d",linen);
-	enum c_declarator_kind kind=declarator->kind;
-	printf("第一个是 kind:%d %s declarator:%p\n",kind,aet_c_declarator_kind_str[kind],declarator);
-	if(kind==cdk_pointer){
-		struct c_declarator *second=declarator->declarator;
-		enum c_declarator_kind secondKind=second->kind;
-		printf("当declarator是指针类型，指向的是 %s 第二个是  kind:%d %s second:%p\n",aet_c_declarator_kind_str[kind],secondKind,aet_c_declarator_kind_str[secondKind],second);
-		if(secondKind==cdk_function){
-			struct c_declarator *three=second->declarator;
-			enum c_declarator_kind threeKind=three->kind;
-			printf("第一个是  %s 第二个是  kind:%s 第三个是:%d %s\n",
-					aet_c_declarator_kind_str[kind],aet_c_declarator_kind_str[secondKind],threeKind,aet_c_declarator_kind_str[threeKind]);
-			if(threeKind==cdk_pointer){
-				struct c_declarator *four=three->declarator;
-				enum c_declarator_kind foureKind=four->kind;
-				printf("第四个是 kind:%d %s\n",four,aet_c_declarator_kind_str[foureKind]);
-			}
-		}else if(secondKind==cdk_pointer){
-			struct c_declarator *three=second->declarator;
-		    enum c_declarator_kind threeKind=three->kind;
-			printf("第一个是x  %s 第二个是  kind:%s 第三个是:%d %s\n",
-								aet_c_declarator_kind_str[kind],aet_c_declarator_kind_str[secondKind],threeKind,aet_c_declarator_kind_str[threeKind]);
-						if(threeKind==cdk_pointer){
-							struct c_declarator *four=three->declarator;
-							enum c_declarator_kind foureKind=four->kind;
-							printf("第四个是x kind:%d %s\n",four,aet_c_declarator_kind_str[foureKind]);
-						}else if(threeKind==cdk_function){
+   if(!n_log_is_debug() || !n_log_is_debug_file(file,func))
+      return ;
 
-						}
-		}
-	}
-
-	int i;
-	struct c_declarator *temp=declarator;
-	for(i=0;i<100;i++){
-		if(temp!=NULL){
-		   enum c_declarator_kind kind=temp->kind;
-		   printf("第%d个 %d %s declarator:%p\n",i,kind,aet_c_declarator_kind_str[kind],temp);
-		   printNode(temp->u.id.id);
-		   printf("arg_info:%p\n",temp->u.arg_info);
-		   temp=temp->declarator;
-		}else{
-			break;
-		}
-	}
-//	struct c_arg_info {
-//	  /* A list of parameter decls.  */
-//	  tree parms;
-//	  /* A list of structure, union and enum tags defined.  */
-//	  vec<c_arg_tag, va_gc> *tags;
-//	  /* A list of argument types to go in the FUNCTION_TYPE.  */
-//	  tree types;
-//	  /* A list of non-parameter decls (notably enumeration constants)
-//	     defined with the parameters.  */
-//	  tree others;
-//	  /* A compound expression of VLA sizes from the parameters, or NULL.
-//	     In a function definition, these are used to ensure that
-//	     side-effects in sizes of arrays converted to pointers (such as a
-//	     parameter int i[n++]) take place; otherwise, they are
-//	     ignored.  */
-//	  tree pending_sizes;
-//	  /* True when these arguments had [*].  */
-//	  BOOL_BITFIELD had_vla_unspec : 1;
-//	};
-
-	if(kind==cdk_function){
-  	    struct c_arg_info *argInfo=declarator->u.arg_info;
-  	    printf("打印 declarator中的 c_arg_info\n");
-  	    printf("others---\n");
-  	    printNode(argInfo->others);
-  	    printNode(argInfo->pending_sizes);
-  	    if(argInfo->tags){
-  	    	int len=vec_safe_length(argInfo->tags);
-  	    	printf("tags is :%d\n",len);
-  	    }
-	}
+   char line[20];
+   sprintf(line,"%d",linen);
+   struct c_declarator *temp = declarator;
+   int count=0;
+   while (temp){
+      enum c_declarator_kind kind=temp->kind;
+      tree id = temp->u.id.id;
+      printf("declarator info:%d kind:%d %s pointer_quals:%d\n",
+            count,kind,aet_c_declarator_kind_str[kind],temp->u.pointer_quals);
+      if(kind == cdk_function){
+         struct c_arg_info *arginfo = temp->u.arg_info;
+         printf("declarator 打印 function 类型的参数 c_arg_info: %d\n",count);
+         print_arg_info(arginfo);
+      }
+      if(kind == cdk_id){
+         printf("declarator 打印 id: %d %s\n",count,IDENTIFIER_POINTER(id));
+      }
+      temp = temp->declarator;
+      count++;
+   }
 }
 
 static bool tree_node_has_type (tree t)

@@ -84,7 +84,7 @@ static nboolean initStackFieldObject(NewField *self,tree var)
    }
    aet_utils_add_token_with_location(parse_in,codes->str,codes->len,ctorLoc);
    n_debug("initStackFieldObject 11 源代码:\n%s\n",codes->str);
-   n_string_free(codes,TRUE);
+   n_string_free(codes,FALSE);
    setVarProperties(self,NEW_OBJECT_LOCAL);
    return TRUE;
 }
@@ -116,6 +116,7 @@ static nboolean initHeapFieldObject(NewField *self,tree var)
    }
    if(ctorLoc==0){
       error_at(input_location,"initHeapFieldObject 不应该出现的错误，构造函数的位置是零，报告此错误。");
+      free(tempVarName);
       return FALSE;
    }
    tree mtcsPlatType= c_aet_get_mtcs_plat_type(field);
@@ -125,8 +126,9 @@ static nboolean initHeapFieldObject(NewField *self,tree var)
          className,ctorStr,codes,TRUE,mtcsPlatType,TRUE);
    aet_utils_add_token_with_location(parse_in,codes->str,codes->len,ctorLoc);
    n_debug("initHeapFieldObject 11 源代码:\n%s\n",codes->str);
-   n_string_free(codes,TRUE);
+   n_string_free(codes,FALSE);
    setVarProperties(self,NEW_OBJECT_LOCAL);
+   free(tempVarName);
    return TRUE;
 }
 
@@ -152,7 +154,8 @@ nboolean new_field_modify_object(NewField *self,tree var)
 			n_warning("new_field_modify_object 变量的类型与new$的类型不一样。%s %s",varSysClassName,ctorSysClassName);
 		}
 		ClassName *className=class_mgr_clone_class_name(class_mgr_get(),ctorSysClassName);
-		char *tempVarName=class_util_create_new_object_temp_var_name(className->sysName,CREATE_OBJECT_METHOD_FIELD_STACK);
+		char *tempVarName=class_util_create_new_object_temp_var_name(className->sysName,
+		      CREATE_OBJECT_METHOD_FIELD_STACK);
 		tree id=aet_utils_create_ident(tempVarName);
 		tree varDecl=build_decl(loc, VAR_DECL, id, pointerType);
 		//转地址
@@ -172,7 +175,7 @@ nboolean new_field_modify_object(NewField *self,tree var)
 		tree mtcsPlatType=build_int_cst(unsigned_type_node,0);
 		c_aet_set_ctor(varDecl,ctor,ctorSysClassNameTree,ctorLoc,mtcsPlatType);
 		initStackFieldObject(self,varDecl);
-		n_free(tempVarName);
+      free(tempVarName);
 	}else if(TREE_CODE(type)==POINTER_TYPE){
 		initHeapFieldObject(self,var);
 	}

@@ -86,8 +86,6 @@ struct _ClassImpl
 
 ClassImpl    *class_impl_get();
 void          class_impl_parser(ClassImpl *self);
-nboolean      class_impl_add_self_to_param(ClassImpl *self);
-nboolean      class_impl_add_static_to_declspecs(ClassImpl *self,location_t loc,struct c_declspecs *specs);
 struct c_expr class_impl_process_expression(ClassImpl *self,struct c_expr expr,location_t loc,
                      GenericModel *genericDefineModel,tree id,nboolean fun,int *action);
 struct c_expr class_impl_replace_func_id(ClassImpl *self,struct c_expr expr,vec<tree, va_gc> *exprlist,
@@ -113,9 +111,6 @@ void           class_impl_finish_function(ClassImpl *self,tree fndecl,location_t
 //如果是对象变量加入到objectreturn中处理，如果是转化由objectreturn处理并返回
 tree           class_impl_add_return(ClassImpl *self,location_t loc,tree retExpr,tree exprOrigType);
 
-void           class_impl_in_finish_decl(ClassImpl *self ,location_t loc,tree decl);
-void           class_impl_in_finish_stmt(ClassImpl *self ,location_t loc,tree stmt);
-
 void           class_impl_compile_over(ClassImpl *self);
 struct c_expr  class_impl_parser_object(ClassImpl *self);//解析__OBJECT__
 tree           class_impl_build_deref(ClassImpl *self,location_t loc,
@@ -131,39 +126,39 @@ tree           class_impl_build_deref(ClassImpl *self,location_t loc,
  * 如何知道有多个strHashFunc静态函数时，该选择那一个呢？
  * 用var的参数和strHashFunc生成mangle的函数名，然后再通过funcmgr查找。
  */
-tree            class_impl_modify_or_init_func_pointer(ClassImpl *self,location_t loc,tree lhs,
+tree           class_impl_modify_or_init_func_pointer(ClassImpl *self,location_t loc,tree lhs,
                   tree rhs,tree rhsOrigType,nboolean isModify);
 /**
  * 是不是Abc.xxxx表达式
  */
-nboolean        class_impl_is_class_dot_expression(ClassImpl *self);
-ClassName      *class_impl_get_class_name(ClassImpl *self);
+nboolean       class_impl_is_class_dot_expression(ClassImpl *self);
+ClassName     *class_impl_get_class_name(ClassImpl *self);
 
-struct c_expr   class_impl_nameless_call(ClassImpl *self,struct c_expr expr);
-nboolean        class_impl_replace_self_call_at_statement_after_labels(ClassImpl *self);
-struct c_expr   class_impl_varof_parser(ClassImpl *self,struct c_expr lhs);//解析关键字varof$
-nboolean        class_impl_parser_package_dot_class(ClassImpl *self);//解析com.ai.NLayer
+nboolean       class_impl_replace_self_call_at_statement_after_labels(ClassImpl *self);
+nboolean       class_impl_parser_package_dot_class(ClassImpl *self);//解析com.ai.NLayer
 
-void            class_impl_add_implicitly_actual_param(ClassImpl *self,tree funcCall,
+void           class_impl_add_implicitly_actual_param(ClassImpl *self,tree funcCall,
                              vec<tree, va_gc> *exprlist,  vec<tree, va_gc> *origtypes);
 /**
  * 参数 userCallFuncDecl 源程序中调用的函数声明，如 self->setData setData是一个函数的声明名称。
  * 参数 call 用函数声明setData生成的call语句。setData有可能会变成类中混淆过的函数名
  */
-tree            class_impl_record_mtcs_call(ClassImpl *self,location_t loc,tree userCallFuncDecl,
+tree           class_impl_record_mtcs_call(ClassImpl *self,location_t loc,tree userCallFuncDecl,
                            tree call,ClassFunc *classFunc,int refObjectMethod,vec<tree, va_gc> *exprlist);
 
-GenericModel   *class_impl_get_func_generic_mode(ClassImpl *self);
+GenericModel  *class_impl_get_func_generic_mode(ClassImpl *self);
 
 /**
  * 原型 push_parm_decl c-tree.h c-decl.cc
  * 原 push_parm_decl 没有返回decl
  */
-tree class_impl_push_parm_decl(ClassImpl *self,const struct c_parm *parm, tree *expr);
+tree           class_impl_push_parm_decl(ClassImpl *self,const struct c_parm *parm, tree *expr);
 /**
- * 是否需要必变类中的函数定义为全局函数
+ * 是否需要类中的函数定义为全局函数
  */
-nboolean class_impl_can_global(ClassImpl *self,tree fndecl);
+nboolean       class_impl_can_global(ClassImpl *self,tree fndecl);
+
+void           class_impl_add_static_to_declspecs(ClassImpl *self,location_t loc,struct c_declspecs *specs);
 
 #endif
 

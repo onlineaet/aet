@@ -288,16 +288,6 @@ char *var_mgr_define_class_static_var(VarMgr *self,ClassName *implClassName)
 	}
 	//printf("var is :%s\n",codes->str);
 	return  n_string_free(codes,FALSE);
-
-	//在这里编译代码报错误：重复的‘static’
-//	c_token *t=c_parser_peek_token (self->parser->parser);
-//	aet_print_token(t);
-//	if(codes->len>0){
-//		//要编译与下内容
-//		printf("要编译与下内容 %s\n",codes->str);
-//	    aet_utils_add_token(parse_in,codes->str,codes->len);
-//	}
-//	n_string_free(codes,TRUE);
 }
 
 //生成新的变量名

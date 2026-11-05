@@ -25,6 +25,7 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 
 #include "c-aet.h"
 #include "aetparser.h"
+#include "classinfo.h"
 
 typedef void (* TargetIntrinsicFunc) (tree fndecl,void *userData);
 
@@ -61,6 +62,7 @@ void     parser_static_replace_dimension(ParserStatic *self,struct c_declarator 
 
 void     parser_static_set_func(ParserStatic *self,TargetIntrinsicFunc func,void *userData);
 
+void parser_static_add_aclass(ParserStatic *self,NString *codes,ClassName *className);
 
 #endif
 

@@ -26,7 +26,6 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 #include "aetmangle.h"
 #include "aetparser.h"
 
-
 typedef struct _ClassFinalize ClassFinalize;
 /* --- structures --- */
 struct _ClassFinalize
@@ -34,18 +33,14 @@ struct _ClassFinalize
 	AetParser *parser;
 };
 
-
 ClassFinalize *class_finalize_new();
-
-
-nboolean  class_finalize_parser(ClassFinalize *self,ClassName *className);
 nboolean  class_finalize_have_field(ClassFinalize *self,ClassName *className);
 nboolean  class_finalize_have_define(ClassFinalize *self,ClassName *className);
 tree      class_finalize_create_finalize_decl(ClassFinalize *self,ClassName *className,tree structType);
 tree      class_finalize_create_unref_decl(ClassFinalize *self,ClassName *className,tree structType);
 void      class_finalize_build_finalize_define(ClassFinalize *self,ClassName *className);
 nboolean  class_finalize_build_unref_define(ClassFinalize *self,location_t loc,ClassName *className);
-
+nboolean  class_finalize_parser_by_specs(ClassFinalize *self,ClassName *className,struct c_declspecs *specs);
 
 #endif
 

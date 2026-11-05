@@ -632,7 +632,8 @@ void iface_impl_compile(IfaceImpl *self,char *tokenString)
          n_string_append(codes,staticVar);
          n_free(staticVar);
       }
-      char *createAClassFunc=class_build_create_codes(classParser->classBuild,ifaceName);
+      char *createAClassFunc=class_build_create_get_aclass_codes(classParser->classBuild,ifaceName);
+      //printf("iface_impl_compile -- %s\n",createAClassFunc);
       if(createAClassFunc){
          n_string_append(codes,createAClassFunc);
          n_free(createAClassFunc);
@@ -660,9 +661,11 @@ void iface_impl_compile(IfaceImpl *self,char *tokenString)
    createGlobalVar(globalIfaceVarName,names->str,names->len);
    if(codes->len>0){
       n_debug("ifaceimpl.c 接口实现文件:%s 源代码:\n%s\n",in_fnames[0],codes->str);
-      aet_utils_add_token(parse_in,codes->str,codes->len);
+      aet_utils_add_token_free(parse_in,codes->str,codes->len);
+      n_string_free(codes,FALSE);
+   }else{
+      n_string_free(codes,TRUE);
    }
-   n_string_free(codes,TRUE);
 }
 
 /**
@@ -684,15 +687,16 @@ void iface_impl_compile_at_cfile(IfaceImpl *self,ClassInfo *classInfo)
               n_string_append(codes,staticVar);
               n_free(staticVar);
            }
-           char *createAClassFunc=class_build_create_codes(classParser->classBuild,ifaceName);
+           char *createAClassFunc=class_build_create_get_aclass_codes(classParser->classBuild,ifaceName);
+           printf("接口实现文件---%s\n",createAClassFunc);
            if(createAClassFunc){
               n_string_append(codes,createAClassFunc);
               n_free(createAClassFunc);
            }
            class_init_create_init_define_for_interface(classParser->classInit,ifaceName->sysName,codes);
            access_controls_add_impl(access_controls_get(),ifaceName->sysName);//关键否则AClass的构造函数禁止访问。
-           aet_utils_add_token(parse_in,codes->str,codes->len);
-           n_string_free(codes,TRUE);
+           aet_utils_add_token_free(parse_in,codes->str,codes->len);
+           n_string_free(codes,FALSE);
       }
    }
 }

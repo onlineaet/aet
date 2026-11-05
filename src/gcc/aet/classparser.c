@@ -35,6 +35,7 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 #include "c-family/c-pragma.h"
 #include "gcc-rich-location.h"
 #include "opts.h"
+#include "c-family/c-common.h"
 #include "c/c-tree.h"
 #include "../libcpp/internal.h"
 #include "c/c-parser.h"
@@ -69,10 +70,13 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 #include "genericgraph.h"
 #include "genericcode.h"
 #include "makefileparm.h"
+#include "aetexpr.h"
+#include "classimpl.h"
 
 int enter_aet=0;
 
 static void restoreToken(ClassParser *self);
+static void backupToken(ClassParser *self);
 
 /**
  * 主要实现功能：
@@ -81,7 +85,7 @@ static void restoreToken(ClassParser *self);
  *   int getName(int a)
  * }；
  * 1.把Class Abc{分两二步替换为 typedef struct _Abc Abc 然后 再Class _Abc，
- *    struct 是一个类型声明说明符class_parser_parser_class_specifier 然后再调declspecs_add_type
+ *    struct 是一个类型声明说明符class_parser_parser_class 然后再调declspecs_add_type
  * 2.把Abc替换为_Abc
  * 4.把 int getName()变成 int (*getName)();主要是把struct c_parser中的tokens_buf改为从原来的2改为5
  *   并添加 ( * )三个token
@@ -142,84 +146,6 @@ static void classParserInit(ClassParser *self)
    self->addAetHeader.running=FALSE;
 }
 
-/**
- * 把 getName( 重整为  getName(Abc *self
- */
-static void addSelfToField(c_parser *parser,ClassName *className,int openParenPos)
-{
-   c_token *who=c_parser_peek_nth_token (parser,openParenPos+1);
-   c_token *who1=c_parser_peek_nth_token (parser,openParenPos+2);
-   int tokenCount=parser->tokens_avail;
-   int i;
-   nboolean dhaoAfter=FALSE;//逗号加后面还是前面
-   if (who->keyword == RID_VOID  && who1->type == CPP_CLOSE_PAREN){
-      //printf("class_parser 进这里了---000 who->keyword == RID_VOID  && who1->type == CPP_CLOSE_PAREN %d openParenPos:%d\n",tokenCount,openParenPos);
-      //需要加2个token 因为 void被替换了
-      //getName(void) getName 1 ( 2 void 3 )4
-      parser->tokens_avail=tokenCount+2;
-      for(i=tokenCount;i>openParenPos+1;i--){
-         aet_utils_copy_token(&parser->tokens[i-1],&parser->tokens[i-1+2]);
-      }
-   }else{//()->(Abc *self)
-      //需要加2个token 因为 void被替换了
-      int offset=(who->type == CPP_CLOSE_PAREN)?3:4;
-      //printf("class_parser 进这里了---111 who->type == CPP_CLOSE_PAREN %d openParenPos:%d offset:%d\n",tokenCount,openParenPos,offset);
-      parser->tokens_avail=tokenCount+offset;
-      for(i=tokenCount;i>openParenPos;i--){
-         aet_utils_copy_token(&parser->tokens[i-1],&parser->tokens[i-1+offset]);
-      }
-      if(offset==4){
-         aet_utils_create_token(&parser->tokens[openParenPos+3],CPP_COMMA,",",1);
-         dhaoAfter=TRUE;
-      }
-   }
-   aet_utils_create_token(&parser->tokens[openParenPos+2],CPP_NAME,"self",4);
-   aet_utils_create_token(&parser->tokens[openParenPos+1],CPP_MULT,"*",1);
-   aet_utils_create_token(&parser->tokens[openParenPos],CPP_NAME,className->sysName,strlen(className->sysName));
-   parser->tokens[openParenPos].id_kind=C_ID_TYPENAME;//关键
-//   aet_print_token_in_parser("class_parser rearrangeMode className ---- sysName:%s userName:%s ",
-//         className->sysName,className->userName);
-}
-
-static void rearrangeMode(c_parser *parser,ClassName *className,int openParenPos)
-{
-   //第一步 把 getName(变成 (*getName(
-   c_token *who=c_parser_peek_nth_token (parser,openParenPos+1);
-   c_token *who1=c_parser_peek_nth_token (parser,openParenPos+2);
-   int i;
-   int tokenCount=parser->tokens_avail;
-   for(i=tokenCount;i>openParenPos-2;i--){
-      aet_utils_copy_token(&parser->tokens[i-1],&parser->tokens[i-1+2]);
-   }
-   aet_utils_create_token(&parser->tokens[openParenPos-2],CPP_OPEN_PAREN,"(",1);
-   aet_utils_create_token(&parser->tokens[openParenPos-1],CPP_MULT,"*",1);
-   parser->tokens_avail=tokenCount+2;
-   //第二步 把 (*getName(变成 (*getName)(
-   openParenPos+=2;
-   tokenCount=parser->tokens_avail;
-   for(i=tokenCount;i>openParenPos-1;i--){
-      aet_utils_copy_token(&parser->tokens[i-1],&parser->tokens[i-1+1]);
-   }
-   aet_utils_create_token(&parser->tokens[openParenPos-1],CPP_CLOSE_PAREN,")",1);
-   parser->tokens_avail=tokenCount+1;
-   openParenPos+=1;
-   addSelfToField(parser,className,openParenPos);
-}
-
-
-static void checkConstructor(c_parser *parser,c_token *token,ClassName *className,nboolean need)
-{
-   if(!need)
-      return;
-   tree ident = token->value;
-   const char *funName=IDENTIFIER_POINTER (ident);
-   if(strcmp(funName,className->userName)==0)
-      c_parser_error (parser, "除构造方法外，其它方法不能使用类名命名。");
-
-   if((strcmp(funName,"unref")==0 || strcmp(funName,"ref")==0)
-         && strcmp(className->userName,AET_ROOT_OBJECT))
-      c_parser_error (parser, "ref或unref函数名是系统保留的，不能覆盖。");
-}
 
 static nboolean isFieldFunc(ClassParser *self,tree field)
 {
@@ -286,11 +212,11 @@ static tree  c_parser_class_declaration (ClassParser *self,ClassInfo *classInfo,
    tree all_prefix_attrs;
    tree decls;
    location_t decl_loc;
-   ClassName *className=&classInfo->className;
-   nboolean needCheckConstructors=TRUE;
-   nboolean needCheckFinalize=TRUE;
-   tree fieldGeneric=NULL_TREE;//函数返回值或变量声明是否是泛型
-   tree funcGeneric=NULL_TREE; //是不是一个函数泛型
+   ClassName *className = &classInfo->className;
+   nboolean isConstructor = FALSE;//是不是一个构造函数
+   nboolean needCheckFinalize = TRUE;
+   tree fieldGeneric = NULL_TREE;//函数返回值或变量声明是否是泛型
+   tree funcGeneric = NULL_TREE; //是不是一个函数泛型
    GenericModel *fieldGenericModel=NULL;//函数返回值或变量声明是否是泛型
    GenericModel *funcGenericModel=NULL; //是不是一个函数泛型
    nboolean isIface=class_info_is_interface(classInfo);//是不是接口声明
@@ -315,7 +241,7 @@ static tree  c_parser_class_declaration (ClassParser *self,ClassInfo *classInfo,
       if(c_parser_next_token_is_keyword (parser, RID_AET_ENUM)){
          n_debug("class内的声明 22 static enum$ sysClassName:%s", className->sysName);
          //在class xx{
-             //static enum$ YYY
+         //   static enum$ YYY
          //}
          //当作是 enum$ YYY 处理，相当于static修饰无用 由 c_parser_declspecs解析关键字 enum$
          dr.isStatic=FALSE;
@@ -330,56 +256,19 @@ static tree  c_parser_class_declaration (ClassParser *self,ClassInfo *classInfo,
    }
 
    class_permission_set_decorate(self->classPermission,&dr);
-   if(c_parser_next_token_is (parser, CPP_NAME)){
-      aet_print_token(c_parser_peek_token (parser));
-      char *str=IDENTIFIER_POINTER(c_parser_peek_token (parser)->value);
-      location_t loc=c_parser_peek_token (parser)->location;
-//      nboolean isMtcsAttr=mtcs_parser_is_attribute(mtcs_parser_get(),c_parser_peek_token (parser));
-//      if(isMtcsAttr){
-//         n_debug("class内的声明 44 class_permission_set_decorate 11 mtcs_types_init");
-//         mtcs_parser_add_attribute(mtcs_parser_get());
-//      }
-      needCheckConstructors=!(class_ctor_parser_constructor(self->classCtor,className));
-//      if(!needCheckConstructors && isMtcsAttr){
-//          error_at(loc,"构造函数不能声明为核函数或设备函数");
-//      }
-      c_token *token=c_parser_peek_token (parser);
-      n_debug("class内的声明 55 是一个泛型吗  needCheckConstructors:%d %s\n",
-            needCheckConstructors,IDENTIFIER_POINTER(token->value));
-      if(generic_util_valid_id(token->value))
-         generic_impl_replace_token(generic_impl_get(),token);
-   }else if(c_parser_next_token_is (parser, CPP_COMPL)){
-      class_finalize_parser(self->classFinalize,className);
-   }
+
    //检查是不是泛型方法
    //格式如下：public$ <T> void getName(); <T>在函数返回值之前。
    if(c_parser_next_token_is (parser, CPP_LESS)){
       funcGenericModel=generic_model_new(TRUE,GEN_FROM_CLASS_DECL);
       self->currentFuncModel=funcGenericModel;
-      n_debug("class内的声明 66 可以是一个泛型函数。");
-      if(c_parser_next_token_is (parser, CPP_NAME)){
-         char *str=IDENTIFIER_POINTER(c_parser_peek_token (parser)->value);
-         location_t loc=c_parser_peek_token (parser)->location;
-//         nboolean isMtcsAttr=mtcs_parser_is_attribute(mtcs_parser_get(),c_parser_peek_token (parser));
-//         if(isMtcsAttr){
-//              mtcs_parser_add_attribute(mtcs_parser_get());
-//         }
-         needCheckConstructors=!(class_ctor_parser_constructor(self->classCtor,className));
-//         if(!needCheckConstructors && isMtcsAttr){
-//            error_at(loc,"构造函数不能声明为核函数或设备函数");
-//         }
-         c_token *token=c_parser_peek_token (parser);
-         n_debug("class内的声明 77 是一个泛型吗? %s\n",IDENTIFIER_POINTER(token->value));
-         if(generic_util_valid_id(token->value))
-            generic_impl_replace_token(generic_impl_get(),token);
-      }else if(c_parser_next_token_is (parser, CPP_COMPL)){
-         class_finalize_parser(self->classFinalize,className);
-      }
+      n_debug("class内的声明 55 可能是一个泛型函数。");
    }
 
    specs = build_null_declspecs ();
    decl_loc = c_parser_peek_token (parser)->location;
-   n_debug("class内的声明 88 建立空的声明说明符 sysClassName:%s", className->sysName);
+   n_debug("class内的声明 77 建立空的声明说明符 sysClassName:%s", className->sysName);
+
    if(c_parser_peek_token (parser)->type == CPP_PRAGMA){
       mark_valid_location_for_stdc_pragma (true);
       aet_parser_c_parser_pragma/*!c_parser_pragma*/(self->parser, 0, NULL,NULL_TREE);//pragma_struct=1
@@ -387,78 +276,45 @@ static tree  c_parser_class_declaration (ClassParser *self,ClassInfo *classInfo,
       return NULL_TREE;
    }
 
-   //在这里匹配的是public$  __global__  int   setData(void *data);
-//   if(mtcs_parser_is_attribute(mtcs_parser_get(),c_parser_peek_token (parser))){
-//      n_debug("class内的声明 99 token 是一个MTCS 属性 sysClassName:%s", className->sysName);
-//      mtcs_parser_add_attribute(mtcs_parser_get());
-//   }
    aet_parser_c_parser_declspecs/*!c_parser_declspecs*/(self->parser,
          specs, false, true, true,true, false, true, true, cla_nonabstract_decl);
+
    if (parser->error)
       return NULL_TREE;
    if (!specs->declspecs_seen_p){
-      c_parser_error (parser, "expected specifier-qualifier-list");
-      return NULL_TREE;
+      //检查是不是析构函数，用户代码 ~TFirst 不会有任何 specs出现
+      if(c_parser_next_token_is (parser, CPP_COMPL)){
+           if(!class_finalize_parser_by_specs(self->classFinalize,className,specs)){
+              c_parser_error (parser, "expected specifier-qualifier-list");
+              return NULL_TREE;
+           }
+      }else{
+         c_parser_error (parser, "expected specifier-qualifier-list");
+         return NULL_TREE;
+      }
    }
-   //在这里匹配的是public$  int  __global__  setData(void *data);
-//   if(mtcs_parser_is_attribute(mtcs_parser_get(),c_parser_peek_token (parser))){
-//        n_debug("class内的声明 100 token 是一个MTCS 属性 sysClassName:%s", className->sysName);
-//        mtcs_parser_add_attribute(mtcs_parser_get());
-//        aet_parser_c_parser_declspecs/*!c_parser_declspecs*/(self->parser,
-//              specs, false, true, true,true, false, true, true, cla_nonabstract_decl);
-//   }
+
    finish_declspecs (specs);
-   n_debug("class内的声明 101 到这里specs已有声明说明符了比如 int 完成finish_declspecs %p",specs);
+
    class_parser_complete_enum(self,specs,TRUE,dr.permission,className);
-   //    if(TREE_CODE(specs->type)==ENUMERAL_TYPE){
-   //         if(specs->typespec_kind==ctsk_tagdef){
-   //             n_debug("为类中的枚举加入类型声明 %s\n",className->sysName);
-   //             enum_parser_create_decl(enum_parser_get(),decl_loc,className,specs,dr.permission);
-   //        }
-   //    }
+   if(c_parser_next_token_is (parser, CPP_COMPL)){
+      if(!class_finalize_parser_by_specs(self->classFinalize,className,specs)){
+         printf("c_parser_class_declaration 析构函数xxx----error \n");
+      }
+   }
+
    /**
    * 检查函数返回类型的泛型
    * 如 Abc<E> *getAbc();
    * 或是变量声明的泛型如：
    * Abc<E> *abc;
+   * 在 aet_parser_c_parser_declspecs中会解析<E>并把结果存在 generic_impl中
    */
-   if(c_parser_next_token_is (parser, CPP_LESS)){
-      n_error("不会再进这里了，先保留c_parser_class_declaration");
-      fieldGenericModel=generic_model_new(TRUE,GEN_FROM_CLASS_DECL);
-   }else{
-      fieldGenericModel=generic_impl_pop_generic_from_declspecs(generic_impl_get(),specs);
-   }
-
-   /*如果next是* 然后下一个是 CPP_NAME 再下一个是"("说明这是一个返回指针的函数
-   *如果next是CPP_NAME 再下一个是"("说明是一个函数
-   * 把int getName 变成 int (*getName
-   */
-   if(c_parser_next_token_is (parser, CPP_MULT) && c_parser_peek_2nd_token(parser)->type==CPP_NAME
-   && !c_token_starts_typename(c_parser_peek_2nd_token(parser)) && c_parser_peek_nth_token(parser,3)->type==CPP_OPEN_PAREN){
-      /*匹配 * getName(*/
-      checkConstructor(parser,c_parser_peek_2nd_token(parser),className,needCheckConstructors);
-      rearrangeMode(parser,className,3);
-   }else  if(c_parser_next_token_is (parser, CPP_NAME) && c_parser_peek_2nd_token(parser)->type==CPP_OPEN_PAREN){
-      /*匹配 getName(*/
-      checkConstructor(parser,c_parser_peek_token(parser),className,needCheckConstructors);
-      rearrangeMode(parser,className,2);
-   }else if(c_parser_next_token_is (parser, CPP_MULT) && c_parser_peek_2nd_token(parser)->type==CPP_MULT &&
-      c_parser_peek_nth_token(parser,3)->type==CPP_NAME
-      && !c_token_starts_typename(c_parser_peek_nth_token(parser,3)) && c_parser_peek_nth_token(parser,4)->type==CPP_OPEN_PAREN){
-      checkConstructor(parser,c_parser_peek_nth_token(parser,3),className,needCheckConstructors);
-      /*匹配 ** getName(*/
-      rearrangeMode(parser,className,4);
-   }else if(c_parser_next_token_is (parser, CPP_MULT) && c_parser_peek_2nd_token(parser)->type==CPP_MULT
-      && c_parser_peek_nth_token(parser,3)->type==CPP_MULT
-      && c_parser_peek_nth_token(parser,4)->type==CPP_NAME
-      && !c_token_starts_typename(c_parser_peek_nth_token(parser,4)) && c_parser_peek_nth_token(parser,5)->type==CPP_OPEN_PAREN){
-      checkConstructor(parser,c_parser_peek_nth_token(parser,3),className,needCheckConstructors);
-      /*匹配 ** getName(*/
-      rearrangeMode(parser,className,5);
-   }
+   fieldGenericModel=generic_impl_pop_generic_from_declspecs(generic_impl_get(),specs);
+   isConstructor = class_ctor_parser_from_specs(self->classCtor,className,specs);
 
    if (c_parser_next_token_is (parser, CPP_SEMICOLON) || c_parser_next_token_is (parser, CPP_CLOSE_BRACE)){
-      n_debug("class内的声明 102 如果是CPP_SEMICOLON或CPP_CLOSE_BRACE 返回 ");
+      n_debug("class内的声明 99 如果是CPP_SEMICOLON或CPP_CLOSE_BRACE 返回 ");
       tree ret;
       if (specs->typespec_kind == ctsk_none){
          pedwarn (decl_loc, OPT_Wpedantic,"ISO C forbids member declarations with no members");
@@ -469,7 +325,7 @@ static tree  c_parser_class_declaration (ClassParser *self,ClassInfo *classInfo,
          structs or unions (which is [a] useful and [b] supports
          MS P-SDK).  */
          tree attrs = NULL;
-         n_debug("class内的声明 103 Support for unnamed structs ");
+         n_debug("class内的声明 100 Support for unnamed structs ");
          if(!RECORD_OR_UNION_TYPE_P (specs->type) && TREE_CODE(specs->type)==ENUMERAL_TYPE){
             // printf("在类%s中定义了枚举%s，但没有声明变量。\n",className->sysName,IDENTIFIER_POINTER(DECL_NAME(TYPE_NAME(specs->type))));
             // printf("在类%s中定义了枚举%s，但没有声明变量。\n",className->sysName,IDENTIFIER_POINTER(TYPE_NAME(specs->type)));
@@ -483,7 +339,9 @@ static tree  c_parser_class_declaration (ClassParser *self,ClassInfo *classInfo,
       self->currentFuncModel =NULL;
       return ret;
    }
-   n_debug("class内的声明 104 不是CPP_SEMICOLON或CPP_CLOSE_BRACE 继续");
+   n_debug("class内的声明 101 不是CPP_SEMICOLON或CPP_CLOSE_BRACE 继续");
+   aet_print_token(c_parser_peek_token (parser));
+
    /* Provide better error recovery.  Note that a type name here is valid,
    and will be treated as a field name.  */
    if (specs->typespec_kind == ctsk_tagdef
@@ -492,7 +350,6 @@ static tree  c_parser_class_declaration (ClassParser *self,ClassInfo *classInfo,
    && !c_parser_next_token_is (parser, CPP_NAME)){
       c_parser_error (parser, "expected %<;%>, identifier or %<(%>");
       parser->error = false;
-      n_debug("class内的声明 105 返回 NULL_TREE ");
       return NULL_TREE;
    }
    pending_xref_error ();
@@ -500,7 +357,6 @@ static tree  c_parser_class_declaration (ClassParser *self,ClassInfo *classInfo,
    all_prefix_attrs = prefix_attrs;
    specs->attrs = NULL_TREE;
    decls = NULL_TREE;
-   int testcount=0;
    while (true){
       /* Declaring one or more declarators or un-named bit-fields.  */
       struct c_declarator *declarator;
@@ -508,15 +364,13 @@ static tree  c_parser_class_declaration (ClassParser *self,ClassInfo *classInfo,
       if (c_parser_next_token_is (parser, CPP_COLON)){
          declarator = build_id_declarator (NULL_TREE);
       }else{
-         n_debug("class内的声明 106 一定进这里 这时peek token 声明符getName declarator 的id_loc可能会变很大。不正常！！，count:%d\n", testcount);
+         n_debug("class内的声明 102 一定进这里 这时peek token 声明符getName declarator 的id_loc可能会变很大。不正常！\n");
          //在这里token 是getName了
          declarator = aet_parser_c_parser_declarator/*!c_parser_declarator*/(self->parser,
                specs->typespec_kind != ctsk_none,C_DTR_NORMAL, &dummy);
-         n_debug("class内的声明 107 declarator:%p\n", declarator);
-
       }
       if (declarator == NULL){
-         n_debug("class内的声明 108 出错了 break count:%d", testcount);
+         n_debug("class内的声明 103 出错了 break");
          aet_parser_c_parser_skip_to_end_of_block_or_statement
             /*!c_parser_skip_to_end_of_block_or_statement*/(self->parser);
          break;
@@ -540,15 +394,16 @@ static tree  c_parser_class_declaration (ClassParser *self,ClassInfo *classInfo,
          if(!funcGenericModel && isQueryGenFunc){
             generic_query_add_parm_to_declarator(generic_query_get(),declarator);
          }
-         struct c_arg_info *temp = declarator->u.arg_info;
-         n_debug("class内的声明 109 并在这里改名 grokfield className:%s isQueryFunction:%d structTree:%p\n",
+
+         n_debug("class内的声明 104 重构declarator className:%s isQueryFunction:%d structTree:%p\n",
                className->sysName,isQueryGenFunc,structTree);
+         //满足域声明的条件，特别是函数名 declarator 之前要加入指针类型的  declarator,并加入self
+         func_mgr_add_self_to_declarator(func_mgr_get(),className,declarator,isConstructor,TRUE);
          int errInfo=0;
          ClassFunc *newFunc=func_mgr_change_class_func_decl(func_mgr_get(),
                declarator,className,structTree,&errInfo);
-         aet_print_tree(all_prefix_attrs);
          if(newFunc && errInfo==-2){
-            n_debug("class内的声明 110 在类中声明与接口重复的函数了----%s\n",className->sysName);
+            n_debug("class内的声明 105 在类中声明与接口重复的函数了----%s\n",className->sysName);
             if(self->state==CLASS_STATE_ABSTRACT){
                newFunc->isAbstract=TRUE;
             }else{
@@ -558,7 +413,7 @@ static tree  c_parser_class_declaration (ClassParser *self,ClassInfo *classInfo,
             return NULL_TREE;
          }
          if(!newFunc){
-            n_debug("class内的声明 110 不是函数是变量 说明符中有静态变量替换常量 %s\n",className->sysName);
+            n_debug("class内的声明 106 不是函数是变量 说明符中有静态变量替换常量 %s\n",className->sysName);
             parser_static_replace_dimension(parser_static_get(),declarator);
          }
 
@@ -567,14 +422,12 @@ static tree  c_parser_class_declaration (ClassParser *self,ClassInfo *classInfo,
          checkAndSetGeneric(self,d, fieldGenericModel,funcGenericModel,(newFunc && errInfo==0),declarator);
          DECL_CHAIN (d) = decls;
          decls = d;
-         n_debug("新----struct内的声明 88 并在这里改名 newFunc:%p",newFunc);
-         aet_print_tree(all_prefix_attrs);
-
+         n_debug("class内的声明 107 并在这里改名 newFunc:%p",newFunc);
          if(newFunc && errInfo==0)
             class_func_set_decl(newFunc,decls,STRUCT_DECL);
          else{//说明是变量
             char *varName=IDENTIFIER_POINTER(DECL_NAME(decls));
-            if(isIface && strcmp(varName,IFACE_COMMON_STRUCT_VAR_NAME) && strcmp(varName,AET_MAGIC_NAME)){
+            if(isIface && !class_interface_is_reserve_var(self->classInterface,varName)){
                error_at(decl_loc,"接口中不能声明或定义变量。%qD",decls);
                self->currentFuncModel =NULL;//到这里函数参数已解析完成了。
                return NULL_TREE;
@@ -589,20 +442,18 @@ static tree  c_parser_class_declaration (ClassParser *self,ClassInfo *classInfo,
             c_parser_consume_token (parser);
          else if (c_parser_next_token_is (parser, CPP_SEMICOLON) || c_parser_next_token_is (parser, CPP_CLOSE_BRACE)){
             /* Semicolon consumed in caller.  */
-            n_debug("class内的声明 111 下一个 token 是CPP_SEMICOLON or CPP_CLOSE_BRACE 退出循环 count:%d", testcount);
             break;
          }else{
             c_parser_error (parser, "expected %<,%>, %<;%> or %<}%>");
             break;
          }
       }else{
+         n_debug("class内的声明 108 出错了");
          c_parser_error (parser,"expected %<:%>, %<,%>, %<;%>, %<}%> or %<__attribute__%>");
-         n_debug("class内的声明 112 出错了 count:%d", testcount);
          break;
       }
    }//end while
    self->currentFuncModel =NULL;//到这里函数参数已解析完成了。
-   n_debug("class内的声明 113 over count:%d ", testcount);
    return decls;
 }
 
@@ -683,41 +534,21 @@ static nboolean checkTypeExists(char *id)
  * 变为
  * { XXX parentXXX1234;YYY ifaceYYY1234;ZZZ ifaceZZZ1234;
  */
-static void addParentAndIfaceToToken(ClassParser *self,ClassName *parent,ClassName **ifaces,int count)
+static void addParentAndIfaceString(ClassParser *self,ClassName *parent,
+      ClassName **ifaces,int count,NString *codes)
 {
    c_parser *parser=self->parser->parser;
+   //当前的token是{
    c_token *openBrace=c_parser_peek_token(parser); //"{"
-   location_t loc=openBrace->location;
-   int tokenCount=parser->tokens_avail;
-   c_token *move1=NULL;
-   c_token *move2=NULL;
-
-   if(tokenCount==2){//要移到第11位去
-      move1=&parser->tokens[1];
-   }
-   if(tokenCount==3){//要移到第11位去
-      move1=&parser->tokens[1];
-      move2=&parser->tokens[2];
-   }
-   int offset=1;
    nboolean exists=checkTypeExists(parent->sysName);
    if(!exists){
       n_warning("不存在的类型 %s",parent->userName);
       c_parser_error (parser, "不存在的类型。检查是否包含了类型所在的头文件。");
       return;
    }
-   aet_utils_create_token(&parser->tokens[offset],CPP_NAME,parent->sysName,(int)strlen(parent->sysName));
-   parser->tokens[offset].id_kind=C_ID_TYPENAME;//关键
-   parser->tokens[offset].location=loc;
-   offset++;
    char *name=class_util_create_parent_class_var_name(parent->userName);
-   aet_utils_create_token(&parser->tokens[offset],CPP_NAME,name,(int)strlen(name));
-   parser->tokens[offset].location=loc;
+   n_string_append_printf(codes,"%s %s;\n",parent->sysName,name);
    n_free(name);
-   offset++;
-   aet_utils_create_token(&parser->tokens[offset],CPP_SEMICOLON,";",1);
-   parser->tokens[offset].location=loc;
-   offset++;
    int i;
    for(i=0;i<count;i++){
       nboolean exists=checkTypeExists(ifaces[i]->sysName);
@@ -726,35 +557,13 @@ static void addParentAndIfaceToToken(ClassParser *self,ClassName *parent,ClassNa
          c_parser_error (parser, "不存在的类型。检查是否包含了类型所在的头文件。");
          return;
       }
-      aet_utils_create_token(&parser->tokens[offset],CPP_NAME,ifaces[i]->sysName,(int)strlen(ifaces[i]->sysName));
-      parser->tokens[offset].id_kind=C_ID_TYPENAME;//关键
-      parser->tokens[offset].location=loc;
-      //检查是不存在该类型
-      offset++;
       char name[255];
       aet_utils_create_in_class_iface_var(ifaces[i]->userName,name);
-      aet_utils_create_token(&parser->tokens[offset],CPP_NAME,name,(int)strlen(name));
-      parser->tokens[offset].location=loc;
-      offset++;
-      aet_utils_create_token(&parser->tokens[offset],CPP_SEMICOLON,";",1);
-      parser->tokens[offset].location=loc;
-      offset++;
+      n_string_append_printf(codes,"%s %s;\n",ifaces[i]->sysName,name);
    }
-   parser->tokens_avail=tokenCount+offset-1;
-   if(move1){
-      aet_utils_copy_token(move1,&parser->tokens[offset]);
-      parser->tokens[offset].location=loc;
-      offset++;
-   }
-   if(move2){
-      aet_utils_copy_token(move2,&parser->tokens[offset]);
-      parser->tokens[offset].location=loc;
-      offset++;
-   }
-   //aet_print_token_in_parser("add parent and interface---- parent %s",parent->sysName);
 }
 
-static void addExentdsAndImplements(ClassParser *self,ClassInfo *classInfo)
+static void addExentdsAndImplements(ClassParser *self,ClassInfo *classInfo,NString *codes)
 {
    c_parser *parser=self->parser->parser;
    location_t start_loc = c_parser_peek_token (parser)->location;
@@ -808,7 +617,7 @@ static void addExentdsAndImplements(ClassParser *self,ClassInfo *classInfo)
          }
          ifaces[i]=ifaceClass;
       }
-      addParentAndIfaceToToken(self,parentClass,ifaces,ifaceCount);
+      addParentAndIfaceString(self,parentClass,ifaces,ifaceCount,codes);
       class_info_set_parent(classInfo,parentClass);
       class_info_set_ifaces(classInfo,ifaces,ifaceCount);
    }
@@ -903,10 +712,65 @@ static void classCompleted (ClassParser *self)
    self->currentClassName=NULL;
    intrinsic_parser_class_end(self->intrinsicParser);
 }
+
+static const char *getPackName(ClassParser *self)
+{
+   cpp_buffer *buffer= parse_in->buffer;
+   struct _cpp_file *file=buffer->file;
+   const char *fileName=_cpp_get_file_name (file);
+   cpp_dir *dir=cpp_get_dir (file);
+   char *classPrefix=class_package_get_class_prefix(self->classPackage,fileName,dir->name);
+   return classPrefix;
+}
+
+static void createStruct(location_t loc,char *sysName,char *structTagName,char *userName)
+{
+   struct c_declspecs *specs=build_null_declspecs ();
+   tree typedefid=get_identifier("typedef");
+   TREE_LANG_FLAG_0 (typedefid) = 1;
+   C_SET_RID_CODE(typedefid,RID_TYPEDEF);
+   declspecs_add_scspec (loc, specs, typedefid);
+   struct c_typespec t = parser_xref_tag (loc, RECORD_TYPE, get_identifier(structTagName),
+         NULL_TREE, NULL_TREE,false);
+   declspecs_add_type (loc, specs, t);
+   if(strcmp(sysName,userName)){
+      struct c_declarator *declarator = build_id_declarator (get_identifier(sysName));
+      location_t lastloc;
+      tree d = start_decl (declarator, specs, false, NULL, true, &lastloc);
+      tree asm_name = NULL_TREE;
+      finish_decl (d, UNKNOWN_LOCATION, NULL_TREE, NULL_TREE, asm_name);
+   }
+   {
+      struct c_declarator *declarator = build_id_declarator (get_identifier(userName));
+      location_t lastloc;
+      tree d = start_decl (declarator, specs, false, NULL, true, &lastloc);
+      tree asm_name = NULL_TREE;
+      finish_decl (d, UNKNOWN_LOCATION, NULL_TREE, NULL_TREE, asm_name);
+   }
+}
+
+/**
+ * 創建 typedef struct _debug_AClass debug_AClass ;
+ * 和 typedef struct _debug_AClass AClass ;
+ */
+static void createAClass(ClassParser *self,ClassInfo *aobject,location_t loc)
+{
+   char sysName[255];
+   char *package = aobject->className.package;
+   if(package && strlen(package)>0)
+      sprintf(sysName,"%s_%s",package,AET_ROOT_CLASS);
+   else
+      sprintf(sysName,"%s",AET_ROOT_CLASS);
+   char structTagName[255];
+   sprintf(structTagName,"_%s",sysName);
+   createStruct(loc,sysName,structTagName,AET_ROOT_CLASS);
+   class_mgr_add(class_mgr_get(),sysName,AET_ROOT_CLASS,package);
+}
+
 /**
  *解析类或接口声明，即 class$ Abc{ 或 interface$ Abc{
  */
-struct c_typespec class_parser_parser_class_specifier (ClassParser *self)
+static struct c_typespec createClassSpec (ClassParser *self,char *structTagName,char *sysClassName)
 {
    c_parser *parser=self->parser->parser;
    enter_aet=1;//进入了aet
@@ -957,13 +821,9 @@ struct c_typespec class_parser_parser_class_specifier (ClassParser *self)
    /* Set the location in case we create a decl now.  */
    aet_parser_c_parser_set_source_position_from_token
       /*!c_parser_set_source_position_from_token*/(c_parser_peek_token (parser));
-
-   if (c_parser_next_token_is (parser, CPP_NAME)){
-      ident = c_parser_peek_token (parser)->value;
-      char sysClassName[255];//没有下划线的类名
-      memcpy(sysClassName,IDENTIFIER_POINTER(ident)+1,IDENTIFIER_LENGTH(ident)-1);//去除下划线
-      sysClassName[IDENTIFIER_LENGTH(ident)-1]='\0';
-      c_parser_consume_token (parser);
+   NString *codes=n_string_sized_new(512);
+      c_parser_consume_token (parser);//consume Abc
+      ident = get_identifier(structTagName);
       FieldDecorate dr= class_permission_get_decorate_by_class(self->classPermission,sysClassName,classType);
       n_debug("分析class 11aa sysClassName:%s classType:%d isFinal:%d %d\n",
             sysClassName,classType,dr.isFinal,dr.permission);
@@ -985,12 +845,8 @@ struct c_typespec class_parser_parser_class_specifier (ClassParser *self)
          generic_model_class_or_func_decl_check(model);
          class_info_set_generic_model(classInfo,model);
       }
-      addExentdsAndImplements(self,classInfo);
-   }
-   if(classInfo==NULL){
-      c_parser_error (parser, "类型不正确。classInfo是空的");
-      return ret;
-   }
+      addExentdsAndImplements(self,classInfo,codes);
+
    //检查泛型声明是否正确。
    class_info_check_generic_decl(classInfo);
 
@@ -1014,15 +870,23 @@ struct c_typespec class_parser_parser_class_specifier (ClassParser *self)
       tree contents = NULL_TREE;
       location_t loc = c_parser_peek_token (parser)->location;
       c_parser_consume_token (parser);//consume {
-      aet_print_token(c_parser_peek_token (parser));
       //加一个魔数变量作为类或接口的第一个变量  4 个token
-      if(class_info_is_root(classInfo))
-         parser_help_add_magic(loc);
-      //如果是接口加入一个变量和两个方法   14个token
+      if(class_info_is_root(classInfo)){
+         //创建AClass ，因为在还没有解析AClass前，需要AClass
+         createAClass(self,classInfo,loc);
+         parser_help_add_magic(codes);
+      }
+      //如果是接口加入一个变量和两个方法  _iface_common_var、ref、unref 14个token
       if(classType==CLASS_TYPE_INTERFACE){
          n_debug("分析class  是接口声明:%s\n",classInfo->className.sysName);
-         class_interface_add_var_ref_unref_method(self->classInterface,loc);
+         class_interface_add_sys_field(self->classInterface,&classInfo->className,codes);
       }
+      //加一个static AClass *get_class(AObject *obj); static AClass *aclassInstance;
+      parser_static_add_aclass(parser_static_get(),codes,&classInfo->className);
+      n_string_append_printf(codes,"%s\n",RID_AET_GOTO_STR);
+      backupToken(self);
+      aet_utils_add_token_with_location(parse_in,codes->str,codes->len,loc);
+      n_string_free(codes,FALSE);
 
       /* Parse the struct-declarations and semicolons.  Problems with
       semicolons are diagnosed here; empty structures are diagnosed
@@ -1032,7 +896,8 @@ struct c_typespec class_parser_parser_class_specifier (ClassParser *self)
          tree decls;
          /* Parse any stray semicolon.  */
          if (c_parser_next_token_is (parser, CPP_SEMICOLON)){
-            n_debug("分析class 33 下一个token是CPP_SEMICOLON  have_std_attrs:%d--- tokensavail:%d ",have_std_attrs,parser->tokens_avail);
+            n_debug("分析class 33 下一个token是CPP_SEMICOLON  have_std_attrs:%d--- tokensavail:%d ",
+                  have_std_attrs,parser->tokens_avail);
             location_t semicolon_loc= c_parser_peek_token (parser)->location;
             gcc_rich_location richloc (semicolon_loc);
             richloc.add_fixit_remove ();
@@ -1054,6 +919,12 @@ struct c_typespec class_parser_parser_class_specifier (ClassParser *self)
             }
             c_parser_consume_token (parser);
             break;
+         }
+
+         if(c_parser_next_token_is_keyword (parser,RID_AET_GOTO)){
+            c_parser_consume_token (parser);//consume RID_AET_GOTO
+            restoreToken(self);
+            continue;
          }
          /* Parse some comma-separated declarations, but not the
          trailing semicolon if any.  */
@@ -1113,6 +984,8 @@ struct c_typespec class_parser_parser_class_specifier (ClassParser *self)
             n_debug("分析class 66 下一个token是CPP_SEMICOLON code:%d RECORD_TYPE:%d have_std_attrs:%d--- ",
               code,RECORD_TYPE,have_std_attrs);
             c_parser_consume_token (parser);
+            aet_print_token(c_parser_peek_token (parser));
+
          }else{
             if (c_parser_next_token_is (parser, CPP_CLOSE_BRACE))
                pedwarn (c_parser_peek_token (parser)->location, 0, "no semicolon at end of struct or union");
@@ -1168,7 +1041,8 @@ struct c_typespec class_parser_parser_class_specifier (ClassParser *self)
       }
 
       postfix_attrs = aet_parser_c_parser_gnu_attributes/*!c_c_parser_gnu_attributes*/(self->parser);
-      ret.spec = finish_struct(struct_loc, type, nreverse (contents),chainon (std_attrs,chainon (attrs, postfix_attrs)),struct_info);
+      ret.spec = finish_struct(struct_loc, type, nreverse (contents),
+            chainon (std_attrs,chainon (attrs, postfix_attrs)),struct_info);
       n_debug("分析class 101 完成finish_struct %s %p",IDENTIFIER_POINTER(TYPE_NAME (ret.spec)),ret.spec);
       class_mgr_set_record(class_mgr_get(),&classInfo->className,ret.spec);
       printClass(ret.spec);
@@ -1184,7 +1058,6 @@ struct c_typespec class_parser_parser_class_specifier (ClassParser *self)
          */
          gotoStaticAndInit(self,input_location,classInfo->className.sysName);
       }
-      class_build_replace_getclass_rtn(self->classBuild,self->currentClassName);
       //如果是接口，并且声明所在.c文件，加入实现代码。
       classCompleted(self);
       return ret;
@@ -1209,144 +1082,51 @@ struct c_typespec class_parser_parser_class_specifier (ClassParser *self)
    return ret;
 }
 
-static char *createClassName(ClassParser *self,char *origName,char **package)
+struct c_typespec class_parser_parser_class(ClassParser *self)
 {
-   cpp_buffer *buffer= parse_in->buffer;
-   struct _cpp_file *file=buffer->file;
-   const char *fileName=_cpp_get_file_name (file);
-   cpp_dir *dir=cpp_get_dir (file);
-   char *classPrefix=class_package_get_class_prefix(self->classPackage,fileName,dir->name);
-   char *className=NULL;
-   if(classPrefix!=NULL){
-      className=n_strdup_printf("%s_%s",classPrefix,origName);
-      *package=n_strdup(classPrefix);
-   }else
-      className=n_strdup(origName);
-   return className;
-}
-
-/* Return true if TOKEN is the __attribute__ token.  */
-static bool is_attribute (c_token *token)
-{
-  return token->type == CPP_KEYWORD && token->keyword==RID_ATTRIBUTE;
-}
-
-/* Skip one complete __attribute__((...)) construct.  */
-static void aet_skip_attribute (c_parser *parser)
-{
-   int paren_depth = 0;
-   c_parser_consume_token (parser);
-   while (!c_parser_next_token_is (parser, CPP_EOF)){
-      c_token *token = c_parser_peek_token (parser);
-      if (token->type == CPP_OPEN_PAREN){
-         paren_depth++;
-         c_parser_consume_token (parser);
-         continue;
-      }
-
-      if (token->type == CPP_CLOSE_PAREN){
-         paren_depth--;
-         c_parser_consume_token (parser);
-         if (paren_depth == 0)
-            return;
-         continue;
-      }
-
-      c_parser_consume_token (parser);
-   }
-}
-
-static c_token *skip_to_class_name (c_parser *parser)
-{
-   while (true){
-      c_token *token = c_parser_peek_token (parser);
-      if (token->type == CPP_NAME || token->type == CPP_EOF)
-         return token;
-      if (is_attribute (token)){
-         aet_skip_attribute (parser);
-      }else{
-         c_parser_consume_token (parser);
-      }
-   }
-}
-
-/**
- * 把class$ Abc 或 interface$ Abc 或 abstract$ class$ Abc
- * 替换为 typedef sruct _Abc Abc; Class _Abc
- * 带有包名和不带包名，因为用户source是可以不写包名的，所以在c_lex_token可以进入type_decl中替换，不像原来所有的cpp_name都要
- * 检查一次，速度会变慢，但实测下来没有影响
- * 或者替换为 typedef sruct _debug_Abc debug_Abc; typedef sruct _debug_Abc Abc; Class _Abc
- *
- * Abc是类型名是一个IDENTIFIER tree 全局只有一个
- * 所以lookup_name 用的是第一个从c-lex.c 中创建的ident
- * 参见c-parser.c 中的c_lex_one_token decl = lookup_name (token->value);
- * 新加的token要加位置，否则start_decl pushdecl set_underlying_type 不会复制一个新的record
- * 当用abc->时会
- */
-void class_parser_replace_class_to_typedef(ClassParser *self)
-{
+   struct c_typespec spec;
    c_parser *parser=self->parser->parser;
    c_token *classSpec = c_parser_peek_token (parser);//"Class"
-   classSpec->id_kind=C_ID_CLASSNAME;/*这是一个指示看	c-parser.c中的case RID_AET_CLASS:*/
    c_token *classNameToken=c_parser_peek_2nd_token(parser); //Abc
-   location_t orgLoc=classNameToken->location;//classSpec->location;
-   if(classNameToken->type==CPP_KEYWORD){
-      error_at(orgLoc,"class$或interface$后不能是关键字。");
-      classNameToken = skip_to_class_name(parser);
+   location_t loc=classNameToken->location;
+   if(classNameToken->type!=CPP_NAME){
+      error_at(loc,"class$或interface$后应是类名或接口名。");
+      return spec;
    }
+   char *ident = IDENTIFIER_POINTER(classNameToken->value);
+   char *package=getPackName(self);
+   char *userClassName = ident;
+   char  sysClassName[255];
+   char structTagName[255];
 
    /* 加一个下划线 把className改为“_”+className*/
-   char *package=NULL;
-   char *userClassName=n_strdup(IDENTIFIER_POINTER(classNameToken->value));
-   char *sysClassName=createClassName(self,userClassName,&package);
-   nboolean needAddUseTypedecl = FALSE;
-   int tokens = 5;
-   if(package){
-      //有包名,再加 typedef struct _package_name name;但先查找有没有重复的class useName
-      tree decl = lookup_name(classNameToken->value);
-      if(!decl){
-         needAddUseTypedecl = TRUE;
-         tokens+=5;
+   if(!endswith(ident,AET_ROOT_CLASS)){
+      if(lookup_name(get_identifier(userClassName))){
+         error_at(loc,"重复的类名---:%qs\n",userClassName);
+         printf("class_parser_parser_class %s %s %s %s\n",package,userClassName,sysClassName,structTagName);
+         exit(0);
+         return spec;
       }
+      if(package!=NULL)
+         sprintf(sysClassName,"%s_%s",package,userClassName);
+      else
+         sprintf(sysClassName,"%s",userClassName);
+      sprintf(structTagName,"_%s",sysClassName);
+      createStruct(loc,sysClassName,structTagName,userClassName);
+      class_mgr_add(class_mgr_get(),sysClassName,userClassName,package);
+   }else{
+      //进入解析AClass AClass的 ClassName在创建AObject时就创建了
+      classNameToken->value = get_identifier(AET_ROOT_CLASS);
+      ClassName *aclass = class_mgr_get_class_name_by_user(class_mgr_get(), AET_ROOT_CLASS);
+      sprintf(sysClassName,"%s",aclass->sysName);
+      sprintf(structTagName,"_%s",sysClassName);
    }
-   classNameToken->value = get_identifier(sysClassName);
-   int tokenCount=parser->tokens_avail;
-   int i;
-   for(i=tokenCount-2;i>0;i--){
-      aet_utils_copy_token(&parser->tokens[i-1],&parser->tokens[i-1+tokens]);
-   }
-   char buff[255];
-   sprintf(buff,"_%s",sysClassName);
-   aet_utils_create_token(&parser->tokens[tokens+1],CPP_NAME,buff,strlen(buff));
-   parser->tokens[tokens+1].location = orgLoc;
-
-   aet_utils_copy_token(classSpec,&parser->tokens[tokens]);
-
-   aet_utils_create_typedef_token(&parser->tokens[0],orgLoc);
-   aet_utils_create_struct_token(&parser->tokens[1],orgLoc);
-   aet_utils_create_token(&parser->tokens[2],CPP_NAME,buff,strlen(buff));
-   aet_utils_create_token(&parser->tokens[3],CPP_NAME,sysClassName,strlen(sysClassName));
-   parser->tokens[3].location = orgLoc;
-   aet_utils_create_token(&parser->tokens[4],CPP_SEMICOLON,(char *)";",1);
-   if(needAddUseTypedecl){
-      aet_utils_create_typedef_token(&parser->tokens[5],orgLoc);
-      aet_utils_create_struct_token(&parser->tokens[6],orgLoc);
-      aet_utils_create_token(&parser->tokens[7],CPP_NAME,buff,strlen(buff));
-      aet_utils_create_token(&parser->tokens[8],CPP_NAME,userClassName,strlen(userClassName));
-      parser->tokens[8].location = orgLoc;
-      aet_utils_create_token(&parser->tokens[9],CPP_SEMICOLON,(char *)";",1);
-   }
-   parser->tokens_avail=tokenCount+tokens;
-   for(i=0;i<tokens;i++)
-      parser->tokens[i].location=orgLoc;
-   //aet_print_token_in_parser("class_parser_replace ---- %s  %s package:%s sysClassName:%s",
-        //userClassName,buff,package,sysClassName);
-   class_mgr_add(class_mgr_get(),sysClassName,userClassName,package);
-   n_free(sysClassName);
-   n_free(userClassName);
-   if(package)
-      n_free(package);
+   spec = createClassSpec (self, structTagName,sysClassName);
+   return spec;
 }
+
+
+//----------------------------结束新的创建class的方法----------------------
 
 void class_parser_abstract_keyword(ClassParser *self)
 {
@@ -1379,13 +1159,13 @@ void   class_parser_decorate(ClassParser *self)
 {
    FieldDecorate  dr= class_permission_try_parser(self->classPermission,-1);
    n_debug("class_permission_set_decorate 00----%s fileName:%s state:%d permission:%d\n",
-         self->currentClassName?self->currentClassName->sysName:"null",self->fileName,self->state,dr.permission);
+         self->currentClassName?self->currentClassName->sysName:"NULL",self->fileName,self->state,dr.permission);
    class_permission_set_decorate(self->classPermission,&dr);
 }
 
 nboolean  class_parser_is_parsering(ClassParser *self)
 {
-	return self->state!=CLASS_STATE_STOP;
+   return self->state!=CLASS_STATE_STOP;
 }
 
 /**
@@ -1457,47 +1237,16 @@ nboolean  class_parser_goto(ClassParser *self,nboolean start_attr_ok,int *action
       restoreToken(self);
       input_location=self->addAetHeader.loc;
       self->addAetHeader.running=FALSE;
+   }else if(pos==GOTO_COMPILE_VAROF){
+      aet_expr_compile(class_impl_get()->aetExpr);//实现varof$
+   }else if(pos==GOTO_ADD_CLEANUP){
+      c_parser_consume_token (parser);//consume   RID_AET_GOTO
+      c_parser_consume_token (parser);//consume   GOTO_ADD_CLEANUP
+      new_statck_add_cleanup(new_object_get()->newStack);
    }else{
       return block_mgr_parser_goto(block_mgr_get(),start_attr_ok,pos);
    }
    return FALSE;
-}
-
-/**
- * 分析AClass *getClass() 这时，还没有AClass 把AClass 替换成 void *
- */
-nboolean   class_parser_exception(ClassParser *self,tree value)
-{
-   //printf("分析class_parser_exception 00 %s\n",IDENTIFIER_POINTER(value));
-   c_parser *parser=self->parser->parser;
-   if(strcmp(IDENTIFIER_POINTER(value),"AClass")!=0){
-      return FALSE;
-   }
-   if(self->state!=CLASS_STATE_FIELD || self->currentClassName==NULL){
-      printf("分析class_parser_exception 00eeee %s %p\n",IDENTIFIER_POINTER(value),self->currentClassName);
-      return FALSE;
-   }
-   //printf("分析class_parser_exception 11 %s\n",self->currentClassName->userName);
-   if(strcmp(self->currentClassName->userName,"AObject")!=0){
-      return FALSE;
-   }
-   c_token *t=c_parser_peek_token (parser);
-   if(t->type!=CPP_MULT)
-      return FALSE;
-   t=c_parser_peek_2nd_token (parser);
-   if(t->type!=CPP_NAME)
-      return FALSE;
-   char *name=IDENTIFIER_POINTER(t->value);
-   if(strcmp(name,"getClass"))
-      return FALSE;
-   int tokenCount=parser->tokens_avail;
-   location_t  loc = t->location;
-   int i;
-   for(i=tokenCount;i>0;i--)
-      aet_utils_copy_token(&parser->tokens[i-1],&parser->tokens[i-1+1]);
-   aet_utils_create_void_token(&parser->tokens[0],loc);
-   parser->tokens_avail=tokenCount+1;
-   return TRUE;
 }
 
 /**
@@ -1540,7 +1289,7 @@ void class_parser_complete_enum(ClassParser *self,struct c_declspecs *specs,
         nboolean haveAccessControl,ClassPermissionType permission,ClassName *className)
 {
    if(TREE_CODE(specs->type)==ENUMERAL_TYPE && specs->typespec_kind==ctsk_tagdef){
-      //n_debug("class_parser_complete_enum 00 sysName:%s\n",className!=NULL?className->sysName:"null");
+      //n_debug("class_parser_complete_enum 00 sysName:%s\n",className!=NULL?className->sysName:"NULL");
       if(!aet_utils_valid_tree(specs->expr) || TREE_CODE(specs->expr)!=IDENTIFIER_NODE)
          return;
       char *tag=IDENTIFIER_POINTER(specs->expr);

@@ -77,6 +77,7 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 #include "classparser.h"
 #include "classimpl.h"
 #include "funcmgr.h"
+#include "genericparser.h"
 
 
 #define NONE ""
@@ -312,20 +313,28 @@ static nboolean checkCtor(NewObject *self,GenericModel **model,ClassInfo **class
    return TRUE;
 }
 
+/**
+ * 获取当前函数的ClassName
+ *
+ */
 static ClassName *getBelongClassName(NewObject *self)
 {
-     c_parser *parser=self->parser->parser;
-     ClassParser  *classPaser=class_parser_get();
-     ClassImpl  *classImpl=class_impl_get();
-     nboolean pasering=class_parser_is_parsering(classPaser);
-     n_debug("getBelongClassName--- %d %p",self->parser->isAet,current_function_decl);
-     if(self->parser->isAet){
-          return classImpl->className;
-     }else if(pasering && classPaser->currentClassName){
-        n_debug("正在进行 classparsering %s",classPaser->currentClassName->userName);
-        return classPaser->currentClassName;
-     }
-     return NULL;
+   c_parser *parser=self->parser->parser;
+   ClassParser  *classPaser=class_parser_get();
+   ClassImpl  *classImpl=class_impl_get();
+   nboolean pasering=class_parser_is_parsering(classPaser);
+   n_debug("getBelongClassName--- %d %p",self->parser->isAet,current_function_decl);
+   if(self->parser->isAet){
+      return classImpl->className;
+   }else if(pasering && classPaser->currentClassName){
+      n_debug("正在进行 classparsering %s",classPaser->currentClassName->userName);
+      return classPaser->currentClassName;
+   }else if(aet_parser_is_generic_state(self->parser)){
+      ClassFunc *func=func_mgr_get_current_fwgb(func_mgr_get());
+      if(func)
+         return func->className;
+   }
+   return NULL;
 }
 
 /**
@@ -340,11 +349,12 @@ static nboolean genericCheck(NewObject *self,location_t loc,ClassName *varClassN
        ClassInfo *belongInfo=class_mgr_get_class_info_by_class_name(class_mgr_get(),belongClassName);
        belongGen= belongInfo->genericModel;
     }
-    //printf("genericCheck---- %p\n",belongGen);
     if(current_function_decl){
-        ClassFunc  *classFunc = func_mgr_get_func_by_mangle(func_mgr_get(),IDENTIFIER_POINTER(DECL_NAME(current_function_decl)));
+        ClassFunc  *classFunc = func_mgr_get_func_by_mangle(func_mgr_get(),
+              IDENTIFIER_POINTER(DECL_NAME(current_function_decl)));
         funcGen=class_func_get_func_generic(classFunc);
     }
+
     if(varGen!=NULL){
         ClassInfo *varClassInfo=class_mgr_get_class_info_by_class_name(class_mgr_get(),varClassName);
         int c1=generic_model_get_count(varClassInfo->genericModel);
@@ -418,7 +428,7 @@ static nboolean checkVar(NewObject *self,tree decl,GenericModel *genericsModel)
           return FALSE;
       ClassName *className=&info->className;
       if(TREE_CODE(type)==RECORD_TYPE){
-         char *sysName=class_util_get_class_name_by_record(type);
+         char *sysName=class_util_get_class_name/*!class_util_get_class_name_by_record*/(type);
          if(strcmp(className->sysName,sysName)){
              char *varName=IDENTIFIER_POINTER(DECL_NAME(decl));
              error_at(token->location,"变量%qs的类型是%qs，不能通过%qs初始化。",varName,sysName,className->userName);
@@ -754,10 +764,10 @@ tree  new_object_get_mtcs_plat_and_dev(NewObject *self,unsigned long address)
 
 NewObject *new_object_get()
 {
-    static NewObject *singleton = NULL;
-    if (!singleton){
-         singleton =n_slice_alloc0 (sizeof(NewObject));
-         newObjectInit(singleton);
-    }
-    return singleton;
+   static NewObject *singleton = NULL;
+   if (!singleton){
+      singleton =n_slice_alloc0 (sizeof(NewObject));
+      newObjectInit(singleton);
+   }
+   return singleton;
 }

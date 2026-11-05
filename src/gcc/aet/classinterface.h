@@ -45,13 +45,22 @@ struct _ClassInterface
 ClassInterface *class_interface_new();
 int             class_interface_parser(ClassInterface *self,ClassInfo *info,char **interface);
 char           *class_interface_create_codes(ClassInterface *self,ClassName *className);
-tree            class_interface_transport_ref_and_unref(ClassInterface *self,tree component,tree expr);
-void            class_interface_add_var_ref_unref_method(ClassInterface *self,location_t loc);
 //是一个接口中声明的host device函数吗
-nboolean class_interface_is_host_device_func(ClassInterface *self,ClassInfo *info,tree decls);
-tree class_interface_divide_host_device_func(ClassInterface *self,location_t loc,ClassInfo *info,tree decls);
+nboolean        class_interface_is_host_device_func(ClassInterface *self,ClassInfo *info,tree decls);
+tree            class_interface_divide_host_device_func(ClassInterface *self,location_t loc,ClassInfo *info,tree decls);
 //接口方法加入到类中
-int class_interface_add_to_class(ClassInterface *self,location_t loc,ClassInfo *info,tree *classMethods);
+int             class_interface_add_to_class(ClassInterface *self,location_t loc,ClassInfo *info,tree *classMethods);
+void            class_interface_add_sys_field(ClassInterface *self,ClassName *iface,NString *codes);
+
+inline nboolean class_interface_is_reserve_var(ClassInterface *self,char *var)
+{
+   return !strcmp(var,AET_MAGIC_NAME) || !strcmp(var,IFACE_AT_CLASS);
+}
+
+//每个接口都动态的创建一个ref函数定义
+tree class_interface_create_ref_function_define(ClassInterface *self,location_t loc,
+      ClassName *className,char *funcName);
+
 
 #endif
 

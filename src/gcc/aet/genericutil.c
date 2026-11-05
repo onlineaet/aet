@@ -277,7 +277,7 @@ int generic_util_get_generic_type(tree type)
    }else if(TREE_CODE(type)==FIXED_POINT_TYPE){
       gt=GENERIC_TYPE_FIXED_POINT;
    }else if(TREE_CODE(type)==RECORD_TYPE){
-      char *className=class_util_get_class_name_by_record(type);
+      char *className=class_util_get_class_name/*!class_util_get_class_name_by_record*/(type);
       gt=className!=NULL?GENERIC_TYPE_CLASS:GENERIC_TYPE_STRUCT;
    }
    return gt;
@@ -314,115 +314,6 @@ char *generic_util_create_block_func_name(char *sysName,int index)
 char *generic_util_create_block_func_type_decl_name(char *sysName,int index)
 {
   return n_strdup_printf("_%s_%s_%d_typedecl",sysName,GENERIC_BLOCK_TO_FUNC_PREFIX,index);
-}
-
-///////////////////以下是生成一个复合语句的参数--------------------------------------
-
-static inline void c_parser_check_literal_zero (c_parser *parser, unsigned *literal_zero_mask,unsigned int idx)
-{
-  if (idx >= HOST_BITS_PER_INT)
-    return;
-  c_token *tok = c_parser_peek_token (parser);
-  switch (tok->type)
-    {
-    case CPP_NUMBER:
-    case CPP_CHAR:
-    case CPP_WCHAR:
-    case CPP_CHAR16:
-    case CPP_CHAR32:
-    case CPP_UTF8CHAR:
-      /* If a parameter is literal zero alone, remember it
-    for -Wmemset-transposed-args warning.  */
-      if (integer_zerop (tok->value)
-     && !TREE_OVERFLOW (tok->value)
-     && (c_parser_peek_2nd_token (parser)->type == CPP_COMMA
-         || c_parser_peek_2nd_token (parser)->type == CPP_CLOSE_PAREN))
-   *literal_zero_mask |= 1U << idx;
-    default:
-      break;
-    }
-}
-
-static int backupToken(c_parser *parser,c_token *backups)
-{
-   int tokenCount=parser->tokens_avail;
-   int i;
-   c_token *token;
-   for(i=0;i<tokenCount;i++){
-      token=c_parser_peek_token (parser);
-      aet_utils_copy_token(token,&backups[i]);
-      c_parser_consume_token (parser);
-   }
-   return tokenCount;
-}
-
-static void restore(c_parser *parser,c_token *backups,int count)
-{
-   if(count==0)
-      return;
-   int tokenCount=parser->tokens_avail;
-   if(tokenCount+count>AET_MAX_TOKEN){
-      error("token太多了");
-      return;
-   }
-   int i;
-   for(i=0;i<count;i++){
-      aet_utils_copy_token(&backups[i],&parser->tokens[i+tokenCount]);
-   }
-   parser->tokens_avail=tokenCount+count;
-   aet_print_token_in_parser("generic_call restore ------");
-}
-
-static tree createTarget(c_parser *parser,char *codes)
-{
-   aet_utils_add_token(parse_in,codes,strlen(codes));
-   struct c_expr expr;
-   int literal_zero_mask=0;
-   c_parser_check_literal_zero (parser, &literal_zero_mask, 0);
-   n_debug("createTarget 00 --源代码 %s\n",codes);
-   expr = aet_parser_c_parser_expr_no_commas/*!c_parser_expr_no_commas*/(aet_parser_get(), NULL);
-   expr = convert_lvalue_to_rvalue (expr.get_location (), expr, true, true);
-   return expr.value;
-}
-
-/**
- * 生成一个复合语句的参数如:
- * setData(({int big;big;}));
- * ({int big;big;})后面必须再加上“(\n”
- * codes参数的源代码，最后要加上“(\n”
- * 所以({int big;big;})变成({int big;big;}))\n才能生成参数
- * 最后还要consume CPP_CLOSE_PAREN
- */
-tree generic_util_create_target(char *codes)
-{
-   c_parser *parser=class_impl_get()->parser->parser;
-   int count=parser->tokens_avail;
-   c_token backups[30];
-   int backCount=backupToken(parser,backups);
-   tree target=createTarget(parser,codes);
-   restore(parser,backups,backCount);
-   c_parser_consume_token (parser);
-   return target;
-}
-
-tree generic_util_create_target_loc(char *codes,location_t loc)
-{
-   c_parser *parser=aet_parser_get()->parser;
-   int count=parser->tokens_avail;
-   c_token backups[30];
-   int backCount=backupToken(parser,backups);
-
-   aet_utils_add_token_with_location/*!aet_utils_add_token*/(parse_in,codes,strlen(codes),loc);
-   struct c_expr expr;
-   int literal_zero_mask=0;
-   c_parser_check_literal_zero (parser, &literal_zero_mask, 0);
-   n_debug("generic_util_create_target_loc --源代码 %s\n",codes);
-   expr = aet_parser_c_parser_expr_no_commas/*!c_parser_expr_no_commas*/(aet_parser_get(), NULL);
-   expr = convert_lvalue_to_rvalue (expr.get_location (), expr, true, true);
-   tree target=expr.value;//createTarget(parser,codes);
-   restore(parser,backups,backCount);
-   c_parser_consume_token (parser);
-   return target;
 }
 
 /**

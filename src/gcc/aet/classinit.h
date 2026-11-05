@@ -47,7 +47,6 @@ struct _ClassInit
 
 ClassInit *class_init_new();
 void       class_init_create_init_decl(ClassInit *self,location_t loc,ClassName *className);
-char      *class_init_override_parent_ref(ClassInit *self,ClassName *childName,char *varName);
 char      *class_init_modify_root_object_free_child(ClassInit *self,ClassName *className,char *varName);
 void       class_init_create_init_define_for_interface(ClassInit *self,char *sysName,NString *buf);
 //创建函数定义 void * TFirst_init_1234ergR5678_TFirst(TFirst *self)

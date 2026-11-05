@@ -42,22 +42,21 @@ struct _ObjectReturn
 	ClassCast *classCast;
 	NPtrArray *dataArray;
 	NPtrArray *tlsDataArray;//泛型块函数中播入的tls
-
+	//记录返回变量是类变量
+   NPtrArray *returnValArray;//返回值表达式
+   //记录有初始的类变量
+   NPtrArray *varArray;
 };
 
 
 ObjectReturn    *object_return_get();
 void             object_return_finish_function(ObjectReturn *self,tree fndecl);
 /**
- * 只有对象变量才能加入处理
- */
-void             object_return_add_return(ObjectReturn *self,tree retExpr);
-/**
- * 只有对象指针才能根据函数返回值声明转化
+ * 只有对象指针才能根据函数返回值声明转化到接口
+ * 转化泛型块函数中的tls
  */
 tree             object_return_convert(ObjectReturn *self,location_t loc,tree retExpr);
-tree             object_return_convert_block(ObjectReturn *self,tree expr);
-
+void             object_return_add_var(ObjectReturn *self,location_t loc,tree var);
 
 
 #endif

@@ -392,8 +392,6 @@ static void genBlockFuncCompileOver(BlockMgr *self)
       error_at(input_location,"在blockmgr发生不可知的错误！函数%qs是空的",self->currentBlockName);
       n_error("报告此错误！");
    }
-   //tree  field=generic_info_get_field(info,self->currentBlockName);
- //  generic_block_match_field_and_func(block,decl,field);
    generic_block_set_compile(block,TRUE);
    n_free(self->currentBlockName);
    self->currentBlockName=NULL;
@@ -404,14 +402,13 @@ static void genBlockFuncCompileOver(BlockMgr *self)
  */
 static void compileFile(BlockMgr *self)
 {
-   //printf("generic_expand_create_generic_class 00 %s\n",in_fnames[0]);
    MakefileParm  *makefileParm=makefile_parm_get();
    FILE *fp=fopen(makefileParm->compileFileName,"r");
-   char buffer[1024*500];
-   int rev=fread(buffer,1,1024*500,fp);
+   char *buffer = xmalloc(1024*600);
+   int rev=fread(buffer,1,1024*600,fp);
    buffer[rev]='\0';
    fclose(fp);
-   aet_utils_add_token(parse_in,buffer,rev);
+   aet_utils_add_token_free(parse_in,buffer,rev);
 }
 
 /*
@@ -470,8 +467,8 @@ static void testBlock(BlockMgr *self,GenericBlock *block)
    n_string_append_printf(codes,"%s %d %s\n",RID_AET_GOTO_STR,GOTO_GENERIC_BLOCK_FUNC_TEST_COMPILE_START,source);
    n_string_append_printf(codes,"%s %d\n",RID_AET_GOTO_STR,GOTO_GENERIC_BLOCK_FUNC_TEST_COMPILE_END);
    printf("testBlock----- %s\n",codes->str);
-   aet_utils_add_token(parse_in,codes->str,codes->len);
-   n_string_free(codes,TRUE);
+   aet_utils_add_token_free(parse_in,codes->str,codes->len);
+   n_string_free(codes,FALSE);
    n_free(source);
 }
 

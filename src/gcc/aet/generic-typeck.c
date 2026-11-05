@@ -178,8 +178,8 @@ static tree convertRealOrIntegerCstToPointer_new(location_t loc,tree realOrIntCs
  * static __attribute__((constructor)) void TFirst_tempxd_3460645734_ctor()
 {
 tempxd=({
-   TFirst<int > *_notv2_6TFirst0;
-   unsigned int _mtcsPlatType0=0;
+   TFirst<int > *_newobj20;
+   unsigned int _mtcsPlatType=0;
    ...
  */
 static tree convertRealOrIntegerCstToPointer(location_t loc,tree realOrIntCst,nboolean replace)

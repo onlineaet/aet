@@ -58,6 +58,7 @@ typedef struct _SelectFunc{
     int genericQuery;//一个标记，如果=1，执行在selectfield.c中的setGenericQuery()方法
     tree funcdecl;//用户调用的函数声明 object->setData funcdel就是setData 最终选择的是object混淆过的函数名如 ObjectSetDataVEx
     nboolean implicitlyFunc;//是不是隐藏函数
+    nboolean ifaceCallRef;//是不是接口调用的ref
 }SelectFunc;
 /**
  * 选取在类中声明的静态函数

@@ -21,6 +21,9 @@
  */
 MtcsFuncType mtcs_info_get_func_type(tree decl)
 {
+   if(!decl || !DECL_ATTRIBUTES (decl))
+      return MTCS_FUNC_NOT;
+
    tree g1 = lookup_attribute (MTCS_GLOBAL_STR, DECL_ATTRIBUTES (decl));
    tree g2 = lookup_attribute (MTCS_DEVICE_STR, DECL_ATTRIBUTES (decl));
    tree g3 = lookup_attribute (MTCS_HOST_STR, DECL_ATTRIBUTES (decl));
@@ -38,7 +41,7 @@ MtcsFuncType mtcs_info_get_func_type(tree decl)
 
 MtcsFuncType mtcs_info_get_and_check_func_type(tree decl,location_t loc)
 {
-   if(!decl)
+   if(!decl || !DECL_ATTRIBUTES (decl))
       return MTCS_FUNC_NOT;
    tree g1 = lookup_attribute (MTCS_GLOBAL_STR, DECL_ATTRIBUTES (decl));
    tree g2 = lookup_attribute (MTCS_DEVICE_STR, DECL_ATTRIBUTES (decl));
@@ -65,7 +68,7 @@ MtcsFuncType mtcs_info_get_and_check_func_type(tree decl,location_t loc)
 
 MtcsVarType mtcs_info_get_var_type(tree decl)
 {
-   if(!decl || !VAR_P(decl))
+   if(!decl || !VAR_P(decl) || !DECL_ATTRIBUTES (decl))
       return MTCS_VAR_NOT;
    tree sharedAtt = lookup_attribute (MTCS_SHARED_STR, DECL_ATTRIBUTES (decl));
    tree managedAtt = lookup_attribute (MTCS_MANAGED_STR, DECL_ATTRIBUTES (decl));

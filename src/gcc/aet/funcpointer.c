@@ -240,8 +240,8 @@ static int  compare(tree ltype, tree rtype)
             //printf("两个结构是一样的。\n");
             return 0;
          }
-         char *sysNameL=class_util_get_class_name_by_record(ltyp);
-         char *sysNameR=class_util_get_class_name_by_record(rtyp);
+         char *sysNameL=class_util_get_class_name/*!class_util_get_class_name_by_record*/(ltyp);
+         char *sysNameR=class_util_get_class_name/*!class_util_get_class_name_by_record*/(rtyp);
          if(sysNameL!=NULL && sysNameR==NULL){
             printf("右值结构体不能转为左值类。\n");
             return -9;

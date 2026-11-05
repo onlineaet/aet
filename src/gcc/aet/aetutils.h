@@ -62,15 +62,16 @@ char          *aet_utils_create_init_global_super_func_name(char *sysName);
 char          *aet_utils_create_init_inner_super_func_name(char *sysName);
 char          *aet_utils_get_sys_name_from_init_method(char *funcName);
 int            aet_utils_add_token(cpp_reader *pfile, const char *str,size_t len);
-int            aet_utils_add_token_with_location(cpp_reader *pfile, const char *str,size_t len,location_t loc);
-int            aet_utils_add_token_with_force(cpp_reader *pfile, const char *str,size_t len,location_t loc,nboolean force);
+int            aet_utils_add_token_with_location(cpp_reader *pfile, char *str,size_t len,location_t loc);
+int            aet_utils_add_token_with_force(cpp_reader *pfile, char *str,size_t len,location_t loc,nboolean force);
+//释放str
+int            aet_utils_add_token_free(cpp_reader *pfile, char *str,size_t len);
 void          *aet_utils_create_restore_location_data(cpp_reader *pfile,location_t loc);
 location_t     aet_utils_get_location(location_t loc);//classctor.c调用
 //restorelocation.c实现
 void           aet_utils_write_cpp_buffer(cpp_buffer *newBuffer,void *restoreData);
 unsigned int   aet_utils_create_hash(const uchar *str,size_t len);
 void           aet_utils_create_in_class_iface_var(char *ifaceName,char *result);
-void           aet_utils_create_super_field_name(char *className,char *mangle,char *result);
 void           aet_utils_create_finalize_name(char *className,char *result);
 nboolean       aet_utils_is_finalize_name(char *className,char *funcName);
 void           aet_utils_create_unref_name(char *className,char *funcName);

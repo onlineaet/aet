@@ -76,10 +76,7 @@ void aet_utils_create_in_class_iface_var(char *ifaceName,char *result)
    sprintf(result,"%s%u",temp,hash);
 }
 
-void aet_utils_create_super_field_name(char *className,char *mangle,char *result)
-{
-   sprintf(result,"super_%s_%s",className,mangle);
-}
+
 
 void aet_utils_create_finalize_name(char *className,char *result)
 {
@@ -357,7 +354,7 @@ c_token       *aet_utils_create_super_token(c_token *token,location_t start_loc)
    return token;
 }
 
-c_token       *aet_utils_create_aet_goto_token(c_token *token,location_t start_loc)
+c_token  *aet_utils_create_aet_goto_token(c_token *token,location_t start_loc)
 {
    token->type = CPP_KEYWORD;
    token->id_kind=C_ID_NONE;
@@ -370,7 +367,7 @@ c_token       *aet_utils_create_aet_goto_token(c_token *token,location_t start_l
    return token;
 }
 
-c_token       *aet_utils_create_void_token(c_token *token,location_t start_loc)
+c_token  *aet_utils_create_void_token(c_token *token,location_t start_loc)
 {
    token->type = CPP_KEYWORD;
    token->id_kind=C_ID_NONE;
@@ -532,14 +529,8 @@ void aet_utils_create_string_token(c_token *token,uchar *str,int len)
  */
 char* aet_utils_create_init_method(char *sysName)
 {
-   char buffer[256];
    unsigned int hash=aet_utils_create_hash(sysName,strlen(sysName));
-  // sprintf(result,"%s%u",temp,hash);
-  // sprintf(buffer,"%s_%s_%s",sysName,AET_INIT_GLOBAL_METHOD_STRING,sysName);
-   sprintf(buffer,"%s_%s_%u",sysName,AET_INIT_GLOBAL_METHOD_STRING,hash);
-
-   char *re=n_strdup(buffer);
-   return re;
+   return n_strdup_printf("%s_%s_%u",sysName,AET_INIT_GLOBAL_METHOD_STRING,hash);
 }
 
 /**
@@ -548,12 +539,12 @@ char* aet_utils_create_init_method(char *sysName)
  */
 char* aet_utils_create_init_global_super_func_name(char *sysName)
 {
-   return n_strdup_printf("%s_%s_%s",sysName,AET_INIT_GLOBAL_SUPER_FUNC_NAME,sysName);
+   return n_strdup_printf("_%s_%s",sysName,AET_INIT_GLOBAL_SUPER_FUNC_NAME);
 }
 //static void TSecond_init_inner_super_data_2_TSecond()
 char* aet_utils_create_init_inner_super_func_name(char *sysName)
 {
-   return n_strdup_printf("%s_%s_%s",sysName,AET_INIT_INNER_SUPER_FUNC_NAME,sysName);
+   return n_strdup_printf("_%s_%s",sysName,AET_INIT_INNER_SUPER_FUNC_NAME);
 }
 
 /**
@@ -581,7 +572,8 @@ char   *aet_utils_get_sys_name_from_init_method(char *funcName)
 /**
  * 加入附加代码
  */
-static int addAetBuiltinCodes(cpp_reader *pfile, const char *str,size_t len,location_t loc,nboolean forceLocation)
+static int addAetBuiltinCodes(cpp_reader *pfile, const char *str,
+      size_t len,location_t loc,nboolean forceLocation,nboolean freeStr)
 {
    int tokenFrom= aet_utils_in_micro();
    if(tokenFrom==FROM_MACRO){
@@ -624,11 +616,14 @@ static int addAetBuiltinCodes(cpp_reader *pfile, const char *str,size_t len,loca
         loc=input_location;
    }
 
-   char *nbuf=xstrndup(str,len);
    void *restoreData=aet_utils_create_restore_location_data(pfile,loc);
    if(restoreData==NULL)
       return 0;
+   char *nbuf = str;
+   if(!freeStr)
+      nbuf=xstrndup(str,len);
    cpp_buffer *newBuffer=cpp_push_buffer (pfile, (uchar *) nbuf, len, /* from_stage3 */ true);
+   newBuffer->to_free = nbuf ;
    aet_utils_write_cpp_buffer(newBuffer,restoreData);
    _cpp_clean_line (pfile);
    if(forceLocation)
@@ -645,19 +640,28 @@ static int addAetBuiltinCodes(cpp_reader *pfile, const char *str,size_t len,loca
  */
 int aet_utils_add_token(cpp_reader *pfile, const char *str,size_t len)
 {
-   return aet_utils_add_token_with_location(pfile,str,len,input_location);
+   return addAetBuiltinCodes(pfile,str,len,input_location,TRUE,FALSE);
 }
 
-int aet_utils_add_token_with_location(cpp_reader *pfile, const char *str,size_t len,location_t loc)
+/**
+ * 由cpp_buffer释放
+ */
+int aet_utils_add_token_free(cpp_reader *pfile, char *str,size_t len)
 {
-   return addAetBuiltinCodes(pfile,str,len,loc,TRUE);
+   return addAetBuiltinCodes(pfile,str,len,input_location,TRUE,TRUE);
+}
+
+
+int aet_utils_add_token_with_location(cpp_reader *pfile, char *str,size_t len,location_t loc)
+{
+   return addAetBuiltinCodes(pfile,str,len,loc,TRUE,TRUE);
 }
 /**
  * 是否要强制屏蔽位置。
  */
-int aet_utils_add_token_with_force(cpp_reader *pfile, const char *str,size_t len,location_t loc,nboolean force)
+int aet_utils_add_token_with_force(cpp_reader *pfile, char *str,size_t len,location_t loc,nboolean force)
 {
-   return addAetBuiltinCodes(pfile,str,len,loc,force);
+   return addAetBuiltinCodes(pfile,str,len,loc,force,TRUE);
 }
 
 static char *getIdent(c_token *token)

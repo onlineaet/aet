@@ -385,49 +385,49 @@ static void addCall(AccessControls *self,ClassFunc *calleeFunc,nboolean isAet,ch
 static void addVar(AccessControls *self,char  *calleeSystem,VarEntity *var,nboolean isAet,
       nboolean compileGenericBlock,char *callSysName,location_t loc)
 {
-    AccessEnv *env=(AccessEnv *)n_slice_new0(AccessEnv);
-    char *currentFile=in_fnames[0];
-    env->file=NULL;
-    if(in_fnames[0])
-        env->file=n_strdup(currentFile);
-    env->atFuncName=NULL;
-    if (aet_utils_valid_tree(current_function_decl)){
+   AccessEnv *env=(AccessEnv *)n_slice_new0(AccessEnv);
+   char *currentFile=in_fnames[0];
+   env->file=NULL;
+   if(in_fnames[0])
+      env->file=n_strdup(currentFile);
+   env->atFuncName=NULL;
+   if (aet_utils_valid_tree(current_function_decl)){
       char *funcName=IDENTIFIER_POINTER(DECL_NAME(current_function_decl));
       env->atFuncName=n_strdup(funcName);
-    }
-    env->isAet=isAet;
-    env->compileGenericBlock=compileGenericBlock;
-    env->calleeFunc=NULL;
-    env->callSysName=n_strdup(callSysName);
-    env->calleeSysName=n_strdup(calleeSystem);
-    env->varEntity=var;
-    env->loc=loc;
-    env->accessType=ACCESS_CLASS_VAR;
-    n_ptr_array_add(self->accessArray,env);
+   }
+   env->isAet=isAet;
+   env->compileGenericBlock=compileGenericBlock;
+   env->calleeFunc=NULL;
+   env->callSysName=n_strdup(callSysName);
+   env->calleeSysName=n_strdup(calleeSystem);
+   env->varEntity=var;
+   env->loc=loc;
+   env->accessType=ACCESS_CLASS_VAR;
+   n_ptr_array_add(self->accessArray,env);
 }
 
 static void addEnum(AccessControls *self,char  *calleeSystem,EnumData *enumData,char *enumVar,nboolean isAet,char *callSysName,location_t loc)
 {
-    AccessEnv *env=(AccessEnv *)n_slice_new0(AccessEnv);
-    char *currentFile=in_fnames[0];
-    env->file=NULL;
-    if(in_fnames[0])
-        env->file=n_strdup(currentFile);
-    env->atFuncName=NULL;
-    if (aet_utils_valid_tree(current_function_decl)){
+   AccessEnv *env=(AccessEnv *)n_slice_new0(AccessEnv);
+   char *currentFile=in_fnames[0];
+   env->file=NULL;
+   if(in_fnames[0])
+      env->file=n_strdup(currentFile);
+   env->atFuncName=NULL;
+   if (aet_utils_valid_tree(current_function_decl)){
       char *funcName=IDENTIFIER_POINTER(DECL_NAME(current_function_decl));
       env->atFuncName=n_strdup(funcName);
-    }
-    env->isAet=isAet;
-    env->calleeFunc=NULL;
-    env->callSysName=n_strdup(callSysName);
-    env->calleeSysName=n_strdup(calleeSystem);
-    env->varEntity=NULL;
-    env->enumData=enumData;
-    env->enumVar=n_strdup(enumVar);
-    env->loc=loc;
-    env->accessType=ACCESS_CLASS_ENUM;
-    n_ptr_array_add(self->accessArray,env);
+   }
+   env->isAet=isAet;
+   env->calleeFunc=NULL;
+   env->callSysName=n_strdup(callSysName);
+   env->calleeSysName=n_strdup(calleeSystem);
+   env->varEntity=NULL;
+   env->enumData=enumData;
+   env->enumVar=n_strdup(enumVar);
+   env->loc=loc;
+   env->accessType=ACCESS_CLASS_ENUM;
+   n_ptr_array_add(self->accessArray,env);
 }
 
 /**
@@ -436,280 +436,277 @@ static void addEnum(AccessControls *self,char  *calleeSystem,EnumData *enumData,
  */
 static nboolean filter(AccessControls *self)
 {
-   if (aet_utils_valid_tree(current_function_decl)){
-      char *name=IDENTIFIER_POINTER(DECL_NAME(current_function_decl));
-      int i;
-      for(i=0;i<self->implClassArray->len;i++){
-         char funcName[255];
-         char *sysName=(char *)n_ptr_array_index(self->implClassArray,i);
-         class_build_create_func_name_by_sys_name(sysName,funcName);
-         if(!strcmp(funcName,name)){
-            return TRUE;
-         }
-      }
-   }
    return FALSE;
 }
 
 static char *getPackageFromClassImpl(AccessControls *self)
 {
-        int i;
-        for(i=0;i<self->implClassArray->len;i++){
-            char *sysName=(char *)n_ptr_array_index(self->implClassArray,i);
-            ClassName *call=class_mgr_get_class_name_by_sys(class_mgr_get(),sysName);
-            if(call->package!=NULL)
-                return call->package;
-        }
-        return NULL;
+   int i;
+   for(i=0;i<self->implClassArray->len;i++){
+      char *sysName=(char *)n_ptr_array_index(self->implClassArray,i);
+      ClassName *call=class_mgr_get_class_name_by_sys(class_mgr_get(),sysName);
+      if(call->package!=NULL)
+      return call->package;
+   }
+   return NULL;
 }
-
-
 
 static nboolean isSamePackage(char *callee,char *call)
 {
-    if(callee==NULL || call==NULL )
-       return FALSE;
-    return strcmp(callee,call)==0;
+   if(callee==NULL || call==NULL )
+      return FALSE;
+   return strcmp(callee,call)==0;
 }
 
 static void checkMethod(AccessControls *self,AccessEnv *env)
 {
-       //char *calleeFuncSysName=IDENTIFIER_POINTER(TYPE_NAME(env->calleeFunc->classTree));
-       char *calleeFuncSysName = class_func_get_class_name(env->calleeFunc);
-       //calleeFuncSysName=calleeFuncSysName+1;//去除下划线 _debug_ARandom
-       if(exitsImpl(self,calleeFuncSysName)){
-           //printf("在:%s中调用类:%s的方法:%s，并且调用类和被调用类的实现都在同一个文件中。",
-                  // env->callSysName==NULL?"在文件":env->callSysName,calleeFuncSysName,env->calleeFunc->orgiName);
-           return;
-       }
-       //检查类关系
-       ClassInfo *info=class_mgr_get_class_info(class_mgr_get(),calleeFuncSysName);
-       if(info->permission==CLASS_PERMISSION_PRIVATE){ //如果被调用的类是private,判断是不是在一个文件内实现
-          error_at(env->loc,"调用的类%qs是私有的，不能访问它的方法%qs",calleeFuncSysName,env->calleeFunc->orgiName);
-          return;
-       }else if(info->permission==CLASS_PERMISSION_PROTECTED || info->permission==CLASS_PERMISSION_DEFAULT){
-           if(env->isAet){
-               ClassName *callee=&info->className;//class_mgr_get_class_name_by_sys(class_mgr_get(),calleeFuncSysName);
-               ClassName *call=class_mgr_get_class_name_by_sys(class_mgr_get(),env->callSysName);
-               nboolean samePackage=isSamePackage(callee->package,call->package);
-               ClassRelationship ship=   class_mgr_relationship(class_mgr_get(), env->callSysName,calleeFuncSysName);
-               if(!samePackage && ship!=CLASS_RELATIONSHIP_PARENT){
-                   if(!samePackage)
-                      error_at(env->loc,"类%qs与调用类%qs不在同一个包内。",env->callSysName,calleeFuncSysName);
-                   if(ship!=CLASS_RELATIONSHIP_PARENT)
-                       error_at(env->loc,"类%qs与调用类%qs不是父子关系。",env->callSysName,calleeFuncSysName);
-                   return;
-               }
-           }else{
-               error_at(env->loc,"不能引用保护类型的类%qs。",calleeFuncSysName);
-               return;
-           }
-       }
-       //检查方法
-       if(env->calleeFunc->permission==CLASS_PERMISSION_PUBLIC){
-           return;
-       }
-       if(env->calleeFunc->permission==CLASS_PERMISSION_PRIVATE){
-          if(aet_parser_is_generic_state(self->parser)){
-             return;
-          }
-           error_at(env->loc,"在%qs中调用类%qs的私有方法%qs被禁止。",
-                   env->callSysName==NULL?"在文件":env->callSysName,calleeFuncSysName,env->calleeFunc->orgiName);
-       }
-       if(env->isAet){
-           //如果调用类与被调用类在同一个包或是继承关系可以调用。
-           ClassName *callee=&info->className;
-           ClassInfo *callInfo=class_mgr_get_class_info(class_mgr_get(),env->callSysName);
-           ClassName *call=&callInfo->className;
-           char *callPackage=call->package;
-           //如果调用类没有包名，但类实现现其它类实现在一起，并且其中某个类实现声明有包名，则调用类使用这个包名
-           if(callPackage==NULL)
-               callPackage= getPackageFromClassImpl(self);
-           if(isSamePackage(callee->package,callPackage)) //同一个包内
-               return;
-           ClassRelationship ship=   class_mgr_relationship(class_mgr_get(), env->callSysName,calleeFuncSysName);
-           if(ship==CLASS_RELATIONSHIP_CHILD)
-               return;
-           ClassName *calleeFuncUseName=class_mgr_get_class_name_by_sys(class_mgr_get(),calleeFuncSysName);
-           error_at(env->loc,"%qs调用%qs的方法%qs被禁止。两个类并不在同一包内，也无继承关系。",
-                 call->userName,calleeFuncUseName->userName,env->calleeFunc->orgiName);
-       }else{
-          //当前文件
-          ClassName *calleeFuncUseName=class_mgr_get_class_name_by_sys(class_mgr_get(),calleeFuncSysName);
-           error_at(env->loc,"在文件中不能访问类%qs的保护或缺省方法%qs。",calleeFuncUseName->userName,env->calleeFunc->orgiName);
-       }
+   //char *calleeFuncSysName=IDENTIFIER_POINTER(TYPE_NAME(env->calleeFunc->classTree));
+   char *calleeFuncSysName = class_func_get_class_name(env->calleeFunc);
+   //calleeFuncSysName=calleeFuncSysName+1;//去除下划线 _debug_ARandom
+   if(exitsImpl(self,calleeFuncSysName)){
+      //printf("在:%s中调用类:%s的方法:%s，并且调用类和被调用类的实现都在同一个文件中。",
+      // env->callSysName==NULL?"在文件":env->callSysName,calleeFuncSysName,env->calleeFunc->orgiName);
+      return;
+   }
+   //检查类关系
+   ClassInfo *info=class_mgr_get_class_info(class_mgr_get(),calleeFuncSysName);
+   if(info->permission==CLASS_PERMISSION_PRIVATE){ //如果被调用的类是private,判断是不是在一个文件内实现
+      error_at(env->loc,"调用的类%qs是私有的，不能访问它的方法%qs",calleeFuncSysName,env->calleeFunc->orgiName);
+      return;
+   }else if(info->permission==CLASS_PERMISSION_PROTECTED || info->permission==CLASS_PERMISSION_DEFAULT){
+      if(env->isAet){
+         ClassName *callee=&info->className;//class_mgr_get_class_name_by_sys(class_mgr_get(),calleeFuncSysName);
+         ClassName *call=class_mgr_get_class_name_by_sys(class_mgr_get(),env->callSysName);
+         nboolean samePackage=isSamePackage(callee->package,call->package);
+         ClassRelationship ship=   class_mgr_relationship(class_mgr_get(), env->callSysName,calleeFuncSysName);
+         if(!samePackage && ship!=CLASS_RELATIONSHIP_PARENT){
+            if(!samePackage)
+               error_at(env->loc,"类%qs与调用类%qs不在同一个包内。",env->callSysName,calleeFuncSysName);
+            if(ship!=CLASS_RELATIONSHIP_PARENT)
+               error_at(env->loc,"类%qs与调用类%qs不是父子关系。",env->callSysName,calleeFuncSysName);
+            return;
+         }
+      }else{
+         error_at(env->loc,"不能引用保护类型的类%qs。",calleeFuncSysName);
+         return;
+      }
+   }
+   //检查方法
+   if(env->calleeFunc->permission==CLASS_PERMISSION_PUBLIC)
+      return;
 
+   if(env->calleeFunc->permission==CLASS_PERMISSION_PRIVATE){
+      nboolean isctor = env->calleeFunc->isCtor;
+      nboolean isAClass = !strcmp(env->calleeFunc->className->userName,AET_ROOT_CLASS);
+      aet_print_tree(current_function_decl);
+      if(aet_parser_is_generic_state(self->parser) || !strcmp(env->file,in_fnames[0]));
+         return;
+      error_at(env->loc,"在%qs中调用类%qs的私有方法%qs被禁止。",
+               env->callSysName==NULL?"在文件":env->callSysName,calleeFuncSysName,env->calleeFunc->orgiName);
+   }
+   if(env->isAet){
+      //如果调用类与被调用类在同一个包或是继承关系可以调用。
+      ClassName *callee=&info->className;
+      ClassInfo *callInfo=class_mgr_get_class_info(class_mgr_get(),env->callSysName);
+      ClassName *call=&callInfo->className;
+      char *callPackage=call->package;
+      //如果调用类没有包名，但类实现现其它类实现在一起，并且其中某个类实现声明有包名，则调用类使用这个包名
+      if(callPackage==NULL)
+         callPackage= getPackageFromClassImpl(self);
+      if(isSamePackage(callee->package,callPackage)) //同一个包内
+         return;
+      ClassRelationship ship=   class_mgr_relationship(class_mgr_get(), env->callSysName,calleeFuncSysName);
+      if(ship==CLASS_RELATIONSHIP_CHILD)
+         return;
+      if(callPackage==NULL && callee->package == NULL &&
+             callInfo->file && info->file && !strcmp(callInfo->file,info->file))
+          return;
+      ClassName *calleeFuncUseName=class_mgr_get_class_name_by_sys(class_mgr_get(),calleeFuncSysName);
+      error_at(env->loc,"%qs调用%qs的方法%qs被禁止。两个类并不在同一包内，也无继承关系。",
+            call->userName,calleeFuncUseName->userName,env->calleeFunc->orgiName);
+   }else{
+      //当前文件
+      ClassName *calleeFuncUseName=class_mgr_get_class_name_by_sys(class_mgr_get(),calleeFuncSysName);
+      error_at(env->loc,"在文件中不能访问类%qs的保护或缺省方法%qs。",calleeFuncUseName->userName,env->calleeFunc->orgiName);
+   }
 }
 
 static void checkVar(AccessControls *self,AccessEnv *env)
 {
-       char *calleeSysName=env->calleeSysName;
-       if(exitsImpl(self,calleeSysName)){
-           //printf("在:%s中调用类:%s的变量:%s，并且调用类和被调用类的实现都在同一个文件中。",
-                 //  env->callSysName==NULL?"在文件":env->callSysName,calleeSysName,env->varEntity->orgiName);
-           return;
-       }
-       //检查类关系
-       ClassInfo *info=class_mgr_get_class_info(class_mgr_get(),calleeSysName);
-       if(info->permission==CLASS_PERMISSION_PRIVATE){ //如果被调用的类是private,判断是不是在一个文件内实现
-          error_at(env->loc,"调用的类%qs是私有的，不能访问它的变量%qs。",calleeSysName,env->varEntity->orgiName);
-          return;
-       }else if(info->permission==CLASS_PERMISSION_PROTECTED || info->permission==CLASS_PERMISSION_DEFAULT){
-           if(env->isAet){
-               ClassName *callee=&info->className;//class_mgr_get_class_name_by_sys(class_mgr_get(),calleeFuncSysName);
-               ClassName *call=class_mgr_get_class_name_by_sys(class_mgr_get(),env->callSysName);
-               nboolean samePackage=isSamePackage(callee->package,call->package);
-               ClassRelationship ship=   class_mgr_relationship(class_mgr_get(), env->callSysName,calleeSysName);
-               if(!samePackage && ship!=CLASS_RELATIONSHIP_PARENT){
-                   if(!samePackage)
-                      error_at(env->loc,"类%qs与调用类%qs不在同一个包内。",env->callSysName,calleeSysName);
-                   if(ship!=CLASS_RELATIONSHIP_PARENT)
-                       error_at(env->loc,"类%qs与调用类%qs不是父子关系。",env->callSysName,calleeSysName);
-                   return;
+   char *calleeSysName=env->calleeSysName;
+   if(exitsImpl(self,calleeSysName)){
+      //printf("在:%s中调用类:%s的变量:%s，并且调用类和被调用类的实现都在同一个文件中。",
+      //  env->callSysName==NULL?"在文件":env->callSysName,calleeSysName,env->varEntity->orgiName);
+      return;
+   }
+   //检查类关系
+   ClassInfo *info=class_mgr_get_class_info(class_mgr_get(),calleeSysName);
+   if(info->permission==CLASS_PERMISSION_PRIVATE){ //如果被调用的类是private,判断是不是在一个文件内实现
+      error_at(env->loc,"调用的类%qs是私有的，不能访问它的变量%qs。",calleeSysName,env->varEntity->orgiName);
+      return;
+   }else if(info->permission==CLASS_PERMISSION_PROTECTED || info->permission==CLASS_PERMISSION_DEFAULT){
+      if(env->isAet){
+         ClassName *callee=&info->className;//class_mgr_get_class_name_by_sys(class_mgr_get(),calleeFuncSysName);
+         ClassName *call=class_mgr_get_class_name_by_sys(class_mgr_get(),env->callSysName);
+         nboolean samePackage=isSamePackage(callee->package,call->package);
+         ClassRelationship ship=   class_mgr_relationship(class_mgr_get(), env->callSysName,calleeSysName);
+         if(!samePackage && ship!=CLASS_RELATIONSHIP_PARENT){
+            if(!samePackage)
+               error_at(env->loc,"类%qs与调用类%qs不在同一个包内。",env->callSysName,calleeSysName);
+            if(ship!=CLASS_RELATIONSHIP_PARENT)
+               error_at(env->loc,"类%qs与调用类%qs不是父子关系。",env->callSysName,calleeSysName);
+            return;
+         }
+      }else{
+         error_at(env->loc,"不能引用保护类型的类%qs。",calleeSysName);
+         return;
+      }
+   }
+   //检查变量
+   if(env->varEntity->permission==CLASS_PERMISSION_PUBLIC)
+      return;
+
+   if(env->varEntity->permission==CLASS_PERMISSION_PRIVATE){
+      if(info->file && env->atFuncName!=NULL){
+         tree funcNameId=aet_utils_create_ident(env->atFuncName);
+         tree decl=lookup_name(funcNameId);
+         if(aet_utils_valid_tree(decl)){
+            expanded_location xloc = expand_location (DECL_SOURCE_LOCATION (decl));
+            if (xloc.file){
+               const char *filename = lbasename (xloc.file);
+               NFile *nfile=n_file_new(info->file);
+               char *f=n_file_get_name(nfile);
+               if(strcmp(f,filename)==0){
+                  n_file_unref(nfile);
+                  return ;
                }
-           }else{
-               error_at(env->loc,"不能引用保护类型的类%qs。",calleeSysName);
-               return;
-           }
-       }
-       //检查变量
-       if(env->varEntity->permission==CLASS_PERMISSION_PUBLIC){
-           return;
-       }
-       if(env->varEntity->permission==CLASS_PERMISSION_PRIVATE){
-           if(info->file && env->atFuncName!=NULL){
-               tree funcNameId=aet_utils_create_ident(env->atFuncName);
-               tree decl=lookup_name(funcNameId);
-               if(aet_utils_valid_tree(decl)){
-                   expanded_location xloc = expand_location (DECL_SOURCE_LOCATION (decl));
-                   if (xloc.file){
-                      const char *filename = lbasename (xloc.file);
-                      NFile *nfile=n_file_new(info->file);
-                      char *f=n_file_get_name(nfile);
-                      if(strcmp(f,filename)==0){
-                          n_file_unref(nfile);
-                          return ;
-                      }
-                      n_file_unref(nfile);
-                   }
-               }
-           }
-           if(env->compileGenericBlock)
-              return;
-           error_at(env->loc,"在%qs中调用类%qs的私有变量%qs被禁止。所在函数：%qs",
-                   env->callSysName==NULL?"在文件":env->callSysName,calleeSysName,env->varEntity->orgiName,env->atFuncName);
-           return;
-       }
-       if(env->isAet){
-           //如果调用类与被调用类在同一个包或是继承关系可以调用。
-           ClassName *callee=&info->className;
-           ClassInfo *callInfo=class_mgr_get_class_info(class_mgr_get(),env->callSysName);
-           ClassName *call=&callInfo->className;
-           char *callPackage=call->package;
-           //如果调用类没有包名，但类实现现其它类实现在一起，并且其中某个类实现声明有包名，则调用类使用这个包名
-           if(callPackage==NULL)
-               callPackage= getPackageFromClassImpl(self);
-           if(isSamePackage(callee->package,callPackage)) //同一个包内
-               return;
-           ClassRelationship ship=   class_mgr_relationship(class_mgr_get(), env->callSysName,calleeSysName);
-           if(ship==CLASS_RELATIONSHIP_CHILD)
-               return;
-            error_at(env->loc,"%qs调用%qs的变量%qs被禁止。两个类并不在同一包内，也无继承关系。",
-                  class_mgr_get_user_name(class_mgr_get(),env->callSysName),
-                  class_mgr_get_user_name(class_mgr_get(),calleeSysName),
-                  env->varEntity->orgiName);
-       }else{
-           //当前文件有实现了与被调用类相同的包的类。
-           char *callPackage= getPackageFromClassImpl(self);
-           if(callPackage!=NULL){
-               if(isSamePackage(info->className.package,callPackage)) //同一个包内
-                  return;
-           }
-           const char *file = LOCATION_FILE (env->loc);
-           if(file!=NULL){
-               if(class_info_is_decl_file(info,file))
-                   return;
-           }
-           if(env->compileGenericBlock)
-               return;
-           error_at(env->loc,"在文件中不能访问类%qs的保护或缺省的变量%qs。",calleeSysName,env->varEntity->orgiName);
-       }
+               n_file_unref(nfile);
+            }
+         }
+      }
+      if(env->compileGenericBlock)
+         return;
+      error_at(env->loc,"在%qs中调用类%qs的私有变量%qs被禁止。所在函数：%qs",
+      env->callSysName==NULL?"在文件":env->callSysName,calleeSysName,env->varEntity->orgiName,env->atFuncName);
+      return;
+   }
+   if(env->isAet){
+      //如果调用类与被调用类在同一个包或是继承关系可以调用。
+      ClassName *callee=&info->className;
+      ClassInfo *callInfo=class_mgr_get_class_info(class_mgr_get(),env->callSysName);
+      ClassName *call=&callInfo->className;
+      char *callPackage=call->package;
+      //如果调用类没有包名，但类实现现其它类实现在一起，并且其中某个类实现声明有包名，则调用类使用这个包名
+      if(callPackage==NULL)
+         callPackage= getPackageFromClassImpl(self);
+      if(isSamePackage(callee->package,callPackage)) //同一个包内
+         return;
+      ClassRelationship ship=   class_mgr_relationship(class_mgr_get(), env->callSysName,calleeSysName);
+      if(ship==CLASS_RELATIONSHIP_CHILD)
+         return;
+      if(callPackage==NULL && callee->package == NULL &&
+            callInfo->file && info->file && !strcmp(callInfo->file,info->file))
+         return;
+      error_at(env->loc,"%qs调用%qs的变量%qs被禁止。两个类并不在同一包内，也无继承关系。",
+            class_mgr_get_user_name(class_mgr_get(),env->callSysName),
+            class_mgr_get_user_name(class_mgr_get(),calleeSysName),
+            env->varEntity->orgiName);
+   }else{
+      //当前文件有实现了与被调用类相同的包的类。
+      char *callPackage= getPackageFromClassImpl(self);
+      if(callPackage!=NULL){
+         if(isSamePackage(info->className.package,callPackage)) //同一个包内
+            return;
+      }
+      const char *file = LOCATION_FILE (env->loc);
+      if(file!=NULL){
+         if(class_info_is_decl_file(info,file))
+            return;
+      }
+      if(env->compileGenericBlock)
+         return;
+      error_at(env->loc,"在文件中不能访问类%qs的保护或缺省的变量%qs。",calleeSysName,env->varEntity->orgiName);
+   }
 }
 
 static void checkEnum(AccessControls *self,AccessEnv *env)
 {
-       char *calleeSysName=env->calleeSysName;
-       if(exitsImpl(self,calleeSysName)){
-          // printf("在:%s中调用类:%s的枚举:%s，并且调用类和被调用类的实现都在同一个文件中。",
-                 //  env->callSysName==NULL?"在文件":env->callSysName,calleeSysName,env->enumData->origName);
-           return;
-       }
-       //检查类关系
-       ClassInfo *info=class_mgr_get_class_info(class_mgr_get(),calleeSysName);
-       if(info->permission==CLASS_PERMISSION_PRIVATE){ //如果被调用的类是private,判断是不是在一个文件内实现
-          error_at(env->loc,"被调用类%qs是私有的，不能访问它的枚举%qs的元素%qs。",calleeSysName,env->enumData->origName,env->enumVar);
-          return;
-       }else if(info->permission==CLASS_PERMISSION_PROTECTED || info->permission==CLASS_PERMISSION_DEFAULT){
-           if(env->isAet){
-               ClassName *callee=&info->className;//class_mgr_get_class_name_by_sys(class_mgr_get(),calleeFuncSysName);
-               ClassName *call=class_mgr_get_class_name_by_sys(class_mgr_get(),env->callSysName);
-               nboolean samePackage=isSamePackage(callee->package,call->package);
-               ClassRelationship ship=   class_mgr_relationship(class_mgr_get(), env->callSysName,calleeSysName);
-               if(!samePackage && ship!=CLASS_RELATIONSHIP_PARENT){
-                   if(!samePackage)
-                      error_at(env->loc,"类%qs与被调用类%qs不在同一个包内。",env->callSysName,calleeSysName);
-                   if(ship!=CLASS_RELATIONSHIP_PARENT)
-                       error_at(env->loc,"类%qs与被调用类%qs不是父子关系。",env->callSysName,calleeSysName);
-                   return;
-               }
-           }else{
-               error_at(env->loc,"不能引用保护类型的类%qs。",calleeSysName);
-               return;
-           }
-       }
-       //检查枚举
-      // printf("enum is -sss--- %s %s %d %s\n",env->enumData->sysName,env->enumData->origName,env->enumData->permission,env->enumVar);
-       if(env->enumData->permission==CLASS_PERMISSION_PUBLIC){
-           return;
-       }
-       if(env->enumData->permission==CLASS_PERMISSION_PRIVATE){
-           error_at(env->loc,"在%qs中调用类%qs的私有枚举%qs被禁止。所在函数：%qs",
-                   env->callSysName==NULL?"在文件":env->callSysName,calleeSysName,env->enumData->origName,env->atFuncName);
-           return;
-       }
-       if(env->isAet){
-           //如果调用类与被调用类在同一个包或是继承关系可以调用。
-           ClassName *callee=&info->className;
-           ClassInfo *callInfo=class_mgr_get_class_info(class_mgr_get(),env->callSysName);
-           ClassName *call=&callInfo->className;
-           char *callPackage=call->package;
-           //如果调用类没有包名，但类实现现其它类实现在一起，并且其中某个类实现声明有包名，则调用类使用这个包名
-           if(callPackage==NULL)
-               callPackage= getPackageFromClassImpl(self);
-           if(isSamePackage(callee->package,callPackage)) //同一个包内
-               return;
-           ClassRelationship ship=   class_mgr_relationship(class_mgr_get(), env->callSysName,calleeSysName);
-           if(ship==CLASS_RELATIONSHIP_CHILD)
-               return;
-            error_at(env->loc,"%qs调用%qs的枚举%qs被禁止。两个类并不在同一包内，也无继承关系。",
-                  class_mgr_get_user_name(class_mgr_get(),env->callSysName),
-                  class_mgr_get_user_name(class_mgr_get(),calleeSysName),
-                  env->enumData->origName);
-       }else{
-           //当前文件有实现了与被调用类相同的包的类。
-           char *callPackage= getPackageFromClassImpl(self);
-           if(callPackage!=NULL){
-               if(isSamePackage(info->className.package,callPackage)) //同一个包内
-                  return;
-           }
-           const char *file = LOCATION_FILE (env->loc);
-           if(file!=NULL){
-               if(class_info_is_decl_file(info,file))
-                   return;
-           }
-           error_at(env->loc,"在文件中不能访问类%qs的保护或缺省的枚举%qs。",
-                 class_mgr_get_user_name(class_mgr_get(),calleeSysName),env->enumData->origName);
-       }
+   char *calleeSysName=env->calleeSysName;
+   if(exitsImpl(self,calleeSysName)){
+      // printf("在:%s中调用类:%s的枚举:%s，并且调用类和被调用类的实现都在同一个文件中。",
+      //  env->callSysName==NULL?"在文件":env->callSysName,calleeSysName,env->enumData->origName);
+      return;
+   }
+   //检查类关系
+   ClassInfo *info=class_mgr_get_class_info(class_mgr_get(),calleeSysName);
+   if(info->permission==CLASS_PERMISSION_PRIVATE){ //如果被调用的类是private,判断是不是在一个文件内实现
+      error_at(env->loc,"被调用类%qs是私有的，不能访问它的枚举%qs的元素%qs。",calleeSysName,env->enumData->origName,env->enumVar);
+      return;
+   }else if(info->permission==CLASS_PERMISSION_PROTECTED || info->permission==CLASS_PERMISSION_DEFAULT){
+      if(env->isAet){
+         ClassName *callee=&info->className;//class_mgr_get_class_name_by_sys(class_mgr_get(),calleeFuncSysName);
+         ClassName *call=class_mgr_get_class_name_by_sys(class_mgr_get(),env->callSysName);
+         nboolean samePackage=isSamePackage(callee->package,call->package);
+         ClassRelationship ship=   class_mgr_relationship(class_mgr_get(), env->callSysName,calleeSysName);
+         if(!samePackage && ship!=CLASS_RELATIONSHIP_PARENT){
+            if(!samePackage)
+               error_at(env->loc,"类%qs与被调用类%qs不在同一个包内。",env->callSysName,calleeSysName);
+            if(ship!=CLASS_RELATIONSHIP_PARENT)
+               error_at(env->loc,"类%qs与被调用类%qs不是父子关系。",env->callSysName,calleeSysName);
+            return;
+         }
+      }else{
+         error_at(env->loc,"不能引用保护类型的类%qs。",calleeSysName);
+         return;
+      }
+   }
+   //检查枚举
+   // printf("enum is -sss--- %s %s %d %s\n",env->enumData->sysName,env->enumData->origName,env->enumData->permission,env->enumVar);
+   if(env->enumData->permission==CLASS_PERMISSION_PUBLIC)
+      return;
+
+   if(env->enumData->permission==CLASS_PERMISSION_PRIVATE){
+      error_at(env->loc,"在%qs中调用类%qs的私有枚举%qs被禁止。所在函数：%qs",
+      env->callSysName==NULL?"在文件":env->callSysName,calleeSysName,env->enumData->origName,env->atFuncName);
+      return;
+   }
+   if(env->isAet){
+      //如果调用类与被调用类在同一个包或是继承关系可以调用。
+      ClassName *callee=&info->className;
+      ClassInfo *callInfo=class_mgr_get_class_info(class_mgr_get(),env->callSysName);
+      ClassName *call=&callInfo->className;
+      char *callPackage=call->package;
+      //如果调用类没有包名，但类实现现其它类实现在一起，并且其中某个类实现声明有包名，则调用类使用这个包名
+      if(callPackage==NULL)
+         callPackage= getPackageFromClassImpl(self);
+      if(isSamePackage(callee->package,callPackage)) //同一个包内
+         return;
+      ClassRelationship ship = class_mgr_relationship(class_mgr_get(), env->callSysName,calleeSysName);
+      if(ship==CLASS_RELATIONSHIP_CHILD)
+         return;
+      //同一文件内
+      if(callPackage == NULL && callee->package == NULL &&
+            callInfo->file && info->file && !strcmp(callInfo->file,info->file))
+         return;
+      error_at(env->loc,"%qs调用%qs的枚举%qs被禁止。两个类并不在同一包内，也无继承关系。",
+         class_mgr_get_user_name(class_mgr_get(),env->callSysName),
+         class_mgr_get_user_name(class_mgr_get(),calleeSysName),
+         env->enumData->origName);
+   }else{
+      //当前文件有实现了与被调用类相同的包的类。
+      char *callPackage= getPackageFromClassImpl(self);
+      if(callPackage!=NULL){
+         if(isSamePackage(info->className.package,callPackage)) //同一个包内
+            return;
+      }
+      const char *file = LOCATION_FILE (env->loc);
+      if(file!=NULL){
+         if(class_info_is_decl_file(info,file))
+            return;
+      }
+      error_at(env->loc,"在文件中不能访问类%qs的保护或缺省的枚举%qs。",
+            class_mgr_get_user_name(class_mgr_get(),calleeSysName),env->enumData->origName);
+   }
 }
 
 /**
@@ -763,43 +760,43 @@ nboolean access_controls_access_method(AccessControls *self,location_t loc,Class
  */
 nboolean access_controls_access_var(AccessControls *self,location_t loc,char *varName,char *calleeSysName)
 {
-    //如果调用是在类中，但是该类
-    //第一种：公共方法，返回TRUE
-    c_parser *parser=self->parser->parser;
-    VarEntity *entity=var_mgr_get_var(var_mgr_get(),calleeSysName,varName);
-    if(entity==NULL){
-        //printf("access_controls_access_var ---找不到变量,可能是一个方法赋值。 %s %s\n",varName,calleeSysName);
-        return TRUE;
-    }
-    if(aet_utils_compile_additional_code_status()){ //正在编译附加代码
-       n_debug("访问的变量属于附加代码:%s %s",varName,calleeSysName);
-       return TRUE;
-    }
-    char *atFuncName=NULL;
-    if (aet_utils_valid_tree(current_function_decl)){
-        atFuncName=IDENTIFIER_POINTER(DECL_NAME(current_function_decl));
-    }
-    //printf("访问类变量---- var:%s calleeSysName:%s permission:%d parser->isAet:%d 所在函数:%s\n",
-           // varName,calleeSysName,entity->permission,self->parser->isAet,atFuncName);
-    if(self->parser->isAet ){
-        ClassName *implClassName=class_impl_get_class_name(class_impl_get());
-        char *sysName=implClassName->sysName;
-        if(!strcmp(sysName,calleeSysName)){
-            //1.在类实现中，调用的是本类的方法，不需要判断权限
-            return TRUE;
-        }else{
-            //2.在类实现中，调用的是其它类的方法，保存调用信息，当整个文件编译完后再判断权限
-            addVar(self,calleeSysName,entity,TRUE,FALSE,sysName,loc);
-        }
-    }else{
-        if(filter(self)) //过滤编译器内部创建的初始化代码
-           return TRUE;
-        if(aet_parser_is_generic_state(self->parser))
-           addVar(self,calleeSysName,entity,FALSE,TRUE,NULL,loc);
-        else
-           addVar(self,calleeSysName,entity,FALSE,FALSE,NULL,loc);
-    }
-    return TRUE;
+   //如果调用是在类中，但是该类
+   //第一种：公共方法，返回TRUE
+   c_parser *parser=self->parser->parser;
+   VarEntity *entity=var_mgr_get_var(var_mgr_get(),calleeSysName,varName);
+   if(entity==NULL){
+      //printf("access_controls_access_var ---找不到变量,可能是一个方法赋值。 %s %s\n",varName,calleeSysName);
+      return TRUE;
+   }
+   if(aet_utils_compile_additional_code_status()){ //正在编译附加代码
+      n_debug("访问的变量属于附加代码:%s %s",varName,calleeSysName);
+      return TRUE;
+   }
+   char *atFuncName=NULL;
+   if (aet_utils_valid_tree(current_function_decl))
+      atFuncName=IDENTIFIER_POINTER(DECL_NAME(current_function_decl));
+
+   //printf("访问类变量---- var:%s calleeSysName:%s permission:%d parser->isAet:%d 所在函数:%s\n",
+   // varName,calleeSysName,entity->permission,self->parser->isAet,atFuncName);
+   if(self->parser->isAet ){
+      ClassName *implClassName=class_impl_get_class_name(class_impl_get());
+      char *sysName=implClassName->sysName;
+      if(!strcmp(sysName,calleeSysName)){
+         //1.在类实现中，调用的是本类的方法，不需要判断权限
+         return TRUE;
+      }else{
+         //2.在类实现中，调用的是其它类的方法，保存调用信息，当整个文件编译完后再判断权限
+         addVar(self,calleeSysName,entity,TRUE,FALSE,sysName,loc);
+      }
+   }else{
+      if(filter(self)) //过滤编译器内部创建的初始化代码
+         return TRUE;
+      if(aet_parser_is_generic_state(self->parser))
+         addVar(self,calleeSysName,entity,FALSE,TRUE,NULL,loc);
+      else
+         addVar(self,calleeSysName,entity,FALSE,FALSE,NULL,loc);
+   }
+   return TRUE;
 }
 
 /**
@@ -849,17 +846,15 @@ void access_controls_check(AccessControls *self)
 {
    int i;
    for(i=0;i<self->accessArray->len;i++){
-       AccessEnv *item=(AccessEnv*)n_ptr_array_index(self->accessArray,i);
-       if(item->accessType==ACCESS_CLASS_FUNC)
-           checkMethod(self,item);
-       else  if(item->accessType==ACCESS_CLASS_VAR)
-           checkVar(self,item);
-       else
-           checkEnum(self,item);
+      AccessEnv *item=(AccessEnv*)n_ptr_array_index(self->accessArray,i);
+      if(item->accessType==ACCESS_CLASS_FUNC)
+         checkMethod(self,item);
+      else  if(item->accessType==ACCESS_CLASS_VAR)
+         checkVar(self,item);
+      else
+         checkEnum(self,item);
    }
 }
-
-
 
 /**
  * 加入在当前编译文件中实现的类的名称到AccessControls中.
@@ -872,8 +867,6 @@ void  access_controls_add_impl(AccessControls *self,char *sysName)
     n_ptr_array_add(self->implClassArray,n_strdup(sysName));
 }
 
-
-
 AccessControls *access_controls_get()
 {
     static AccessControls *singleton = NULL;
@@ -884,8 +877,4 @@ AccessControls *access_controls_get()
     }
     return singleton;
 }
-
-
-
-
 

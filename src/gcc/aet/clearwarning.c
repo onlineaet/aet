@@ -52,97 +52,28 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 #include "implicitlycall.h"
 #include "aetparser.h"
 
-
-static char *getIfaceCommonData123ByRecord(tree type)
+static ClassInfo *getClassInfo(tree leftOrRightType)
 {
-    if(TREE_CODE(type)!=RECORD_TYPE){
-        //n_warning("class_util_get_class_name_by_record 00 不是record_type %s",get_tree_code_name(TREE_CODE(type)));
-        if(TREE_CODE(type)==POINTER_TYPE){
-            //n_warning("class_util_get_class_name_by_record 11 可能是 Abc **obj %s",get_tree_code_name(TREE_CODE(type)));
-            return getIfaceCommonData123ByRecord(TREE_TYPE(type));
-        }
-        return NULL;
-    }
-    tree next=TYPE_NAME(type);
-    if(!aet_utils_valid_tree(next))
-        return NULL;
-    if(TREE_CODE(next)!=TYPE_DECL){
-        //n_warning("class_util_get_class_name_by_record 11 不是TYPE_DECL %s",get_tree_code_name(TREE_CODE(next)));
-        return NULL;
-    }
-    char *ifaceCommon=IDENTIFIER_POINTER(DECL_NAME (next));
-    if(!strcmp(ifaceCommon,IFACE_COMMON_STRUCT_NAME)){
-        return ifaceCommon;
-    }
-    return NULL;
-}
-
-static tree getTypeFromPointer(tree pointerType)
-{
-    if(TREE_CODE(pointerType)!=POINTER_TYPE)
-        return pointerType;
-    pointerType=TREE_TYPE(pointerType);
-    return getTypeFromPointer(pointerType);
-}
-
-static char *getIfaceCommonData123ByPointer(tree pointerType)
-{
-    if(TREE_CODE(pointerType)!=POINTER_TYPE)
-        return NULL;
-    tree record=getTypeFromPointer(pointerType);
-    return getIfaceCommonData123ByRecord(record);
-}
-
-static char *getIfaceCommonData123(tree type)
-{
-    if(!aet_utils_valid_tree(type))
-        return NULL;
-    if(TREE_CODE(type)==POINTER_TYPE)
-        return getIfaceCommonData123ByPointer(type);
-    else if(TREE_CODE(type)==RECORD_TYPE)
-        return getIfaceCommonData123ByRecord(type);
-    else if(TREE_CODE(type)==ARRAY_TYPE){
-        tree vt=TREE_TYPE(type);
-        if(TREE_CODE(vt)==POINTER_TYPE)
-           return getIfaceCommonData123ByPointer(vt);
-        else if(TREE_CODE(vt)==RECORD_TYPE)
-           return getIfaceCommonData123ByRecord(vt);
-    }
-    return NULL;
-}
-
-static char *getClassName(tree leftOrRightType)
-{
-   char *className=NULL;
+   ClassInfo *className=NULL;
    if(TREE_CODE(leftOrRightType)!=FUNCTION_TYPE
    && TREE_CODE(leftOrRightType)!=RECORD_TYPE
    && TREE_CODE(leftOrRightType)!=POINTER_TYPE)
-      return 0;
+      return NULL;
    if(TREE_CODE(leftOrRightType)==FUNCTION_TYPE){
       for (tree al = TYPE_ARG_TYPES (leftOrRightType); al; al = TREE_CHAIN (al)){
          tree type=TREE_VALUE(al);
          if(TREE_CODE(type)!=POINTER_TYPE)
             return NULL;
-         className=class_util_get_class_name(type);
+         className=class_mgr_get_class_info_by_type(class_mgr_get(),type);
          n_debug("从函数参数据中取第一个参数 第一个参数是:%s\n",className);
-         if(className==NULL){
-            className=getIfaceCommonData123(type);
-            if(className==NULL)
-               return NULL;
-         }
          break;
       }
    }else if(TREE_CODE(leftOrRightType)==RECORD_TYPE || TREE_CODE(leftOrRightType)==POINTER_TYPE){
-      className=class_util_get_class_name(leftOrRightType);
-      // printf("从类型pointer_tpe中取类名:%s\n",className);
-      if(className==NULL){
-         className=getIfaceCommonData123(leftOrRightType);
-         if(className==NULL)
-            return NULL;
-      }
+      className=class_mgr_get_class_info_by_type(class_mgr_get(),leftOrRightType);
    }
    return className;
 }
+
 
 /**
  * 检查右值是不是函数调用ref()。如果是不要出现警告。
@@ -314,6 +245,20 @@ static nboolean isImplicitlyCall(tree call)
 }
 
 /**
+ * 判断是不是接口的 IFACE_AT_CLASS                     "_atClass123"
+ */
+static nboolean isIfaceToCalss(tree rhs)
+{
+  if(TREE_CODE(rhs)==COMPONENT_REF){
+     tree field=TREE_OPERAND(rhs,1);
+     if(TREE_CODE(field)==FIELD_DECL){
+        tree name = DECL_NAME(field);
+        return strcmp(IDENTIFIER_POINTER(name),IFACE_AT_CLASS)==0;
+     }
+  }
+  return FALSE;
+}
+/**
  * c-typeck.cc 中调用，检查是否是aet类之间的转换。
  * 1.warn
  * -1 error
@@ -328,10 +273,9 @@ enum impl_conv {
   ic_unknow
 };
 
+
 static int  matchTree(tree lhtype,tree rhs,tree origRhType,int errortype)
 {
-   char *leftObjectName=NULL;
-   char *rightObjectName=NULL;
    //如果右值是调用隐藏函数时，返回0
    if(isImplicitlyCall(rhs)){
       n_debug("如果右值是调用隐藏函数时，返回1\n");
@@ -344,8 +288,8 @@ static int  matchTree(tree lhtype,tree rhs,tree origRhType,int errortype)
    if(TREE_CODE(lhtype_2)!=FUNCTION_TYPE && TREE_CODE(lhtype_2)!=RECORD_TYPE
    && TREE_CODE(lhtype_2)!=POINTER_TYPE/*匹配AObject **values */)
       return 0;
-   leftObjectName=getClassName(lhtype_2);
-   n_debug("class_util_erase_warning leftObjectName:%s",leftObjectName);
+   ClassInfo *leftObjectName =getClassInfo(lhtype_2);
+   n_debug("class_util_erase_warning leftObjectName:%p",leftObjectName);
    if(leftObjectName==NULL){ //如左值不是类，判断是不是函数指针。
       //按函数指针判断
       n_debug("clear_warning_modify 是不是函数指针\n");
@@ -365,84 +309,72 @@ static int  matchTree(tree lhtype,tree rhs,tree origRhType,int errortype)
    if(TREE_CODE(rhtype)!=POINTER_TYPE)
       return 0;
    tree rhtype_2=TREE_TYPE (rhtype);
-   rightObjectName=getClassName(rhtype_2);
+   ClassInfo *rightObjectName =getClassInfo(rhtype_2);
+
    if(rightObjectName==NULL)
       return 0;
 
-   if(!strcmp(leftObjectName,IFACE_COMMON_STRUCT_NAME) && !strcmp(rightObjectName,IFACE_COMMON_STRUCT_NAME)){
-      n_debug("接口关系 00 IfaceCommonData123 ------ %s %s\n",leftObjectName,rightObjectName);
+   ClassRelationship ship=  class_mgr_relationship_by_info(class_mgr_get(),leftObjectName,rightObjectName);
+   n_debug("左右关系是 ------ %s %s ship:%d\n",leftObjectName->className.sysName,rightObjectName->className.sysName,ship);
+   if(ship==CLASS_RELATIONSHIP_PARENT){
+      // printf("左边%s是右边%s的父类。\n",leftObjectName,rightObjectName);
       return 1;
-   }else if(!strcmp(leftObjectName,IFACE_COMMON_STRUCT_NAME) && strcmp(rightObjectName,IFACE_COMMON_STRUCT_NAME)){
-      n_debug("接口关系 11 IfaceCommonData123 ------ %s %s\n",leftObjectName,rightObjectName);
-      ClassInfo *info=class_mgr_get_class_info(class_mgr_get(),rightObjectName);
-      return class_info_is_interface(info);
-   }else if(strcmp(leftObjectName,IFACE_COMMON_STRUCT_NAME) && !strcmp(rightObjectName,IFACE_COMMON_STRUCT_NAME)){
-      n_debug("接口关系 22 IfaceCommonData123 ------ %s %s\n",leftObjectName,rightObjectName);
-      ClassInfo *info=class_mgr_get_class_info(class_mgr_get(),leftObjectName);
-      return class_info_is_interface(info);
-   }else{
-      ClassRelationship ship=  class_mgr_relationship(class_mgr_get(), leftObjectName,rightObjectName);
-      n_debug("左右关系是 ------ %s %s ship:%d\n",leftObjectName,rightObjectName,ship);
-      if(ship==CLASS_RELATIONSHIP_PARENT){
-         // printf("左边%s是右边%s的父类。\n",leftObjectName,rightObjectName);
+   }else if(ship==CLASS_RELATIONSHIP_OTHER_IMPL){
+      // n_debug("右边%s是左边%s接口的实现。\n",rightObjectName,leftObjectName);
+      return 1;
+   }else if(ship==CLASS_RELATIONSHIP_IMPL){
+      location_t loc=EXPR_LOCATION(rhs);
+      loc=loc==0?input_location:loc;
+      /*在classcast.c class_cast_in_finish_decl方法中castClassToInterface方法也有同样的判断。*/
+      error_at(loc,"不能转化接口%qs到类%qs。",rightObjectName->className.sysName,leftObjectName->className.sysName);
+   }else if(ship==CLASS_RELATIONSHIP_CHILD){
+      location_t loc=EXPR_LOCATION(rhs);
+      loc=loc==0?input_location:loc;
+      if(isRef(rhs)){
          return 1;
-      }else if(ship==CLASS_RELATIONSHIP_OTHER_IMPL){
-         // n_debug("右边%s是左边%s接口的实现。\n",rightObjectName,leftObjectName);
-         return 1;
-      }else if(ship==CLASS_RELATIONSHIP_IMPL){
-         location_t loc=EXPR_LOCATION(rhs);
-         loc=loc==0?input_location:loc;
-         /*在classcast.c class_cast_in_finish_decl方法中castClassToInterface方法也有同样的判断。*/
-         error_at(loc,"不能转化接口%qs到类%qs。",rightObjectName,leftObjectName);
-      }else if(ship==CLASS_RELATIONSHIP_CHILD){
-         location_t loc=EXPR_LOCATION(rhs);
-         loc=loc==0?input_location:loc;
-         if(isRef(rhs)){
+      }else {
+         if(errortype==ic_assign && TREE_CODE(origRhType)==POINTER_TYPE
+         && TREE_CODE(lhtype)==POINTER_TYPE
+         && TREE_CODE(TREE_TYPE(origRhType))==FUNCTION_TYPE
+         && TREE_CODE(TREE_TYPE(lhtype))==FUNCTION_TYPE){
+            //匹配条件一
             return 1;
-         }else {
-            if(errortype==ic_assign && TREE_CODE(origRhType)==POINTER_TYPE
-                  && TREE_CODE(lhtype)==POINTER_TYPE
-                  && TREE_CODE(TREE_TYPE(origRhType))==FUNCTION_TYPE
-                  && TREE_CODE(TREE_TYPE(lhtype))==FUNCTION_TYPE){
-               //匹配条件一
-               return 1;
-            }
          }
-         //else
-         // warning_at(loc,0,"从父类%s转子类%s",rightObjectName,leftObjectName);
-         //n_error("不未实现CLASS_RELATIONSHIP_CHILD---%s\n",get_tree_code_name(TREE_CODE(rhs)));
-      }else{
-         ClassInfo *leftInfo=class_mgr_get_class_info(class_mgr_get(),leftObjectName);
-         if(leftInfo && class_info_is_interface(leftInfo)){
-            ClassInfo *rightInfo=class_mgr_get_class_info(class_mgr_get(),rightObjectName);
-            /*
-            * ARandom *objectVar=new$ ARandom();
-            * RandomGenerator *ifaceVar=(RandomGenerator *)objectVar;
-            * ifaceVar->evaluate();//这句引起
-            * 警告：传递‘ifaceVar->evaluate()’的第 1 个参数时在不兼容的指针类型间转换 [-Wincompatible-pointer-types]
-            * evaluate的型参是:RandomGenerator，实参是:(AObject *)(objectVar->ifaceRandomGenerator2066046634._iface_common_var._atClass123)
-            */
-            if(rightInfo!=NULL && class_info_is_root(rightInfo) && TREE_CODE(rhs)==NOP_EXPR)
-               return 1;
-            tree currentDecl=current_function_decl;//匹配第五种情况
-            if(aet_utils_valid_tree(currentDecl)){
-               char *funcName=IDENTIFIER_POINTER(DECL_NAME(currentDecl));
-               char *sysName=aet_utils_get_sys_name_from_init_method(funcName);
-               if(sysName!=NULL){
-                  ClassRelationship ship1=  class_mgr_relationship(class_mgr_get(),sysName,rightObjectName);
-                  ClassRelationship ship2=  class_mgr_relationship(class_mgr_get(),sysName,leftObjectName);
-                  n_free(sysName);
-                  //说明sysName是rightObjectName的儿子，同时也实现了接口leftObjectName，但它的实现方法在父类rightObjectName中
-                  if(ship1==CLASS_RELATIONSHIP_CHILD && ship2==CLASS_RELATIONSHIP_IMPL){
-                     return 1;
-                  }
+      }
+   }else{
+      ClassInfo *leftInfo=leftObjectName;
+      if(leftInfo && class_info_is_interface(leftInfo)){
+         ClassInfo *rightInfo=rightObjectName;
+         /*
+         * ARandom *objectVar=new$ ARandom();
+         * RandomGenerator *ifaceVar=(RandomGenerator *)objectVar;
+         * ifaceVar->evaluate();//这句引起
+         * 警告：传递‘ifaceVar->evaluate()’的第 1 个参数时在不兼容的指针类型间转换 [-Wincompatible-pointer-types]
+         * evaluate的型参是:RandomGenerator，实参是:(AObject *)(objectVar->ifaceRandomGenerator2066046634._iface_common_var._atClass123)
+         */
+         if(rightInfo!=NULL && class_info_is_root(rightInfo) && isIfaceToCalss(rhs)){
+            return 1;
+         }
+         tree currentDecl=current_function_decl;//匹配第五种情况
+         if(aet_utils_valid_tree(currentDecl)){
+            char *funcName=IDENTIFIER_POINTER(DECL_NAME(currentDecl));
+            char *sysName=aet_utils_get_sys_name_from_init_method(funcName);
+            if(sysName!=NULL){
+               ClassRelationship ship1=  class_mgr_relationship(class_mgr_get(),sysName,rightObjectName->className.sysName);
+               ClassRelationship ship2=  class_mgr_relationship(class_mgr_get(),sysName,leftObjectName->className.sysName);
+               n_free(sysName);
+               //说明sysName是rightObjectName的儿子，同时也实现了接口leftObjectName，但它的实现方法在父类rightObjectName中
+               if(ship1==CLASS_RELATIONSHIP_CHILD && ship2==CLASS_RELATIONSHIP_IMPL){
+                  return 1;
                }
             }
          }
       }
    }
+
    return 0;
 }
+
 
 /**
  * 如果不是类之间的转换

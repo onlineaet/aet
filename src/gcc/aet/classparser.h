@@ -74,17 +74,15 @@ struct _ClassParser
       //aetparser.c 中分析说明符时，会报警告：空声明 加入状态 running ,aetparser可以具此跳过警告。
       nboolean running;
    }addAetHeader;
+
 };
 
 
 ClassParser       *class_parser_get();
-struct c_typespec  class_parser_parser_class_specifier (ClassParser *self);
-void               class_parser_replace_class_to_typedef(ClassParser *self);
 void               class_parser_abstract_keyword(ClassParser *self);
 nboolean           class_parser_is_parsering(ClassParser *self);
 nboolean           class_parser_goto(ClassParser *self,nboolean start_attr_ok,int *action);
 void               class_parser_final(ClassParser *self,struct c_declspecs *specs);
-nboolean           class_parser_exception(ClassParser *self,tree value);
 void               class_parser_decorate(ClassParser *self);
 void               class_parser_parser_enum_dot(ClassParser *self,struct c_typespec *ret);
 struct c_typespec  class_parser_enum(ClassParser *self,location_t loc);
@@ -96,6 +94,8 @@ GenericModel      *class_parser_get_func_generic_mode(ClassParser *self);
 nboolean           class_parser_add_include(ClassParser *self);
 //是否正在加入aet.h头文件
 nboolean           class_parser_is_add_include(ClassParser *self);
+
+struct c_typespec class_parser_parser_class(ClassParser *self);
 
 #endif
 

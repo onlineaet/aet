@@ -2198,11 +2198,11 @@ const char *mtcs_ptx_get_replace_function_name(MtcsPtx *self,const char *origNam
    if (strcmp (origName, "call") == 0)
       return "__nvptx_call";
    if (strcmp (origName, "malloc") == 0)
-      return "__nvptx_malloc";
+      return "malloc";
    if (strcmp (origName, "free") == 0)
-      return "__nvptx_free";
+      return "free";
    if (strcmp (origName, "realloc") == 0)
-      return "__nvptx_realloc";
+      return "realloc";
    if (strcmp (origName, "printf") == 0) //ptx没有printf系统调用，只有vprintf(fmt,va_list)//zclei
       return "vprintf";
    //if (strcmp (name, "puts") == 0) //ptx没有puts系统调用，只有vprintf(fmt,va_list)//zclei

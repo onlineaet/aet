@@ -77,6 +77,8 @@ inline const char *mtcs_info_get_mtcs_type_string(MtcsFuncType type)
       return MTCS_DEVICE_STR;
    else if(type==MTCS_FUNC_DEVICE_HOST)
       return MTCS_DEVICE_HOST_STRING;
+   else if(type == MTCS_FUNC_NOT)
+      return MTCS_HOST_STR;
    else
       gcc_unreachable();
 }

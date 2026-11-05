@@ -37,13 +37,8 @@ struct _ClassBuild
 
 
 ClassBuild *class_build_new();
-char       *class_build_create_codes(ClassBuild *self,ClassName *className);
-tree        class_build_get_func(ClassBuild *self,ClassName *className);
-void        class_build_replace_getclass_rtn(ClassBuild *self,ClassName *className);
-void        class_build_create_func_name(ClassName *className,char *buf);
-void        class_build_create_func_name_by_sys_name(char *sysName,char *buf);
-
-
+char       *class_build_create_get_aclass_codes(ClassBuild *self,ClassName *className);
+tree        class_build_build_get_class_call(ClassBuild *self,location_t loc,ClassName *className);
 
 
 #endif

@@ -26,6 +26,7 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 #include "system.h"
 #include "coretypes.h"
 #include "target.h"
+#include "tree-core.h"
 
 #include "function.h"
 #include "tree.h"
@@ -43,6 +44,8 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 #include "gcc-rich-location.h"
 #include "c-family/c-common.h"
 #include "gimple-expr.h"
+#include "tree-iterator.h"
+#include "gimplify.h"
 
 #include "c/c-tree.h"
 
@@ -74,13 +77,11 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 #include "accesscontrols.h"
 #include "classparser.h"
 
-
 /**
  * 函数调用分两种情况
  * 在implimpl的没有加self->访问
  * 在implimpl加self->或其它对象的 如abc->
  */
-
 static void funcCallInit(FuncCall *self)
 {
     self->funcHelp=func_help_new();
@@ -175,17 +176,6 @@ static tree buildExternalRef (location_t loc, tree id)
    return ref;
 }
 
-static tree createTempFunction(tree field)
-{
-   tree funid=DECL_NAME(field);
-   tree type=TREE_TYPE(field);
-   tree functionType=TREE_TYPE(type);
-   tree decl = build_decl (0, FUNCTION_DECL, funid, default_function_type);
-   TREE_TYPE(decl)=functionType;
-   c_aet_copy_lang(decl,field);
-   return decl;
-}
-
 
 static char *getLowClassName(tree field)
 {
@@ -236,26 +226,14 @@ static int findStaticFuncAtClass(FuncCall *self,ClassName *className,char *orgiN
    }
 }
 
-static int findFunc(FuncCall *self,ClassName *className,char *orgiName)
-{
-	int re=findFuncAtClassAndInterface(self,className,orgiName);
-	return re;
-}
-
-static int findFuncAtStatic(FuncCall *self,ClassName *className,char *orgiName)
-{
-	int re=findStaticFuncAtClass(self,className,orgiName);
-	return re;
-}
-
 /**
  * 先找类函数，找不到再找类静态函数
  */
 int fun_call_find_func(FuncCall *self,ClassName *className,tree id)
 {
-   int re=findFunc(self,className,IDENTIFIER_POINTER(id));
+   int re=findFuncAtClassAndInterface(self,className,IDENTIFIER_POINTER(id));
    if(re==ID_NOT_FIND){
-      re=findFuncAtStatic(self,className,IDENTIFIER_POINTER(id));
+      re=findStaticFuncAtClass(self,className,IDENTIFIER_POINTER(id));
    }
    return re;
 }
@@ -390,7 +368,7 @@ static tree callItself(FuncCall *self,tree func,CandidateFunc *selected,vec<tree
 			error_at(DECL_SOURCE_LOCATION(item->fromImplDefine),"接口%qs不应有定义。",selected->sysName);
 			return NULL_TREE;
 		}
-		n_debug("func_call_select callItself 00 在这里创建本身接口方法的引用。接口所属类:%s 接口:%s\n",selected->implSysName,selected->sysName);
+		//n_debug("func_call_select callItself 00 在这里创建本身接口方法的引用。接口所属类:%s 接口:%s\n",selected->implSysName,selected->sysName);
 		tree firstParm=NULL_TREE;
 		ClassName *implClassName=class_mgr_get_class_name_by_sys(class_mgr_get(),selected->implSysName);
 		ClassName *iface=class_mgr_get_class_name_by_sys(class_mgr_get(),selected->sysName);
@@ -401,16 +379,19 @@ static tree callItself(FuncCall *self,tree func,CandidateFunc *selected,vec<tree
 		}
 	}else{
 		if(aet_utils_valid_tree(item->fieldDecl)){
-      //printf("func_call_select localClass 11 在这里创建本身的field引用 类:%s\n",selected->sysName);
+         //n_debug("func_call_select localClass 11 在这里创建本身的field引用 类:%s\n",selected->sysName);
+         //如果是这样 getObject()->setData() setData的第一个参数原本是 getObject()
+         //经过func_help_create_itself_deref_new后变成了 null,但又能过 nameless_call_parser 还原回 getObject()
+         // nameless_call_parser 中把 getObject() 赋值给变量 xxx  setData中的第一个参数就是 xxx
          tree firstParm= NULL;//(*exprlist)[0];
          decl=func_help_create_itself_deref_new(self->funcHelp,func,item->fieldDecl,loc,&firstParm);
-        // printf("func_call_select localClass 11ccccc 在这里创建本身的field引用 类:%s\n",selected->sysName);
+         //n_debug("func_call_select localClass 22 在这里创建本身的field引用 类:%s\n",selected->sysName);
          if(aet_utils_valid_tree(decl)){
              exprlist->ordered_remove(0);
              vec_safe_insert (exprlist, 0, firstParm);
          }
 		}else if(aet_utils_valid_tree(item->fromImplDefine) && allscope){
-		    //printf("func_call_select localClass 11 有定义直接用 类:%s\n",selected->sysName);
+		   //n_debug("func_call_select localClass 33 有定义直接用 类:%s\n",selected->sysName);
 			decl=item->fromImplDefine;
 		}
 	}
@@ -424,9 +405,9 @@ static tree callItself(FuncCall *self,tree func,CandidateFunc *selected,vec<tree
 static CandidateFunc *selectStaticByRecursion(FuncCall *self,ClassName *className,char *orgiName,vec<tree, va_gc> *exprlist,
         vec<tree, va_gc> *origtypes,vec<location_t> arg_loc,location_t expr_loc,FuncPointerError **errors)
 {
-   if(className==NULL || orgiName==NULL || className->sysName==NULL){
+   if(className==NULL || orgiName==NULL || className->sysName==NULL)
       return NULL;
-   }
+
    CandidateFunc *result=select_field_get_static_func(select_field_get(),className,orgiName,exprlist,origtypes,arg_loc,expr_loc,errors);
    if(result==NULL){
       ClassInfo *info=class_mgr_get_class_info_by_class_name(class_mgr_get(),className);
@@ -472,6 +453,13 @@ tree func_call_deref_select(FuncCall *self,tree func,vec<tree, va_gc> *exprlist,
       item=select_field_get_func(select_field_get(),className,funName,exprlist,origtypes,
             arg_loc,expr_loc,FALSE,generics,errors);
       if(item==NULL){
+         //如果是接口调用ref,创建一个函数
+         tree ret = class_interface_create_ref_function_define(class_parser_get()->classInterface,
+               expr_loc,className,funName);
+         if(ret){
+            selRet->ifaceCallRef=TRUE;
+            return ret;
+         }
          error_at(expr_loc,"接口%qs没有%qs方法。",className->userName,funName);
          return last;
       }
@@ -496,14 +484,13 @@ tree func_call_deref_select(FuncCall *self,tree func,vec<tree, va_gc> *exprlist,
       item=selectFunc(self,lowClassName,funName,exprlist,origtypes,arg_loc,
             expr_loc,FALSE,generics,funcGenericDefine,errors,selRet);
       if(item!=NULL){
-         //convertParmForGenerics(self,item,exprlist,expr_loc,FALSE,generics);//转化实参到void*
          if(!strcmp(item->sysName,lowClassName->sysName)){
-            //printf("func_call_deref_select 找到了 11 方法就在本类中 class:%s  mangleFunName:%s lowClassName:%s\n",
-            //item->sysName,item->classFunc->mangleFunName,lowClassName->userName);
+            n_debug("func_call_deref_select 找到了 22 方法就在本类中 class:%s  mangleFunName:%s lowClassName:%s\n",
+            item->sysName,item->classFunc->mangleFunName,lowClassName->userName);
             last=callItself(self,func,item,exprlist,expr_loc,FALSE);
          }else{
-            //printf("func_call_deref_select 找到了 22 方法就在父类中 class:%s mangleFunName:%s lowClassName:%s\n",
-            // item->sysName,item->classFunc->mangleFunName,lowClassName->sysName);
+            n_debug("func_call_deref_select 找到了 33 方法就在父类中 class:%s mangleFunName:%s lowClassName:%s\n",
+             item->sysName,item->classFunc->mangleFunName,lowClassName->sysName);
             last=callParentOrParentIface(self,func,item,exprlist,expr_loc,FALSE);
          }
          //设置后再select_field_build_function_call_vec再调用setGenericQuery
@@ -564,7 +551,8 @@ tree func_call_select(FuncCall *self,tree func,vec<tree, va_gc> *exprlist, vec<t
    CandidateFunc *item=NULL;
    GenericModel *generics=NULL;//在这里的调用都是在类实现中，不会有具体的泛型找到，所以是空的.
    GenericModel *funcGenericDefine=c_aet_get_func_generics_model(func);//如果funcGenericDefine是有效的说明这是一个泛型函数
-   item=selectFunc(self,className,funName,exprlist,origtypes,arg_loc,expr_loc,TRUE,generics,funcGenericDefine,errors,selRet);
+   item=selectFunc(self,className,funName,exprlist,origtypes,arg_loc,
+         expr_loc,TRUE,generics,funcGenericDefine,errors,selRet);
    //如果是field要加入指针，否则访问不到
    if(item!=NULL){
       n_debug("func_call_select is 找到了 00 class:%s mangleFunName:%s\n",item->sysName,item->classFunc->mangleFunName);

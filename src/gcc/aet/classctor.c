@@ -209,7 +209,6 @@ static struct c_arg_info *createParam (c_parser *parser, char *className)
    struct c_arg_info * args= get_parm_info (false, expr);
    pop_scope ();
    return args;
-
 }
 
 /**
@@ -245,7 +244,6 @@ static tree rebuildComponentRef(ClassCtor *self,tree componentref ,tree field)
     return componentref;
 }
 
-
 /**
  * 获取参数的个数
  */
@@ -260,67 +258,6 @@ static int getParamsNumber(tree parm_types)
              count++;
      }
      return count;
-}
-
-/**
- * 把 Abc( 重整为 Abc* Abc(
- */
-static void rearrangeConstructor(c_parser *parser,ClassName *className)
-{
-   c_token *funName=c_parser_peek_token(parser); //Abc
-   c_token *openParen=c_parser_peek_2nd_token (parser);//"(";
-   int tokenCount=parser->tokens_avail;
-   if(tokenCount+2>AET_MAX_TOKEN){
-      error("token太多了");
-      return;
-   }
-
-   int i;
-   for(i=tokenCount;i>0;i--){
-      aet_utils_copy_token(&parser->tokens[i-1],&parser->tokens[i-1+2]);
-   }
-   aet_utils_create_token(&parser->tokens[3],CPP_OPEN_PAREN,"(",1);
-   aet_utils_copy_token(funName,&parser->tokens[2]);
-   tree value=aet_utils_create_ident(className->userName);
-   parser->tokens[2].value=value;
-   parser->tokens[2].id_kind=C_ID_ID;//关键
-   aet_utils_create_token(&parser->tokens[1],CPP_MULT,"*",1);
-   aet_utils_create_token(&parser->tokens[0],CPP_NAME,className->sysName,(int)strlen(className->sysName));
-   parser->tokens[0].id_kind=C_ID_TYPENAME;//关键
-   parser->tokens_avail=tokenCount+2;
-   aet_print_token_in_parser("class ctor rearrangeConstructor className ---- %s %s",className->sysName,className->userName);
-}
-
-
-/**
- * 检查是不是型如 Abc(的构造函数
- * 如果是代码用户写成 Abc() 通过c-parser后，变成了 com_ai_Abc 整有包名的。
- */
-nboolean class_ctor_parser_constructor(ClassCtor *self,ClassName *className)
-{
-   if(className==NULL)
-      return FALSE;
-   c_parser *parser=self->parser->parser;
-   if(c_parser_next_token_is (parser, CPP_NAME)){
-      tree ident = c_parser_peek_token (parser)->value;
-      const char *str1=IDENTIFIER_POINTER (ident);
-      if(strcmp(str1,className->sysName)==0 && c_parser_peek_2nd_token(parser)->type==CPP_OPEN_PAREN){
-         n_info("class_ctor_parser_constructor 这是一个构函数 name:%s current_function_decl:%p", str1,current_function_decl);
-         if(current_function_decl){
-            location_t loc = c_parser_peek_token (parser)->location;
-            error_at(loc,"不能在类中调用构造函数%qs。",className->userName);
-            return FALSE;
-         }
-         if(class_mgr_is_interface(class_mgr_get(),className)){
-            location_t loc = c_parser_peek_token (parser)->location;
-            error_at(loc,"接口不能有有构造函数:%qs",className->userName);
-            return FALSE;
-         }
-         rearrangeConstructor(parser,className);
-         return TRUE;
-      }
-   }
-   return FALSE;
 }
 
 /**
@@ -444,7 +381,7 @@ void class_ctor_build_default_define(ClassCtor *self,ClassName *className)
    aet_utils_create_token(&parser->tokens[2],CPP_CLOSE_PAREN,")",1);
    aet_utils_create_token(&parser->tokens[1],CPP_OPEN_PAREN,"(",1);
    aet_utils_create_token(&parser->tokens[0],CPP_NAME,className->sysName,(int)strlen(className->sysName));
-   parser->tokens[0].id_kind=C_ID_ID;//关键
+   parser->tokens[0].id_kind=C_ID_TYPENAME;//关键
    parser->tokens_avail=tokenCount+5;
    aet_print_token_in_parser("class_ctor_build_default_define className Abc(){}---- %s",className->sysName);
    //加入人工创建的构造函数声明。这个方法调用发生在classparser中
@@ -732,7 +669,6 @@ void  class_ctor_parser_super(ClassCtor *self,ClassName *className)
    }
 }
 
-
 static char *getLowClassName(tree field)
 {
    tree pointerType=TREE_TYPE(field);
@@ -883,6 +819,39 @@ void class_ctor_add_call(ClassCtor *self,tree call)
    n_ptr_array_add(self->recordCtorArray,call);
 }
 
+/**
+ * TFirst();
+ * aet_parser_c_parser_declspecs只解析到TFirst ,后面的 *留到aet_parser_c_parser_declarator处理
+ */
+nboolean class_ctor_parser_from_specs(ClassCtor *self,ClassName *className,struct c_declspecs *specs)
+{
+   c_parser *parser=self->parser->parser;
+   if(!specs->type || TREE_CODE(specs->type)!=RECORD_TYPE)
+      return FALSE;
+   tree typeName = TYPE_NAME(specs->type);
+   if(!typeName || TREE_CODE(typeName)!=TYPE_DECL || !DECL_NAME(typeName))
+      return FALSE;
+   const char *name = IDENTIFIER_POINTER(DECL_NAME(typeName));
+   if(name && !strcmp(className->sysName,name)){
+      n_debug("classparser.c createConstructor c_declspecs 的类型是 :%s\n",name);
+      if(c_parser_next_token_is (parser, CPP_OPEN_PAREN)){
+         //这是一个构造函数，要加入 * TFirst，用户代码 TFirst在specs已解析为返回的类型
+         int tokenCount=parser->tokens_avail;
+         int i;
+         for(i=tokenCount;i>0;i--)
+            aet_utils_copy_token(&parser->tokens[i-1],&parser->tokens[i-1+2]);
+
+         aet_utils_create_token(&parser->tokens[0],CPP_MULT,"*",1);
+         aet_utils_create_token(&parser->tokens[1],CPP_NAME,className->userName,(int)strlen(className->userName));
+         parser->tokens_avail=tokenCount+2;
+         aet_print_token_in_parser("classparser.c class_ctor_parser_from_specs className ---- %s %s",
+                  className->sysName,className->userName);
+         return TRUE;
+      }
+   }
+   return FALSE;
+}
+
 ClassCtor *class_ctor_new()
 {
     ClassCtor *self = n_slice_alloc0 (sizeof(ClassCtor));
@@ -890,5 +859,4 @@ ClassCtor *class_ctor_new()
     self->parser = aet_parser_get();
     return self;
 }
-
 

@@ -75,32 +75,71 @@ static void classDotInit(ClassDot *self)
 
 }
 
+static int exitsFunc(ClassDot *self,char *sysClassName,tree component)
+{
+   ClassName *className=class_mgr_get_class_name_by_sys(class_mgr_get(), sysClassName);
+   if(className==NULL)
+      return ID_NOT_FIND;
+   int ret= fun_call_find_func(((ClassAccess*)self)->funcCall,className,component);
+   return ret;
+}
+
 static tree createNormalOrSuperRef(ClassDot *self,location_t loc,location_t component_loc,tree component,tree exprValue)
 {
-	 c_parser *parser =((ClassAccess*)self)->parser->parser;
-	 char *lows[4];
-	 int relationShip=class_access_get_last_class_and_var((ClassAccess*)self,component_loc,component,exprValue,lows);
-	 if(relationShip<0)
-		 return error_mark_node;
-	 char *lowestClass=lows[2];
-	 char *className=lows[3];
-	 tree newComponent=aet_utils_create_temp_func_name(className,IDENTIFIER_POINTER(component));
-	 n_debug("class_dot_build_deref 22 className:%s component:%s 根类:%s 根变量:%s lowestClass:%s 当前所在函数：%s",
-			 className,IDENTIFIER_POINTER(newComponent),lows[0],lows[1],lowestClass,IDENTIFIER_POINTER(DECL_NAME(current_function_decl)));
-	 //把函数名变成_A3Abc4open1。
-	 tree tempField=class_access_create_temp_field((ClassAccess*)self,lowestClass,newComponent,component_loc);
-	 if(!aet_utils_valid_tree(tempField)){
-		 error_at(loc,"创建临时的类%qs成员%qs失败。",className,IDENTIFIER_POINTER(component));
-		 return error_mark_node;
-	 }
-	 tree datum=exprValue;
-	 tree ref=class_access_build_field_ref((ClassAccess *)self,loc,datum, tempField);
-     if(!aet_utils_valid_tree(ref)){
-         error_at(loc,"创建临时的类%qs成员%qs失败。",className,IDENTIFIER_POINTER(component));
-         return error_mark_node;
-     }
-     AET_LANG_FLAG_6(ref)=1;//这是通过类引用的方式调用函数的标记
-	 return ref;
+   c_parser *parser =((ClassAccess*)self)->parser->parser;
+   char *lows[4];
+   if(exprValue==error_mark_node){
+      printf("createNormalOrSuperRef 是错的\n");
+      return error_mark_node;
+   }
+   int relationShip=class_access_get_last_class_and_var((ClassAccess*)self,component_loc,component,exprValue,lows);
+   if(relationShip<0)
+      return error_mark_node;
+   char *lowestClass=lows[2];
+   char *className=lows[3];
+   tree newComponent=aet_utils_create_temp_func_name(className,IDENTIFIER_POINTER(component));
+   n_debug("classdot.c createNormalOrSuperRef 00 className:%s component:%s 根类:%s 根变量:%s lowestClass:%s 当前所在函数：%s",
+         className,IDENTIFIER_POINTER(newComponent),lows[0],lows[1],
+         lowestClass,IDENTIFIER_POINTER(DECL_NAME(current_function_decl)));
+   //exprValue最后调用的方式,需要变成 indirect_ref RO_ARROW吗?
+   nboolean needArrow = FALSE;
+   //检查有没有component的函数名
+   int haveFunc=exitsFunc(self,lowestClass,component);
+   if(haveFunc!=ISAET_FIND_FUNC && haveFunc!=ISAET_FIND_STATIC_FUNC){
+      n_debug("classdot.c createNormalOrSuperRef 11 找不到需要的函数 class:%s func:%s\n",
+            lowestClass,IDENTIFIER_POINTER(component));
+      ClassInfo *ifaceInfo = class_mgr_get_class_info(class_mgr_get(),lowestClass);
+      //接口调用 unref ref,源代码可能 iface.unref(),iface.ref()
+      //变成 iface.atClass123->unref(),iface.atClass123->ref()
+      if(ifaceInfo && class_info_is_interface(ifaceInfo)
+         && (!strcmp(IDENTIFIER_POINTER(component),"unref") || !strcmp(IDENTIFIER_POINTER(component),"ref"))){
+         if(!strcmp(IDENTIFIER_POINTER(component),"unref")){
+            tree atClassVarName=aet_utils_create_ident(IFACE_AT_CLASS);
+            exprValue = build_component_ref (loc,exprValue,atClassVarName, loc,loc);//
+            ClassInfo *rootInfo = class_mgr_get_root(class_mgr_get());
+            newComponent=aet_utils_create_temp_func_name(rootInfo->className.sysName,IDENTIFIER_POINTER(component));
+            lowestClass = rootInfo->className.sysName;
+            needArrow = TRUE;
+         }else{
+            ;
+         }
+      }else{
+         return NULL_TREE;
+      }
+   }
+
+   //把函数名变成_A3Abc4open1。
+   tree tempField=class_access_create_temp_field((ClassAccess*)self,lowestClass,newComponent,component_loc);
+   tree datum=exprValue;
+   if(needArrow)
+      datum=build_indirect_ref (loc,exprValue,RO_ARROW);
+   tree ref=class_access_build_field_ref((ClassAccess *)self,loc,datum, tempField);
+   if(!aet_utils_valid_tree(ref)){
+      error_at(loc,"创建临时的类%qs成员%qs失败。",className,IDENTIFIER_POINTER(component));
+      return error_mark_node;
+   }
+   AET_LANG_FLAG_6(ref)=1;//这是通过类引用的方式调用函数的标记
+   return ref;
 }
 
 /**
@@ -145,12 +184,11 @@ tree  class_dot_build_ref(ClassDot *self,location_t loc,location_t component_loc
       ClassName *className=class_mgr_get_class_name_by_user(class_mgr_get(),idStr);
       ClassInfo *info=class_mgr_get_class_info_by_class_name(class_mgr_get(),className);
       n_debug("class_dot_build_deref 00 %s component:%s 当前所在函数：%s",
-      className==NULL?"null":className->sysName,idStr,IDENTIFIER_POINTER(DECL_NAME(current_function_decl)));
+      className==NULL?"NULL":className->sysName,idStr,IDENTIFIER_POINTER(DECL_NAME(current_function_decl)));
       if(info!=NULL){
          error_at(loc,"不能调用构造函数 %qs",className->userName);
          return error_mark_node;
       }else{
-         component=class_interface_transport_ref_and_unref(self->classInterface,component,exprValue);
          tree ref=createNormalOrSuperRef(self,loc,component_loc,component,exprValue);
          c_aet_set_func_generics_model(ref,funcDefineModel);
          if(lanuchList!=NULL){

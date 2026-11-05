@@ -85,7 +85,7 @@ nboolean   class_info_is_abstract_class(ClassInfo *self)
 
 nboolean   class_info_is_interface(ClassInfo *self)
 {
-	return self->type==CLASS_TYPE_INTERFACE;
+	return self && self->type==CLASS_TYPE_INTERFACE;
 }
 
 nboolean   class_info_is_final(ClassInfo *self)

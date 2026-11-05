@@ -26,7 +26,6 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 #include "c-aet.h"
 #include "classinfo.h"
 
-
 /**
  * 实参与形参比较后返回三种状态
   */
@@ -34,10 +33,9 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 #define COMPARE_ARGUMENT_ORIG_PARM_ERROR -1
 #define COMPARE_ARGUMENT_ORIG_PARM_OK     1
 
-nboolean             class_util_add_self(struct c_expr expr,vec<tree, va_gc> **exprlist,vec<tree, va_gc> **porigtypes,vec<location_t> *arg_loc);
-char                *class_util_get_class_name_by_record(tree record);
-char                *class_util_get_class_name_by_pointer(tree pointerType);
-char                *class_util_get_class_name(tree type);
+nboolean             class_util_add_self(struct c_expr expr,vec<tree, va_gc> **exprlist,
+                                       vec<tree, va_gc> **porigtypes,vec<location_t> *arg_loc);
+const char          *class_util_get_class_name(tree type);
 CreateClassMethod    class_util_get_create_method(tree selfexpr);
 nboolean             class_util_is_class(struct c_declspecs *declspecs);
 CreateClassMethod    class_util_get_new_object_method(char *var);
@@ -68,7 +66,6 @@ int                   class_util_get_nameless_call_link(tree value,NPtrArray *ar
 nboolean              class_util_is_function_field(tree field);
 nboolean              class_util_have_field(tree type, tree component);//在结构体或UNION中查找component
 
-
 /**
  * 创建字符串的实参
  */
@@ -76,8 +73,12 @@ tree                  class_util_create_string_actual_param(location_t loc,char 
 tree                  class_util_create_integer_actual_param(location_t loc,int value);
 //判断是否有编译错误
 nboolean              class_util_have_error();
-char *class_util_get_fndecl_type_name(tree fndecl);
-char *class_util_get_return_type_name (tree fndecl);
-
+char                 *class_util_get_fndecl_type_name(tree fndecl);
+char                 *class_util_get_return_type_name (tree fndecl);
+/**
+ * 创建call_expr
+ * 对应的代码：obj->unref()
+ */
+tree                  class_util_build_unref_call(location_t loc, tree decl);
 
 #endif /* ! GCC_C_AET_H */

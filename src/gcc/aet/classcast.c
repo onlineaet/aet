@@ -113,8 +113,8 @@ static char* getClassNameInVarDeclOrModifyOrComponentRefExpr(ClassCast *self,tre
 {
    if(TREE_CODE(declOrModify)==VAR_DECL || TREE_CODE(declOrModify)==MODIFY_EXPR
    ||  TREE_CODE(declOrModify)==COMPONENT_REF || TREE_CODE(declOrModify)==ARRAY_REF){
-      tree pointerType=TREE_TYPE(declOrModify);
-      return class_util_get_class_name_by_pointer(pointerType);
+      //tree pointerType=TREE_TYPE(declOrModify);
+      return class_util_get_class_name/*!class_util_get_class_name_by_pointer*/(TREE_TYPE(declOrModify));
    }
    return NULL;
 }
@@ -215,7 +215,7 @@ static tree buildDynamicIfaceToClassExpr(location_t loc,tree op,char *ifaceSysNa
    class$ B extends$ A implements$ C
    C c=new$ B();
    A *a=(A*)c;
-   A并未实现接口C,但C其实是B,B又继承自A，所以c是可以转成A的，关键是要知道C类实现B继承自A
+   A并未实现接口C,但C其实是B,B又继承自A，所以c是可以转成A的，关键是要知道B类实现C,并且B继承自A
    可以通过c的接口变量_iface_common_var.atClass,知道实现它的类
  */
 static void castClassToInterface(location_t loc,char *rightName,char *leftName,tree nopexpr,tree op)
@@ -234,7 +234,7 @@ static void castClassToInterface(location_t loc,char *rightName,char *leftName,t
    if(lhs && !rhs){
       ClassName *belongClass=class_mgr_find_interface(class_mgr_get(),&rightInfo->className,&leftInfo->className);
       n_debug("class_cast_parser_decl castClassToInterface 22 左边是接口，右边是类 类转接口 %s %s belongClass:%s",
-      leftName,rightName,belongClass?belongClass->sysName:"null");
+      leftName,rightName,belongClass?belongClass->sysName:"NULL");
       if(belongClass!=NULL){
          char ifaceVarInClass[255];
          aet_utils_create_in_class_iface_var(leftInfo->className.userName,ifaceVarInClass);
@@ -248,13 +248,13 @@ static void castClassToInterface(location_t loc,char *rightName,char *leftName,t
    }else if(!lhs && rhs){
       ClassName *belongClass=class_mgr_find_interface(class_mgr_get(),&leftInfo->className,&rightInfo->className);
       n_debug("class_cast_parser_decl castClassToInterface 33 左边是类:%s，右边是接口:%s 接口转类 接口实现类是:%s",
-            leftName,rightName,belongClass?belongClass->sysName:"null");
+            leftName,rightName,belongClass?belongClass->sysName:"NULL");
 
       //分析能不能转为leftName
       //1.找出所有实现rightName的类。
       //2.实现类与leftName的关系
       if(belongClass!=NULL){
-         // n_debug("class_cast_parser_decl castClassToInterface 44 左边是类:%s，右边是接口:%s 接口转类 %s",leftName,rightName,belongClass?belongClass->sysName:"null");
+         // n_debug("class_cast_parser_decl castClassToInterface 44 左边是类:%s，右边是接口:%s 接口转类 %s",leftName,rightName,belongClass?belongClass->sysName:"NULL");
          error_at(EXPR_LOCATION(nopexpr),"不能转化接口%qs到类qs。",rightName,leftName);
       }else{
          if(isIfaceToClass(TREE_TYPE(nopexpr),op)){
@@ -300,7 +300,7 @@ static char *getClassNameFromTargetExpr(tree targetexpr)
    if(TREE_CODE(va)!=POINTER_TYPE || TREE_CODE(init)!=BIND_EXPR)
       return NULL;
    //printf("getClassNameFromTargetExpr 00 %s %s\n",get_tree_code_name(TREE_CODE(va)),get_tree_code_name(TREE_CODE(init)));
-   char *className=class_util_get_class_name_by_pointer(va);
+   char *className=class_util_get_class_name/*!class_util_get_class_name_by_pointer*/(va);
    if(className==NULL)
       return NULL;
    tree vars=TREE_OPERAND (init, 0);
@@ -332,7 +332,7 @@ static char *getClassNameFromVarDecl(tree varDecl)
    tree record=TREE_TYPE(pointerType);
    // printf("getClassNameFromVarDecl ----00 %s %s\n",get_tree_code_name(TREE_CODE(record)),IDENTIFIER_POINTER(name));
    if(TREE_CODE(record)==RECORD_TYPE){
-      return class_util_get_class_name_by_pointer(pointerType);
+      return class_util_get_class_name/*!class_util_get_class_name_by_pointer*/(pointerType);
    }else if(TREE_CODE(record)==VOID_TYPE){
       // printf("getClassNameFromVarDecl ----11 右边变量是一个void_type,检查是否有强转 %s %s\n",
       //  get_tree_code_name(TREE_CODE(record)),IDENTIFIER_POINTER(name));
@@ -387,7 +387,7 @@ static void setTargetExpr(ClassCast *self,tree decl,tree targetexpr,char *declCl
    tree init=TREE_OPERAND (targetexpr, 1);
    if(TREE_CODE(va)!=POINTER_TYPE || TREE_CODE(init)!=BIND_EXPR)
       return;
-   char *className=class_util_get_class_name_by_pointer(va);
+   char *className=class_util_get_class_name/*!class_util_get_class_name_by_pointer*/(va);
    if(className==NULL)
       return;
    n_debug("class_cast_add_ref_in_finish_decl setTargetExpr 00 %s %s %s",
@@ -454,7 +454,7 @@ void   class_cast_in_finish_decl(ClassCast *self ,location_t loc,tree decl)
       tree init=DECL_INITIAL(decl);
       n_debug("class_cast_add_ref_in_finish_decl 先声明再有初始值 00 \
             declClassName:%s init tree:%p declClassName:%s init code:%s",
-            declClassName,init,declClassName,aet_utils_valid_tree(init)?get_tree_code_name(TREE_CODE(init)):"null");
+            declClassName,init,declClassName,aet_utils_valid_tree(init)?get_tree_code_name(TREE_CODE(init)):"NULL");
       if(!aet_utils_valid_tree(init))
          return;
       if(TREE_CODE(init)==NOP_EXPR){
@@ -512,14 +512,16 @@ void  class_cast_in_finish_stmt(ClassCast *self ,location_t loc,tree stmt)
    if(varClassName==NULL)
       return;
 
+   n_debug("class_cast_in_finish_stmt 00 declClassName:%s varClassName:%s\n",declClassName,varClassName);
+
    if((TREE_CODE(lt)==VAR_DECL || TREE_CODE(lt)==COMPONENT_REF || TREE_CODE(lt)==ARRAY_REF )
          && TREE_CODE(rt)==NOP_EXPR){
       setNopExpr(self,loc,lt,rt,declClassName);
    }else if(TREE_CODE(lt)==COMPONENT_REF && TREE_CODE(rt)==TARGET_EXPR){
-      n_debug("class_cast_add_ref_in_finish_stmt 语句 22 stmt:%p %s",stmt,varClassName);
+      n_debug("class_cast_in_finish_stmt 11 stmt:%p %s",stmt,varClassName);
       tree field=TREE_OPERAND(lt,1);
       if(TREE_CODE(field)==FIELD_DECL){
-         //n_debug("class_cast_add_ref_in_finish_stmt 语句 2xxx2 stmt:%p %s",stmt,varClassName);
+         n_debug("class_cast_in_finish_stmt 22aa stmt:%p %s",stmt,varClassName);
          setTargetExpr(self,field,rt,declClassName);
       }
    }else  if(TREE_CODE(lt)==VAR_DECL && TREE_CODE(rt)==VAR_DECL){
@@ -533,7 +535,7 @@ void  class_cast_in_finish_stmt(ClassCast *self ,location_t loc,tree stmt)
       if(TREE_CODE(lt)==ARRAY_REF){
          ;
       }else{
-         n_debug("class_cast_add_ref_in_finish_stmt 语句 33 stmt:%p %s",stmt,varClassName);
+         n_debug("class_cast_in_finish_stmt 22 stmt:%p %s",stmt,varClassName);
          aet_print_tree_skip_debug(lt);
          n_error("还未处理此种类型。");
       }
@@ -644,17 +646,13 @@ static nboolean isIfaceToClass(tree castToType,tree op)
       printf("isIfaceToClass 类型相同---- \n");
       return FALSE;
    }
+   n_debug("isIfaceToClass 11 %s %s\n",leftSysName,rightSysName);
 
    ClassInfo *rightInfo=class_mgr_get_class_info(class_mgr_get(),rightSysName);
    ClassInfo *leftInfo=class_mgr_get_class_info(class_mgr_get(),leftSysName);
    if(!class_info_is_interface(leftInfo) && class_info_is_interface(rightInfo)){
+      n_debug("isIfaceToClass 22 %s %s\n",leftSysName,rightSysName);
       ClassName *belongClass=class_mgr_find_interface(class_mgr_get(),&leftInfo->className,&rightInfo->className);
-      //没有直接关系
-//      if(belongClass==NULL){
-//         nboolean indirect=class_mgr_have_indirect_relationship(class_mgr_get(),rightInfo,leftInfo);
-//         printf("isIfaceToClass 没有直接关系，是否有间接关系 %s %s indirect:%d\n",leftSysName,rightSysName,indirect);
-//         return indirect;
-//      }
       return belongClass!=NULL;
    }else{
       return FALSE;
@@ -778,10 +776,20 @@ tree class_cast_cast(ClassCast *self,location_t loc,struct c_type_name *type_nam
       n_error("从表达式转化到类%s时出错。原因：找不到类:%s\n",sysName,sysName);
       return expr;
    }
+   n_debug("class_cast_cast 11 sysName:%s\n",sysName);
+
    if(class_info_is_class(leftInfo) || class_info_is_abstract_class(leftInfo)){
+      n_debug("class_cast_cast 22 sysName:%s\n",sysName);
+
       if(TREE_CODE(expr)==NOP_EXPR){
+         n_debug("class_cast_cast 22aa sysName:%s\n",sysName);
+
          tree op=TREE_OPERAND (expr, 0);
+         n_debug("class_cast_cast 22bb sysName:%s\n",sysName);
+
          if(isIfaceToClass(type,op)){
+            n_debug("class_cast_cast 33 sysName:%s\n",sysName);
+
             char *rightSysName=class_util_get_class_name(TREE_TYPE(op));
             ClassInfo *rightInfo=class_mgr_get_class_info(class_mgr_get(),rightSysName);
             ClassName *belongClass=class_mgr_find_interface(class_mgr_get(),&leftInfo->className,&rightInfo->className);
@@ -794,6 +802,8 @@ tree class_cast_cast(ClassCast *self,location_t loc,struct c_type_name *type_nam
             tree value= ifaceToClass(op,pointerType);
             TREE_OPERAND (expr,0)=value;
          }else{
+            n_debug("class_cast_cast 44 sysName:%s\n",sysName);
+
             char *rightSysName=class_util_get_class_name(TREE_TYPE(op));
             if(rightSysName){
                ClassInfo *rightInfo=class_mgr_get_class_info(class_mgr_get(),rightSysName);
@@ -844,26 +854,21 @@ static nboolean isAetClass(tree type)
 
 static nboolean isIface(tree type)
 {
-   char *sysName=class_util_get_class_name(type);
-   ClassInfo *info=class_mgr_get_class_info(class_mgr_get(),sysName);
+   ClassInfo *info=class_mgr_get_class_info_by_type(class_mgr_get(),type);
    return class_info_is_interface(info);
 }
 
 /**
  * 接口转类
- * actualParm->_iface_common_var._atClass123
- * IFACE_COMMON_STRUCT_VAR_NAME = "_iface_common_var"
+ * actualParm->_atClass123
  * IFACE_AT_CLASS = "_atClass123"
- *
  */
 static tree ifaceToClass(tree actualParm,tree formulaType)
 {
    location_t loc=input_location;
    tree  actualRef=build_indirect_ref (loc,actualParm,RO_ARROW);
-   tree _iface_common_var=aet_utils_create_ident(IFACE_COMMON_STRUCT_VAR_NAME);
-   tree componetTwo = build_component_ref (loc,actualRef,_iface_common_var, loc,UNKNOWN_LOCATION);//
    tree atClassVarName=aet_utils_create_ident(IFACE_AT_CLASS);
-   tree componetRef = build_component_ref (loc,componetTwo,atClassVarName, loc,UNKNOWN_LOCATION);//
+   tree componetRef = build_component_ref (loc,actualRef,atClassVarName, loc,UNKNOWN_LOCATION);//
    tree nopExpr= build1 (NOP_EXPR, formulaType, componetRef);
    return nopExpr;
 }
@@ -972,12 +977,8 @@ void class_cast_parm_convert_from_ctor(ClassCast *self,tree func,vec<tree, va_gc
 
 static nboolean isIFaceCall(tree op)
 {
-   char *sysName=class_util_get_class_name(TREE_TYPE(op));
-   if(sysName!=NULL){
-      ClassInfo *info=class_mgr_get_class_info(class_mgr_get(),sysName);
-      return class_info_is_interface(info);
-   }
-   return FALSE;
+   ClassInfo *info=class_mgr_get_class_info_by_type(class_mgr_get(),TREE_TYPE(op));
+   return class_info_is_interface(info);
 }
 
 static nboolean isIFaceField(tree op,tree field)
@@ -989,41 +990,13 @@ static nboolean isIFaceField(tree op,tree field)
    int i;
    for(i=0;i<funcs->len;i++){
       ClassFunc *func=n_ptr_array_index(funcs,i);
-      //zclei super
-      //       char superName[255];
-      //       aet_utils_create_super_field_name(info->className.userName,func->mangleFunName,superName);
-      //       if(!strcmp(fieldName,func->mangleFunName) || !strcmp(fieldName,superName))
-      //    	   return TRUE;
       if(!strcmp(fieldName,func->mangleFunName))
          return TRUE;
    }
    return FALSE;
 }
 
-static nboolean isIFaceRefOrUnref(tree op,tree field)
-{
-   char *sysName=class_util_get_class_name(TREE_TYPE(op));
-   ClassInfo *info=class_mgr_get_class_info(class_mgr_get(),sysName);
-   char *fieldName=IDENTIFIER_POINTER(DECL_NAME(field));
-   NPtrArray    *funcsArray=func_mgr_get_funcs(func_mgr_get(),&info->className);
-   int i;
-   for(i=0;i<funcsArray->len;i++){
-      ClassFunc *func=n_ptr_array_index(funcsArray,i);
-      //zcl super$
-      //       char superName[255];
-      //       aet_utils_create_super_field_name(info->className.userName,func->mangleFunName,superName);
-      //       printf("isIFaceRefOrUnref --- %s %s %s\n",fieldName,func->mangleFunName,func->orgiName);
-      //       if((!strcmp(fieldName,func->mangleFunName)  || !strcmp(fieldName,superName)) &&
-      //    		   (!strcmp(func->orgiName,IFACE_REF_FIELD_NAME) || !strcmp(func->orgiName,IFACE_UNREF_FIELD_NAME)))
-      //    	   return TRUE;
-      if(!strcmp(fieldName,func->mangleFunName)  &&
-      (!strcmp(func->orgiName,IFACE_REF_FIELD_NAME) || !strcmp(func->orgiName,IFACE_UNREF_FIELD_NAME)))
-         return TRUE;
-   }
-   return FALSE;
-}
-
-static tree convertToIface(tree type,tree actualParm,nboolean isRefOrUnref)
+static tree convertToIface(tree type,tree actualParm)
 {
    if(!isAetClass(type)){
       return NULL_TREE;
@@ -1043,16 +1016,14 @@ static tree convertToIface(tree type,tree actualParm,nboolean isRefOrUnref)
          error_at(input_location,"接口%qs不能转接口%qs。",actualSysName,formulaSysName);
          return NULL_TREE;
       }else{
-         if(!isRefOrUnref){
-            //把接口类型的实参转成AObject
-            ClassName *rootClassName=class_mgr_get_class_name_by_user(class_mgr_get(),AET_ROOT_OBJECT);
-            tree id=aet_utils_create_ident(rootClassName->sysName);
-            tree aobjectType=lookup_name(id);
-            aobjectType=TREE_TYPE(aobjectType);
-            tree pointerType=build_pointer_type(aobjectType);
-            n_debug("接口调用接口的方法:11 实参:%s 形参:%s",actualSysName,formulaSysName);
-            return ifaceToClass(actualParm,pointerType);
-         }
+         //把接口类型的实参转成AObject
+         ClassName *rootClassName=class_mgr_get_class_name_by_user(class_mgr_get(),AET_ROOT_OBJECT);
+         tree id=aet_utils_create_ident(rootClassName->sysName);
+         tree aobjectType=lookup_name(id);
+         aobjectType=TREE_TYPE(aobjectType);
+         tree pointerType=build_pointer_type(aobjectType);
+         n_debug("接口调用接口的方法:11 实参:%s 形参:%s",actualSysName,formulaSysName);
+         return ifaceToClass(actualParm,pointerType);
       }
    }else if(isface && !isActualFace){
      ;
@@ -1085,8 +1056,7 @@ void class_cast_parm_convert_from_deref(ClassCast *self,tree func,vec<tree, va_g
 				tree actualParm = (*exprlist)[count];
 				n_debug("class_cast_parm_convert_from_deref 实参是:%d",count);
 				if(count==0){
-					nboolean isRefUnref=isIFaceRefOrUnref(op0,fieldDecl);
-					tree cc=convertToIface(type,actualParm,isRefUnref);
+					tree cc = convertToIface(type,actualParm);
 					n_debug("class_cast_parm_convert_from_deref 11 实参是:%d cc:%p",count,cc);
 					if(cc!=NULL_TREE)
 					  (*exprlist)[count]=cc;

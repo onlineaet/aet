@@ -70,126 +70,33 @@ public$ class$ AClass{
 ///////////////---------------以下都是编译器调用的，用户程序不能调用---------------
 
 /**
- * 配合编译器，清除实参new$ Object()。
- * void **values会报警告
- * 警告：传递‘a_object_cleanup_nameless_object’的第 1 个参数时在不兼容的指针类型间转换 [-Wincompatible-pointer-types]
- */
-static inline void a_object_cleanup_nameless_object(AObject **values)
-{
-    AObject *obj=*values;
-    obj->unref();
-    obj=NULL;
-}
-
-static inline void a_object_cleanup_local_object_from_static_or_stack(AObject *obj)
-{
-    //printf("a_object_cleanup_local_object_from_static_or_stack ---%p\n",obj);
-    obj->unref();
-    obj=NULL;
-}
-
-typedef struct _IfaceCommonData123 IfaceCommonData123;
-struct _IfaceCommonData123{
-    int   _aet_magic$_123;
-    void *_atClass123;
-};
-
-/**
- * 因为用户调用方式如下:
- * Iface *var=objectIface->ref();
- * 原来的AObject返回的是对象。这里需要返回IfaceCommonData123
- * 因为IfaceCommonData123是所有接口的第一个结构体变量。
- */
-static inline  IfaceCommonData123 * _iface_reserve_ref_func_define_123(IfaceCommonData123 *iface)
-{
-    //printf("_iface_reserve_ref_func_define_123 %p\n",iface);
-    ((AObject*)iface->_atClass123)->ref();
-    return iface;
-}
-
-static inline  void _iface_reserve_unref_func_define_123(IfaceCommonData123 *iface)
-{
-    ((AObject*)iface->_atClass123)->unref();
-}
-
-static inline int is_aet_class(AClass *class,char *name)
-{
-   char sysName[512];
-   char *package=class->getPackage();
-   if(package!=NULL)
-      sprintf(sysName,"%s_%s",package,class->getName());
-   else
-      sprintf(sysName,"%s",class->getName());
-   return strcmp(sysName,name)==0;
-}
-
-static inline int object_varof(AClass *class,char *name)
-{
-   if(class==NULL)
-      return 0;
-   if(is_aet_class(class,name))
-      return 1;
-   AClass *parentClass=class->getParent();
-   if(parentClass!=NULL){
-      if(is_aet_class(parentClass,name))
-         return 1;
-   }
-   int ifaceCount=0;
-   AClass **interfaceClasses=class->getInterfaces(&ifaceCount);
-   int i;
-   for(i=0;i<ifaceCount;i++){
-      if(is_aet_class(interfaceClasses[i],name))
-         return 1;
-   }
-   return object_varof(parentClass,name);
-}
-
-/**
- * 关键字 varof$的用法
- * if(var varof$ type)
- * var转成 void*类型 作为 varof_object_or_interface的第一个参数 object
- * type 取类型名作为第二个参数 name
- * name= type 的名字
- * object = var
- * AET类或接口的第一个域是魔数
- */
-static inline int  varof_object_or_interface (void *object,char *name)
-{
-    char *magic=(char*)object;
-    int magicNum =0;
-    memcpy(&magicNum,magic,sizeof(int));
-    if(magicNum!=1725348960 && magicNum!=1725348961)
-        return 0;
-    AObject *dest=NULL;
-    if(magicNum==1725348960){
-        dest=(AObject*)object;
-    }else if(magicNum==1725348961){
-        IfaceCommonData123 *iface=(IfaceCommonData123*)magic;
-        dest=(AObject*)iface->_atClass123;
-    }
-    if(dest==NULL)
-        return 0;
-    return object_varof(dest->getClass(),name);
-}
-
-/**
  * 动态的类转接口
  */
 static inline int class_to_iface(AClass *class,char *ifaceSysName,unsigned long *offset)
 {
-    if(class==NULL)
-          return 0;
-    int ifaceCount=0;
-    AClass **interfaceClasses=class->getInterfaces(&ifaceCount);
-    int i;
-    for(i=0;i<ifaceCount;i++){
-      if(is_aet_class(interfaceClasses[i],ifaceSysName)){
-           *offset=class->getInterfaceOffset(i);
-           return 1;
+   if(class==NULL)
+      return 0;
+   int ifaceCount=0;
+   AClass **interfaceClasses=class->getInterfaces(&ifaceCount);
+   int i;
+   for(i=0;i<ifaceCount;i++){
+      char *package = interfaceClasses[i]->getPackage();
+      char *clName  = interfaceClasses[i]->getName();
+      int same = 0;
+      if (package){
+         size_t len = strlen(package);
+         same = strncmp(package, ifaceSysName, strlen(package)) == 0
+                  && ifaceSysName[len] == '_'  && strcmp(ifaceSysName + strlen(package) + 1,clName) == 0;
+      }else{
+         same =  strcmp(clName, ifaceSysName) == 0;
       }
-    }
-    AClass *parentClass=class->getParent();
-    return class_to_iface(parentClass,ifaceSysName,offset);
+      if(same){
+         *offset=class->getInterfaceOffset(i);
+         return 1;
+      }
+   }
+   AClass *parentClass=class->getParent();
+   return class_to_iface(parentClass,ifaceSysName,offset);
 }
 
 /**
@@ -238,8 +145,7 @@ static inline int _find_class_by_AClass(AClass *class,char *findSysName)
 /**
  * 由AET编译器生成调用
  * 接口转类
- * 接口的第一个域是 _iface_common_var IFACE_COMMON_STRUCT_NAME = "IfaceCommonData123"
- * _iface_common_var的类型是 IfaceCommonData123，该结体的第一个参数是 _atClass123
+ * 接口的第一个域是 _aet_magic$_123 第二个是 _atClass123
  * 是接口指向实现的类"
  * bug 078
  */

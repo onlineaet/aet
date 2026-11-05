@@ -61,6 +61,8 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 
 static void aetExprInit(AetExpr *self)
 {
+   self->useVarOf = FALSE;
+   self->state = 0;
 }
 
 static tree createStringActualParm(location_t loc,char *rightSysName)
@@ -87,6 +89,34 @@ static  vec<tree, va_gc> *createParm(location_t loc,tree firstParm,char *rightSy
    return parmVec;
 }
 
+static tree create_varof_object_or_interface_decl (void)
+{
+   location_t loc = UNKNOWN_LOCATION;
+   tree name = get_identifier ("varof_object_or_interface");
+   tree object_type = build_pointer_type (void_type_node);
+   tree name_type = build_pointer_type (char_type_node);
+   tree argtypes = tree_cons (NULL_TREE, object_type,
+                   tree_cons (NULL_TREE, name_type,
+                   tree_cons (NULL_TREE, void_type_node, NULL_TREE)));
+   tree fntype = build_function_type (integer_type_node, argtypes);
+   tree fndecl = build_decl (loc, FUNCTION_DECL, name, fntype);
+
+   /* static */
+   TREE_PUBLIC (fndecl) = 0;
+   TREE_STATIC (fndecl) = 1;
+
+   /* inline */
+   //DECL_DECLARED_INLINE_P (fndecl) = 1;
+
+   /* 仅声明，没有函数定义 */
+   DECL_EXTERNAL (fndecl) = 1;
+
+   /* 登记到文件作用域 */
+   c_c_decl_bind_file_scope(fndecl);//放在file_scope，c_c_decl_bind_file_scope是增加的,原本没有
+   finish_decl (fndecl, loc, NULL_TREE,NULL_TREE, NULL_TREE);
+   return fndecl;
+}
+
 /**
  * varof_object_or_interface
  * 关键字 varof$的用法
@@ -97,7 +127,7 @@ static  vec<tree, va_gc> *createParm(location_t loc,tree firstParm,char *rightSy
  * object = var
  * AET类或接口的第一个参数是魔数
  */
-static tree buildExpr(location_t loc,tree leftValue,char *rightSysName)
+static tree buildExpr(AetExpr *self,location_t loc,tree leftValue,char *rightSysName)
 {
    tree valueType=TREE_TYPE(leftValue);
    tree type=build_pointer_type(void_type_node);
@@ -110,9 +140,12 @@ static tree buildExpr(location_t loc,tree leftValue,char *rightSysName)
    }
    tree funcName=aet_utils_create_ident(AET_VAR_OF_FUNC_NAME);
    tree decl=lookup_name(funcName);
+   if(!decl)
+      decl = create_varof_object_or_interface_decl();
    vec<tree, va_gc> *parms=createParm(loc,firstParm,rightSysName);
    tree newCallExpr = c_build_function_call_vec (loc, vNULL, decl,parms, NULL);
    release_tree_vector (parms);
+   self->useVarOf = TRUE;
    return newCallExpr;
 }
 /**
@@ -162,16 +195,16 @@ struct c_expr aet_expr_varof_parser(AetExpr *self,struct c_expr lhs)
       }else{
          if(class_info_is_interface(rightInfo)){
             n_debug("左边%s只能在运行时才能知道是否实现了右边%s接口。\n",leftSysName,rightSysName);
-            lhs.value=buildExpr(startLoc,left,rightSysName);
+            lhs.value=buildExpr(self,startLoc,left,rightSysName);
          }else if(!strcmp(AET_ROOT_OBJECT,leftInfo->className.userName)){
             n_debug("左边%s是一个根类。只能在运行时才能知道是否是右边%s类型。\n",leftSysName,rightSysName);
-            lhs.value=buildExpr(startLoc,left,rightSysName);
+            lhs.value=buildExpr(self,startLoc,left,rightSysName);
          }else if(class_info_is_interface(leftInfo) && !class_info_is_interface(rightInfo)){
             n_debug("左边%s是一个接口。只能在运行时才能知道接口是从右边%s类型转化而来的。\n",leftSysName,rightSysName);
-            lhs.value=buildExpr(startLoc,left,rightSysName);
+            lhs.value=buildExpr(self,startLoc,left,rightSysName);
          }else if(!class_info_is_interface(leftInfo) && !class_info_is_interface(rightInfo) && ship==CLASS_RELATIONSHIP_PARENT){
             n_debug("左边%s是右边%s的父类。只能在运行时才能知道左边类型的变量是不是右边的类型。\n",leftSysName,rightSysName);
-            lhs.value=buildExpr(startLoc,left,rightSysName);
+            lhs.value=buildExpr(self,startLoc,left,rightSysName);
          }else{
             error_at(startLoc,"%qs不是%qs类型。",leftSysName,IDENTIFIER_POINTER(typeName));
             return lhs;
@@ -181,12 +214,116 @@ struct c_expr aet_expr_varof_parser(AetExpr *self,struct c_expr lhs)
       //  printf("lefttype is --- %s\n",get_tree_code_name(TREE_CODE(leftType)));
       if(TREE_CODE(leftType)==POINTER_TYPE){
          n_debug("左边是指针类型，只能在运行时确定是否可以转化为右边%s类型.\n",rightSysName);
-         lhs.value=buildExpr(startLoc,left,rightSysName);
+         lhs.value=buildExpr(self,startLoc,left,rightSysName);
       }else{
          error_at(startLoc,"不是%qs类型。",rightSysName);
       }
    }
    return lhs;
+}
+
+static const char *codes = R"%%%(
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmisleading-indentation"
+
+static inline int is_aet_class (AClass *cl, const char *name)
+{
+    const char *package = cl->getPackage();
+    if (package){
+        size_t len = strlen(package);
+        return strncmp(package, name, len) == 0
+            && name[len] == '_'
+            && strcmp(name + len + 1, cl->getName()) == 0;
+    }
+    return strcmp(cl->getName(), name) == 0;
+}
+
+static inline int object_varof(AClass *cl,char *name)
+{
+   if(cl==NULL){
+      return 0;
+   }
+   if(is_aet_class(cl,name)){
+      return 1;
+   }
+   AClass *parentClass=cl->getParent();
+   if(parentClass!=NULL){
+      if(is_aet_class(parentClass,name)){
+         return 1;
+      }
+   }
+   int ifaceCount=0;
+   AClass **interfaceClasses=cl->getInterfaces(&ifaceCount);
+   int i;
+   for(i=0;i<ifaceCount;i++){
+      if(is_aet_class(interfaceClasses[i],name)){
+         return 1;
+      }
+   }
+   return object_varof(parentClass,name);
+}
+
+#define AET_IFACE_CLASS_OFFSET   ((sizeof(int) + _Alignof(void *) - 1) & ~(_Alignof(void *) - 1))
+
+static int  varof_object_or_interface (void *object,char *name)
+{
+   char *magic=(char*)object;
+   int magicNum =0;
+   memcpy(&magicNum,magic,sizeof(int));
+   if(magicNum!=1725348960 && magicNum!=1725348961){
+      return 0;
+   }
+   AObject *dest=NULL;
+   if(magicNum==1725348960){
+      dest=(AObject*)object;
+   }else if(magicNum==1725348961){
+      memcpy(&dest,magic + AET_IFACE_CLASS_OFFSET,sizeof(void *));
+   }
+   if(dest==NULL){
+      return 0;
+   }
+   return object_varof(dest->getClass(),name);
+}
+#pragma GCC diagnostic pop
+)%%%";
+
+void aet_expr_compile(AetExpr *self)
+{
+   c_parser *parser=self->parser->parser;
+   if(self->useVarOf && self->state==1 && !self->parser->isAet){
+      c_parser_consume_token (parser);//consume   RID_AET_GOTO
+      c_parser_consume_token (parser);//consume   GOTO_STATIC_VAR_FUNC
+      aet_utils_add_token(parse_in,codes,strlen(codes));
+      self->state = 2;
+   }else{
+      n_error("报告此错误！");
+   }
+}
+
+const char *aet_expr_get_compile_codes(AetExpr *self)
+{
+   if(self->useVarOf && self->state==0){
+      self->state=2;
+      return codes;
+   }
+   return NULL;
+}
+
+void  aet_expr_compile_ready(AetExpr *self)
+{
+   c_parser *parser=self->parser->parser;
+
+   if(self->useVarOf && self->state==0 && !self->parser->isAet){
+      c_parser *parser=self->parser->parser;
+      int tokenCount=parser->tokens_avail;
+      for(int i=tokenCount;i>0;i--)
+         aet_utils_copy_token(&parser->tokens[i-1],&parser->tokens[i-1+2]);
+
+      aet_utils_create_aet_goto_token(&parser->tokens[0],input_location);
+      aet_utils_create_number_token(&parser->tokens[1],GOTO_COMPILE_VAROF);
+      parser->tokens_avail=tokenCount+2;
+      self->state = 1;
+   }
 }
 
 

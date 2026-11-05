@@ -343,22 +343,22 @@ static void createDirectives(GenericParser *self,char *content)
  */
 void generic_parser_enter(GenericParser *self)
 {
-     c_parser *parser=self->parser->parser;
-     if(c_parser_peek_token (parser)->type!=CPP_STRING){
-        n_error("在generic_create_gen_str不可知的错误，这里应该是一个CPP_STRING符号！");
-     }
-     tree string=c_parser_peek_token (parser)->value;
-     const char *tokenString  = TREE_STRING_POINTER (string);
-     //去除一头一尾的"号
-     char *genDefine=n_strndup(tokenString+1,strlen(tokenString)-1);
-     freeDirectives(self);
-     createDirectives(self,genDefine);
-     aet_parser_set_generic_state(self->parser,true);
-     aet_print_token(c_parser_peek_token (parser));
-    // printf("value is  :%s\n",genDefine);
-     c_parser_consume_token (parser);
-     aet_print_token(c_parser_peek_token (parser));
-     n_free(genDefine);
+   c_parser *parser=self->parser->parser;
+   if(c_parser_peek_token (parser)->type!=CPP_STRING){
+      n_error("在generic_create_gen_str不可知的错误，这里应该是一个CPP_STRING符号！");
+   }
+   tree string=c_parser_peek_token (parser)->value;
+   const char *tokenString  = TREE_STRING_POINTER (string);
+   //去除一头一尾的"号
+   char *genDefine=n_strndup(tokenString+1,strlen(tokenString)-1);
+   freeDirectives(self);
+   createDirectives(self,genDefine);
+   aet_parser_set_generic_state(self->parser,true);
+   aet_print_token(c_parser_peek_token (parser));
+   // printf("value is  :%s\n",genDefine);
+   c_parser_consume_token (parser);
+   aet_print_token(c_parser_peek_token (parser));
+   n_free(genDefine);
 }
 
 static char *getTrueGenStr(Directive *d)
@@ -2032,4 +2032,29 @@ NPtrArray *generic_parser_create_fwgb_text(char *content)
       content = end+strlen(FUNC_WITH_GB_END);
    }
    return array;
+}
+
+
+/**
+ * 用directive替换replaced中未定义的 GenericUnit
+ */
+void generic_parser_replace_model(GenericParser *self,GenericModel *replaced)
+{
+   int i,j;
+   for(i=0;i<replaced->unitCount;i++){
+      GenericUnit  *u = replaced->genUnits[i];
+      if(generic_unit_is_undefine(u)){
+         for(j=0;j<self->directiveCount;j++){
+            Directive *d=self->directives[j];
+            if(u->name[0]==d->declName[0]){
+               printf("generic_parser_replace_model --%s %s\n",u->name,d->defineTypeName);
+               n_free(u->name);
+               u->name = n_strdup(d->defineTypeName);
+               u->size = d->size;
+               u->pointerCount=d->pointerCount;
+               u->isDefine = TRUE;
+            }
+         }
+      }
+   }
 }

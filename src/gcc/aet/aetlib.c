@@ -133,7 +133,7 @@ static nboolean  isAetFile(const char *path,int *is_shared)
 
 static void appendData(char *src,char *buffer,int *offset)
 {
-   nchar**	items=n_strsplit(src," ",-1);
+   nchar**  items=n_strsplit(src," ",-1);
    int len=n_strv_length(items);
    int i;
    int a=0;
@@ -184,10 +184,10 @@ static char *readContent(char *fileName,nint64 offset,int size,int *dataSize)
 }
 
 typedef struct _SegmentData{
-	char *name;
-	nuint64 virt_addr;
-	nuint64 offset;
-	nuint64 size;
+   char *name;
+   nuint64 virt_addr;
+   nuint64 offset;
+   nuint64 size;
 }SegmentData;
 
 #define SEGMENT_NAME_DATA ".data"
@@ -218,7 +218,7 @@ static nint64 getSegmentVirtAdd(char *src,nint64 *dataOffset,nint64 *dataSize,ch
    //printf("getSegmentVirtAdd 00 is:%s\n",src);
    NString *sub=n_string_substring(content,index+strlen(prefix));
    n_string_trim(sub);
-   nchar**	items=n_strsplit(sub->str," ",-1);
+   nchar**  items=n_strsplit(sub->str," ",-1);
    n_string_free(content,TRUE);
    n_string_free(sub,TRUE);
    int len=n_strv_length(items);
@@ -227,9 +227,9 @@ static nint64 getSegmentVirtAdd(char *src,nint64 *dataOffset,nint64 *dataSize,ch
    // int i;
    //for(i=0;i<len;i++)
    //printf("getSegmentVirtAdd info: is:%d %s\n",i,items[i]);
-   nint64	add=n_ascii_strtoll(items[0],NULL,16);
-   nint64	v1=n_ascii_strtoll(items[1],NULL,16);
-   nint64	v2=n_ascii_strtoll(items[2],NULL,16);
+   nint64   add=n_ascii_strtoll(items[0],NULL,16);
+   nint64   v1=n_ascii_strtoll(items[1],NULL,16);
+   nint64   v2=n_ascii_strtoll(items[2],NULL,16);
    *dataOffset=v1;
    *dataSize=v2;
    return add;
@@ -314,9 +314,9 @@ static NPtrArray *createSegmentFromFile(char *fileName)
 }
 
 typedef struct _VarInfo{
-	char *name;
-	nint64 virtAdd;
-	nint64 size;
+   char *name;
+   nint64 virtAdd;
+   nint64 size;
 }VarInfo;
 
 static void freeVarInfo_cb(VarInfo *info)
@@ -334,37 +334,37 @@ static void freeVarInfo_cb(VarInfo *info)
  */
 static VarInfo *getVarInfo(char *src,char *varName)
 {
-	if(src==NULL)
-		return NULL;
-	NString *content=n_string_new(src);
-	int index=n_string_indexof(content,":");
-	if(index<0){
-		n_string_free(content,TRUE);
-		return NULL;
-	}
-	//printf("getVarInfo 00 is:%s\n",src);
-	NString *sub=n_string_substring(content,index+1);
-	n_string_trim(sub);
-   nchar**	items=n_strsplit(sub->str," ",-1);
-	n_string_free(content,TRUE);
-	n_string_free(sub,TRUE);
+   if(src==NULL)
+      return NULL;
+   NString *content=n_string_new(src);
+   int index=n_string_indexof(content,":");
+   if(index<0){
+      n_string_free(content,TRUE);
+      return NULL;
+   }
+   //printf("getVarInfo 00 is:%s\n",src);
+   NString *sub=n_string_substring(content,index+1);
+   n_string_trim(sub);
+   nchar**  items=n_strsplit(sub->str," ",-1);
+   n_string_free(content,TRUE);
+   n_string_free(sub,TRUE);
     int len=n_strv_length(items);
     if(len==0){
        n_strfreev(items);
-    	return NULL;
+      return NULL;
     }
     int i;
     int size=0;
     for(i=1;i<len;i++){
-    	//printf("getVarInfo is:%d %s\n",i,items[i]);
-    	if(strlen(items[i])>0){
-    		size=atoi(items[i]);
-        	//printf("getVarInfo ----- is:%d %s %d\n",i,items[i],size);
-    		break;
-    	}
+      //printf("getVarInfo is:%d %s\n",i,items[i]);
+      if(strlen(items[i])>0){
+         size=atoi(items[i]);
+         //printf("getVarInfo ----- is:%d %s %d\n",i,items[i],size);
+         break;
+      }
     }
-	//printf("getVarInfo vir----- is:%s size:%d\n",items[0],size);
-    nint64	add=n_ascii_strtoll(items[0],NULL,16);
+   //printf("getVarInfo vir----- is:%s size:%d\n",items[0],size);
+    nint64  add=n_ascii_strtoll(items[0],NULL,16);
     VarInfo *data=(VarInfo *)n_slice_new0(VarInfo);
     data->virtAdd=add;
     data->size=size;
@@ -381,7 +381,7 @@ static VarInfo *getVarInfo(char *src,char *varName)
  */
 static char *getVarName(char *src)
 {
-   nchar**	items=n_strsplit(src," ",-1);
+   nchar**  items=n_strsplit(src," ",-1);
    int length=n_strv_length(items);
    if(length<=0)
       return NULL;
@@ -475,9 +475,9 @@ static nboolean varInSegment(SegmentData *dataSeg,VarInfo *varInfo)
 {
    if(dataSeg==NULL)
       return FALSE;
-   //	   int_ary.virt_addr = 0x08049550
-   //	   segment.data.virt_addr.begin = 0x0804954c
-   //	   segmeng.data.virt_addr.end   = 0x0804954c + 0x034 = 0x08049580
+   //    int_ary.virt_addr = 0x08049550
+   //    segment.data.virt_addr.begin = 0x0804954c
+   //    segmeng.data.virt_addr.end   = 0x0804954c + 0x034 = 0x08049580
    if(dataSeg->size==0)
       return FALSE;
    nint64 begin=dataSeg->virt_addr;
@@ -492,14 +492,14 @@ static nboolean varInSegment(SegmentData *dataSeg,VarInfo *varInfo)
 
 static SegmentData *matchSegment(NPtrArray *segments,VarInfo *varInfo)
 {
-	int i;
-	for(i=0;i<segments->len;i++){
-		SegmentData *dataSeg=n_ptr_array_index(segments,i);
-		nboolean in=varInSegment(dataSeg,varInfo);
-		if(in)
-			return dataSeg;
-	}
-	return NULL;
+   int i;
+   for(i=0;i<segments->len;i++){
+      SegmentData *dataSeg=n_ptr_array_index(segments,i);
+      nboolean in=varInSegment(dataSeg,varInfo);
+      if(in)
+         return dataSeg;
+   }
+   return NULL;
 }
 
 /**
@@ -518,20 +518,20 @@ static void guessPointerVar(char *fileName,NPtrArray *segmentArray,VarInfo *info
       return;
    }
    int i;
-   //	for(i=0;i<segmentArray->len;i++){
-   //		SegmentData *dataSeg=n_ptr_array_index(segmentArray,i);
-   //		nint64 varAdd=info->virtAdd - dataSeg->virt_addr+dataSeg->offset;//变量名本身的地址
-   //		printf("dddxxx : %s %lli\n",dataSeg->name,varAdd);
-   //		int dataLen=0;
-   //		char *valueVirtAddStr=readContent(fileName,varAdd,16,&dataLen);//变量名指向的初始值地址 00 20 00 00 00 00 00 00
-   //		if(dataLen==0){
-   //				n_error("getValue 从字符串取不出虚拟地址！%s %s",valueVirtAddStr,fileName);
-   //		}
-   //		nint64 valueVirtAdd=0;
-   //		memcpy(&valueVirtAdd,valueVirtAddStr,sizeof(nuint64));
-   //		printf("valueVirtAdd------valueVirtAdd:%#x %lli\n",valueVirtAdd,valueVirtAdd);
-   //		n_free(valueVirtAddStr);
-   //	}
+   // for(i=0;i<segmentArray->len;i++){
+   //    SegmentData *dataSeg=n_ptr_array_index(segmentArray,i);
+   //    nint64 varAdd=info->virtAdd - dataSeg->virt_addr+dataSeg->offset;//变量名本身的地址
+   //    printf("dddxxx : %s %lli\n",dataSeg->name,varAdd);
+   //    int dataLen=0;
+   //    char *valueVirtAddStr=readContent(fileName,varAdd,16,&dataLen);//变量名指向的初始值地址 00 20 00 00 00 00 00 00
+   //    if(dataLen==0){
+   //          n_error("getValue 从字符串取不出虚拟地址！%s %s",valueVirtAddStr,fileName);
+   //    }
+   //    nint64 valueVirtAdd=0;
+   //    memcpy(&valueVirtAdd,valueVirtAddStr,sizeof(nuint64));
+   //    printf("valueVirtAdd------valueVirtAdd:%#x %lli\n",valueVirtAdd,valueVirtAdd);
+   //    n_free(valueVirtAddStr);
+   // }
 
    {
       //SegmentData *dataSeg=getSegmentData(segmentArray,".data");
@@ -560,12 +560,12 @@ static void guessPointerVar(char *fileName,NPtrArray *segmentArray,VarInfo *info
    }
 
    //nint64 varAdd=info->virtAdd - dataSegmentVirtAdd+dataOffset;//变量名本身的地址
-   //	    printf("变量名本身的地址 varAdd------varAdd:%#x\n",varAdd);
-   //	    int dataLen=0;
-   //		char *valueVirtAddStr=readContent(fileName,varAdd,16,&dataLen);//变量名指向的初始值地址 00 20 00 00 00 00 00 00
-   //		if(dataLen==0){
-   //			n_error("getValue 从字符串取不出虚拟地址！%s %s",dataSegmentStr,fileName);
-   //		}
+   //     printf("变量名本身的地址 varAdd------varAdd:%#x\n",varAdd);
+   //     int dataLen=0;
+   //    char *valueVirtAddStr=readContent(fileName,varAdd,16,&dataLen);//变量名指向的初始值地址 00 20 00 00 00 00 00 00
+   //    if(dataLen==0){
+   //       n_error("getValue 从字符串取不出虚拟地址！%s %s",dataSegmentStr,fileName);
+   //    }
 }
 
 /**
@@ -575,52 +575,52 @@ static void guessPointerVar(char *fileName,NPtrArray *segmentArray,VarInfo *info
  */
 static char *getVarValue(char *varName,char *fileName,int *dataSize)
 {
-	//第一步
-	NPtrArray *segmentArray=createSegmentFromFile(fileName);
+   //第一步
+   NPtrArray *segmentArray=createSegmentFromFile(fileName);
     //第二步
-	VarInfo *varInfo=createVarInfoFromFile(fileName,varName);
-	if(varInfo==NULL){
-		n_warning("在文件%s中找不到变量：%s",fileName,varName);
-		return NULL;
-	}
-	//第三步
-	SegmentData *dataSeg=matchSegment(segmentArray,varInfo);
-	if(!dataSeg){
-		n_warning("在四个段都没找到变量的值：%s\n",varName);
-		//guessPointerVar(fileName,segmentArray,varInfo);
-		return NULL;
-	}
-	//	   int_ary.virt_addr = 0x08049550
-	//	   segment.data.virt_addr.begin = 0x0804954c
-	//	   segmeng.data.virt_addr.end   = 0x0804954c + 0x034 = 0x08049580
-	//第四步
-	nint64 begin=dataSeg->virt_addr;
-	nint64 varOffset=0;
-	//printf("说明变量:%s在%s段.\n",varInfo->name,dataSeg->name);
-	nint64 segmentOffset = dataSeg->offset;
-	varOffset= segmentOffset+ (varInfo->virtAdd - begin);
-	char *rec=readOffset(fileName,varOffset,varInfo->size,dataSize);
-	return rec;
+   VarInfo *varInfo=createVarInfoFromFile(fileName,varName);
+   if(varInfo==NULL){
+      n_warning("在文件%s中找不到变量：%s",fileName,varName);
+      return NULL;
+   }
+   //第三步
+   SegmentData *dataSeg=matchSegment(segmentArray,varInfo);
+   if(!dataSeg){
+      n_warning("在四个段都没找到变量的值：%s\n",varName);
+      //guessPointerVar(fileName,segmentArray,varInfo);
+      return NULL;
+   }
+   //    int_ary.virt_addr = 0x08049550
+   //    segment.data.virt_addr.begin = 0x0804954c
+   //    segmeng.data.virt_addr.end   = 0x0804954c + 0x034 = 0x08049580
+   //第四步
+   nint64 begin=dataSeg->virt_addr;
+   nint64 varOffset=0;
+   //printf("说明变量:%s在%s段.\n",varInfo->name,dataSeg->name);
+   nint64 segmentOffset = dataSeg->offset;
+   varOffset= segmentOffset+ (varInfo->virtAdd - begin);
+   char *rec=readOffset(fileName,varOffset,varInfo->size,dataSize);
+   return rec;
 }
 
 //一个文件中会有多个类实现，所以先取该文件所有匹配FUNC_CEHCK_GLOBAL_VAR_NAME_PREFIX的变量
 static char *getFullVarName(char *content,char *varNamePrefix)
 {
-	 //printf("getFullVarName global is :%s\n",content);
-	 //取类名
-	 char *re=strstr(content,varNamePrefix);
-	 if(re){
-		char *sysName=re;//+strlen(varNamePrefix)+1;//1代表 _
-		int len=strlen(sysName);
-		char *last=NULL;
-		if(sysName[len-1]=='\n'){
-			last=n_strndup(sysName,len-1);
-		}else{
-			last=n_strdup(sysName);
-		}
-		return last;
-	 }
-	 return NULL;
+    //printf("getFullVarName global is :%s\n",content);
+    //取类名
+    char *re=strstr(content,varNamePrefix);
+    if(re){
+      char *sysName=re;//+strlen(varNamePrefix)+1;//1代表 _
+      int len=strlen(sysName);
+      char *last=NULL;
+      if(sysName[len-1]=='\n'){
+         last=n_strndup(sysName,len-1);
+      }else{
+         last=n_strdup(sysName);
+      }
+      return last;
+    }
+    return NULL;
 }
 
 /**
@@ -660,10 +660,10 @@ static NPtrArray *getMatchVar(AetLib *self,char *fileName,char *varName,int isSo
 }
 
 typedef struct _VarData{
-	char *varName;
-	char *data;
-	int size;
-	int compress;//是不是压缩数据
+   char *varName;
+   char *data;
+   int size;
+   int compress;//是不是压缩数据
 }VarData;
 
 static nboolean addLibData(AetLib *self,char *varName,char *value,int size,int compress)
@@ -675,7 +675,7 @@ static nboolean addLibData(AetLib *self,char *varName,char *value,int size,int c
          return FALSE;
    }
    VarData *vd=(VarData *)n_slice_new0(VarData);
-   vd->varName=varName;
+   vd->varName=n_strdup(varName);
    vd->data=value;
    vd->size=size;
    vd->compress=compress;
@@ -789,7 +789,7 @@ static void varContentWrite(AetLib *self)
 
 static void aetLibInit(AetLib *self)
 {
-   self->resultArray=n_ptr_array_new_with_free_func(n_free);
+   self->resultArray=n_ptr_array_new();
    self->haveIfaceData=FALSE;
    self->haveGenericObjs=FALSE;
    self->haveClassIfaceImplInfo=FALSE;
@@ -926,12 +926,12 @@ int aet_lib_get_generic_zero_storage_size(AetLib *self)
 
 AetLib *aet_lib_get()
 {
-	static AetLib *singleton = NULL;
-	if (!singleton){
-		singleton =(AetLib *)n_slice_new0(AetLib);
-		aetLibInit(singleton);
-	}
-	return singleton;
+   static AetLib *singleton = NULL;
+   if (!singleton){
+      singleton =(AetLib *)n_slice_new0(AetLib);
+      aetLibInit(singleton);
+   }
+   return singleton;
 }
 
 

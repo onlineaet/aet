@@ -75,8 +75,8 @@ AET was originally developed  by the zclei@sina.com at guiyang china .
 
 int enter_aet=0;
 
-static void restoreToken(ClassParser *self);
-static void backupToken(ClassParser *self);
+static void addHFileBeforeBackupToken(ClassParser *self);
+static void addHFileAfterRestoreToken(ClassParser *self);
 
 /**
  * 主要实现功能：
@@ -768,6 +768,37 @@ static void createAClass(ClassParser *self,ClassInfo *aobject,location_t loc)
 }
 
 /**
+ * 在编译 源代码前备份
+ * static AClass *get_class(AObject *obj); static AClass *aclassInstance;
+ */
+static void backToken(ClassParser *self,c_token *backTokens,int *count)
+{
+   c_parser *parser=self->parser->parser;
+   int tokenCount=parser->tokens_avail;
+   int i;
+   c_token *token;
+   for(i=0;i<tokenCount;i++){
+      token=c_parser_peek_token (parser);
+      aet_utils_copy_token(token,&backTokens[i]);
+      c_parser_consume_token (parser);
+   }
+   *count = tokenCount;
+}
+
+static void restoreToken(ClassParser *self,c_token *backTokens,int count)
+{
+   c_parser *parser=self->parser->parser;
+   if(count==0)
+      return;
+   int tokenCount=parser->tokens_avail;
+   int i;
+   for(i=0;i<count;i++)
+      aet_utils_copy_token(&backTokens[i],&parser->tokens[i+tokenCount]);
+
+   parser->tokens_avail=tokenCount+count;
+   //aet_print_token_in_parser("restoreToken restore ------");
+}
+/**
  *解析类或接口声明，即 class$ Abc{ 或 interface$ Abc{
  */
 static struct c_typespec createClassSpec (ClassParser *self,char *structTagName,char *sysClassName)
@@ -884,10 +915,11 @@ static struct c_typespec createClassSpec (ClassParser *self,char *structTagName,
       //加一个static AClass *get_class(AObject *obj); static AClass *aclassInstance;
       parser_static_add_aclass(parser_static_get(),codes,&classInfo->className);
       n_string_append_printf(codes,"%s\n",RID_AET_GOTO_STR);
-      backupToken(self);
+      c_token btokens[30];
+      int backTokenCount = 0;
+      backToken(self,btokens,&backTokenCount);
       aet_utils_add_token_with_location(parse_in,codes->str,codes->len,loc);
       n_string_free(codes,FALSE);
-
       /* Parse the struct-declarations and semicolons.  Problems with
       semicolons are diagnosed here; empty structures are diagnosed
       elsewhere.  */
@@ -923,7 +955,7 @@ static struct c_typespec createClassSpec (ClassParser *self,char *structTagName,
 
          if(c_parser_next_token_is_keyword (parser,RID_AET_GOTO)){
             c_parser_consume_token (parser);//consume RID_AET_GOTO
-            restoreToken(self);
+            restoreToken(self,btokens,backTokenCount);
             continue;
          }
          /* Parse some comma-separated declarations, but not the
@@ -1234,7 +1266,7 @@ nboolean  class_parser_goto(ClassParser *self,nboolean start_attr_ok,int *action
       c_parser_consume_token (parser);//consume   GOTO_MTCS_CREATE_OBJ
       parse_in->buffer->file=NULL;//重要 否则报错 编译器内部错误：在 linemap_add 中，于 libcpp/line-map.cc:588
       n_debug("加入头文件<aet.h>的过程结束。");
-      restoreToken(self);
+      addHFileAfterRestoreToken(self);
       input_location=self->addAetHeader.loc;
       self->addAetHeader.running=FALSE;
    }else if(pos==GOTO_COMPILE_VAROF){
@@ -1345,7 +1377,7 @@ static int addAetBuiltinCodes(cpp_reader *pfile, const char *str,size_t len,loca
  * 需要当前tokens_avail变为空，这样才有机会通过c_parser_peek_token 起动新的cpp_buffer
  * 所以在备份token代码中其它地方不能再调用c_parser_peek_token
  */
-static void backupToken(ClassParser *self)
+static void addHFileBeforeBackupToken(ClassParser *self)
 {
    c_parser *parser=self->parser->parser;
    int tokenCount=parser->tokens_avail;
@@ -1354,13 +1386,12 @@ static void backupToken(ClassParser *self)
    for(i=0;i<tokenCount;i++){
       token=c_parser_peek_token (parser);
       aet_utils_copy_token(token,&self->addAetHeader.headBackTokens[i]);
-      aet_print_token(token);
       c_parser_consume_token (parser);
    }
    self->addAetHeader.backTokenCount= tokenCount;
 }
 
-static void restoreToken(ClassParser *self)
+static void addHFileAfterRestoreToken(ClassParser *self)
 {
    c_parser *parser=self->parser->parser;
    if(self->addAetHeader.backTokenCount==0)
@@ -1375,7 +1406,7 @@ static void restoreToken(ClassParser *self)
       aet_utils_copy_token(&self->addAetHeader.headBackTokens[i],&parser->tokens[i+tokenCount]);
 
    parser->tokens_avail=tokenCount+self->addAetHeader.backTokenCount;
-  // aet_print_token_in_parser("加aet.h restore ------");
+   //aet_print_token_in_parser("加aet.h restore ------");
 }
 
 static char *getCompileFile(ClassParser *self)
@@ -1531,7 +1562,7 @@ nboolean class_parser_add_include(ClassParser *self)
    self->addAetHeader.loc=input_location;
    n_debug("class_parser_add_include 11 正在编译的文件有3个来源 : %s\n",in_fnames[0]);
 
-   backupToken(self);
+   addHFileBeforeBackupToken(self);
    //必须加入'\n'否则报有游离的#号错误
    char incstr[256];
    sprintf(incstr,";\n#include <aet.h>\n \n#include <aet_mtcs.h>\n %s %d\n",RID_AET_GOTO_STR,GOTO_ADD_H_FILE);
